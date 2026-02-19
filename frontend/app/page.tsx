@@ -1,9 +1,10 @@
 'use client';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 
-// 1. Animación de Entrada (Más dramática)
-const fadeInUp = {
+import { motion, Variants } from 'framer-motion';
+
+// 1. Animación de Entrada (Más dramática) - AHORA TIPADA
+const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 60 }, // Empieza más abajo
   visible: { 
     opacity: 1, 
@@ -12,8 +13,8 @@ const fadeInUp = {
   }
 };
 
-// 2. Animación de Cascada (Para las tarjetas)
-const staggerContainer = {
+// 2. Animación de Cascada (Para las tarjetas) - AHORA TIPADA
+const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -21,8 +22,8 @@ const staggerContainer = {
   }
 };
 
-// 3. Animación de "Levitación" (Flotar suavemente) 🛸
-const floating = {
+// 3. Animación de "Levitación" (Flotar suavemente) 🛸 - AHORA TIPADA
+const floating: Variants = {
   animate: {
     y: [0, -15, 0], // Sube 15px y baja
     transition: {
@@ -33,8 +34,8 @@ const floating = {
   }
 };
 
-// 4. Animación de "Latido" (Para el botón principal) 💓
-const heartbeat = {
+// 4. Animación de "Latido" (Para el botón principal) 💓 - AHORA TIPADA
+const heartbeat: Variants = {
   animate: {
     scale: [1, 1.05, 1],
     boxShadow: [

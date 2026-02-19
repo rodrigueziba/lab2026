@@ -26,27 +26,47 @@ export default function DetalleLocacionPage({ params }: { params: Promise<{ id: 
   };
 
   useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-        const user = JSON.parse(userStr);
-        if (user.role === 'admin') setIsAdmin(true);
-    }
+    // 1. Verificamos el usuario (de forma segura)
+    const checkUserRole = () => {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+            try {
+                const user = JSON.parse(userStr);
+                if (user.role === 'admin') setIsAdmin(true);
+            } catch (e) {
+                console.error("Error al parsear usuario:", e);
+            }
+        }
+    };
+    checkUserRole();
+
+    // 2. Cargamos los datos de la locación
+    let isMounted = true; // Para evitar actualizaciones si el componente se desmonta
 
     params.then(unwrap => {
         fetch(`${apiUrl}/locacion/${unwrap.id}`)
             .then(res => res.json())
             .then(data => {
-                const locConCoords = {
-                    ...data,
-                    lat: data.lat ? parseFloat(data.lat) : null,
-                    lng: data.lng ? parseFloat(data.lng) : null
-                };
-                setLocacion(locConCoords);
-                setLoading(false);
+                if (isMounted) {
+                    const locConCoords = {
+                        ...data,
+                        lat: data.lat ? parseFloat(data.lat) : null,
+                        lng: data.lng ? parseFloat(data.lng) : null
+                    };
+                    setLocacion(locConCoords);
+                    setLoading(false);
+                }
             })
-            .catch(err => console.error(err));
+            .catch(err => {
+                console.error(err);
+                if (isMounted) setLoading(false);
+            });
     });
-  }, [params]);
+
+    return () => {
+        isMounted = false; // Cleanup function
+    };
+  }, [params, apiUrl]);
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div></div>;
   if (!locacion) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-red-400">Locación no encontrada</div>;

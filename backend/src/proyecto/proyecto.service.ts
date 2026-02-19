@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { CreateProyectoDto } from './dto/create-proyecto.dto';
 import { UpdateProyectoDto } from './dto/update-proyecto.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -17,7 +21,7 @@ export class ProyectoService {
         userId, // El dueño del proyecto
         // Magia de Prisma: Crea los puestos en la tabla relacionada automáticamente
         puestos: {
-          create: puestos, 
+          create: puestos,
         },
       },
       include: { puestos: true }, // Devolvemos el resultado completo
@@ -27,11 +31,11 @@ export class ProyectoService {
   // VER TODOS
   findAll() {
     return this.prisma.proyecto.findMany({
-      include: { 
-        puestos: true, 
-        user: { select: { nombre: true, email: true } } // Traemos datos del creador
+      include: {
+        puestos: true,
+        user: { select: { nombre: true, email: true } }, // Traemos datos del creador
       },
-      orderBy: { createdAt: 'desc' } // Los más nuevos primero
+      orderBy: { createdAt: 'desc' }, // Los más nuevos primero
     });
   }
 
@@ -39,9 +43,9 @@ export class ProyectoService {
   findOne(id: number) {
     return this.prisma.proyecto.findUnique({
       where: { id },
-      include: { 
-        puestos: true, 
-        user: { select: { nombre: true, email: true } } 
+      include: {
+        puestos: true,
+        user: { select: { nombre: true, email: true } },
       },
     });
   }
@@ -55,13 +59,20 @@ export class ProyectoService {
 
     // Comprobación clave: Si no es el dueño Y TAMPOCO es administrador, bloqueamos.
     if (proyecto.userId !== userId && role !== 'admin') {
-      throw new ForbiddenException('No tienes permiso para modificar este proyecto');
+      throw new ForbiddenException(
+        'No tienes permiso para modificar este proyecto',
+      );
     }
 
     return proyecto;
   }
 
-  async update(id: number, updateProyectoDto: UpdateProyectoDto, userId: number, role?: string) {
+  async update(
+    id: number,
+    updateProyectoDto: UpdateProyectoDto,
+    userId: number,
+    role?: string,
+  ) {
     // 1. Verificamos permisos
     await this.findOneMine(id, userId, role);
 
@@ -73,7 +84,7 @@ export class ProyectoService {
     if (puestos) {
       dataToUpdate.puestos = {
         deleteMany: {}, // Borra los antiguos
-        create: puestos // Crea los nuevos
+        create: puestos, // Crea los nuevos
       };
     }
 
@@ -81,11 +92,11 @@ export class ProyectoService {
     return this.prisma.proyecto.update({
       where: { id },
       data: dataToUpdate,
-      include: { puestos: true }
+      include: { puestos: true },
     });
   }
 
-  async remove(id: number, userId: number, role?: string) {  
+  async remove(id: number, userId: number, role?: string) {
     // 1. Verificamos permisos
     await this.findOneMine(id, userId, role);
 
@@ -99,7 +110,7 @@ export class ProyectoService {
     // 1. Buscamos el proyecto y sus puestos
     const proyecto = await this.prisma.proyecto.findUnique({
       where: { id: proyectoId },
-      include: { puestos: true }
+      include: { puestos: true },
     });
 
     if (!proyecto || proyecto.puestos.length === 0) return [];
@@ -108,18 +119,18 @@ export class ProyectoService {
     // Tomamos las primeras 4 letras de cada puesto buscado.
     // Ej: "Sonidista" se convierte en "Soni" -> Coincide con "Sonido"
     // Ej: "Director" se convierte en "Dire" -> Coincide con "Dirección"
-    const orConditions = proyecto.puestos.map(p => ({
+    const orConditions = proyecto.puestos.map((p) => ({
       rubro: {
-        contains: p.nombre.substring(0, 4), 
+        contains: p.nombre.substring(0, 4),
         mode: 'insensitive' as const, // Ignora si está en mayúsculas o minúsculas
-      }
+      },
     }));
 
     // 3. Buscamos prestadores que cumplan CUALQUIERA de esas condiciones
     const candidatos = await this.prisma.prestador.findMany({
       where: {
-        OR: orConditions
-      }
+        OR: orConditions,
+      },
     });
 
     return candidatos;

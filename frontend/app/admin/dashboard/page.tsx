@@ -8,8 +8,9 @@ import {
 } from 'lucide-react';
 
 const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), { ssr: false });
+ const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'; 
 
-const API = 'http://localhost:3000';
+
 
 // ─────────────────────────────────────────────
 // NODOS ANCLA POR CIUDAD (esferas grandes atractoras)
@@ -220,7 +221,7 @@ const ShaderHUD = ({ speed, distortion }: { speed: number; distortion: number })
 };
 
 // ─────────────────────────────────────────────
-// NODO 3D — núcleo emissive + halo, SIN anillos, SIN label nativo
+// NODO 3D 
 // ─────────────────────────────────────────────
 const NODE_HEX: Record<string, string> = {
   locacion:                '#f1f5f9',
@@ -304,7 +305,7 @@ function makeNodeObject(node: any): THREE.Object3D {
 }
 
 // ─────────────────────────────────────────────
-// TOOLTIP — solo tarjeta con datos, sin texto nativo del grafo
+// TOOLTIP 
 // ─────────────────────────────────────────────
 interface TooltipData {
   name: string; type: string; subTipo?: string;
@@ -332,7 +333,7 @@ const NodeTooltip = ({ node }: { node: TooltipData }) => {
 // DASHBOARD
 // ─────────────────────────────────────────────
 export default function AdminDashboardPage() {
-  const graphRef       = useRef<any>();
+  const graphRef       = useRef<any>(null); 
   const iframeRef      = useRef<HTMLIFrameElement>(null);
   const waveCounterRef = useRef(0);
   const speedRef       = useRef(1.0);
@@ -353,9 +354,9 @@ export default function AdminDashboardPage() {
     const buildGraph = async () => {
       try {
         const [resLoc, resProj, resPrest] = await Promise.all([
-          fetch(`${API}/locacion`).then(r => r.json()),
-          fetch(`${API}/proyecto`).then(r => r.json()),
-          fetch(`${API}/prestador`).then(r => r.json()),
+          fetch(`${apiUrl}/locacion`).then(r => r.json()),
+          fetch(`${apiUrl}/proyecto`).then(r => r.json()),
+          fetch(`${apiUrl}/prestador`).then(r => r.json()),
         ]);
 
         const nodes: any[] = [];
@@ -540,7 +541,7 @@ export default function AdminDashboardPage() {
     setWaves(prev => [...prev.slice(-8), { id, color, startTime: performance.now() }]);
   }, []);
 
-  useEffect(() => { if (!loading) resetCamera(); }, [loading]);
+  useEffect(() => { if (!loading) resetCamera(); }, [loading, resetCamera]);
 
   useEffect(() => {
     const iv = setInterval(() => {
@@ -687,7 +688,7 @@ export default function AdminDashboardPage() {
       {/* 5. HUD SHADER */}
       <ShaderHUD speed={speed} distortion={distortion}/>
 
-      {/* 6. TOOLTIP — solo tarjeta, sin texto nativo del grafo */}
+      {/* 6. TOOLTIP */}
       {hoveredNode && (
         <div className="fixed z-50 pointer-events-none" style={{ left:tooltipPos.x, top:tooltipPos.y }}>
           <NodeTooltip node={hoveredNode}/>
@@ -769,7 +770,7 @@ export default function AdminDashboardPage() {
           <div className="absolute inset-0 flex items-center justify-center z-30">
             <div className="flex flex-col items-center gap-4">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"/>
-              <p className="text-slate-500 text-sm animate-pulse tracking-widest uppercase">Conectando red neuronal...</p>
+              <p className="text-slate-500 text-sm animate-pulse tracking-widest uppercase">Conectando red de nodos...</p>
             </div>
           </div>
         )}

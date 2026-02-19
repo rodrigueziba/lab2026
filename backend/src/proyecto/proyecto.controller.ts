@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { ProyectoService } from './proyecto.service';
 import { CreateProyectoDto } from './dto/create-proyecto.dto';
 import { UpdateProyectoDto } from './dto/update-proyecto.dto';
@@ -12,7 +22,7 @@ export class ProyectoController {
 
   // POST: Crear Proyecto (Protegido 🔒)
   @Post()
-  @UseGuards(AuthGuard('jwt')) 
+  @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   create(@Body() createProyectoDto: CreateProyectoDto, @Request() req) {
     // req.user viene del token JWT. Ahí está el ID del usuario.
@@ -32,19 +42,24 @@ export class ProyectoController {
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard('jwt')) 
+  @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   update(
-    @Param('id') id: string, 
-    @Body() updateProyectoDto: UpdateProyectoDto, 
-    @Request() req: any
+    @Param('id') id: string,
+    @Body() updateProyectoDto: UpdateProyectoDto,
+    @Request() req: any,
   ) {
     // Pasamos el ID del usuario y su rol al servicio
-    return this.proyectoService.update(+id, updateProyectoDto, +req.user.userId, req.user.role);
+    return this.proyectoService.update(
+      +id,
+      updateProyectoDto,
+      +req.user.userId,
+      req.user.role,
+    );
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard('jwt')) 
+  @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   remove(@Param('id') id: string, @Request() req: any) {
     // Pasamos el ID del usuario y su rol al servicio

@@ -1,17 +1,18 @@
 'use client';
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import Swal from 'sweetalert2';
 import { 
   MapPin, Image as ImageIcon, FileText, Save, Loader2, 
-  ArrowLeft, Navigation, UploadCloud, Trash2, Edit, Plus, Camera 
+  ArrowLeft, Navigation, UploadCloud, Plus, Trash2, Camera
 } from 'lucide-react';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'; 
 
 const CATEGORIAS_TDF = {
   "Paisaje Natural": ["Montañas", "Bosques", "Costas", "Lagos y lagunas", "Glaciares", "Turberas"],
@@ -22,106 +23,72 @@ const CATEGORIAS_TDF = {
   "Deporte": ["Centros invernales", "Pistas de patinaje", "Canchas", "Senderos de trekking"]
 };
 
-export default function EditarLocacionPage({ params }: { params: Promise<{ id: string }> }) {
+export default function NuevaLocacionPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [locacionId, setLocacionId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  // Datos del formulario
   const [formData, setFormData] = useState({
     nombre: '', ciudad: 'Ushuaia', categoria: '', subcategoria: '',
     descripcion: '', direccion: '', accesibilidad: '',
-    lat: '', lng: '', foto: '',
-    galeria: [] as string[] // Aquí guardamos las URLs que YA existen en la BD
+    lat: '', lng: '', foto: ''
   });
 
-  // Estados para archivos NUEVOS (que se subirán al guardar)
-  const [newMainFile, setNewMainFile] = useState<File | null>(null);
-  const [previewNewMain, setPreviewNewMain] = useState<string | null>(null);
+  // Estado para archivos
+  const [archivoPrincipal, setArchivoPrincipal] = useState<File | null>(null);
+  const [previewPrincipal, setPreviewPrincipal] = useState<string | null>(null);
+  
+  const [archivosGaleria, setArchivosGaleria] = useState<File[]>([]);
+  const [previewsGaleria, setPreviewsGaleria] = useState<string[]>([]);
 
-  const [newGalleryFiles, setNewGalleryFiles] = useState<File[]>([]);
-  const [previewNewGallery, setPreviewNewGallery] = useState<string[]>([]);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'; 
-
-  // 1. Autenticación y Carga de Datos
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
     const user = userStr ? JSON.parse(userStr) : null;
 
     if (!token || user?.role !== 'admin') {
-        router.push('/locaciones');
-        return;
+      router.push('/locaciones');
     }
+  }, [router]);
 
-    params.then(unwrap => {
-        setLocacionId(unwrap.id);
-        fetch(`${apiUrl}/locacion/${unwrap.id}`)
-            .then(res => res.json())
-            .then(data => {
-                setFormData({
-                    nombre: data.nombre || '',
-                    ciudad: data.ciudad || 'Ushuaia',
-                    categoria: data.categoria || '',
-                    subcategoria: data.subcategoria || '',
-                    descripcion: data.descripcion || '',
-                    direccion: data.direccion || '',
-                    accesibilidad: data.accesibilidad || '',
-                    lat: data.lat ? String(data.lat) : '',
-                    lng: data.lng ? String(data.lng) : '',
-                    foto: data.foto || '',
-                    galeria: data.galeria || []
-                });
-                setLoading(false);
-            })
-            .catch(() => router.push('/locaciones'));
-    });
-  }, [params, router]);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
-  // --- HANDLERS ---
-  const handleChange = (e: any) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  // --- MANEJO DE FOTOS ---
 
-  // Cambiar Foto Principal
-  const handleMainFileChange = (e: any) => {
+  const handleMainPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
-      setNewMainFile(e.target.files[0]);
-      setPreviewNewMain(URL.createObjectURL(e.target.files[0]));
+      const file = e.target.files[0];
+      setArchivoPrincipal(file);
+      setPreviewPrincipal(URL.createObjectURL(file));
     }
   };
 
-  // Galería: Agregar Nuevas
-  const handleNewGalleryFiles = (e: any) => {
-    const files = Array.from(e.target.files as FileList);
-    const total = formData.galeria.length + newGalleryFiles.length + files.length;
+  const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    const total = archivosGaleria.length + files.length;
     
     if (total > 8) {
-        return Swal.fire('Límite alcanzado', 'Máximo 8 fotos en total.', 'warning');
+        return Swal.fire('Límite alcanzado', 'Máximo 8 fotos en la galería', 'warning');
     }
 
     const newPreviews = files.map(f => URL.createObjectURL(f));
-    setNewGalleryFiles([...newGalleryFiles, ...files]);
-    setPreviewNewGallery([...previewNewGallery, ...newPreviews]);
+    setArchivosGaleria([...archivosGaleria, ...files]);
+    setPreviewsGaleria([...previewsGaleria, ...newPreviews]);
   };
 
-  // Galería: Borrar Existente (BD)
-  const removeExistingImage = (idx: number) => {
-    const updated = [...formData.galeria];
-    updated.splice(idx, 1);
-    setFormData({ ...formData, galeria: updated });
+  const removeGalleryImage = (index: number) => {
+    const newFiles = [...archivosGaleria];
+    const newPreviews = [...previewsGaleria];
+    newFiles.splice(index, 1);
+    newPreviews.splice(index, 1);
+    setArchivosGaleria(newFiles);
+    setPreviewsGaleria(newPreviews);
   };
 
-  // Galería: Borrar Nueva (Local)
-  const removeNewImage = (idx: number) => {
-    const files = [...newGalleryFiles];
-    const previews = [...previewNewGallery];
-    files.splice(idx, 1);
-    previews.splice(idx, 1);
-    setNewGalleryFiles(files);
-    setPreviewNewGallery(previews);
-  };
-
-  // Subir a Supabase
+  // Subir a Supabase (Reutilizable)
   const uploadToSupabase = async (file: File) => {
     const fileExt = file.name.split('.').pop();
     const fileName = `loc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
@@ -134,71 +101,66 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
   const handleGetLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
-        setFormData(prev => ({ ...prev, lat: pos.coords.latitude.toString(), lng: pos.coords.longitude.toString() }));
-        Swal.fire({ toast: true, icon: 'success', title: 'Ubicación actualizada', position: 'top-end', showConfirmButton: false, timer: 1000 });
+        setFormData(prev => ({
+          ...prev,
+          lat: pos.coords.latitude.toString(),
+          lng: pos.coords.longitude.toString()
+        }));
+        Swal.fire({ toast: true, icon: 'success', title: 'Ubicación obtenida', showConfirmButton: false, timer: 1000, position: 'top-end' });
       });
     } else {
-        Swal.fire('Error', 'Geolocalización no soportada', 'error');
+      Swal.fire('Error', 'Geolocalización no disponible', 'error');
     }
   };
 
-  // Submit Final
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!locacionId) return;
-    setSaving(true);
+    setLoading(true);
+    setUploading(true);
 
     try {
-        let finalFotoUrl = formData.foto;
-        let finalGaleria = [...formData.galeria]; // Arrancamos con las que NO se borraron
+      // 1. Subir Foto Principal
+      let finalFotoUrl = '';
+      if (archivoPrincipal) {
+        finalFotoUrl = await uploadToSupabase(archivoPrincipal);
+      }
 
-        // 1. Subir nueva foto principal si existe
-        if (newMainFile) {
-            finalFotoUrl = await uploadToSupabase(newMainFile);
-        }
+      // 2. Subir Galería (en paralelo)
+      let galeriaUrls: string[] = [];
+      if (archivosGaleria.length > 0) {
+        const uploadPromises = archivosGaleria.map(file => uploadToSupabase(file));
+        galeriaUrls = await Promise.all(uploadPromises);
+      }
 
-        // 2. Subir nuevas fotos de galería
-        if (newGalleryFiles.length > 0) {
-            const uploadPromises = newGalleryFiles.map(f => uploadToSupabase(f));
-            const newUrls = await Promise.all(uploadPromises);
-            finalGaleria = [...finalGaleria, ...newUrls]; // Concatenamos
-        }
+      // 3. Guardar en BD
+      const payload = {
+        ...formData,
+        foto: finalFotoUrl,
+        galeria: galeriaUrls, // Array de strings
+        lat: formData.lat ? parseFloat(formData.lat) : null,
+        lng: formData.lng ? parseFloat(formData.lng) : null
+      };
 
-        const payload = {
-            ...formData,
-            foto: finalFotoUrl,
-            galeria: finalGaleria,
-            lat: formData.lat ? parseFloat(formData.lat) : null,
-            lng: formData.lng ? parseFloat(formData.lng) : null
-        };
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${apiUrl}/locacion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
 
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${apiUrl}/locacion/${locacionId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-            Swal.fire({
-                title: '¡Guardado!',
-                text: 'Locación actualizada correctamente.',
-                icon: 'success',
-                confirmButtonColor: '#ea580c'
-            }).then(() => router.push(`/locaciones/${locacionId}`));
-        } else {
-            throw new Error("Error al guardar");
-        }
-
-    } catch (error) {
-        console.error(error);
-        Swal.fire('Error', 'No se pudo guardar los cambios', 'error');
+      if (res.ok) {
+        Swal.fire('¡Creada!', 'Locación agregada al catálogo.', 'success').then(() => router.push('/locaciones'));
+      } else {
+        throw new Error('Error al guardar en la base de datos');
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      Swal.fire('Error', errorMessage, 'error');
     } finally {
-        setSaving(false);
+      setLoading(false);
+      setUploading(false);
     }
   };
-
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white"><Loader2 className="animate-spin"/></div>;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-sans pt-28 pb-12 px-6 selection:bg-orange-500/30">
@@ -206,49 +168,50 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
         
         {/* HEADER */}
         <button onClick={() => router.back()} className="text-slate-400 hover:text-white flex items-center gap-2 mb-8 transition font-medium group">
-            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform"/> Cancelar Edición
+            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform"/> Cancelar
         </button>
         
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 pb-6 border-b border-slate-800">
             <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/30 rotate-3">
-                    <Edit size={28} className="text-white"/>
+                <div className="w-14 h-14 bg-gradient-to-br from-orange-600 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-900/30 rotate-3">
+                    <MapPin size={28} className="text-white"/>
                 </div>
                 <div>
-                    <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Editar Locación</h1>
-                    <p className="text-slate-400 mt-1">Modificando: <span className="text-white font-bold">{formData.nombre}</span></p>
+                    <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Nueva Locación</h1>
+                    <p className="text-slate-400 mt-1">Registra un nuevo escenario para producciones.</p>
                 </div>
             </div>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            {/* COLUMNA IZQUIERDA: DATOS (2/3) - Lógica Flex para estiramiento simétrico */}
+            {/* COLUMNA IZQUIERDA: DATOS (2/3 de ancho) */}
             <div className="lg:col-span-2 flex flex-col gap-6 animate-in slide-in-from-left duration-500">
                 
-                {/* TARJETA 1: DATOS GENERALES (Flexible) */}
+                {/* TARJETA 1: DATOS GENERALES */}
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-xl relative overflow-hidden group hover:border-slate-700 transition-colors flex-1 flex flex-col">
                     <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
                         <FileText size={120}/>
                     </div>
                     
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2 shrink-0">
-                        <span className="w-2 h-2 rounded-full bg-blue-500"></span> Información General
+                    <h3 className="text-sm font-bold text-orange-500 uppercase tracking-widest mb-6 flex items-center gap-2 shrink-0">
+                        <span className="w-2 h-2 rounded-full bg-orange-500"></span> Información General
                     </h3>
                     
+                    {/* Contenedor flexible para inputs */}
                     <div className="space-y-6 relative z-10 flex-1 flex flex-col">
                         <div className="shrink-0">
-                            <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Nombre *</label>
-                            <input required name="nombre" value={formData.nombre} onChange={handleChange} placeholder="Nombre"
-                                className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-blue-500 outline-none transition text-white placeholder:text-slate-600"/>
+                            <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Nombre de la Locación *</label>
+                            <input required name="nombre" type="text" onChange={handleChange} placeholder="Ej: Laguna Esmeralda"
+                                className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-orange-500 outline-none transition text-white placeholder:text-slate-600"/>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 shrink-0">
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Ciudad</label>
+                                <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Ciudad / Zona</label>
                                 <div className="relative">
-                                    <select name="ciudad" value={formData.ciudad} onChange={handleChange}
-                                        className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-blue-500 outline-none transition text-slate-300 appearance-none cursor-pointer">
+                                    <select name="ciudad" onChange={handleChange}
+                                        className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-orange-500 outline-none transition text-slate-300 appearance-none cursor-pointer">
                                         <option value="Ushuaia">Ushuaia</option>
                                         <option value="Tolhuin">Tolhuin</option>
                                         <option value="Río Grande">Río Grande</option>
@@ -259,42 +222,41 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Dirección</label>
-                                <input name="direccion" value={formData.direccion} onChange={handleChange} placeholder="Dirección"
-                                    className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-blue-500 outline-none transition text-white placeholder:text-slate-600"/>
+                                <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Dirección / Acceso</label>
+                                <input name="direccion" type="text" onChange={handleChange} placeholder="Ej: Ruta 3 Km 3040"
+                                    className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-orange-500 outline-none transition text-white placeholder:text-slate-600"/>
                             </div>
                         </div>
 
-                        {/* TEXTAREA FLEXIBLE (Ocupa todo el alto) */}
                         <div className="flex-1 flex flex-col">
-                            <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Descripción *</label>
-                            <textarea required name="descripcion" value={formData.descripcion} onChange={handleChange} rows={5}
-                                className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-blue-500 outline-none transition text-white resize-none placeholder:text-slate-600 leading-relaxed flex-1 h-full min-h-[150px]"/>
+                            <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Descripción Técnica *</label>
+                            <textarea required name="descripcion" onChange={handleChange} placeholder="Detalles visuales, logística, permisos necesarios..."
+                                className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-orange-500 outline-none transition text-white resize-none placeholder:text-slate-600 leading-relaxed flex-1 h-full min-h-[150px]"/>
                         </div>
                     </div>
                 </div>
 
-                {/* TARJETA 2: GEOLOCALIZACIÓN (Fija) */}
+                {/* TARJETA 2: UBICACIÓN (Tamaño fijo, no flexible) */}
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-xl shrink-0">
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-blue-500"></span> Geolocalización
+                        <h3 className="text-sm font-bold text-orange-500 uppercase tracking-widest flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-orange-500"></span> Geolocalización
                         </h3>
                         <button type="button" onClick={handleGetLocation} 
                             className="text-xs bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white px-4 py-2 rounded-lg transition font-bold flex items-center gap-2 border border-blue-500/20">
-                            <MapPin size={14}/> Actualizar
+                            <MapPin size={14}/> Detectar Ubicación
                         </button>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-6">
                         <div>
                             <label className="block text-xs font-bold text-slate-400 mb-2">Latitud</label>
-                            <input name="lat" value={formData.lat} onChange={handleChange} placeholder="Lat"
+                            <input name="lat" type="number" step="any" value={formData.lat} onChange={handleChange} placeholder="-54.8000"
                                 className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-blue-500 outline-none font-mono text-sm text-blue-300 placeholder:text-slate-600"/>
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-400 mb-2">Longitud</label>
-                            <input name="lng" value={formData.lng} onChange={handleChange} placeholder="Lng"
+                            <input name="lng" type="number" step="any" value={formData.lng} onChange={handleChange} placeholder="-68.3000"
                                 className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-blue-500 outline-none font-mono text-sm text-blue-300 placeholder:text-slate-600"/>
                         </div>
                     </div>
@@ -302,7 +264,7 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
 
             </div>
 
-            {/* COLUMNA DERECHA: MULTIMEDIA (1/3) */}
+            {/* COLUMNA DERECHA: MULTIMEDIA Y CATEGORÍA (1/3 ancho) */}
             <div className="space-y-8 animate-in slide-in-from-right duration-500 delay-100 h-full">
                 
                 {/* TARJETA 3: FOTO PRINCIPAL */}
@@ -310,23 +272,22 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                         <ImageIcon size={16}/> Foto de Portada
                     </h3>
-                    <div className="relative aspect-video w-full rounded-2xl bg-slate-950 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center overflow-hidden group hover:border-blue-500/50 hover:bg-slate-900 transition-all cursor-pointer">
-                        {previewNewMain ? (
-                            <img src={previewNewMain} className="w-full h-full object-cover"/>
-                        ) : (formData.foto ? (
+                    
+                    <div className="relative aspect-video w-full rounded-2xl bg-slate-950 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center overflow-hidden group hover:border-orange-500/50 hover:bg-slate-900 transition-all cursor-pointer">
+                        {previewPrincipal ? (
                             <>
-                                <img src={formData.foto} className="w-full h-full object-cover"/>
+                                <img src={previewPrincipal} className="w-full h-full object-cover"/>
                                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <span className="text-xs font-bold text-white flex items-center gap-2"><Camera size={16}/> Cambiar</span>
                                 </div>
                             </>
                         ) : (
                             <div className="text-center p-4">
-                                <UploadCloud size={32} className="mx-auto text-slate-500 mb-2 group-hover:text-blue-500 group-hover:scale-110 transition-all"/>
-                                <p className="text-xs text-slate-500 font-medium">Subir portada</p>
+                                <UploadCloud size={32} className="mx-auto text-slate-500 mb-2 group-hover:text-orange-500 group-hover:scale-110 transition-all"/>
+                                <p className="text-xs text-slate-500 font-medium">Click para subir imagen</p>
                             </div>
-                        ))}
-                        <input type="file" accept="image/*" onChange={handleMainFileChange} className="absolute inset-0 opacity-0 cursor-pointer"/>
+                        )}
+                        <input type="file" accept="image/*" onChange={handleMainPhotoChange} className="absolute inset-0 opacity-0 cursor-pointer"/>
                     </div>
                 </div>
 
@@ -336,38 +297,24 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <ImageIcon size={16}/> Galería
                         </h3>
-                        <span className="text-[10px] text-slate-500">{formData.galeria.length + newGalleryFiles.length}/8</span>
+                        <span className="text-[10px] text-slate-500">{archivosGaleria.length}/8</span>
                     </div>
                     
                     <div className="grid grid-cols-3 gap-3">
-                        {/* Existentes (BD) */}
-                        {formData.galeria.map((src, idx) => (
-                            <div key={`old-${idx}`} className="relative aspect-square rounded-xl overflow-hidden group border border-slate-700">
+                        {previewsGaleria.map((src, idx) => (
+                            <div key={idx} className="relative aspect-square rounded-xl overflow-hidden group border border-slate-700">
                                 <img src={src} className="w-full h-full object-cover"/>
-                                <button type="button" onClick={() => removeExistingImage(idx)} 
+                                <button type="button" onClick={() => removeGalleryImage(idx)} 
                                     className="absolute inset-0 bg-red-500/80 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
                                     <Trash2 size={16}/>
                                 </button>
                             </div>
                         ))}
                         
-                        {/* Nuevas (Local) */}
-                        {previewNewGallery.map((src, idx) => (
-                            <div key={`new-${idx}`} className="relative aspect-square rounded-xl overflow-hidden group border border-blue-500/50">
-                                <img src={src} className="w-full h-full object-cover opacity-80"/>
-                                <button type="button" onClick={() => removeNewImage(idx)} 
-                                    className="absolute inset-0 bg-red-500/80 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                                    <Trash2 size={16}/>
-                                </button>
-                                <span className="absolute bottom-1 left-1 bg-blue-600 text-[9px] px-1.5 rounded text-white font-bold">NUEVA</span>
-                            </div>
-                        ))}
-
-                        {/* Botón Agregar */}
-                        {(formData.galeria.length + newGalleryFiles.length) < 8 && (
+                        {archivosGaleria.length < 8 && (
                             <div className="relative aspect-square rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center hover:border-blue-500/50 hover:bg-slate-950 transition cursor-pointer group">
                                 <Plus size={20} className="text-slate-600 group-hover:text-blue-500 transition-colors"/>
-                                <input type="file" multiple accept="image/*" onChange={handleNewGalleryFiles} className="absolute inset-0 opacity-0 cursor-pointer"/>
+                                <input type="file" multiple accept="image/*" onChange={handleGalleryChange} className="absolute inset-0 opacity-0 cursor-pointer"/>
                             </div>
                         )}
                     </div>
@@ -375,38 +322,41 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
 
                 {/* TARJETA 5: CLASIFICACIÓN */}
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Clasificación</h3>
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Categorización</h3>
+                    
                     <div className="space-y-4">
                         <div>
                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Categoría</label>
                             <div className="relative">
-                                <select required name="categoria" value={formData.categoria} onChange={handleChange}
-                                    className="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl focus:border-blue-500 outline-none transition text-white text-sm appearance-none cursor-pointer">
+                                <select required name="categoria" onChange={handleChange}
+                                    className="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl focus:border-orange-500 outline-none transition text-white text-sm appearance-none cursor-pointer">
                                     <option value="">Seleccionar...</option>
                                     {Object.keys(CATEGORIAS_TDF).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                                 </select>
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 text-xs">▼</div>
                             </div>
                         </div>
+
                         <div>
                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Subcategoría</label>
                             <div className="relative">
-                                <select name="subcategoria" value={formData.subcategoria} onChange={handleChange}
-                                    className="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl focus:border-blue-500 outline-none transition text-white text-sm appearance-none cursor-pointer disabled:opacity-50"
+                                <select name="subcategoria" onChange={handleChange}
+                                    className="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl focus:border-orange-500 outline-none transition text-white text-sm appearance-none cursor-pointer disabled:opacity-50"
                                     disabled={!formData.categoria}>
                                     <option value="">Seleccionar...</option>
-                                    {formData.categoria && (CATEGORIAS_TDF as any)[formData.categoria]?.map((sub: string) => (
+                                    {formData.categoria && (CATEGORIAS_TDF as Record<string, string[]>)[formData.categoria]?.map((sub: string) => (
                                         <option key={sub} value={sub}>{sub}</option>
                                     ))}
                                 </select>
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 text-xs">▼</div>
                             </div>
                         </div>
+
                         <div>
                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Accesibilidad</label>
                             <div className="relative">
-                                <select name="accesibilidad" value={formData.accesibilidad} onChange={handleChange}
-                                    className="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl focus:border-blue-500 outline-none transition text-white text-sm appearance-none cursor-pointer">
+                                <select name="accesibilidad" onChange={handleChange}
+                                    className="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl focus:border-orange-500 outline-none transition text-white text-sm appearance-none cursor-pointer">
                                     <option value="">Seleccionar...</option>
                                     <option value="Fácil (Vehículo)">Fácil (Vehículo)</option>
                                     <option value="Media (Caminata corta)">Media (Caminata corta)</option>
@@ -421,11 +371,11 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
 
                 <button 
                     type="submit" 
-                    disabled={saving}
-                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-900/30 transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
+                    disabled={uploading || loading}
+                    className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-black py-4 rounded-xl shadow-lg shadow-orange-900/30 transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
                 >
-                    {saving ? <Loader2 className="animate-spin"/> : <Save size={20}/>}
-                    {saving ? 'Guardando...' : 'GUARDAR CAMBIOS'}
+                    {uploading ? <Loader2 className="animate-spin"/> : <Save size={20}/>}
+                    {uploading ? 'Subiendo Archivos...' : 'PUBLICAR LOCACIÓN'}
                 </button>
 
             </div>

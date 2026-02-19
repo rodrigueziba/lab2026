@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+// Importamos 'Variants' de framer-motion para tipar correctamente las animaciones
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { ChevronLeft, ChevronRight, Search, MapPin, Mountain, ArrowRight, Filter } from 'lucide-react';
 
@@ -23,19 +24,33 @@ const COORDS_BASE: { [key: string]: [number, number] } = {
   "Default": [-54.5, -67.5]
 };
 
-const containerVariants = {
+// 1. SOLUCIÓN AL ERROR DE VARIANTS: Tipamos explícitamente los objetos de animación
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.08 } }
 };
 
-const cardVariants = {
+const cardVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 15 } },
   exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } }
 };
 
+// Interfaz para reemplazar el uso de 'any' en las locaciones
+interface Locacion {
+  id: string | number;
+  nombre: string;
+  ciudad: string;
+  categoria: string;
+  descripcion: string;
+  foto: string | null;
+  lat: number | string;
+  lng: number | string;
+  [key: string]: unknown; // Permite otras propiedades adicionales de forma segura
+}
+
 export default function CatalogoLocacionesPage() {
-  const [locaciones, setLocaciones] = useState<any[]>([]);
+  const [locaciones, setLocaciones] = useState<Locacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroCategoria, setFiltroCategoria] = useState("Todas");
   const [busqueda, setBusqueda] = useState("");
@@ -49,13 +64,12 @@ export default function CatalogoLocacionesPage() {
     fetch(`${apiUrl}/locacion`)
       .then(res => res.json())
       .then(data => {
-        const dataConCoords = data.map((loc: any) => {
+        // 2. SOLUCIÓN AL ANY: Tipamos el mapeo de los datos recibidos
+        const dataConCoords = data.map((loc: Locacion) => {
           const base = COORDS_BASE[loc.ciudad] || COORDS_BASE["Default"];
-          // CORRECCIÓN: Parseamos explícitamente a float para evitar strings
-          let lat = parseFloat(loc.lat);
-          let lng = parseFloat(loc.lng);
+          let lat = typeof loc.lat === 'string' ? parseFloat(loc.lat) : Number(loc.lat);
+          let lng = typeof loc.lng === 'string' ? parseFloat(loc.lng) : Number(loc.lng);
 
-          // Si no es un número válido, usamos simulados
           if (isNaN(lat)) lat = base[0] + (Math.random() - 0.5) * 0.05;
           if (isNaN(lng)) lng = base[1] + (Math.random() - 0.5) * 0.05;
 
@@ -65,7 +79,7 @@ export default function CatalogoLocacionesPage() {
         setLoading(false);
       })
       .catch(err => console.error(err));
-  }, []);
+  }, [apiUrl]); // 3. SOLUCIÓN AL EXHAUSTIVE DEPS: Añadimos apiUrl a las dependencias
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -135,7 +149,12 @@ export default function CatalogoLocacionesPage() {
                 <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-orange-500">
                   <Search size={18} />
                 </div>
-                <input type="text" placeholder="Buscar ciudad, nombre..." className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-11 pr-4 py-2.5 text-sm outline-none text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all shadow-inner placeholder:text-slate-600" onChange={(e) => setBusqueda(e.target.value)}/>
+                <input 
+                  type="text" 
+                  placeholder="Buscar ciudad, nombre..." 
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-11 pr-4 py-2.5 text-sm outline-none text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all shadow-inner placeholder:text-slate-600" 
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBusqueda(e.target.value)} // Tipado añadido aquí
+                />
               </div>
 
               <div className="relative flex items-center w-full md:w-auto md:max-w-md group/filters h-10 overflow-hidden border-l border-slate-800 pl-4 md:pl-6 ml-2">
@@ -160,14 +179,13 @@ export default function CatalogoLocacionesPage() {
           
           <div className="sticky top-0 bg-slate-950/95 backdrop-blur z-20 px-6 py-4 border-b border-slate-800 flex justify-between items-center">
              
-             {/* CORRECCIÓN: CAMBIADO <p> POR <div> PARA EVITAR ERROR DE HIDRATACIÓN */}
              <div className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
                <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
                {locacionesFiltradas.length} resultados
              </div>
 
              <Link href="/locaciones/nueva" className="text-[10px] bg-slate-900 hover:bg-orange-600 hover:text-white border border-slate-700 hover:border-orange-500 text-slate-300 px-4 py-2 rounded-lg transition-all font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg">
-                + Sugerir
+               + Sugerir
              </Link>
           </div>
 
