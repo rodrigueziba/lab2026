@@ -1,0 +1,174 @@
+// GENERADOR Y CONEXIÓN
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. EL USUARIO (Base central: Admin y Usuarios normales)
+model User {
+  id          Int      @id @default(autoincrement())
+  email       String   @unique
+  password    String
+  nombre      String
+  role        String   @default("user") // "admin" o "user"
+
+  proyectos   Proyecto[]
+  notificaciones Notificacion[]
+
+  // --- RECUPERACIÓN DE PASSWORD ---
+  resetToken       String?   // El código secreto
+  resetTokenExpiry DateTime? // Cuándo vence el código
+
+  // --- LOGIN SOCIAL 
+  googleId      String?  @unique
+  facebookId    String?  @unique
+  avatar        String?  // Foto que viene de Google
+  
+  // Relación: Un usuario -> Muchos perfiles
+  prestadores Prestador[] 
+  createdAt   DateTime @default(now())
+  postulaciones       Postulacion[]
+  solicitudesEnviadas SolicitudContacto[] @relation("SolicitudesEnviadas")
+}
+
+// 2. EL PRESTADOR (Los Perfiles Públicos)
+model Prestador {
+  id          Int      @id @default(autoincrement())
+  tipoPerfil  String   // Ej: "Profesional", "Productora"
+  nombre      String   // Nombre de fantasía o apellido
+  rubro       String   // Ej: "Sonido", "Catering"
+  
+  descripcion String   @db.Text 
+  
+  email       String   // 
+  telefono    String?
+  web         String?
+  foto        String?  // URL de Supabase
+
+  colorTema   String?  @default("#ea580c") // Naranja por defecto
+  videoReel   String?  // URL de YouTube/Vimeo
+  galeria     String[] // Array de URLs de fotos 
+  
+  // Relación OBLIGATORIA con el dueño
+  ciudad      String?  @default("Ushuaia")
+  userId      Int
+  user        User    @relation(fields: [userId], references: [id])
+  solicitudes         SolicitudContacto[]
+
+  fechaNacimiento DateTime?
+  formacion     String?       // Ej: "Diseño de Imagen y Sonido - UBA"
+  experiencias  Experiencia[] // Relación con la tabla de abajo
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+// 3. LOCACIONES
+model Locacion {
+  id           Int      @id @default(autoincrement())
+  nombre       String
+  ciudad       String
+  descripcion  String?  @db.Text
+  direccion    String?
+  categoria    String   
+  subcategoria String?  
+  accesibilidad String?
+  foto         String?
+  galeria      String[]
+  lat          Float?   
+  lng          Float?
+  createdAt    DateTime @default(now())
+}
+
+model Experiencia {
+  id          Int      @id @default(autoincrement())
+  proyecto    String   // Nombre del proyecto
+  anio        String   // Año
+  rol         String   // Qué hizo
+  
+  prestadorId Int
+  prestador   Prestador @relation(fields: [prestadorId], references: [id], onDelete: Cascade)
+}
+
+model Proyecto {
+  id          Int       @id @default(autoincrement())
+  titulo      String
+  descripcion String    // Sinopsis
+  tipo        String    // Ej: Largometraje, Corto, Videoclip
+  estado      String    @default("Abierto") // Abierto, En Producción, Finalizado
+  foto        String?   // Poster o Concept Art
+  ciudad       String   @default("Ushuaia")
+  referencias String[]  // Links a referencias (YouTube, Vimeo, Behance)
+  galeria     String[]  // Fotos de moodboard o locaciones
+  fechaInicio DateTime? // Fecha estimada de rodaje
+  fechaFin    DateTime? 
+  esEstudiante Boolean  @default(false) // ¿Es tesis/trabajo práctico?
+  esRemunerado Boolean  @default(false) // ¿Hay paga?
+
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  
+  puestos     Puesto[]  // Las vacantes disponibles
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  postulaciones       Postulacion[]
+}
+
+model Puesto {
+  id          Int       @id @default(autoincrement())
+  nombre      String    // Ej: "Sonidista", "Gaffer"
+  descripcion String?   // Ej: "Con experiencia en nieve"
+  estado      String    @default("Vacante") // Vacante, Cubierto
+  postulaciones       Postulacion[]
+  proyectoId  Int
+  proyecto    Proyecto  @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+}
+
+// --- SISTEMA DE CASTING Y PRIVACIDAD ---
+
+model Postulacion {
+  id           Int      @id @default(autoincrement())
+  mensaje      String?  @db.Text
+  estado       String   @default("Pendiente") // Pendiente, Aceptada, Rechazada
+  
+  proyectoId   Int
+  proyecto     Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  
+  puestoId     Int
+  puesto       Puesto   @relation(fields: [puestoId], references: [id], onDelete: Cascade)
+  
+  postulanteId Int
+  postulante   User     @relation(fields: [postulanteId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+}
+
+model SolicitudContacto {
+  id             Int      @id @default(autoincrement())
+  estado         String   @default("Pendiente") // Pendiente, Aprobada, Rechazada
+  
+  solicitanteId  Int
+  solicitante    User     @relation("SolicitudesEnviadas", fields: [solicitanteId], references: [id], onDelete: Cascade)
+  
+  prestadorId    Int
+  prestador      Prestador @relation(fields: [prestadorId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+}
+
+model Notificacion {
+  id          Int      @id @default(autoincrement())
+  usuarioId   Int      // Quién recibe la notificación
+  titulo      String
+  mensaje     String
+  leida       Boolean  @default(false)
+  link        String?  // Ej: "/mis-proyectos/candidatos/5"
+  createdAt   DateTime @default(now())
+
+  usuario     User     @relation(fields: [usuarioId], references: [id])
+}

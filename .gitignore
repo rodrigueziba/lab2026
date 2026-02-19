@@ -1,0 +1,15 @@
+node_modules
+.next
+dist
+postgres_data
+
+# env files
+.env
+.env.*
+**/.env
+**/.env.*
+
+# (opcional) si querés permitir un template
+!.env.example
+
+CONTEXTO_PROYECTO.txt
