@@ -1,26 +1,23 @@
 # backend/Dockerfile
 FROM node:20-alpine
 
-# Directorio de trabajo
 WORKDIR /app
 
-# Copiamos TODOS los archivos primero
-COPY . .
-
-# Instalamos TODAS las dependencias (incluyendo dev)
+# 1. Instalar dependencias
+COPY package*.json ./
+COPY prisma ./prisma/
 RUN npm install
 
-# Inyectamos variable temporal para Prisma
+# 2. Copiar código y compilar
+COPY . .
 ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db"
-
-# Generamos Prisma
 RUN npx prisma generate
-
-# Compilamos NestJS
 RUN npm run build
 
-# Exponemos el puerto
+# 3. Debug: Esto mostrará en el log de Render dónde se guardaron los archivos
+RUN ls -R dist
+
 EXPOSE 3000
 
-# Arrancamos desde la carpeta generada (dist/src/main o dist/main según genere Nest)
-CMD ["npm", "run", "start:prod"]
+# 4. Comando dinámico: Prueba ambas rutas comunes de NestJS
+CMD ["sh", "-c", "if [ -f dist/src/main.js ]; then node dist/src/main.js; else node dist/main.js; fi"]
