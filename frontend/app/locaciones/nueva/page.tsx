@@ -8,10 +8,11 @@ import {
   ArrowLeft, Navigation, UploadCloud, Plus, Trash2, Camera
 } from 'lucide-react';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// INICIALIZACIÓN SEGURA: Fallback a strings vacíos si las env vars no existen (evita que se rompa el build)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'; 
 
 const CATEGORIAS_TDF = {
@@ -34,7 +35,6 @@ export default function NuevaLocacionPage() {
     lat: '', lng: '', foto: ''
   });
 
-  // Estado para archivos
   const [archivoPrincipal, setArchivoPrincipal] = useState<File | null>(null);
   const [previewPrincipal, setPreviewPrincipal] = useState<string | null>(null);
   
@@ -51,13 +51,11 @@ export default function NuevaLocacionPage() {
     }
   }, [router]);
 
-  const handleChange = (e: any) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // --- MANEJO DE FOTOS ---
-
-  const handleMainPhotoChange = (e: any) => {
+  const handleMainPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       const file = e.target.files[0];
       setArchivoPrincipal(file);
@@ -65,12 +63,14 @@ export default function NuevaLocacionPage() {
     }
   };
 
-  const handleGalleryChange = (e: any) => {
-    const files = Array.from(e.target.files as FileList);
+  const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
     const total = archivosGaleria.length + files.length;
     
     if (total > 8) {
-        return Swal.fire('Límite alcanzado', 'Máximo 8 fotos en la galería', 'warning');
+        Swal.fire('Límite alcanzado', 'Máximo 8 fotos en la galería', 'warning');
+        return;
     }
 
     const newPreviews = files.map(f => URL.createObjectURL(f));
@@ -87,10 +87,12 @@ export default function NuevaLocacionPage() {
     setPreviewsGaleria(newPreviews);
   };
 
-  // Subir a Supabase (Reutilizable)
   const uploadToSupabase = async (file: File) => {
+    // Si estamos en entorno de build con placeholder, abortar subida
+    if (supabaseUrl === 'https://placeholder.supabase.co') throw new Error("Configuración de Supabase no encontrada");
+    
     const fileExt = file.name.split('.').pop();
-    const fileName = `loc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+    const fileName = `loc-${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
     const { error } = await supabase.storage.from('locaciones').upload(fileName, file);
     if (error) throw error;
     const { data } = supabase.storage.from('locaciones').getPublicUrl(fileName);
@@ -112,30 +114,27 @@ export default function NuevaLocacionPage() {
     }
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setUploading(true);
 
     try {
-      // 1. Subir Foto Principal
       let finalFotoUrl = '';
       if (archivoPrincipal) {
         finalFotoUrl = await uploadToSupabase(archivoPrincipal);
       }
 
-      // 2. Subir Galería (en paralelo)
       let galeriaUrls: string[] = [];
       if (archivosGaleria.length > 0) {
         const uploadPromises = archivosGaleria.map(file => uploadToSupabase(file));
         galeriaUrls = await Promise.all(uploadPromises);
       }
 
-      // 3. Guardar en BD
       const payload = {
         ...formData,
         foto: finalFotoUrl,
-        galeria: galeriaUrls, // Array de strings
+        galeria: galeriaUrls, 
         lat: formData.lat ? parseFloat(formData.lat) : null,
         lng: formData.lng ? parseFloat(formData.lng) : null
       };
@@ -150,10 +149,11 @@ export default function NuevaLocacionPage() {
       if (res.ok) {
         Swal.fire('¡Creada!', 'Locación agregada al catálogo.', 'success').then(() => router.push('/locaciones'));
       } else {
-        throw new Error('Error al guardar');
+        throw new Error('Error al guardar en base de datos');
       }
-    } catch (error: any) {
-      Swal.fire('Error', error.message, 'error');
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Error desconocido';
+      Swal.fire('Error', msg, 'error');
     } finally {
       setLoading(false);
       setUploading(false);
@@ -164,7 +164,6 @@ export default function NuevaLocacionPage() {
     <div className="min-h-screen bg-slate-950 text-white font-sans pt-28 pb-12 px-6 selection:bg-orange-500/30">
       <div className="max-w-7xl mx-auto">
         
-        {/* HEADER */}
         <button onClick={() => router.back()} className="text-slate-400 hover:text-white flex items-center gap-2 mb-8 transition font-medium group">
             <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform"/> Cancelar
         </button>
@@ -181,20 +180,8 @@ export default function NuevaLocacionPage() {
             </div>
         </div>
 
-        {/* CAMBIO 1: Quitamos 'items-start' del grid para que las columnas se estiren.
-           Ahora el grid forzará a que ambas columnas tengan la misma altura.
-        */}
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* COLUMNA IZQUIERDA: DATOS (2/3 de ancho) 
-                CAMBIO 2: 'flex flex-col' para poder expandir los hijos.
-            */}
             <div className="lg:col-span-2 flex flex-col gap-6 animate-in slide-in-from-left duration-500">
-                
-                {/* TARJETA 1: DATOS GENERALES 
-                    CAMBIO 3: 'flex-1' hace que esta tarjeta ocupe todo el espacio sobrante
-                    que no use la tarjeta de Geolocalización.
-                */}
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-xl relative overflow-hidden group hover:border-slate-700 transition-colors flex-1 flex flex-col">
                     <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
                         <FileText size={120}/>
@@ -204,7 +191,6 @@ export default function NuevaLocacionPage() {
                         <span className="w-2 h-2 rounded-full bg-orange-500"></span> Información General
                     </h3>
                     
-                    {/* Contenedor flexible para inputs */}
                     <div className="space-y-6 relative z-10 flex-1 flex flex-col">
                         <div className="shrink-0">
                             <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Nombre de la Locación *</label>
@@ -234,7 +220,6 @@ export default function NuevaLocacionPage() {
                             </div>
                         </div>
 
-                        {/* CAMBIO 4: Textarea flexible que ocupa todo el alto disponible */}
                         <div className="flex-1 flex flex-col">
                             <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Descripción Técnica *</label>
                             <textarea required name="descripcion" onChange={handleChange} placeholder="Detalles visuales, logística, permisos necesarios..."
@@ -243,7 +228,6 @@ export default function NuevaLocacionPage() {
                     </div>
                 </div>
 
-                {/* TARJETA 2: UBICACIÓN (Tamaño fijo, no flexible) */}
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-xl shrink-0">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-sm font-bold text-orange-500 uppercase tracking-widest flex items-center gap-2">
@@ -271,10 +255,8 @@ export default function NuevaLocacionPage() {
 
             </div>
 
-            {/* COLUMNA DERECHA: MULTIMEDIA Y CATEGORÍA (1/3 ancho) */}
             <div className="space-y-8 animate-in slide-in-from-right duration-500 delay-100 h-full">
                 
-                {/* TARJETA 3: FOTO PRINCIPAL */}
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                         <ImageIcon size={16}/> Foto de Portada
@@ -298,7 +280,6 @@ export default function NuevaLocacionPage() {
                     </div>
                 </div>
 
-                {/* TARJETA 4: GALERÍA */}
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
                     <div className="flex justify-between items-end mb-4">
                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -327,7 +308,6 @@ export default function NuevaLocacionPage() {
                     </div>
                 </div>
 
-                {/* TARJETA 5: CLASIFICACIÓN */}
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Categorización</h3>
                     
@@ -351,7 +331,7 @@ export default function NuevaLocacionPage() {
                                     className="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl focus:border-orange-500 outline-none transition text-white text-sm appearance-none cursor-pointer disabled:opacity-50"
                                     disabled={!formData.categoria}>
                                     <option value="">Seleccionar...</option>
-                                    {formData.categoria && (CATEGORIAS_TDF as any)[formData.categoria]?.map((sub: string) => (
+                                    {formData.categoria && (CATEGORIAS_TDF as Record<string, string[]>)[formData.categoria]?.map((sub: string) => (
                                         <option key={sub} value={sub}>{sub}</option>
                                     ))}
                                 </select>
