@@ -21,7 +21,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
     backgroundSize: "100% 2px, 3px 100%", 
     pointerEvents: "none" as const 
   };
-
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   useEffect(() => {
     params.then(unwrap => {
       fetchData(unwrap.id);
@@ -30,14 +30,14 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
 
   const fetchData = async (id: string) => {
     try {
-      const res = await fetch(`http://localhost:3000/prestador/detalle/${id}`);
+      const res = await fetch(`${apiUrl}/prestador/detalle/${id}`);
       if (!res.ok) throw new Error("No se encontró el perfil");
       const data = await res.json();
       setPrestador(data);
 
       const token = localStorage.getItem('token');
       if (token) {
-        const resAccess = await fetch(`http://localhost:3000/solicitud/check/${id}`, {
+        const resAccess = await fetch(`${apiUrl}/solicitud/check/${id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (resAccess.ok) {
@@ -73,7 +73,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
 
     setSolicitando(true);
     try {
-        const res = await fetch(`http://localhost:3000/solicitud`, {
+        const res = await fetch(`${apiUrl}/solicitud`, {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json', 

@@ -10,6 +10,7 @@ export default function MisPostulacionesPage() {
   const router = useRouter();
   const [postulaciones, setPostulaciones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -17,7 +18,7 @@ export default function MisPostulacionesPage() {
       if (!token) return router.push('/login');
 
       try {
-        const res = await fetch('http://localhost:3000/postulacion/mis-postulaciones', {
+        const res = await fetch(`${apiUrl}/postulacion/mis-postulaciones`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         

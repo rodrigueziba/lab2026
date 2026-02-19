@@ -17,6 +17,7 @@ export default function NotificationDropdown() {
     const interval = setInterval(fetchUnreadCount, 60000);
     return () => clearInterval(interval);
   }, []);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   // 2. Cerrar dropdown si hago clic afuera
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function NotificationDropdown() {
     const token = localStorage.getItem('token');
     if (!token) return;
     try {
-      const res = await fetch('http://localhost:3000/notificacion/badge', {
+      const res = await fetch(`${apiUrl}/notificacion/badge`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -49,7 +50,7 @@ export default function NotificationDropdown() {
     const token = localStorage.getItem('token');
     if (!token) return;
     try {
-      const res = await fetch('http://localhost:3000/notificacion', {
+      const res = await fetch(`${apiUrl}/notificacion`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -72,7 +73,7 @@ export default function NotificationDropdown() {
     // 1. Marcar como leída en backend
     if (!notif.leida) {
         try {
-            await fetch(`http://localhost:3000/notificacion/${notif.id}/leer`, {
+            await fetch(`${apiUrl}/notificacion/${notif.id}/leer`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });

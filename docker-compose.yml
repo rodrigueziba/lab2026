@@ -3,19 +3,18 @@ services:
   # Backend (NestJS)
   backend:
     image: node:18-alpine
-    container_name: film_backend
+    container_name: filmtdf_backend
     working_dir: /app
     volumes:
       - ./backend:/app  
     command: npm run start:dev
     ports:
       - "3000:3000"
-    depends_on:
-      - db
+    
 #  Frontend (Next.js)
   frontend:
     image: node:20-alpine
-    container_name: film_frontend
+    container_name: filmtdf_frontend
     working_dir: /app
     volumes:
       - ./frontend:/app

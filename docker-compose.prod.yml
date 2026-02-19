@@ -1,0 +1,27 @@
+# docker-compose.prod.yml
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+    container_name: film_backend_prod
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./backend/.env.production # Tu .env con las claves reales (NUNCA EN GITHUB)
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: https://api.tudominio.com # CAMBIAR POR TU DOMINIO REAL
+    container_name: film_frontend_prod
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./frontend/.env.production
+    depends_on:
+      - backend
+    restart: always

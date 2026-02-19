@@ -12,6 +12,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'; 
 
 const CATEGORIAS_TDF = {
   "Paisaje Natural": ["Montañas", "Bosques", "Costas", "Lagos y lagunas", "Glaciares", "Turberas"],
@@ -140,7 +141,7 @@ export default function NuevaLocacionPage() {
       };
 
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3000/locacion', {
+      const res = await fetch(`${apiUrl}/locacion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(payload)

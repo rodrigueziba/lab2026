@@ -12,7 +12,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 export default function CrearProyectoPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -105,7 +105,7 @@ export default function CrearProyectoPage() {
       };
 
       // 3. Enviar al Backend
-      const res = await fetch('http://localhost:3000/proyecto', {
+      const res = await fetch(`${apiUrl}/proyecto`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

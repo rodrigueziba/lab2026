@@ -12,6 +12,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 const RUBROS = [
   "Dirección", "Producción", "Guion", "Fotografía / Cámara", 
@@ -99,7 +100,7 @@ export default function RegistroPrestadorPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3000/prestador', {
+      const res = await fetch(`${apiUrl}/prestador`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

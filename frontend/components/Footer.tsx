@@ -21,7 +21,7 @@ export default function Footer() {
           <h5 className="font-bold text-white mb-4 uppercase text-xs tracking-wider">Explorar</h5>
           <ul className="space-y-2 text-sm text-slate-500">
             <li><Link href="/locaciones" className="hover:text-orange-500 transition">Locaciones</Link></li>
-            <li><Link href="/guia" className="hover:text-orange-500 transition">Guía de Profesionales</Link></li>
+            <li><Link href="/guia" className="hover:text-orange-500 transition">Guía de Prestadores</Link></li>
             <li><Link href="/proyectos" className="hover:text-orange-500 transition">Cartelera de Proyectos</Link></li>
           </ul>
         </div>

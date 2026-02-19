@@ -12,6 +12,7 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -38,7 +39,7 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
     const token = localStorage.getItem('token');
     try {
         // Usamos la ruta PRIVADA que creamos hoy para obtener datos reales
-        const res = await fetch(`http://localhost:3000/prestador/mis-perfiles/${id}`, {
+        const res = await fetch(`${apiUrl}/prestador/mis-perfiles/${id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -81,7 +82,7 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
     const token = localStorage.getItem('token');
     
     try {
-      const res = await fetch(`http://localhost:3000/prestador/${profileId}`, {
+      const res = await fetch(`${apiUrl}/prestador/${profileId}`, {
         method: 'PATCH', // Usamos PATCH para actualizar
         headers: { 
           'Content-Type': 'application/json',

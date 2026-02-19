@@ -10,6 +10,7 @@ import {
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   
   // Estados
   const [isScrolled, setIsScrolled] = useState(false);
@@ -39,7 +40,7 @@ export default function Navbar() {
         setUser(JSON.parse(userStr));
         // Cargar Notificaciones
         try {
-            const res = await fetch('http://localhost:3000/notificacion', {
+            const res = await fetch(`${apiUrl}/notificacion`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -93,7 +94,7 @@ export default function Navbar() {
     try {
         const token = localStorage.getItem('token');
         // Marcar en backend
-        await fetch(`http://localhost:3000/notificacion/${notif.id}/leer`, {
+        await fetch(`${apiUrl}/notificacion/${notif.id}/leer`, {
             method: 'PATCH',
             headers: { 'Authorization': `Bearer ${token}` }
         });

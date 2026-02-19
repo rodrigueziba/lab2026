@@ -39,6 +39,7 @@ export default function EditarPrestadorPage() {
   });
 
   const [nuevoArchivo, setNuevoArchivo] = useState<File | null>(null);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   // 1. CARGAR DATOS AL ENTRAR 📥
   useEffect(() => {
@@ -47,7 +48,7 @@ export default function EditarPrestadorPage() {
     if (!token) router.push('/login');
 
     if (id) {
-      fetch(`http://localhost:3000/prestador/${id}`)
+      fetch(`${apiUrl}/prestador/${id}`)
         .then(res => res.json())
         .then(data => {
           // Rellenamos el estado con lo que viene de la BD
@@ -111,7 +112,7 @@ export default function EditarPrestadorPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/prestador/${id}`, {
+      const res = await fetch(`${apiUrl}/prestador/${id}`, {
         method: 'PATCH', // <--- Importante: PATCH para editar
         headers: { 
           'Content-Type': 'application/json',

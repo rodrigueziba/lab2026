@@ -13,7 +13,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 const RUBROS = [
   "Dirección", "Producción", "Guion", "Fotografía / Cámara", "Sonido", 
   "Arte / Escenografía", "Vestuario / Maquillaje", "Montaje / Postproducción", 
@@ -66,7 +66,7 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
   const fetchPerfilData = async (id: string) => {
     const token = localStorage.getItem('token');
     try {
-        const res = await fetch(`http://localhost:3000/prestador/mis-perfiles/${id}`, {
+        const res = await fetch(`${apiUrl}/prestador/mis-perfiles/${id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -180,7 +180,7 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
       }
 
       // 3. Enviar al Backend
-      const res = await fetch(`http://localhost:3000/prestador/${profileId}`, {
+      const res = await fetch(`${apiUrl}/prestador/${profileId}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',

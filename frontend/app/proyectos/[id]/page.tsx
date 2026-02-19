@@ -20,6 +20,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   const [proyecto, setProyecto] = useState<any>(null);
   const [candidatos, setCandidatos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   
   // NUEVO: Estado para saber mis postulaciones
   const [misPostulaciones, setMisPostulaciones] = useState<number[]>([]); 
@@ -30,12 +31,12 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
         const token = localStorage.getItem('token');
 
         // 1. Datos del Proyecto
-        const resProj = await fetch(`http://localhost:3000/proyecto/${id}`);
+        const resProj = await fetch(`${apiUrl}/proyecto/${id}`);
         const dataProj = await resProj.json();
         setProyecto(dataProj);
 
         // 2. Smart Match (Público)
-        const resMatch = await fetch(`http://localhost:3000/proyecto/${id}/matches`);
+        const resMatch = await fetch(`${apiUrl}/proyecto/${id}/matches`);
         if (resMatch.ok) {
            const dataMatch = await resMatch.json();
            setCandidatos(dataMatch);
@@ -48,7 +49,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
            const userStr = localStorage.getItem('user');
            if (userStr) {
              const user = JSON.parse(userStr);
-             const resMyApps = await fetch(`http://localhost:3000/postulacion/proyecto/${id}`, {
+             const resMyApps = await fetch(`${apiUrl}/postulacion/proyecto/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
              });
              if (resMyApps.ok) {
@@ -81,7 +82,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
     if (!confirm(`¿Confirmas tu postulación para: ${puestoNombre}?`)) return;
 
     try {
-      const res = await fetch('http://localhost:3000/postulacion', {
+      const res = await fetch(`${apiUrl}/postulacion`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

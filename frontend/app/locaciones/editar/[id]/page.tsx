@@ -42,6 +42,7 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
 
   const [newGalleryFiles, setNewGalleryFiles] = useState<File[]>([]);
   const [previewNewGallery, setPreviewNewGallery] = useState<string[]>([]);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'; 
 
   // 1. Autenticación y Carga de Datos
   useEffect(() => {
@@ -56,7 +57,7 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
 
     params.then(unwrap => {
         setLocacionId(unwrap.id);
-        fetch(`http://localhost:3000/locacion/${unwrap.id}`)
+        fetch(`${apiUrl}/locacion/${unwrap.id}`)
             .then(res => res.json())
             .then(data => {
                 setFormData({
@@ -172,7 +173,7 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
         };
 
         const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:3000/locacion/${locacionId}`, {
+        const res = await fetch(`${apiUrl}/locacion/${locacionId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify(payload)

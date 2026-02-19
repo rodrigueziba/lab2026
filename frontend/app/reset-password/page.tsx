@@ -11,6 +11,7 @@ function ResetForm() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +19,7 @@ function ResetForm() {
     
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3000/auth/reset-password', {
+      const res = await fetch(`${apiUrl}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password })

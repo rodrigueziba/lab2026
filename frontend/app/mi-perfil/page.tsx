@@ -9,6 +9,7 @@ export default function MisPerfilesPage() {
   const [perfiles, setPerfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -22,8 +23,8 @@ export default function MisPerfilesPage() {
 
   const fetchPerfiles = async (token: string) => {
     try {
-      // Ojo: Usamos el endpoint nuevo 'mis-perfiles' que devuelve un array
-      const res = await fetch('http://localhost:3000/prestador/mis-perfiles', {
+      
+      const res = await fetch(`${apiUrl}/prestador/mis-perfiles`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -42,7 +43,7 @@ export default function MisPerfilesPage() {
     const token = localStorage.getItem('token');
     
     try {
-        await fetch(`http://localhost:3000/prestador/${id}`, {
+        await fetch(`${apiUrl}/prestador/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });

@@ -48,6 +48,7 @@ export default function CrearPerfilPage() {
   const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [formacion, setFormacion] = useState('');
   const [experiencias, setExperiencias] = useState([{ proyecto: '', anio: '', rol: '' }]);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   // Estados de Archivos
   const [archivoPrincipal, setArchivoPrincipal] = useState<File | null>(null);
@@ -90,7 +91,7 @@ export default function CrearPerfilPage() {
     
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3000/prestador/generar-bio-ia', {
+      const res = await fetch(`${apiUrl}/prestador/generar-bio-ia`, {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
@@ -177,7 +178,7 @@ export default function CrearPerfilPage() {
       const experienciasFiltradas = experiencias.filter(e => e.proyecto && e.anio);
 
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3000/prestador', {
+      const res = await fetch(`${apiUrl}/prestador`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

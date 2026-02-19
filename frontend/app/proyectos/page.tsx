@@ -13,7 +13,7 @@ const getYoutubeId = (url: string) => {
   const match = url?.match(regExp);
   return (match && match[2].length === 11) ? match[2] : null;
 };
-
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 // --- CONFIGURACIÓN ---
 const TIPOS = ['Todos', 'Cortometraje', 'Largometraje', 'Documental', 'Videoclip', 'Publicidad'];
 
@@ -63,7 +63,7 @@ export default function CarteleraProyectosPage() {
 
   // 1. CARGA INICIAL
   useEffect(() => {
-    fetch('http://localhost:3000/proyecto')
+    fetch(`${apiUrl}/proyecto`)
       .then(res => res.json())
       .then(data => { 
           setProyectos(data); 

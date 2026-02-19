@@ -12,6 +12,7 @@ function LoginForm() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   // 1. DETECTOR DE GOOGLE 🕵️‍♂️
   // Si la URL tiene ?token=... es porque volvemos de Google
@@ -39,7 +40,7 @@ function LoginForm() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3000/auth/login', {
+      const res = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -63,7 +64,7 @@ function LoginForm() {
 
   // Función para iniciar el viaje a Google
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:3000/auth/google';
+    window.location.href = `${apiUrl}/auth/login`;
   };
 
   return (

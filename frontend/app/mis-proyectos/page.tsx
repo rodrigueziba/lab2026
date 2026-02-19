@@ -9,6 +9,7 @@ export default function MisProyectosPage() {
   const [proyectos, setProyectos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   useEffect(() => {
     // 1. Verificar Sesión
@@ -24,7 +25,7 @@ export default function MisProyectosPage() {
     setUser(userData);
 
     // 2. Traer Proyectos del Usuario
-    fetch('http://localhost:3000/proyecto')
+    fetch(`${apiUrl}/proyecto`)
       .then(res => res.json())
       .then(data => {
         // Filtramos por ID de usuario
@@ -40,7 +41,7 @@ export default function MisProyectosPage() {
 
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:3000/proyecto/${id}`, {
+      await fetch(`${apiUrl}/proyecto/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

@@ -43,9 +43,10 @@ export default function CatalogoLocacionesPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);      
   const filtersRef = useRef<HTMLDivElement>(null);     
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';     
 
   useEffect(() => {
-    fetch('http://localhost:3000/locacion')
+    fetch(`${apiUrl}/locacion`)
       .then(res => res.json())
       .then(data => {
         const dataConCoords = data.map((loc: any) => {

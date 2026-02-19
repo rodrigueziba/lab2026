@@ -14,6 +14,7 @@ export default function RegisterPage() {
     password: '',
     rol: 'Productor' // Valor por defecto
   });
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   const handleChange = (e: any) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -24,7 +25,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:3000/auth/register', {
+      const res = await fetch(`${apiUrl}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)

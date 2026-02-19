@@ -146,7 +146,7 @@ export default function Home() {
           {[
             { icon: "🏔️", title: "Scouting", desc: "Glaciares, bosques y estepas a tu alcance.", delay: 0 },
             { icon: "🎥", title: "Talento Local", desc: "Técnicos y productoras de nivel internacional.", delay: 2 }, // Delay para desfasar la flotación
-            { icon: "📋", title: "Gestión", desc: "Permisos ágiles en áreas protegidas.", delay: 4 }
+            { icon: "📋", title: "Gestión de proyectos", desc: "Gestión y busqueda de proyectos audiovisuales", delay: 4 }
           ].map((item, index) => (
             <motion.div 
               key={index}

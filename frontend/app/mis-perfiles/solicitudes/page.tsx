@@ -10,6 +10,7 @@ export default function GestionSolicitudesPage() {
   const router = useRouter();
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   useEffect(() => {
     fetchSolicitudes();
@@ -20,7 +21,7 @@ export default function GestionSolicitudesPage() {
     if (!token) return router.push('/login');
 
     try {
-      const res = await fetch('http://localhost:3000/solicitud/recibidas', {
+      const res = await fetch(`${apiUrl}/solicitud/recibidas`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -42,7 +43,7 @@ export default function GestionSolicitudesPage() {
         sol.id === id ? { ...sol, estado: nuevoEstado } : sol
       ));
 
-      await fetch(`http://localhost:3000/solicitud/${id}`, {
+      await fetch(`${apiUrl}/solicitud/${id}`, {
         method: 'PATCH',
         headers: { 
             'Content-Type': 'application/json',

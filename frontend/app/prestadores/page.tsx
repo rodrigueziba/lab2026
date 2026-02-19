@@ -6,7 +6,7 @@ export default function PrestadoresPage() {
   // 1. ESTADOS (La memoria temporal de la página)
   const [prestadores, setPrestadores] = useState([]); // Lista de gente
   const [loading, setLoading] = useState(true);       // ¿Está cargando?
-  
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   // Datos del formulario nuevo
   const [formData, setFormData] = useState({
     nombre: '',
@@ -21,7 +21,7 @@ export default function PrestadoresPage() {
   async function fetchPrestadores() {
     try {
       // OJO: Como estamos en el navegador, usamos localhost
-      const res = await fetch('http://localhost:3000/prestador');
+      const res = await fetch(`${apiUrl}/prestador`);
       const data = await res.json();
       setPrestadores(data);
       setLoading(false);
@@ -41,7 +41,7 @@ export default function PrestadoresPage() {
     e.preventDefault(); // Evita que se recargue la página
     
     // Enviamos los datos al Backend
-    const res = await fetch('http://localhost:3000/prestador', {
+    const res = await fetch(`${apiUrl}/prestador`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData)

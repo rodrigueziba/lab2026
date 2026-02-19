@@ -36,6 +36,7 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
 
   const [referencias, setReferencias] = useState(['']);
   const [puestos, setPuestos] = useState([{ id: null, nombre: '', descripcion: '' }]);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   
   // Imágenes
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -48,7 +49,7 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
       if (!token) return router.push('/login');
 
       try {
-        const res = await fetch(`http://localhost:3000/proyecto/${id}`);
+        const res = await fetch(`${apiUrl}/proyecto/${id}`);
         if (!res.ok) throw new Error("Error al cargar proyecto");
         
         const data = await res.json();
@@ -142,7 +143,7 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
       };
 
       // 3. Request PATCH
-      const res = await fetch(`http://localhost:3000/proyecto/${id}`, {
+      const res = await fetch(`${apiUrl}/proyecto/${id}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',

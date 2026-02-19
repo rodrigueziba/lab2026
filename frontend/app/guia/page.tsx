@@ -43,10 +43,11 @@ export default function GuiaPage() {
 
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);      
-  const filtersRef = useRef<HTMLDivElement>(null);     
+  const filtersRef = useRef<HTMLDivElement>(null);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';     
 
   useEffect(() => {
-    fetch('http://localhost:3000/prestador')
+    fetch(`${apiUrl}/prestador`)
       .then(res => res.json())
       .then(data => { 
           setPrestadores(data); 

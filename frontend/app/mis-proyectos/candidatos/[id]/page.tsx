@@ -8,6 +8,7 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
   const resolvedParams = use(params);
   const id = resolvedParams.id;
   const router = useRouter();
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   const [candidatos, setCandidatos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,12 +21,12 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
 
       try {
         // 1. Obtener nombre del proyecto (opcional, para el título)
-        const resProj = await fetch(`http://localhost:3000/proyecto/${id}`);
+        const resProj = await fetch(`${apiUrl}/proyecto/${id}`);
         const dataProj = await resProj.json();
         setProyectoTitulo(dataProj.titulo);
 
         // 2. Obtener Postulaciones
-        const resPost = await fetch(`http://localhost:3000/postulacion/proyecto/${id}`, {
+        const resPost = await fetch(`${apiUrl}/postulacion/proyecto/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -48,7 +49,7 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
     if (!token) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/postulacion/${postulacionId}`, {
+      const res = await fetch(`${apiUrl}/postulacion/${postulacionId}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',

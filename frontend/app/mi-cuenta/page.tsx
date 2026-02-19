@@ -10,6 +10,7 @@ export default function MiCuentaPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   // Estado para Email
   const [email, setEmail] = useState('');
@@ -35,7 +36,7 @@ export default function MiCuentaPage() {
     
     try {
       // Usamos el ID del usuario para la ruta PATCH
-      const res = await fetch(`http://localhost:3000/user/${user.id}`, {
+      const res = await fetch(`${apiUrl}/user/${user.id}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -69,7 +70,7 @@ export default function MiCuentaPage() {
     const token = localStorage.getItem('token');
 
     try {
-      const res = await fetch(`http://localhost:3000/user/${user.id}`, {
+      const res = await fetch(`${apiUrl}/user/${user.id}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
