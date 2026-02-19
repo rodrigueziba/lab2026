@@ -1,4 +1,4 @@
-# 🎬 Neural TDF - Film Commission Tierra del Fuego
+# 🎬 TDF - Film Commission Tierra del Fuego
 
 [![Next.js](https://img.shields.io/badge/Frontend-Next.js_14-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![NestJS](https://img.shields.io/badge/Backend-NestJS-ea2845?style=flat&logo=nestjs)](https://nestjs.com/)
