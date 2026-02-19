@@ -16,11 +16,11 @@ export default function RegisterPage() {
   });
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-  const handleChange = (e: any) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
@@ -30,6 +30,9 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)
       });
+
+      // ¡CORRECCIÓN AQUÍ! Parseamos la respuesta a JSON siempre para poder leer el posible mensaje de error
+      const data = await res.json();
 
       if (res.ok) {
         // ✅ ÉXITO VISUAL
@@ -46,14 +49,19 @@ export default function RegisterPage() {
         // ❌ ERROR VISUAL
         Swal.fire({
             title: 'Error',
-            text: data.message || 'No se pudo crear la cuenta.',
+            text: data.message || 'No se pudo crear la cuenta.', // Ahora data sí existe
             icon: 'error',
             confirmButtonColor: '#334155'
         });
     }
     } catch (err) {
       console.error(err);
-      alert('Error de conexión con el servidor.');
+      Swal.fire({
+        title: 'Error',
+        text: 'Error de conexión con el servidor.',
+        icon: 'error',
+        confirmButtonColor: '#334155'
+      });
     } finally {
       setLoading(false);
     }
@@ -121,17 +129,6 @@ export default function RegisterPage() {
                />
             </div>
           </div>
-
-          {/* Selector de Rol (Opcional por ahora, defaulted a Productor) */}
-          {/* Puedes descomentarlo si quieres que elijan entre Productor/Prestador aquí */}
-          {/* <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-2 pl-1">Perfil Principal</label>
-            <select name="rol" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-orange-500" onChange={handleChange}>
-              <option value="Productor">Productor (Quiero crear proyectos)</option>
-              <option value="Prestador">Prestador (Quiero ofrecer servicios)</option>
-            </select>
-          </div>
-          */}
 
           <button 
             type="submit" 
