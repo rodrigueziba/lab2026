@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+// 1. IMPORTAR Variants
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
   Film, DollarSign, GraduationCap, Users, Calendar, 
   PlayCircle, X, MapPin, Search, Clapperboard, 
@@ -14,6 +15,7 @@ const getYoutubeId = (url: string) => {
   return (match && match[2].length === 11) ? match[2] : null;
 };
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
 // --- CONFIGURACIÓN ---
 const TIPOS = ['Todos', 'Cortometraje', 'Largometraje', 'Documental', 'Videoclip', 'Publicidad'];
 
@@ -24,8 +26,8 @@ const CIUDADES_OPCIONES = [
     { id: 'Tolhuin', label: 'TOLHUIN', short: 'TOL' },
 ];
 
-// Animación aleatoria "Pop"
-const cardVariants = {
+// 2. TIPAR cardVariants COMO Variants
+const cardVariants: Variants = {
   hidden: { opacity: 0, scale: 0.8, y: 50 },
   visible: (i: number) => ({
     opacity: 1,
@@ -41,9 +43,36 @@ const cardVariants = {
   exit: { opacity: 0, scale: 0.9, transition: { duration: 0.2 } }
 };
 
+// 3. DEFINIR INTERFACES PARA EVITAR 'any'
+interface Puesto {
+  id: number | string;
+  nombre: string;
+}
+
+interface ProyectoUser {
+  nombre?: string;
+}
+
+interface Proyecto {
+  id: number;
+  titulo: string;
+  descripcion: string;
+  tipo: string;
+  ciudad: string;
+  esEstudiante: boolean;
+  esRemunerado: boolean;
+  fechaInicio?: string;
+  foto?: string;
+  referencias?: string[];
+  puestos?: Puesto[];
+  user?: ProyectoUser;
+  [key: string]: unknown;
+}
+
 export default function CarteleraProyectosPage() {
-  const [proyectos, setProyectos] = useState<any[]>([]);
-  const [proyectosMostrados, setProyectosMostrados] = useState<any[]>([]);
+  // 4. USAR LAS INTERFACES EN EL ESTADO
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  const [proyectosMostrados, setProyectosMostrados] = useState<Proyecto[]>([]);
   const [loading, setLoading] = useState(true);
   
   // --- FILTROS ---
@@ -171,7 +200,7 @@ export default function CarteleraProyectosPage() {
                       type="text" 
                       placeholder="Buscar proyecto..."
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs outline-none text-white focus:border-orange-500 transition-all"
-                      onChange={(e) => setBusqueda(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBusqueda(e.target.value)}
                     />
                   </div>
 
@@ -394,13 +423,13 @@ export default function CarteleraProyectosPage() {
                         <div className="mt-auto pt-4 border-t border-slate-800">
                             <div className="flex flex-wrap gap-1.5 mb-4">
                                 {p.puestos && p.puestos.length > 0 ? (
-                                    p.puestos.slice(0, 3).map((puesto: any) => (
+                                    p.puestos.slice(0, 3).map((puesto: Puesto) => (
                                         <span key={puesto.id} className="text-[10px] font-bold uppercase bg-slate-800 text-slate-300 px-2 py-1 rounded border border-slate-700">
                                             {puesto.nombre}
                                         </span>
                                     ))
                                 ) : <span className="text-xs text-slate-600 italic">Equipo completo</span>}
-                                {p.puestos?.length > 3 && <span className="text-[10px] text-slate-500 px-1">+{p.puestos.length - 3}</span>}
+                                {p.puestos && p.puestos.length > 3 && <span className="text-[10px] text-slate-500 px-1">+{p.puestos.length - 3}</span>}
                             </div>
 
                             <div className="flex justify-between items-center">
