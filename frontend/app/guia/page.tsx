@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+// Importamos 'Variants'
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
   MapPin, Search, Filter, Briefcase, Users, Clapperboard, GraduationCap, 
   ChevronLeft, ChevronRight, ArrowRight, LayoutGrid, Plus, Dice5 
@@ -20,21 +21,34 @@ const TIPOS_PERFIL = [
   { label: "Estudiantes", value: "Estudiante", icon: GraduationCap },
 ];
 
-// --- ANIMACIONES ---
-const containerVariants = {
+// --- ANIMACIONES (AHORA TIPADAS COMO VARIANTS) ---
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
 };
 
-const cardVariants = {
+const cardVariants: Variants = {
   hidden: { opacity: 0, y: 30, scale: 0.95 },
   visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", bounce: 0.3, duration: 0.6 } },
   exit: { opacity: 0, scale: 0.9, transition: { duration: 0.2 } }
 };
 
+// --- TIPADO PARA EVITAR 'ANY' ---
+interface Prestador {
+  id: string | number;
+  nombre: string;
+  rubro: string;
+  tipoPerfil: string;
+  descripcion?: string;
+  foto?: string | null;
+  ciudad?: string;
+  colorTema?: string;
+  [key: string]: unknown;
+}
+
 export default function GuiaPage() {
-  const [prestadores, setPrestadores] = useState<any[]>([]);
-  const [prestadoresMostrados, setPrestadoresMostrados] = useState<any[]>([]);
+  const [prestadores, setPrestadores] = useState<Prestador[]>([]);
+  const [prestadoresMostrados, setPrestadoresMostrados] = useState<Prestador[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [filtroTexto, setFiltroTexto] = useState('');
@@ -42,7 +56,6 @@ export default function GuiaPage() {
   const [rubroSeleccionado, setRubroSeleccionado] = useState("Todos");
 
   const [isScrolled, setIsScrolled] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);      
   const filtersRef = useRef<HTMLDivElement>(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';     
 
@@ -55,13 +68,13 @@ export default function GuiaPage() {
           setLoading(false); 
       })
       .catch(err => console.error(err));
-  }, []);
+  }, [apiUrl]); // Añadido apiUrl a las dependencias
 
   useEffect(() => {
     const filtrados = prestadores.filter(p => {
         const coincideTexto = p.nombre.toLowerCase().includes(filtroTexto.toLowerCase()) || 
                               p.rubro.toLowerCase().includes(filtroTexto.toLowerCase()) ||
-                              p.descripcion?.toLowerCase().includes(filtroTexto.toLowerCase());
+                              (p.descripcion?.toLowerCase().includes(filtroTexto.toLowerCase()) ?? false);
         const coincideTipo = tipoSeleccionado === "Todos" || p.tipoPerfil === tipoSeleccionado;
         const coincideRubro = rubroSeleccionado === "Todos" || p.rubro === rubroSeleccionado;
         return coincideTexto && coincideTipo && coincideRubro;
@@ -86,7 +99,7 @@ export default function GuiaPage() {
 
   const rubrosDisponibles = ["Todos", ...Array.from(new Set(prestadores
     .filter(p => tipoSeleccionado === "Todos" || p.tipoPerfil === tipoSeleccionado)
-    .map((p: any) => p.rubro)
+    .map(p => p.rubro)
   ))];
 
   const scrollFilters = (direction: 'left' | 'right') => {
@@ -97,8 +110,6 @@ export default function GuiaPage() {
   };
 
   return (
-    // FIX OVERLAP: Aumentamos padding top para empujar el contenido inicial hacia abajo
-    // pt-64 en mobile asegura que la cabecera alta no tape la primera tarjeta
     <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-500/30 pt-64 md:pt-48 flex flex-col">
       
       <style jsx global>{`
@@ -135,7 +146,7 @@ export default function GuiaPage() {
                       type="text" 
                       placeholder="Buscar..."
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white focus:border-orange-500 transition-all"
-                      onChange={(e) => setFiltroTexto(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltroTexto(e.target.value)}
                     />
                   </div>
 
@@ -143,7 +154,6 @@ export default function GuiaPage() {
                   <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-start">
                       
                       {/* Filtros Tipo (Scrollable) */}
-                      {/* FIX OVERLAP: Usamos flex-1 y min-w-0 para que el scroll funcione sin empujar layout */}
                       <div className="flex gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-hide flex-1 md:flex-none md:max-w-[250px] min-w-0">
                           {TIPOS_PERFIL.map((tipo) => {
                               const Icon = tipo.icon;
@@ -190,7 +200,7 @@ export default function GuiaPage() {
                 <button onClick={() => scrollFilters('left')} className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-slate-900/80 p-1 rounded-full text-slate-400 border border-slate-700 hover:text-white"><ChevronLeft size={14}/></button>
                 
                 <div ref={filtersRef} className="flex gap-2 overflow-x-auto scrollbar-hide w-full snap-x scroll-smooth px-2 md:px-8">
-                    {rubrosDisponibles.map((rubro: any) => (
+                    {rubrosDisponibles.map((rubro: string) => (
                       <button 
                         key={rubro}
                         onClick={() => setRubroSeleccionado(rubro)}
@@ -258,7 +268,7 @@ export default function GuiaPage() {
                       ></div>
 
                       <div className="relative bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden h-full flex flex-col items-center transition-all duration-300 group-hover:border-[var(--border-color)] group-hover:shadow-2xl pt-8 pb-6 px-6"
-                           style={{ ['--border-color' as any]: tema }}>
+                           style={{ ['--border-color' as never]: tema }}>
                         
                         <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: tema }}></div>
 
@@ -282,7 +292,7 @@ export default function GuiaPage() {
                         {/* INFO */}
                         <div className="text-center w-full flex-1 flex flex-col items-center mt-2">
                             <h3 className="text-xl font-bold text-white leading-tight mb-2 group-hover:text-[var(--text-color)] transition-colors"
-                                style={{ ['--text-color' as any]: tema }}>
+                                style={{ ['--text-color' as never]: tema }}>
                                 {p.nombre}
                             </h3>
 
