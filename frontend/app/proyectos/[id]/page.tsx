@@ -127,7 +127,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
                allow="autoplay"
              />
           ) : (
-             <img src={proyecto.foto || '/placeholder-dark.jpg'} className="w-full h-full object-cover opacity-50" />
+             <img src={proyecto.foto || proyecto.galeria?.[0] || '/placeholder-dark.jpg'} alt={proyecto.titulo} className="w-full h-full object-cover opacity-50" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent"></div>
         </div>
@@ -141,7 +141,8 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
              <div className="flex flex-col md:flex-row gap-8 items-end">
                 <div className="hidden md:block w-48 h-72 rounded-xl overflow-hidden shadow-2xl border-4 border-slate-800 shrink-0 bg-slate-900 flex items-center justify-center">
                    <img 
-                     src={proyecto.foto || `https://placehold.co/300x450/0f172a/38bdf8?text=${encodeURIComponent(proyecto.titulo)}`} 
+                     src={proyecto.foto || proyecto.galeria?.[0] || `https://placehold.co/300x450/0f172a/38bdf8?text=${encodeURIComponent(proyecto.titulo)}`} 
+                     alt={proyecto.titulo}
                      className="w-full h-full object-cover" 
                    />
                 </div>

@@ -63,6 +63,7 @@ interface Proyecto {
   esRemunerado: boolean;
   fechaInicio?: string;
   foto?: string;
+  galeria?: string[];
   referencias?: string[];
   puestos?: Puesto[];
   user?: ProyectoUser;
@@ -369,12 +370,12 @@ export default function CarteleraProyectosPage() {
                             </motion.div>
                         ) : (
                             <>
-                                {p.foto ? (
-                                    <img src={p.foto} className="w-full h-full object-cover opacity-70 group-hover:scale-110 transition-transform duration-700 grayscale-[30%] group-hover:grayscale-0" />
+                                {(p.foto || p.galeria?.[0]) ? (
+                                    <img src={p.foto || p.galeria?.[0]} alt={p.titulo} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                 ) : (
-                                    <div className="w-full h-full bg-slate-800 flex items-center justify-center opacity-50"><Film size={40}/></div>
+                                    <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-600"><Film size={40}/></div>
                                 )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-90"></div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-85"></div>
                             </>
                         )}
 

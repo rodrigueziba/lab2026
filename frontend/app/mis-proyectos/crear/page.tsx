@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Plus, Trash2, Link as LinkIcon, Calendar, DollarSign, 
-  GraduationCap, Film, Briefcase, X, Image as ImageIcon, Loader2, MapPin 
+  GraduationCap, Film, Briefcase, X, Image as ImageIcon, Loader2, MapPin, ArrowLeft 
 } from 'lucide-react';
 
 // Inicializar Supabase
@@ -94,12 +94,13 @@ export default function CrearProyectoPage() {
         }
       }
 
-      // 2. Preparar Payload
+      // 2. Preparar Payload (la primera imagen de la galería se usa como foto/portada)
       const payload = {
         ...formData,
         referencias: referencias.filter(r => r.trim() !== ''),
         puestos: puestos.filter(p => p.nombre.trim() !== ''),
         galeria: galeriaUrls,
+        foto: galeriaUrls[0] ?? undefined,
         fechaInicio: formData.fechaInicio ? new Date(formData.fechaInicio).toISOString() : null,
         fechaFin: formData.fechaFin ? new Date(formData.fechaFin).toISOString() : null,
       };
@@ -130,7 +131,7 @@ export default function CrearProyectoPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8 font-sans flex justify-center">
+    <div className="min-h-screen bg-slate-950 text-white pt-28 pb-12 px-6 font-sans flex justify-center">
       
       {/* Estilos para forzar el calendario oscuro */}
       <style jsx global>{`
@@ -141,17 +142,25 @@ export default function CrearProyectoPage() {
         }
       `}</style>
 
-      <div className="max-w-5xl w-full">
+      <div className="max-w-5xl w-full bg-slate-900 p-8 md:p-12 rounded-3xl border border-slate-800 shadow-2xl">
         
-        <h1 className="text-4xl font-black mb-8 flex items-center gap-3 tracking-tighter">
-          <Film className="text-orange-600" size={40} />
-          Nuevo Proyecto
-        </h1>
+        <button type="button" onClick={() => router.back()} className="text-slate-500 hover:text-white flex items-center gap-2 mb-8 transition text-sm font-bold uppercase tracking-wider">
+          <ArrowLeft size={16}/> Cancelar y Volver
+        </button>
+
+        <div className="text-center mb-10 border-b border-slate-800/50 pb-8">
+          <h1 className="text-4xl md:text-5xl font-black mb-3 tracking-tighter">
+            Nuevo <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">Proyecto</span>
+          </h1>
+          <p className="text-slate-400 text-lg font-light">
+            Publicá tu producción en la Cartelera TDF.
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           
-          {/* 1. INFORMACIÓN PRINCIPAL (Tarjeta Grande) */}
-          <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-2xl">
+          {/* 1. INFORMACIÓN PRINCIPAL */}
+          <div>
             <h2 className="text-xs font-bold uppercase text-slate-500 mb-8 tracking-widest border-b border-slate-800 pb-2">
               Información General
             </h2>
