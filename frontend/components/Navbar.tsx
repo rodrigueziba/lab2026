@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
   Menu, X, ChevronDown, LogOut, Film, User, 
-  Briefcase, MapPin, Users, Clapperboard, Bell, Check, Shield, Inbox // <--- Agregado Inbox
+  Briefcase, MapPin, Users, Clapperboard, Bell, Shield, Inbox, Atom
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -150,9 +150,20 @@ export default function Navbar() {
     <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-500 ${navHeight} ${isScrolled ? navPaddingScrolled : navPadding} ${navBg}`}>
       <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full min-h-[64px] md:min-h-0">
         
-        <Link href="/" className="text-2xl font-black tracking-tighter text-white group">
-          TDF<span className="text-orange-600 group-hover:text-orange-500 transition-colors duration-300 drop-shadow-[0_0_10px_rgba(234,88,12,0.5)]">FILM</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/" className="text-2xl font-black tracking-tighter text-white group">
+            TDF<span className="text-orange-600 group-hover:text-orange-500 transition-colors duration-300 drop-shadow-[0_0_10px_rgba(234,88,12,0.5)]">FILM</span>
+          </Link>
+          {/* Easter egg: icono átomo casi invisible, enlace a /nodos (solo escritorio) */}
+          <Link
+            href="/nodos"
+            className="hidden md:flex items-center justify-center opacity-[0.12] hover:opacity-30 transition-opacity duration-300 text-white rounded-full p-1 hover:ring-1 hover:ring-white/20"
+            title="Nodos 3D"
+            aria-label="Nodos 3D"
+          >
+            <Atom size={20} strokeWidth={1.5} />
+          </Link>
+        </div>
 
         <div className="hidden md:flex items-center gap-2 bg-black/20 backdrop-blur-sm p-1.5 rounded-full border border-white/5">
           <NavLink href="/locaciones" icon={MapPin} label="Locaciones" />
@@ -292,7 +303,19 @@ export default function Navbar() {
       {isMobileMenuOpen && (
         <>
           <div className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[45]" onClick={() => setIsMobileMenuOpen(false)} aria-hidden />
-          <div className="md:hidden fixed top-16 left-0 right-0 bottom-0 z-[48] bg-slate-950 overflow-y-auto p-6 flex flex-col gap-6 animate-in slide-in-from-right duration-300">
+          <div className="md:hidden fixed top-16 left-0 right-0 bottom-0 z-[48] bg-slate-950 overflow-y-auto flex flex-col animate-in slide-in-from-right duration-300">
+            {/* Botón cerrar menú bien visible arriba */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 shrink-0">
+              <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Menú</span>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-slate-200 transition-colors"
+                aria-label="Cerrar menú"
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="p-6 flex flex-col gap-6">
             {/* Enlaces principales: mismo criterio de activo que en desktop */}
             <MobileNavLink href="/locaciones" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={MapPin} label="Locaciones" />
             <MobileNavLink href="/guia" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Users} label="Prestadores" />
@@ -303,7 +326,7 @@ export default function Navbar() {
                 <div className="h-px bg-slate-700 my-2" />
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Admin</p>
                 <MobileNavLink href="/admin/panel" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label="Panel Admin" />
-                <MobileNavLink href="/admin/dashboard" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={MapPin} label="Nodos 3D" />
+                {/* Nodos 3D solo en escritorio; en móvil no se muestra */}
               </>
             )}
 
@@ -328,6 +351,7 @@ export default function Navbar() {
                 <Link href="/registro" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-4 rounded-xl bg-orange-600 text-white font-bold">Registrarse</Link>
               </div>
             )}
+            </div>
           </div>
         </>
       )}
