@@ -3,13 +3,22 @@ node_modules
 dist
 postgres_data
 
-# env files
+# --- Variables de entorno y secretos (nunca subir) ---
 .env
 .env.*
+.env.local
+.env.*.local
 **/.env
 **/.env.*
-
-# (opcional) si querés permitir un template
+**/.env.local
+**/.env.*.local
+# Permitir solo templates de ejemplo
 !.env.example
+!**/.env.example
+
+# Otros archivos sensibles
+*.pem
+*.key
+secrets.json
 
 CONTEXTO_PROYECTO.txt

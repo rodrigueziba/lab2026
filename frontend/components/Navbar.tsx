@@ -126,9 +126,29 @@ export default function Navbar() {
     );
   };
 
+  const MobileNavLink = ({ href, pathname: p, onClick, icon: Icon, label }: { href: string; pathname: string; onClick: () => void; icon: any; label: string }) => {
+    const isActive = p === href || (href !== '/' && p.startsWith(href));
+    return (
+      <Link
+        href={href}
+        onClick={onClick}
+        className={`flex items-center gap-3 text-xl font-bold transition-colors ${isActive ? 'text-orange-500' : 'text-slate-300 hover:text-white'}`}
+      >
+        <Icon size={22} className={isActive ? 'text-orange-500' : ''} />
+        {label}
+      </Link>
+    );
+  };
+
+  // En móvil la barra mantiene siempre la misma altura (no se reduce al hacer scroll)
+  const navPadding = 'py-4 md:py-6';
+  const navPaddingScrolled = 'py-4 md:py-2';
+  const navBg = isScrolled ? 'bg-slate-950/95 md:bg-slate-950/80 backdrop-blur-xl border-b border-white/5 shadow-2xl' : 'bg-transparent';
+  const navHeight = 'min-h-[64px] md:min-h-0';
+
   return (
-    <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-500 ${isScrolled ? 'bg-slate-950/80 backdrop-blur-xl border-b border-white/5 py-2 shadow-2xl' : 'bg-transparent py-6'}`}>
-      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+    <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-500 ${navHeight} ${isScrolled ? navPaddingScrolled : navPadding} ${navBg}`}>
+      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full min-h-[64px] md:min-h-0">
         
         <Link href="/" className="text-2xl font-black tracking-tighter text-white group">
           TDF<span className="text-orange-600 group-hover:text-orange-500 transition-colors duration-300 drop-shadow-[0_0_10px_rgba(234,88,12,0.5)]">FILM</span>
@@ -196,7 +216,7 @@ export default function Navbar() {
                     {user.nombre ? user.nombre[0].toUpperCase() : 'U'}
                     </div>
                     <span className="text-sm font-bold text-slate-300 group-hover:text-white truncate max-w-[100px]">
-                    {user.nombre.split(' ')[0]}
+                    {user.nombre?.split(' ')[0] ?? 'Usuario'}
                     </span>
                     <ChevronDown size={14} className={`text-slate-500 transition-transform ${isUserMenuOpen ? 'rotate-180 text-white' : ''}`}/>
                 </button>
@@ -230,6 +250,19 @@ export default function Navbar() {
                         <Link href="/mi-cuenta" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition">
                           <Shield size={18} className="text-purple-500"/> Configuración de Cuenta
                         </Link>
+
+                        {user.role === 'admin' && (
+                          <>
+                            <div className="h-px bg-slate-800 my-2 mx-4"></div>
+                            <p className="px-4 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Admin</p>
+                            <Link href="/admin/panel" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition">
+                              <Shield size={18} className="text-amber-500"/> Panel Admin
+                            </Link>
+                            <Link href="/admin/dashboard" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition">
+                              <MapPin size={18} className="text-cyan-500"/> Nodos 3D
+                            </Link>
+                          </>
+                        )}
                     </div>
 
                     <div className="p-3 border-t border-slate-800 bg-black/20">
@@ -255,35 +288,48 @@ export default function Navbar() {
 
       </div>
       
-      {/* MENÚ MÓVIL (También actualizado) */}
+      {/* MENÚ MÓVIL: overlay completo bajo la barra, z-index alto para no superponerse con login/contenido */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 top-[70px] bg-slate-950/95 backdrop-blur-xl z-40 p-6 flex flex-col gap-6 animate-in slide-in-from-right duration-300">
-           <Link href="/locaciones" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 text-xl font-bold text-slate-300"><MapPin/> Locaciones</Link>
-           <Link href="/guia" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 text-xl font-bold text-slate-300"><Users/> Prestadores</Link>
-           <Link href="/proyectos" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 text-xl font-bold text-orange-500"><Clapperboard/> Proyectos</Link>
-           
-           <div className="h-px bg-slate-800 my-2"></div>
-           
-           {user ? (
-             <>
+        <>
+          <div className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[45]" onClick={() => setIsMobileMenuOpen(false)} aria-hidden />
+          <div className="md:hidden fixed top-16 left-0 right-0 bottom-0 z-[48] bg-slate-950 overflow-y-auto p-6 flex flex-col gap-6 animate-in slide-in-from-right duration-300">
+            {/* Enlaces principales: mismo criterio de activo que en desktop */}
+            <MobileNavLink href="/locaciones" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={MapPin} label="Locaciones" />
+            <MobileNavLink href="/guia" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Users} label="Prestadores" />
+            <MobileNavLink href="/proyectos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Clapperboard} label="Proyectos" />
+
+            {user?.role === 'admin' && (
+              <>
+                <div className="h-px bg-slate-700 my-2" />
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Admin</p>
+                <MobileNavLink href="/admin/panel" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label="Panel Admin" />
+                <MobileNavLink href="/admin/dashboard" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={MapPin} label="Nodos 3D" />
+              </>
+            )}
+
+            <div className="h-px bg-slate-800 my-2"></div>
+
+            {user ? (
+              <>
                 <div className="flex items-center gap-3 mb-4 bg-slate-900 p-4 rounded-xl">
-                   <div className="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center text-white font-bold">{user.nombre[0]}</div>
-                   <div><p className="font-bold text-white">{user.nombre}</p><p className="text-xs text-slate-500">{user.email}</p></div>
+                  <div className="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center text-white font-bold">{user.nombre?.[0] ?? 'U'}</div>
+                  <div><p className="font-bold text-white">{user.nombre}</p><p className="text-xs text-slate-500">{user.email}</p></div>
                 </div>
-                <Link href="/mis-proyectos" onClick={() => setIsMobileMenuOpen(false)} className="text-lg text-slate-400 flex items-center gap-2"><Film size={18}/> Mis Proyectos</Link>
-                <Link href="/mis-postulaciones" onClick={() => setIsMobileMenuOpen(false)} className="text-lg text-slate-400 flex items-center gap-2"><Briefcase size={18}/> Mis Postulaciones</Link>
-                <Link href="/mis-perfiles/solicitudes" onClick={() => setIsMobileMenuOpen(false)} className="text-lg text-slate-400 flex items-center gap-2"><Inbox size={18}/> Solicitudes Recibidas</Link>
-                <Link href="/mi-perfil" onClick={() => setIsMobileMenuOpen(false)} className="text-lg text-slate-400 flex items-center gap-2"><User size={18}/> Mi Perfil</Link>
-                <Link href="/mi-cuenta" onClick={() => setIsMobileMenuOpen(false)} className="text-lg text-slate-400 flex items-center gap-2"><Shield size={18}/> Mi Cuenta</Link>
+                <MobileNavLink href="/mis-proyectos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Film} label="Mis Proyectos" />
+                <MobileNavLink href="/mis-postulaciones" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Briefcase} label="Mis Postulaciones" />
+                <MobileNavLink href="/mis-perfiles/solicitudes" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Inbox} label="Solicitudes Recibidas" />
+                <MobileNavLink href="/mi-perfil" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={User} label="Mi Perfil" />
+                <MobileNavLink href="/mi-cuenta" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label="Mi Cuenta" />
                 <button onClick={handleLogout} className="text-lg text-red-500 font-bold mt-4 flex items-center gap-2"><LogOut size={18}/> Cerrar Sesión</button>
-             </>
-           ) : (
-             <div className="flex flex-col gap-4">
-                <Link href="/login" className="text-center w-full py-4 rounded-xl border border-slate-700 text-white font-bold">Ingresar</Link>
-                <Link href="/registro" className="text-center w-full py-4 rounded-xl bg-orange-600 text-white font-bold">Registrarse</Link>
-             </div>
-           )}
-        </div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-4 rounded-xl border border-slate-700 text-white font-bold">Ingresar</Link>
+                <Link href="/registro" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-4 rounded-xl bg-orange-600 text-white font-bold">Registrarse</Link>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </nav>
   );

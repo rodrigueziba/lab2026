@@ -1,158 +1,106 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-// IMPORTAMOS Variants
+// Importamos 'Variants'
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
-  Film, DollarSign, GraduationCap, Users, Calendar, 
-  PlayCircle, X, MapPin, Search, Clapperboard, 
-  ChevronLeft, ChevronRight, Plus, Dice5, Eye, Filter 
+  MapPin, Search, Filter, Briefcase, Users, Clapperboard, GraduationCap, 
+  ChevronLeft, ChevronRight, ArrowRight, LayoutGrid, Plus, Dice5 
 } from 'lucide-react';
 
-const getYoutubeId = (url: string) => {
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-  const match = url?.match(regExp);
-  return (match && match[2].length === 11) ? match[2] : null;
+const getInitials = (name: string) => {
+  return name ? name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() : 'NN';
 };
 
-// --- CONFIGURACIÓN ---
-const TIPOS = ['Todos', 'Cortometraje', 'Largometraje', 'Documental', 'Videoclip', 'Publicidad'];
-
-const CIUDADES_OPCIONES = [
-    { id: 'Todas', label: 'TODAS', short: 'TODOS' },
-    { id: 'Ushuaia', label: 'USHUAIA', short: 'USH' },
-    { id: 'Río Grande', label: 'RIO GRANDE', short: 'RIO' },
-    { id: 'Tolhuin', label: 'TOLHUIN', short: 'TOL' },
+// --- CONFIGURACIÓN DE FILTROS ---
+const TIPOS_PERFIL = [
+  { label: "Todos", value: "Todos", icon: LayoutGrid },
+  { label: "Profesionales", value: "Profesional", icon: Users },
+  { label: "Productoras", value: "Productora", icon: Clapperboard },
+  { label: "Empresas", value: "Empresa", icon: Briefcase },
+  { label: "Estudiantes", value: "Estudiante", icon: GraduationCap },
 ];
 
-// DEFINIMOS LA URL DE LA API AFUERA PARA EVITAR WARNINGS EN USEEFFECT
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+// --- ANIMACIONES (AHORA TIPADAS COMO VARIANTS) ---
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
+};
 
-// TIPAMOS LA ANIMACIÓN COMO VARIANTS
 const cardVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.8, y: 50 },
-  visible: (i: number) => ({
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: {
-      delay: i * 0.05,
-      type: "spring",
-      stiffness: 100 + Math.random() * 50,
-      damping: 10 + Math.random() * 10
-    }
-  }),
+  hidden: { opacity: 0, y: 30, scale: 0.95 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", bounce: 0.3, duration: 0.6 } },
   exit: { opacity: 0, scale: 0.9, transition: { duration: 0.2 } }
 };
 
-// INTERFACES PARA EVITAR EL USO DE "ANY"
-interface Puesto {
-  id: number | string;
+// --- TIPADO PARA EVITAR 'ANY' ---
+interface Prestador {
+  id: string | number;
   nombre: string;
-}
-
-interface ProyectoUser {
-  nombre?: string;
-}
-
-interface Proyecto {
-  id: number;
-  titulo: string;
-  descripcion: string;
-  tipo: string;
-  ciudad: string;
-  esEstudiante: boolean;
-  esRemunerado: boolean;
-  fechaInicio?: string;
-  foto?: string;
-  referencias?: string[];
-  puestos?: Puesto[];
-  user?: ProyectoUser;
+  rubro: string;
+  tipoPerfil: string;
+  descripcion?: string;
+  foto?: string | null;
+  ciudad?: string;
+  colorTema?: string;
   [key: string]: unknown;
 }
 
-export default function CarteleraProyectosPage() {
-  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
-  const [proyectosMostrados, setProyectosMostrados] = useState<Proyecto[]>([]);
+export default function GuiaPage() {
+  const [prestadores, setPrestadores] = useState<Prestador[]>([]);
+  const [prestadoresMostrados, setPrestadoresMostrados] = useState<Prestador[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // --- FILTROS ---
-  const [busqueda, setBusqueda] = useState('');
-  const [filtroTipo, setFiltroTipo] = useState('Todos');
-  const [filtroCiudad, setFiltroCiudad] = useState('Todas');
-  const [filtroEstudiante, setFiltroEstudiante] = useState(false);
-  const [filtroRemunerado, setFiltroRemunerado] = useState(false);
-  const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
+  const [filtroTexto, setFiltroTexto] = useState('');
+  const [tipoSeleccionado, setTipoSeleccionado] = useState("Todos");
+  const [rubroSeleccionado, setRubroSeleccionado] = useState("Todos");
 
-  // UI
   const [isScrolled, setIsScrolled] = useState(false);
-  const filtersRef = useRef<HTMLDivElement>(null); 
-  const [hoveredId, setHoveredId] = useState<number | null>(null);
-  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const filtersRef = useRef<HTMLDivElement>(null);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';     
 
-  // 1. CARGA INICIAL (USANDO LA VARIABLE DE ENTORNO)
   useEffect(() => {
-    fetch(`${apiUrl}/proyecto`)
+    fetch(`${apiUrl}/prestador`)
       .then(res => res.json())
       .then(data => { 
-          setProyectos(data); 
-          setProyectosMostrados(data); 
+          setPrestadores(data); 
+          setPrestadoresMostrados(data); 
           setLoading(false); 
       })
       .catch(err => console.error(err));
-  }, []);
+  }, [apiUrl]); // Añadido apiUrl a las dependencias
 
-  // 2. LÓGICA DE FILTRADO
   useEffect(() => {
-    const filtrados = proyectos.filter(p => {
-      const coincideTexto = p.titulo.toLowerCase().includes(busqueda.toLowerCase()) || 
-                            p.descripcion.toLowerCase().includes(busqueda.toLowerCase());
-      const coincideTipo = filtroTipo === 'Todos' || p.tipo === filtroTipo;
-      const coincideCiudad = filtroCiudad === 'Todas' || p.ciudad === filtroCiudad;
-      const coincideEstudiante = !filtroEstudiante || p.esEstudiante;
-      const coincideRemunerado = !filtroRemunerado || p.esRemunerado;
-      
-      let coincideFecha = true;
-      const fechaProyecto = p.fechaInicio ? new Date(p.fechaInicio).getTime() : 0;
-      if (fechaDesde) {
-        const desde = new Date(fechaDesde).getTime();
-        if (!fechaProyecto || fechaProyecto < desde) coincideFecha = false;
-      }
-      if (fechaHasta) {
-        const hasta = new Date(fechaHasta).getTime();
-        if (!fechaProyecto || fechaProyecto > hasta) coincideFecha = false;
-      }
-
-      return coincideTexto && coincideTipo && coincideCiudad && coincideEstudiante && coincideRemunerado && coincideFecha;
+    const filtrados = prestadores.filter(p => {
+        const coincideTexto = p.nombre.toLowerCase().includes(filtroTexto.toLowerCase()) || 
+                              p.rubro.toLowerCase().includes(filtroTexto.toLowerCase()) ||
+                              (p.descripcion?.toLowerCase().includes(filtroTexto.toLowerCase()) ?? false);
+        const coincideTipo = tipoSeleccionado === "Todos" || p.tipoPerfil === tipoSeleccionado;
+        const coincideRubro = rubroSeleccionado === "Todos" || p.rubro === rubroSeleccionado;
+        return coincideTexto && coincideTipo && coincideRubro;
     });
-    setProyectosMostrados(filtrados);
-  }, [busqueda, filtroTipo, filtroCiudad, filtroEstudiante, filtroRemunerado, fechaDesde, fechaHasta, proyectos]);
+    setPrestadoresMostrados(filtrados);
+  }, [filtroTexto, tipoSeleccionado, rubroSeleccionado, prestadores]);
 
-  // 3. ALEATORIEDAD
   const handleRandomize = () => {
-      const shuffled = [...proyectosMostrados];
-      for (let i = shuffled.length - 1; i > 0; i--) {
+      const arrayMezclado = [...prestadoresMostrados];
+      for (let i = arrayMezclado.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          [arrayMezclado[i], arrayMezclado[j]] = [arrayMezclado[j], arrayMezclado[i]];
       }
-      setProyectosMostrados(shuffled);
+      setPrestadoresMostrados(arrayMezclado);
   };
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleMouseEnter = (id: number) => {
-    hoverTimerRef.current = setTimeout(() => setHoveredId(id), 600);
-  };
-
-  const handleMouseLeave = () => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    setHoveredId(null);
-  };
+  const rubrosDisponibles = ["Todos", ...Array.from(new Set(prestadores
+    .filter(p => tipoSeleccionado === "Todos" || p.tipoPerfil === tipoSeleccionado)
+    .map(p => p.rubro)
+  ))];
 
   const scrollFilters = (direction: 'left' | 'right') => {
     if (filtersRef.current) {
@@ -162,287 +110,208 @@ export default function CarteleraProyectosPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-500/30 pt-80 md:pt-64 flex flex-col overscroll-y-none">
+    <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-500/30 pt-64 md:pt-48 flex flex-col">
       
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
-        ::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; cursor: pointer; }
       `}</style>
 
       {/* --- HEADER FLUIDO --- */}
       <div 
-        className={`fixed top-20 left-0 right-0 z-40 transition-all duration-500 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/95 pb-3 ${
+        className={`fixed top-20 left-0 right-0 z-40 transition-all duration-500 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/95 ${
           isScrolled ? 'shadow-2xl' : ''
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col gap-3 py-3">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex flex-col gap-4">
           
-          {/* ================= FILA 1: TÍTULO, BUSCADOR Y ACCIONES ================= */}
-          <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
-              
-              {/* TÍTULO */}
+          {/* FILA SUPERIOR: TÍTULO Y BUSCADOR */}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+              {/* Título */}
               <div className="flex items-center gap-3 shrink-0">
-                  <div className="bg-red-600/20 p-1.5 rounded-lg border border-red-500/30">
-                    <Clapperboard className="text-red-500" size={20} />
+                  <div className="bg-orange-600/20 p-2 rounded-lg border border-orange-500/30">
+                    <Users className="text-orange-500" size={24} />
                   </div>
-                  <h1 className="font-black tracking-tighter text-xl md:text-2xl leading-none">
-                    CARTELERA <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">TDF</span>
+                  <h1 className="font-black tracking-tighter text-2xl leading-none">
+                    GUÍA DE <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">TALENTO</span>
                   </h1>
               </div>
 
-              {/* GRUPO DERECHA: Buscador + Botones */}
-              <div className="flex flex-row gap-3 w-full lg:w-auto items-center justify-end">
+              {/* Contenedor Derecho: Buscador + Filtros + Botones */}
+              <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-center">
                   
                   {/* Buscador */}
-                  <div className="relative group w-full lg:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500" size={14} />
+                  <div className="relative group w-full md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500" size={16} />
                     <input 
                       type="text" 
-                      placeholder="Buscar proyecto..."
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs outline-none text-white focus:border-orange-500 transition-all"
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBusqueda(e.target.value)}
+                      placeholder="Buscar..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white focus:border-orange-500 transition-all"
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltroTexto(e.target.value)}
                     />
                   </div>
 
-                  {/* SEPARADOR VERTICAL */}
-                  <div className="h-6 w-px bg-slate-800 hidden md:block mx-1"></div>
+                  {/* BLOQUE DE FILTROS Y BOTONES (En línea) */}
+                  <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-start">
+                      
+                      {/* Filtros Tipo (Scrollable) */}
+                      <div className="flex gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-hide flex-1 md:flex-none md:max-w-[250px] min-w-0">
+                          {TIPOS_PERFIL.map((tipo) => {
+                              const Icon = tipo.icon;
+                              const isActive = tipoSeleccionado === tipo.value;
+                              return (
+                                  <button
+                                      key={tipo.value}
+                                      onClick={() => setTipoSeleccionado(tipo.value)}
+                                      className={`p-2 rounded-lg transition-all flex items-center justify-center shrink-0 ${
+                                          isActive ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                      }`}
+                                      title={tipo.label}
+                                  >
+                                      {Icon && <Icon size={18}/>}
+                                  </button>
+                              )
+                          })}
+                      </div>
 
-                  {/* BOTONES DE ACCIÓN */}
-                  <div className="flex gap-2 shrink-0">
-                      <Link href="/mis-proyectos/crear">
-                        <button className="bg-cyan-600 hover:bg-cyan-500 text-white p-1.5 rounded-lg shadow-lg shadow-cyan-900/20 transition-all hover:scale-105 active:scale-95 border border-cyan-500/30 w-8 h-8 flex items-center justify-center" title="Publicar Proyecto">
-                            <Plus size={18} strokeWidth={3} />
-                        </button>
-                      </Link>
+                      {/* Separador */}
+                      <div className="h-8 w-px bg-slate-800 mx-1 hidden md:block"></div>
 
-                      <button 
-                        onClick={handleRandomize}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white p-1.5 rounded-lg shadow-lg shadow-emerald-900/20 transition-all hover:scale-105 active:scale-95 group border border-emerald-500/30 w-8 h-8 flex items-center justify-center"
-                        title="Aleatorio"
-                      >
-                          <Dice5 size={18} className="group-hover:rotate-180 transition-transform duration-500"/>
-                      </button>
+                      {/* Botones Acción */}
+                      <div className="flex gap-2 shrink-0">
+                          <Link href="/mi-perfil/crear">
+                            <button className="bg-cyan-600 hover:bg-cyan-500 text-white p-2.5 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 border border-cyan-500/30 flex items-center justify-center">
+                                <Plus size={20} strokeWidth={3} />
+                            </button>
+                          </Link>
+
+                          <button 
+                            onClick={handleRandomize}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white p-2.5 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 group border border-emerald-500/30 flex items-center justify-center"
+                          >
+                              <Dice5 size={20} className="group-hover:rotate-180 transition-transform duration-500"/>
+                          </button>
+                      </div>
                   </div>
-
               </div>
           </div>
 
-          {/* ================= FILA 2: FILTROS ESTADO + FECHAS + CIUDADES (Centrado) ================= */}
-          <div className="flex flex-wrap justify-center items-center gap-3 border-t border-slate-800/50 pt-3 pb-1">
-              
-              <button 
-                onClick={() => setFiltroEstudiante(!filtroEstudiante)} 
-                className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all border flex items-center gap-1.5 ${
-                  filtroEstudiante 
-                    ? 'bg-blue-600 text-white border-blue-500' 
-                    : 'bg-slate-900 text-slate-500 border-slate-700 hover:text-blue-400'
-                }`}
-              >
-                <GraduationCap size={12} /> ESTUDIANTIL
-              </button>
-
-              <button 
-                onClick={() => setFiltroRemunerado(!filtroRemunerado)} 
-                className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all border flex items-center gap-1.5 ${
-                  filtroRemunerado 
-                    ? 'bg-emerald-600 text-white border-emerald-500' 
-                    : 'bg-slate-900 text-slate-500 border-slate-700 hover:text-emerald-400'
-                }`}
-              >
-                <DollarSign size={12} /> REMUNERADO
-              </button>
-
-              {/* Fechas */}
-              <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1">
-                  <Calendar size={12} className="text-slate-500"/>
-                  <input type="date" className="bg-transparent text-[10px] text-white w-20 outline-none" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFechaDesde(e.target.value)} value={fechaDesde}/>
-                  <span className="text-slate-600 text-[10px]">-</span>
-                  <input type="date" className="bg-transparent text-[10px] text-white w-20 outline-none" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFechaHasta(e.target.value)} value={fechaHasta}/>
-                  {(fechaDesde || fechaHasta) && <button onClick={() => {setFechaDesde(''); setFechaHasta('')}} className="text-slate-500 hover:text-white"><X size={12}/></button>}
-              </div>
-
-              {/* Selector de Ciudades */}
-              <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800 gap-1 overflow-x-auto max-w-full scrollbar-hide ml-2">
-                  {CIUDADES_OPCIONES.map((c) => (
-                      <button
-                          key={c.id}
-                          onClick={() => setFiltroCiudad(c.id)}
-                          className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all flex items-center gap-1 shrink-0 ${
-                              filtroCiudad === c.id 
-                              ? 'bg-orange-600 text-white shadow' 
-                              : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                          }`}
-                          title={c.label}
+          {/* FILA INFERIOR: RUBROS (Scroll) */}
+          <div className="relative group/filters w-full border-t border-slate-800/50 pt-2">
+                <button onClick={() => scrollFilters('left')} className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-slate-900/80 p-1 rounded-full text-slate-400 border border-slate-700 hover:text-white"><ChevronLeft size={14}/></button>
+                
+                <div ref={filtersRef} className="flex gap-2 overflow-x-auto scrollbar-hide w-full snap-x scroll-smooth px-2 md:px-8">
+                    {rubrosDisponibles.map((rubro: string) => (
+                      <button 
+                        key={rubro}
+                        onClick={() => setRubroSeleccionado(rubro)}
+                        className={`whitespace-nowrap rounded-lg font-bold transition-all border snap-center shrink-0 flex items-center justify-center px-4 py-1.5 text-[10px] uppercase tracking-wide ${
+                          rubroSeleccionado === rubro 
+                            ? 'bg-orange-600/10 border-orange-500 text-orange-500' 
+                            : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                        }`}
                       >
-                          {c.id !== 'Todas' && <MapPin size={10} />}
-                          {c.short}
+                        {rubro}
                       </button>
-                  ))}
-              </div>
-          </div>
+                    ))}
+                </div>
 
-          {/* ================= FILA 3: CATEGORÍAS (Centradas) ================= */}
-          <div className="relative group/filters overflow-hidden pt-1 w-full max-w-4xl mx-auto border-t border-slate-800/30 mt-1">
-              <button onClick={() => scrollFilters('left')} className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-slate-900/80 p-1 rounded-full text-slate-400 border border-slate-700"><ChevronLeft size={12}/></button>
-              
-              <div ref={filtersRef} className="flex gap-2 overflow-x-auto scrollbar-hide w-full snap-x scroll-smooth px-4 justify-start md:justify-center">
-                  {TIPOS.map((tipo) => (
-                    <button 
-                      key={tipo}
-                      onClick={() => setFiltroTipo(tipo)}
-                      className={`whitespace-nowrap rounded-lg font-bold transition-all border snap-center shrink-0 flex items-center justify-center px-4 py-1.5 text-[10px] uppercase tracking-wide ${
-                        filtroTipo === tipo 
-                          ? 'bg-red-600/10 border-red-500 text-red-500' 
-                          : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                      }`}
-                    >
-                      {tipo}
-                    </button>
-                  ))}
-              </div>
-
-              <button onClick={() => scrollFilters('right')} className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-slate-900/80 p-1 rounded-full text-slate-400 border border-slate-700"><ChevronRight size={12}/></button>
+                <button onClick={() => scrollFilters('right')} className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-slate-900/80 p-1 rounded-full text-slate-400 border border-slate-700 hover:text-white"><ChevronRight size={14}/></button>
           </div>
 
         </div>
       </div>
 
-      {/* --- GRILLA DE CONTENIDO --- */}
-      <div className="max-w-7xl mx-auto px-6 py-8 flex-1 w-full">
+      {/* --- LISTADO DE TARJETAS --- */}
+      <div className="max-w-7xl mx-auto px-6 pb-20 flex-1 w-full">
         
-        <div className="flex justify-between items-center mb-8 pb-4 border-b border-slate-800">
+        <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
           <div className="flex items-center gap-2 text-slate-400">
             <Filter size={16}/>
-            <span className="text-sm font-medium">{proyectosMostrados.length} resultados</span>
+            <span className="text-sm font-medium">{prestadoresMostrados.length} resultados</span>
           </div>
         </div>
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
-            <p className="text-slate-500 text-sm animate-pulse">Cargando cartelera...</p>
+            <p className="text-slate-500 text-sm animate-pulse">Cargando talento...</p>
           </div>
         ) : (
           <motion.div 
             layout 
+            variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
           >
             <AnimatePresence mode='popLayout'>
-              {proyectosMostrados.map((p, index) => {
-                const videoRef = p.referencias?.find((r: string) => r.includes('youtu'));
-                const youtubeId = videoRef ? getYoutubeId(videoRef) : null;
-                const isHovered = hoveredId === p.id;
-
+              {prestadoresMostrados.map((p) => {
+                const tema = p.colorTema || '#ea580c';
+                
                 return (
                   <motion.div
                     layout
-                    custom={index}
+                    key={p.id}
                     variants={cardVariants}
                     initial="hidden"
                     animate="visible"
                     exit="exit"
-                    key={p.id}
-                    onMouseEnter={() => handleMouseEnter(p.id)}
-                    onMouseLeave={handleMouseLeave}
-                    className="group relative bg-slate-900 rounded-[2rem] border border-slate-800 hover:border-orange-500/30 transition-all hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] h-full flex flex-col overflow-hidden hover:-translate-y-1 duration-300"
+                    whileHover={{ y: -8, transition: { duration: 0.3 } }}
+                    className="group h-full"
                   >
-                    <Link href={`/proyectos/${p.id}`} className="flex flex-col h-full">
+                    <Link href={`/prestador/${p.id}`} className="block h-full relative">
                       
-                      {/* MEDIA AREA */}
-                      <div className="relative h-64 bg-black overflow-hidden">
-                        
-                        {/* Video Overlay on Hover */}
-                        {isHovered && youtubeId ? (
-                            <motion.div 
-                                initial={{ opacity: 0 }} 
-                                animate={{ opacity: 1 }} 
-                                className="absolute inset-0 z-20 bg-black"
-                            >
-                                <iframe 
-                                    src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${youtubeId}`}
-                                    className="w-full h-full object-cover pointer-events-none scale-125"
-                                    allow="autoplay"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-80 pointer-events-none"></div>
-                            </motion.div>
-                        ) : (
-                            <>
-                                {p.foto ? (
-                                    <img src={p.foto} className="w-full h-full object-cover opacity-70 group-hover:scale-110 transition-transform duration-700 grayscale-[30%] group-hover:grayscale-0" />
-                                ) : (
-                                    <div className="w-full h-full bg-slate-800 flex items-center justify-center opacity-50"><Film size={40}/></div>
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-90"></div>
-                            </>
-                        )}
+                      {/* EFECTO GLOW */}
+                      <div 
+                        className="absolute -inset-0.5 rounded-3xl opacity-0 group-hover:opacity-40 transition-opacity duration-500 blur-xl"
+                        style={{ backgroundColor: tema }}
+                      ></div>
 
-                        {/* TIPO + CIUDAD (Badge Flotante) */}
-                        <div className="absolute top-4 left-4 z-30">
-                            <span className="text-[9px] font-black uppercase text-white bg-orange-600 px-3 py-1 rounded-full shadow-lg">
-                                {p.tipo}
+                      <div className="relative bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden h-full flex flex-col items-center transition-all duration-300 group-hover:border-[var(--border-color)] group-hover:shadow-2xl pt-8 pb-6 px-6"
+                           style={{ ['--border-color' as never]: tema }}>
+                        
+                        <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: tema }}></div>
+
+                        {/* FOTO */}
+                        <div className="relative mb-6">
+                            <div 
+                              className="w-32 h-32 rounded-full border-4 p-1 bg-slate-950 flex items-center justify-center text-3xl font-bold overflow-hidden shadow-2xl group-hover:scale-105 transition-transform duration-500"
+                              style={{ borderColor: tema, color: tema }}
+                            >
+                              {p.foto ? (
+                                <img src={p.foto} alt={p.nombre} className="w-full h-full rounded-full object-cover" />
+                              ) : (
+                                <span>{getInitials(p.nombre)}</span>
+                              )}
+                            </div>
+                            <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shadow-md whitespace-nowrap">
+                                {p.tipoPerfil}
                             </span>
                         </div>
 
-                        {/* BADGES ESTADO (Top Right) */}
-                        <div className="absolute top-4 right-4 z-30 flex flex-col gap-2 items-end">
-                            {p.esRemunerado && (
-                                <span className="bg-emerald-500 text-white text-[9px] font-bold p-1.5 rounded-full shadow-lg" title="Remunerado">
-                                    <DollarSign size={12} strokeWidth={3}/>
-                                </span>
-                            )}
-                            {p.esEstudiante && (
-                                <span className="bg-blue-600 text-white text-[9px] font-bold p-1.5 rounded-full shadow-lg" title="Estudiantil">
-                                    <GraduationCap size={12}/>
-                                </span>
-                            )}
-                        </div>
+                        {/* INFO */}
+                        <div className="text-center w-full flex-1 flex flex-col items-center mt-2">
+                            <h3 className="text-xl font-bold text-white leading-tight mb-2 group-hover:text-[var(--text-color)] transition-colors"
+                                style={{ ['--text-color' as never]: tema }}>
+                                {p.nombre}
+                            </h3>
 
-                      </div>
-
-                      {/* CONTENIDO */}
-                      <div className="p-7 flex-1 flex flex-col bg-slate-900 relative z-10 -mt-12 rounded-t-[2rem]">
-                        
-                        {/* Título Grande */}
-                        <h3 className="text-3xl font-black text-white mb-3 leading-none group-hover:text-orange-500 transition-colors tracking-tight">
-                            {p.titulo}
-                        </h3>
-
-                        {/* Ubicación e Inicio */}
-                        <div className="flex items-center gap-4 text-xs text-slate-400 mb-4 font-medium">
-                            <span className="flex items-center gap-1"><MapPin size={12} className="text-orange-500"/> {p.ciudad}</span>
-                            {p.fechaInicio && <span className="flex items-center gap-1"><Calendar size={12}/> {new Date(p.fechaInicio).toLocaleDateString()}</span>}
-                        </div>
-
-                        <p className="text-slate-400 text-sm line-clamp-3 mb-6 font-light leading-relaxed">
-                            {p.descripcion}
-                        </p>
-
-                        {/* Roles */}
-                        <div className="mt-auto pt-4 border-t border-slate-800">
-                            <div className="flex flex-wrap gap-1.5 mb-4">
-                                {p.puestos && p.puestos.length > 0 ? (
-                                    p.puestos.slice(0, 3).map((puesto: Puesto) => (
-                                        <span key={puesto.id} className="text-[10px] font-bold uppercase bg-slate-800 text-slate-300 px-2 py-1 rounded border border-slate-700">
-                                            {puesto.nombre}
-                                        </span>
-                                    ))
-                                ) : <span className="text-xs text-slate-600 italic">Equipo completo</span>}
-                                {p.puestos && p.puestos.length > 3 && <span className="text-[10px] text-slate-500 px-1">+{p.puestos.length - 3}</span>}
+                            <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1 mb-4">
+                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tema }}></div>
+                                {p.rubro}
                             </div>
 
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400 border border-slate-700">
-                                        {p.user?.nombre?.[0] || 'U'}
-                                    </div>
-                                    <span className="text-[10px] text-slate-500 uppercase tracking-widest truncate max-w-[80px]">
-                                        {p.user?.nombre || 'Productor'}
-                                    </span>
+                            <p className="text-slate-400 text-sm mb-6 line-clamp-2 font-light leading-relaxed max-w-[250px]">
+                                {p.descripcion || "Sin descripción disponible."}
+                            </p>
+
+                            <div className="mt-auto w-full border-t border-slate-800/50 pt-4 flex justify-between items-center text-xs">
+                                <div className="flex items-center gap-1 text-slate-500">
+                                    <MapPin size={12} className="text-orange-500"/>
+                                    <span>{p.ciudad || "TDF"}</span>
                                 </div>
-                                <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-orange-500 group-hover:gap-2 transition-all">
-                                    Ver Ficha <Eye size={12}/>
+                                <span className="font-bold uppercase tracking-wider flex items-center gap-1 group-hover:gap-2 transition-all duration-300" style={{ color: tema }}>
+                                    Ver Perfil <ArrowRight size={12}/>
                                 </span>
                             </div>
                         </div>
@@ -456,11 +325,11 @@ export default function CarteleraProyectosPage() {
           </motion.div>
         )}
         
-        {!loading && proyectosMostrados.length === 0 && (
+        {!loading && prestadoresMostrados.length === 0 && (
             <div className="text-center py-20 opacity-50">
-                <p className="text-xl text-slate-400 font-light">No se encontraron proyectos.</p>
-                <button onClick={() => {setBusqueda(''); setFiltroTipo('Todos'); setFiltroCiudad('Todas');}} className="mt-4 text-orange-500 underline hover:text-orange-400">
-                    Resetear Filtros
+                <p className="text-xl text-slate-400 font-light">No se encontraron profesionales.</p>
+                <button onClick={() => {setFiltroTexto(''); setRubroSeleccionado('Todos'); setTipoSeleccionado('Todos');}} className="mt-4 text-orange-500 underline hover:text-orange-400">
+                    Limpiar filtros
                 </button>
             </div>
         )}

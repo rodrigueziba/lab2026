@@ -42,7 +42,7 @@ export default function AdminPanelPage() {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'process.env.NEXT_PUBLIC_API_URL';
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
         const headersAuth = { 'Authorization': `Bearer ${token}` };
 
         // Solicitamos todo en paralelo (Agregamos locación)
@@ -91,7 +91,7 @@ export default function AdminPanelPage() {
   const toggleAdminRole = async (id: number, currentRole: string) => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     const token = localStorage.getItem('token');
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'process.env.NEXT_PUBLIC_API_URL';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
     setUsuarios(usuarios.map(u => u.id === id ? { ...u, role: newRole } : u));
     try {
@@ -116,7 +116,7 @@ export default function AdminPanelPage() {
 
     if (result.isConfirmed) {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'process.env.NEXT_PUBLIC_API_URL';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
       try {
         const res = await fetch(`${apiUrl}/prestador/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) {
@@ -138,7 +138,7 @@ export default function AdminPanelPage() {
 
     if (result.isConfirmed) {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'process.env.NEXT_PUBLIC_API_URL';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
       try {
         const res = await fetch(`${apiUrl}/proyecto/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) {
@@ -160,7 +160,7 @@ export default function AdminPanelPage() {
 
     if (result.isConfirmed) {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'process.env.NEXT_PUBLIC_API_URL';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
       try {
         const res = await fetch(`${apiUrl}/locacion/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) {
