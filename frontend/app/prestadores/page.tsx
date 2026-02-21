@@ -1,11 +1,12 @@
-'use client'; // 👈 IMPORTANTE: Esto le dice a Next.js "Esto corre en el navegador del usuario"
+'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { Search } from 'lucide-react';
 
 export default function PrestadoresPage() {
-  // 1. ESTADOS (La memoria temporal de la página)
-  const [prestadores, setPrestadores] = useState([]); // Lista de gente
-  const [loading, setLoading] = useState(true);       // ¿Está cargando?
+  const [prestadores, setPrestadores] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busqueda, setBusqueda] = useState('');
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   // Datos del formulario nuevo
   const [formData, setFormData] = useState({
@@ -57,11 +58,33 @@ export default function PrestadoresPage() {
     }
   }
 
+  const prestadoresFiltrados = useMemo(() => {
+    if (!busqueda.trim()) return prestadores;
+    const q = busqueda.toLowerCase();
+    return prestadores.filter((p: any) =>
+      [p.nombre, p.apellido, p.email, p.ciudad].some((v) => v && String(v).toLowerCase().includes(q))
+    );
+  }, [prestadores, busqueda]);
+
   return (
     <main className="min-h-screen p-8 bg-slate-900 text-white font-sans">
-      <h1 className="text-3xl font-bold mb-8 text-orange-500 border-b border-gray-700 pb-4">
-        Guía Audiovisual TDF
-      </h1>
+      {/* Cabecera (escritorio): título | buscador centrado y ancho que sobra */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8 pb-6 border-b border-slate-700">
+        <h1 className="text-3xl font-bold text-orange-500 shrink-0">
+          Guía Audiovisual TDF
+        </h1>
+        <div className="relative group w-full md:flex-1 md:min-w-0 md:max-w-xl md:mx-4 flex justify-center">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500" size={16} />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, apellido, email, ciudad..."
+            className="w-full bg-slate-800 border border-slate-600 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white focus:border-orange-500 transition-all"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </div>
+        <div className="shrink-0 w-full md:w-auto md:min-w-[80px]" />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
@@ -142,7 +165,7 @@ export default function PrestadoresPage() {
             <p>Cargando datos...</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {prestadores.map((p: any) => (
+              {prestadoresFiltrados.map((p: any) => (
                 <div key={p.id} className="bg-slate-800 p-4 rounded-lg border border-slate-700 flex justify-between items-center hover:bg-slate-750">
                   <div>
                     <h3 className="font-bold text-lg">{p.nombre} {p.apellido}</h3>

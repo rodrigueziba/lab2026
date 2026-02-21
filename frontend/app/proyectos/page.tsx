@@ -176,17 +176,17 @@ export default function CarteleraProyectosPage() {
           isScrolled ? 'shadow-2xl' : ''
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col gap-3 py-3">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col gap-4 py-4">
           
-          {/* ================= FILA 1: TÍTULO, BUSCADOR Y ACCIONES ================= */}
+          {/* ================= FILA 1: mismo alto que guía (py-4, icono 24, text-2xl, input py-2.5) ================= */}
           <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
               
               {/* TÍTULO */}
               <div className="flex items-center gap-3 shrink-0">
-                  <div className="bg-red-600/20 p-1.5 rounded-lg border border-red-500/30">
-                    <Clapperboard className="text-red-500" size={20} />
+                  <div className="bg-red-600/20 p-2 rounded-lg border border-red-500/30">
+                    <Clapperboard className="text-red-500" size={24} />
                   </div>
-                  <h1 className="font-black tracking-tighter text-xl md:text-2xl leading-none">
+                  <h1 className="font-black tracking-tighter text-2xl leading-none">
                     CARTELERA <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">TDF</span>
                   </h1>
               </div>
@@ -194,13 +194,13 @@ export default function CarteleraProyectosPage() {
               {/* GRUPO DERECHA: Buscador + Botones */}
               <div className="flex flex-row gap-3 w-full lg:w-auto items-center justify-end">
                   
-                  {/* Buscador */}
+                  {/* Buscador (mismo estilo que guía: rounded-xl, py-2.5, text-sm) */}
                   <div className="relative group w-full lg:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500" size={14} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500" size={16} />
                     <input 
                       type="text" 
                       placeholder="Buscar proyecto..."
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs outline-none text-white focus:border-orange-500 transition-all"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white focus:border-orange-500 transition-all"
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBusqueda(e.target.value)}
                     />
                   </div>
@@ -208,20 +208,20 @@ export default function CarteleraProyectosPage() {
                   {/* SEPARADOR VERTICAL */}
                   <div className="h-6 w-px bg-slate-800 hidden md:block mx-1"></div>
 
-                  {/* BOTONES DE ACCIÓN */}
+                  {/* BOTONES DE ACCIÓN (mismo tamaño que guía: p-2.5, rounded-xl, icon 20) */}
                   <div className="flex gap-2 shrink-0">
                       <Link href="/mis-proyectos/crear">
-                        <button className="bg-cyan-600 hover:bg-cyan-500 text-white p-1.5 rounded-lg shadow-lg shadow-cyan-900/20 transition-all hover:scale-105 active:scale-95 border border-cyan-500/30 w-8 h-8 flex items-center justify-center" title="Publicar Proyecto">
-                            <Plus size={18} strokeWidth={3} />
+                        <button className="bg-cyan-600 hover:bg-cyan-500 text-white p-2.5 rounded-xl shadow-lg shadow-cyan-900/20 transition-all hover:scale-105 active:scale-95 border border-cyan-500/30 flex items-center justify-center" title="Publicar Proyecto">
+                            <Plus size={20} strokeWidth={3} />
                         </button>
                       </Link>
 
                       <button 
                         onClick={handleRandomize}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white p-1.5 rounded-lg shadow-lg shadow-emerald-900/20 transition-all hover:scale-105 active:scale-95 group border border-emerald-500/30 w-8 h-8 flex items-center justify-center"
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white p-2.5 rounded-xl shadow-lg shadow-emerald-900/20 transition-all hover:scale-105 active:scale-95 group border border-emerald-500/30 flex items-center justify-center"
                         title="Aleatorio"
                       >
-                          <Dice5 size={18} className="group-hover:rotate-180 transition-transform duration-500"/>
+                          <Dice5 size={20} className="group-hover:rotate-180 transition-transform duration-500"/>
                       </button>
                   </div>
 

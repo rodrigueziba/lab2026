@@ -140,14 +140,13 @@ export default function Navbar() {
     );
   };
 
-  // En móvil la barra mantiene siempre la misma altura (no se reduce al hacer scroll)
+  // En móvil la barra mantiene siempre la misma altura; en escritorio no se retrae ni anima al hacer scroll
   const navPadding = 'py-4 md:py-6';
-  const navPaddingScrolled = 'py-4 md:py-2';
   const navBg = isScrolled ? 'bg-slate-950/95 md:bg-slate-950/80 backdrop-blur-xl border-b border-white/5 shadow-2xl' : 'bg-transparent';
   const navHeight = 'min-h-[64px] md:min-h-0';
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-500 ${navHeight} ${isScrolled ? navPaddingScrolled : navPadding} ${navBg}`}>
+    <nav className={`fixed top-0 left-0 w-full z-50 ${navHeight} ${navPadding} ${navBg}`}>
       <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full min-h-[64px] md:min-h-0">
         
         <div className="flex items-center gap-2">

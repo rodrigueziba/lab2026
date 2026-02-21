@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { 
-  MapPin, ArrowLeft, Info, Navigation, Edit, Calendar, Image as ImageIcon, Maximize2 
+  MapPin, Info, Navigation, Edit, Calendar, Image as ImageIcon, Maximize2 
 } from 'lucide-react';
 
 const MapaTDF = dynamic(() => import('../../../components/MapaTDF'), { 
@@ -87,17 +87,13 @@ export default function DetalleLocacionPage({ params }: { params: Promise<{ id: 
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent"></div>
         <div className="absolute inset-0 z-10" style={tvScanline}></div>
 
-        <div className="absolute top-24 left-0 w-full px-6 flex justify-between z-20">
-            <button onClick={() => router.push('/locaciones')} className="bg-black/40 hover:bg-white/10 backdrop-blur-md px-4 py-2 rounded-full transition text-white border border-white/10 flex items-center gap-2 text-sm font-bold">
-                <ArrowLeft size={18}/> Volver
-            </button>
-
-            {isAdmin && (
-                <Link href={`/locaciones/editar/${locacion.id}`} className="bg-orange-600 hover:bg-orange-500 px-4 py-2 rounded-full transition text-white shadow-lg shadow-orange-900/50 flex items-center gap-2 text-sm font-bold">
-                    <Edit size={18}/> Editar
-                </Link>
-            )}
-        </div>
+        {isAdmin && (
+          <div className="absolute top-24 left-0 w-full px-6 flex justify-center z-20">
+            <Link href={`/locaciones/editar/${locacion.id}`} className="bg-orange-600 hover:bg-orange-500 px-5 py-2.5 rounded-full transition text-white shadow-lg shadow-orange-900/50 flex items-center gap-2 text-sm font-bold border border-orange-500/30">
+              <Edit size={18}/> Editar locación
+            </Link>
+          </div>
+        )}
 
         {/* --- CAMBIO 1: CENTRADO DEL TÍTULO --- */}
         <div className="absolute bottom-0 left-0 w-full p-6 md:p-16 z-20 animate-in slide-in-from-bottom duration-700 flex flex-col items-center text-center">

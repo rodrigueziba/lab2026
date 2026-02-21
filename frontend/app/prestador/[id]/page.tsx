@@ -4,8 +4,7 @@ import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2'; // 👈 Importamos SweetAlert
 import { 
   MapPin, Mail, Phone, Globe, User, Briefcase, 
-  ArrowLeft, Play, Image as ImageIcon, ShieldAlert, 
-  CheckCircle, Loader2, Lock, Clock, XCircle 
+  Image as ImageIcon, CheckCircle, Loader2, Lock, Clock, XCircle 
 } from 'lucide-react';
 
 export default function DetallePrestadorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -137,34 +136,30 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent"></div>
         <div className="absolute inset-0 z-10" style={tvScanline}></div>
         
-        <div className="absolute bottom-0 left-0 w-full p-8 md:p-16 z-20 flex flex-col md:flex-row gap-8 items-end animate-in slide-in-from-bottom duration-1000">
+        <div className="absolute bottom-0 left-0 w-full p-8 md:p-16 z-20 flex flex-col items-center text-center animate-in slide-in-from-bottom duration-1000">
             <div className="relative group-hover:scale-105 transition-transform duration-500">
-                <div className="w-32 h-32 md:w-48 md:h-48 rounded-2xl overflow-hidden border-4 border-white/10 shadow-2xl bg-slate-800">
+                <div className="w-32 h-32 md:w-48 md:h-48 rounded-2xl overflow-hidden border-4 border-white/10 shadow-2xl bg-slate-800 mx-auto">
                     {prestador.foto ? <img src={prestador.foto} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-500"><User size={48}/></div>}
                 </div>
                 <div className="absolute -bottom-3 -right-3 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg">{prestador.tipoPerfil}</div>
             </div>
-            <div className="flex-1 mb-2">
-                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white drop-shadow-2xl">{prestador.nombre}</h1>
-                <p className="text-xl md:text-2xl text-orange-500 font-bold mt-2 flex items-center gap-2">{prestador.rubro} {prestador.ciudad && <span className="text-slate-400 text-sm font-normal flex items-center gap-1 ml-4"><MapPin size={14}/> {prestador.ciudad}</span>}</p>
-            </div>
-            <button onClick={() => router.back()} className="absolute top-8 left-8 md:top-12 md:left-12 bg-black/50 hover:bg-white/20 backdrop-blur-md p-3 rounded-full transition text-white z-50"><ArrowLeft size={24}/></button>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white drop-shadow-2xl mt-4">{prestador.nombre}</h1>
+            <p className="text-xl md:text-2xl text-orange-500 font-bold mt-2 flex items-center justify-center gap-2 flex-wrap">{prestador.rubro} {prestador.ciudad && <span className="text-slate-400 text-sm font-normal flex items-center gap-1"><MapPin size={14}/> {prestador.ciudad}</span>}</p>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 md:grid-cols-3 gap-12">
+      <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
           
-          {/* COLUMNA IZQUIERDA */}
-          <div className="md:col-span-2 space-y-12">
-              <section className="animate-in slide-in-from-left duration-1000 fill-mode-both">
+          {/* COLUMNA IZQUIERDA: tarjetas con hover tipo proyectos */}
+          <div className="flex flex-col gap-8">
+              <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl flex-1 transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
                   <h3 className="text-orange-500 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2">{esEmpresa ? 'Sobre la Empresa' : 'Sobre el Profesional'}</h3>
                   <p className="text-slate-300 text-lg leading-relaxed whitespace-pre-line">{prestador.descripcion || "Sin descripción."}</p>
-              </section>
+              </div>
               
-              {/* Galería y Video */}
               {prestador.galeria && prestador.galeria.length > 0 && (
-                  <section className="animate-in slide-in-from-right duration-1000 delay-300 fill-mode-both">
-                      <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-6 flex items-center gap-2 border-b border-slate-800 pb-2 shadow-cyan-500/20 drop-shadow-md">
+                  <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
+                      <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-6 flex items-center gap-2 border-b border-slate-800 pb-2">
                           <ImageIcon size={20}/> Portafolio
                       </h3>
                       <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-slate-800 bg-black group">
@@ -174,13 +169,13 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
                               </div>
                           ))}
                       </div>
-                  </section>
+                  </div>
               )}
           </div>
 
-          {/* COLUMNA DERECHA (Contacto con Lógica de Acceso) */}
-          <div className="space-y-6 animate-in slide-in-from-right duration-1000 delay-200 fill-mode-both">
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 sticky top-24 shadow-xl">
+          {/* COLUMNA DERECHA (Contacto) — misma altura y estilo */}
+          <div className="flex flex-col">
+              <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl sticky top-24 flex-1 min-h-0 transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
                   <h3 className="text-white font-bold text-xl mb-6">Información de Contacto</h3>
                   
                   <div className="space-y-6">

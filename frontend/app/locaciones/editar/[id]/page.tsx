@@ -1,11 +1,11 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import Swal from 'sweetalert2';
 import { 
   MapPin, Image as ImageIcon, FileText, Save, Loader2, 
-  ArrowLeft, Navigation, UploadCloud, Plus, Trash2, Camera
+  ArrowLeft, UploadCloud, Plus, Trash2, Camera
 } from 'lucide-react';
 
 const supabase = createClient(
@@ -14,7 +14,7 @@ const supabase = createClient(
 );
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'; 
 
-const CATEGORIAS_TDF = {
+const CATEGORIAS_TDF: Record<string, string[]> = {
   "Paisaje Natural": ["Montañas", "Bosques", "Costas", "Lagos y lagunas", "Glaciares", "Turberas"],
   "Urbano y Arquitectura": ["Calles céntricas", "Puerto", "Edificios gubernamentales", "Casas antiguas", "Fábricas"],
   "Cultura y Esparcimiento": ["Museos", "Centros culturales", "Teatros", "Bares y restaurantes", "Hoteles"],
@@ -23,10 +23,14 @@ const CATEGORIAS_TDF = {
   "Deporte": ["Centros invernales", "Pistas de patinaje", "Canchas", "Senderos de trekking"]
 };
 
-export default function NuevaLocacionPage() {
+export default function EditarLocacionPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
+  const resolvedParams = use(params);
+  const id = resolvedParams?.id ?? null;
+
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [loadingData, setLoadingData] = useState(!!id);
 
   const [formData, setFormData] = useState({
     nombre: '', ciudad: 'Ushuaia', categoria: '', subcategoria: '',
@@ -34,22 +38,53 @@ export default function NuevaLocacionPage() {
     lat: '', lng: '', foto: ''
   });
 
-  // Estado para archivos
   const [archivoPrincipal, setArchivoPrincipal] = useState<File | null>(null);
   const [previewPrincipal, setPreviewPrincipal] = useState<string | null>(null);
-  
   const [archivosGaleria, setArchivosGaleria] = useState<File[]>([]);
   const [previewsGaleria, setPreviewsGaleria] = useState<string[]>([]);
+  const [initialGaleriaUrls, setInitialGaleriaUrls] = useState<string[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
     const user = userStr ? JSON.parse(userStr) : null;
-
     if (!token || user?.role !== 'admin') {
       router.push('/locaciones');
+      return;
     }
   }, [router]);
+
+  useEffect(() => {
+    if (!id) {
+      setLoadingData(false);
+      return;
+    }
+    let isMounted = true;
+    fetch(`${apiUrl}/locacion/${id}`)
+      .then(res => res.json())
+      .then((data: Record<string, unknown>) => {
+        if (!isMounted) return;
+        setFormData({
+          nombre: (data.nombre as string) ?? '',
+          ciudad: (data.ciudad as string) ?? 'Ushuaia',
+          categoria: (data.categoria as string) ?? '',
+          subcategoria: (data.subcategoria as string) ?? '',
+          descripcion: (data.descripcion as string) ?? '',
+          direccion: (data.direccion as string) ?? '',
+          accesibilidad: (data.accesibilidad as string) ?? '',
+          lat: data.lat != null ? String(data.lat) : '',
+          lng: data.lng != null ? String(data.lng) : '',
+          foto: (data.foto as string) ?? ''
+        });
+        if (data.foto) setPreviewPrincipal(data.foto as string);
+        const galeria = Array.isArray(data.galeria) ? (data.galeria as string[]) : [];
+        setPreviewsGaleria([...galeria]);
+        setInitialGaleriaUrls([...galeria]);
+      })
+      .catch(() => { if (isMounted) setLoadingData(false); })
+      .finally(() => { if (isMounted) setLoadingData(false); });
+    return () => { isMounted = false; };
+  }, [id, apiUrl]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -68,24 +103,23 @@ export default function NuevaLocacionPage() {
   const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    const total = archivosGaleria.length + files.length;
-    
-    if (total > 8) {
-        return Swal.fire('Límite alcanzado', 'Máximo 8 fotos en la galería', 'warning');
-    }
-
+    const total = previewsGaleria.length + files.length;
+    if (total > 8) return Swal.fire('Límite alcanzado', 'Máximo 8 fotos en la galería', 'warning');
     const newPreviews = files.map(f => URL.createObjectURL(f));
-    setArchivosGaleria([...archivosGaleria, ...files]);
-    setPreviewsGaleria([...previewsGaleria, ...newPreviews]);
+    setArchivosGaleria(prev => [...prev, ...files]);
+    setPreviewsGaleria(prev => [...prev, ...newPreviews]);
   };
 
   const removeGalleryImage = (index: number) => {
-    const newFiles = [...archivosGaleria];
-    const newPreviews = [...previewsGaleria];
-    newFiles.splice(index, 1);
-    newPreviews.splice(index, 1);
-    setArchivosGaleria(newFiles);
-    setPreviewsGaleria(newPreviews);
+    const url = previewsGaleria[index];
+    if (url?.startsWith('blob:')) {
+      const blobIndices = previewsGaleria.map((u, i) => u.startsWith('blob:') ? i : -1).filter(i => i >= 0);
+      const pos = blobIndices.indexOf(index);
+      if (pos >= 0) setArchivosGaleria(prev => prev.filter((_, i) => i !== pos));
+    } else if (url) {
+      setInitialGaleriaUrls(prev => prev.filter(u => u !== url));
+    }
+    setPreviewsGaleria(prev => prev.filter((_, i) => i !== index));
   };
 
   // Subir a Supabase (Reutilizable)
@@ -117,39 +151,35 @@ export default function NuevaLocacionPage() {
     e.preventDefault();
     setLoading(true);
     setUploading(true);
-
     try {
-      // 1. Subir Foto Principal
-      let finalFotoUrl = '';
-      if (archivoPrincipal) {
-        finalFotoUrl = await uploadToSupabase(archivoPrincipal);
-      }
+      let finalFotoUrl = formData.foto;
+      if (archivoPrincipal) finalFotoUrl = await uploadToSupabase(archivoPrincipal);
 
-      // 2. Subir Galería (en paralelo)
-      let galeriaUrls: string[] = [];
+      let galeriaUrls: string[] = [...initialGaleriaUrls];
       if (archivosGaleria.length > 0) {
-        const uploadPromises = archivosGaleria.map(file => uploadToSupabase(file));
-        galeriaUrls = await Promise.all(uploadPromises);
+        const newUrls = await Promise.all(archivosGaleria.map(file => uploadToSupabase(file)));
+        galeriaUrls = [...initialGaleriaUrls, ...newUrls];
       }
 
-      // 3. Guardar en BD
       const payload = {
         ...formData,
         foto: finalFotoUrl,
-        galeria: galeriaUrls, // Array de strings
+        galeria: galeriaUrls,
         lat: formData.lat ? parseFloat(formData.lat) : null,
         lng: formData.lng ? parseFloat(formData.lng) : null
       };
 
       const token = localStorage.getItem('token');
-      const res = await fetch(`${apiUrl}/locacion`, {
-        method: 'POST',
+      const url = id ? `${apiUrl}/locacion/${id}` : `${apiUrl}/locacion`;
+      const method = id ? 'PATCH' : 'POST';
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
 
       if (res.ok) {
-        Swal.fire('¡Creada!', 'Locación agregada al catálogo.', 'success').then(() => router.push('/locaciones'));
+        Swal.fire(id ? 'Actualizada' : '¡Creada!', id ? 'Locación actualizada.' : 'Locación agregada al catálogo.', 'success').then(() => router.push(id ? `/locaciones/${id}` : '/locaciones'));
       } else {
         throw new Error('Error al guardar en la base de datos');
       }
@@ -161,6 +191,8 @@ export default function NuevaLocacionPage() {
       setUploading(false);
     }
   };
+
+  if (loadingData) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div></div>;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-sans pt-28 pb-12 px-6 selection:bg-orange-500/30">
@@ -177,8 +209,8 @@ export default function NuevaLocacionPage() {
                     <MapPin size={28} className="text-white"/>
                 </div>
                 <div>
-                    <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Nueva Locación</h1>
-                    <p className="text-slate-400 mt-1">Registra un nuevo escenario para producciones.</p>
+                    <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">{id ? 'Editar Locación' : 'Nueva Locación'}</h1>
+                    <p className="text-slate-400 mt-1">{id ? 'Actualiza los datos de la locación.' : 'Registra un nuevo escenario para producciones.'}</p>
                 </div>
             </div>
         </div>
@@ -202,7 +234,7 @@ export default function NuevaLocacionPage() {
                     <div className="space-y-6 relative z-10 flex-1 flex flex-col">
                         <div className="shrink-0">
                             <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Nombre de la Locación *</label>
-                            <input required name="nombre" type="text" onChange={handleChange} placeholder="Ej: Laguna Esmeralda"
+                            <input required name="nombre" type="text" value={formData.nombre} onChange={handleChange} placeholder="Ej: Laguna Esmeralda"
                                 className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-orange-500 outline-none transition text-white placeholder:text-slate-600"/>
                         </div>
 
@@ -210,7 +242,7 @@ export default function NuevaLocacionPage() {
                             <div>
                                 <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Ciudad / Zona</label>
                                 <div className="relative">
-                                    <select name="ciudad" onChange={handleChange}
+                                    <select name="ciudad" value={formData.ciudad} onChange={handleChange}
                                         className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-orange-500 outline-none transition text-slate-300 appearance-none cursor-pointer">
                                         <option value="Ushuaia">Ushuaia</option>
                                         <option value="Tolhuin">Tolhuin</option>
@@ -223,14 +255,14 @@ export default function NuevaLocacionPage() {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Dirección / Acceso</label>
-                                <input name="direccion" type="text" onChange={handleChange} placeholder="Ej: Ruta 3 Km 3040"
+                                <input name="direccion" type="text" value={formData.direccion} onChange={handleChange} placeholder="Ej: Ruta 3 Km 3040"
                                     className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-orange-500 outline-none transition text-white placeholder:text-slate-600"/>
                             </div>
                         </div>
 
                         <div className="flex-1 flex flex-col">
                             <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">Descripción Técnica *</label>
-                            <textarea required name="descripcion" onChange={handleChange} placeholder="Detalles visuales, logística, permisos necesarios..."
+                            <textarea required name="descripcion" value={formData.descripcion} onChange={handleChange} placeholder="Detalles visuales, logística, permisos necesarios..."
                                 className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl focus:border-orange-500 outline-none transition text-white resize-none placeholder:text-slate-600 leading-relaxed flex-1 h-full min-h-[150px]"/>
                         </div>
                     </div>
@@ -297,7 +329,7 @@ export default function NuevaLocacionPage() {
                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <ImageIcon size={16}/> Galería
                         </h3>
-                        <span className="text-[10px] text-slate-500">{archivosGaleria.length}/8</span>
+                        <span className="text-[10px] text-slate-500">{previewsGaleria.length}/8</span>
                     </div>
                     
                     <div className="grid grid-cols-3 gap-3">
@@ -311,7 +343,7 @@ export default function NuevaLocacionPage() {
                             </div>
                         ))}
                         
-                        {archivosGaleria.length < 8 && (
+                        {previewsGaleria.length < 8 && (
                             <div className="relative aspect-square rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center hover:border-blue-500/50 hover:bg-slate-950 transition cursor-pointer group">
                                 <Plus size={20} className="text-slate-600 group-hover:text-blue-500 transition-colors"/>
                                 <input type="file" multiple accept="image/*" onChange={handleGalleryChange} className="absolute inset-0 opacity-0 cursor-pointer"/>
@@ -328,7 +360,7 @@ export default function NuevaLocacionPage() {
                         <div>
                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Categoría</label>
                             <div className="relative">
-                                <select required name="categoria" onChange={handleChange}
+                                <select required name="categoria" value={formData.categoria} onChange={handleChange}
                                     className="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl focus:border-orange-500 outline-none transition text-white text-sm appearance-none cursor-pointer">
                                     <option value="">Seleccionar...</option>
                                     {Object.keys(CATEGORIAS_TDF).map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -340,11 +372,11 @@ export default function NuevaLocacionPage() {
                         <div>
                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Subcategoría</label>
                             <div className="relative">
-                                <select name="subcategoria" onChange={handleChange}
+                                <select name="subcategoria" value={formData.subcategoria} onChange={handleChange}
                                     className="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl focus:border-orange-500 outline-none transition text-white text-sm appearance-none cursor-pointer disabled:opacity-50"
                                     disabled={!formData.categoria}>
                                     <option value="">Seleccionar...</option>
-                                    {formData.categoria && (CATEGORIAS_TDF as Record<string, string[]>)[formData.categoria]?.map((sub: string) => (
+                                    {formData.categoria && CATEGORIAS_TDF[formData.categoria]?.map((sub: string) => (
                                         <option key={sub} value={sub}>{sub}</option>
                                     ))}
                                 </select>
@@ -355,7 +387,7 @@ export default function NuevaLocacionPage() {
                         <div>
                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Accesibilidad</label>
                             <div className="relative">
-                                <select name="accesibilidad" onChange={handleChange}
+                                <select name="accesibilidad" value={formData.accesibilidad} onChange={handleChange}
                                     className="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl focus:border-orange-500 outline-none transition text-white text-sm appearance-none cursor-pointer">
                                     <option value="">Seleccionar...</option>
                                     <option value="Fácil (Vehículo)">Fácil (Vehículo)</option>
@@ -375,7 +407,7 @@ export default function NuevaLocacionPage() {
                     className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-black py-4 rounded-xl shadow-lg shadow-orange-900/30 transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
                 >
                     {uploading ? <Loader2 className="animate-spin"/> : <Save size={20}/>}
-                    {uploading ? 'Subiendo Archivos...' : 'PUBLICAR LOCACIÓN'}
+                    {uploading ? 'Subiendo Archivos...' : id ? 'GUARDAR CAMBIOS' : 'PUBLICAR LOCACIÓN'}
                 </button>
 
             </div>

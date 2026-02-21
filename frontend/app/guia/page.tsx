@@ -124,34 +124,31 @@ export default function GuiaPage() {
       >
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex flex-col gap-4">
           
-          {/* FILA SUPERIOR: TÍTULO Y BUSCADOR */}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              {/* Título */}
-              <div className="flex items-center gap-3 shrink-0">
+          {/* FILA SUPERIOR (escritorio): título | buscador centrado (ocupa ancho que sobra) | filtros y botones */}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
+              {/* Título (izquierda) */}
+              <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
                   <div className="bg-orange-600/20 p-2 rounded-lg border border-orange-500/30">
                     <Users className="text-orange-500" size={24} />
                   </div>
                   <h1 className="font-black tracking-tighter text-2xl leading-none">
-                    GUÍA DE <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">TALENTO</span>
+                    GUÍA DE <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">PRESTADORES</span>
                   </h1>
               </div>
 
-              {/* Contenedor Derecho: Buscador + Filtros + Botones */}
-              <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-center">
-                  
-                  {/* Buscador */}
-                  <div className="relative group w-full md:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500" size={16} />
-                    <input 
-                      type="text" 
-                      placeholder="Buscar..."
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white focus:border-orange-500 transition-all"
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltroTexto(e.target.value)}
-                    />
-                  </div>
+              {/* Buscador centrado, ocupa todo el ancho que sobra (solo escritorio) */}
+              <div className="relative group w-full md:flex-1 md:min-w-0 md:max-w-xl md:mx-4 flex justify-center">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar..."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white focus:border-orange-500 transition-all"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltroTexto(e.target.value)}
+                />
+              </div>
 
-                  {/* BLOQUE DE FILTROS Y BOTONES (En línea) */}
-                  <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-start">
+              {/* Filtros y botones (derecha) */}
+              <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end shrink-0">
                       
                       {/* Filtros Tipo (Scrollable) */}
                       <div className="flex gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-hide flex-1 md:flex-none md:max-w-[250px] min-w-0">
@@ -193,13 +190,12 @@ export default function GuiaPage() {
                       </div>
                   </div>
               </div>
-          </div>
 
-          {/* FILA INFERIOR: RUBROS (Scroll) */}
+          {/* FILA INFERIOR: selector de rubros centrado en escritorio */}
           <div className="relative group/filters w-full border-t border-slate-800/50 pt-2">
                 <button onClick={() => scrollFilters('left')} className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-slate-900/80 p-1 rounded-full text-slate-400 border border-slate-700 hover:text-white"><ChevronLeft size={14}/></button>
                 
-                <div ref={filtersRef} className="flex gap-2 overflow-x-auto scrollbar-hide w-full snap-x scroll-smooth px-2 md:px-8">
+                <div ref={filtersRef} className="flex gap-2 overflow-x-auto scrollbar-hide w-full snap-x scroll-smooth px-2 md:px-8 md:justify-center">
                     {rubrosDisponibles.map((rubro: string) => (
                       <button 
                         key={rubro}

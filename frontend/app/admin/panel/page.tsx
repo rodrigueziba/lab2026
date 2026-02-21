@@ -43,21 +43,29 @@ export default function AdminPanelPage() {
       try {
         const token = localStorage.getItem('token');
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-        const headersAuth = { 'Authorization': `Bearer ${token}` };
+        const headersAuth = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-        // Solicitamos todo en paralelo (Agregamos locación)
+        // Solicitamos todo en paralelo (user requiere token + admin)
         const [resUsers, resPrest, resProj, resLoc] = await Promise.all([
           fetch(`${apiUrl}/user`, { headers: headersAuth }),
           fetch(`${apiUrl}/prestador`),
           fetch(`${apiUrl}/proyecto`),
           fetch(`${apiUrl}/locacion`)
         ]);
-        
-        if (resUsers.ok) setUsuarios(await resUsers.json());
+
+        if (resUsers.ok) {
+          const data = await resUsers.json();
+          setUsuarios(Array.isArray(data) ? data : []);
+        } else {
+          setUsuarios([]);
+          if (resUsers.status === 401 || resUsers.status === 403) {
+            const err = await resUsers.json().catch(() => ({}));
+            console.warn('Listado de usuarios no disponible:', err?.message || resUsers.status);
+          }
+        }
         if (resPrest.ok) setPrestadores(await resPrest.json());
         if (resProj.ok) setProyectos(await resProj.json());
         if (resLoc.ok) setLocaciones(await resLoc.json());
-
       } catch (error) {
         console.error("Error conectando con el servidor:", error);
       } finally {
@@ -119,12 +127,15 @@ export default function AdminPanelPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
       try {
         const res = await fetch(`${apiUrl}/prestador/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
           setPrestadores(prestadores.filter(p => p.id !== id));
           Swal.fire({ title: 'Eliminado', icon: 'success', background: '#0f172a', color: '#fff', confirmButtonColor: '#f97316' });
-        } else throw new Error();
+        } else {
+          Swal.fire({ title: 'Error', text: data?.message || 'No se pudo eliminar el prestador', icon: 'error', background: '#0f172a', color: '#fff' });
+        }
       } catch (error) {
-        Swal.fire({ title: 'Error', text: 'Hubo un error al eliminar', icon: 'error', background: '#0f172a', color: '#fff' });
+        Swal.fire({ title: 'Error', text: 'Error de conexión al eliminar', icon: 'error', background: '#0f172a', color: '#fff' });
       }
     }
   };
@@ -141,12 +152,15 @@ export default function AdminPanelPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
       try {
         const res = await fetch(`${apiUrl}/proyecto/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
           setProyectos(proyectos.filter(p => p.id !== id));
           Swal.fire({ title: 'Eliminado', icon: 'success', background: '#0f172a', color: '#fff', confirmButtonColor: '#f97316' });
-        } else throw new Error();
+        } else {
+          Swal.fire({ title: 'Error', text: data?.message || 'No se pudo eliminar el proyecto', icon: 'error', background: '#0f172a', color: '#fff' });
+        }
       } catch (error) {
-        Swal.fire({ title: 'Error', icon: 'error', background: '#0f172a', color: '#fff' });
+        Swal.fire({ title: 'Error', text: 'Error de conexión al eliminar', icon: 'error', background: '#0f172a', color: '#fff' });
       }
     }
   };
@@ -163,12 +177,15 @@ export default function AdminPanelPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
       try {
         const res = await fetch(`${apiUrl}/locacion/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
           setLocaciones(locaciones.filter(l => l.id !== id));
           Swal.fire({ title: 'Eliminada', icon: 'success', background: '#0f172a', color: '#fff', confirmButtonColor: '#f97316' });
-        } else throw new Error();
+        } else {
+          Swal.fire({ title: 'Error', text: data?.message || 'No se pudo eliminar la locación', icon: 'error', background: '#0f172a', color: '#fff' });
+        }
       } catch (error) {
-        Swal.fire({ title: 'Error', icon: 'error', background: '#0f172a', color: '#fff' });
+        Swal.fire({ title: 'Error', text: 'Error de conexión al eliminar', icon: 'error', background: '#0f172a', color: '#fff' });
       }
     }
   };
@@ -187,7 +204,8 @@ export default function AdminPanelPage() {
 
   const filteredProyectos = proyectos.filter(p => 
     p.titulo?.toLowerCase().includes(searchProyectos.toLowerCase()) || 
-    p.etapa?.toLowerCase().includes(searchProyectos.toLowerCase())
+    (p.tipo && String(p.tipo).toLowerCase().includes(searchProyectos.toLowerCase())) ||
+    (p.estado && String(p.estado).toLowerCase().includes(searchProyectos.toLowerCase()))
   );
 
   const filteredLocaciones = locaciones.filter(l => 
@@ -304,6 +322,9 @@ export default function AdminPanelPage() {
           </div>
       </div>
 
+      {usuarios.length === 0 && !loading && (
+        <p className="text-amber-500/90 text-sm mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">Inicia sesión como administrador para ver el listado de usuarios.</p>
+      )}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-xl">
         <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
@@ -376,7 +397,7 @@ export default function AdminPanelPage() {
                             </div>
                             <div>
                                 <p className="text-white font-medium text-sm leading-tight">{p.nombre}</p>
-                                <p className="text-slate-500 text-[10px]">{p.emailContacto || 'Sin email'}</p>
+                                <p className="text-slate-500 text-[10px]">{p.email || 'Sin email'}</p>
                             </div>
                         </td>
                         <td className="p-4"><span className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-md border border-slate-700">{p.tipoPerfil}</span></td>
@@ -404,7 +425,7 @@ export default function AdminPanelPage() {
           <h2 className="text-2xl font-black text-white">Catálogo de Proyectos</h2>
           <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
-              <input type="text" placeholder="Buscar proyecto o etapa..." value={searchProyectos} onChange={(e) => setSearchProyectos(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
+              <input type="text" placeholder="Buscar proyecto..." value={searchProyectos} onChange={(e) => setSearchProyectos(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
           </div>
       </div>
 
@@ -414,7 +435,6 @@ export default function AdminPanelPage() {
                 <tr className="bg-slate-950/50 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
                     <th className="p-4 font-bold">Título del Proyecto</th>
                     <th className="p-4 font-bold">Tipo</th>
-                    <th className="p-4 font-bold">Etapa</th>
                     <th className="p-4 font-bold">Ubicación</th>
                     <th className="p-4 font-bold text-right">Acciones</th>
                 </tr>
@@ -424,10 +444,9 @@ export default function AdminPanelPage() {
                     <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
                         <td className="p-4">
                             <p className="text-white font-medium text-sm">{p.titulo}</p>
-                            <p className="text-slate-500 text-[10px] line-clamp-1 max-w-[200px]">{p.sinopsis || 'Sin sinopsis'}</p>
+                            <p className="text-slate-500 text-[10px] line-clamp-1 max-w-[200px]">{p.descripcion || p.sinopsis || 'Sin sinopsis'}</p>
                         </td>
-                        <td className="p-4 text-slate-300 text-sm">{p.tipoProyecto}</td>
-                        <td className="p-4"><span className="text-xs bg-orange-500/10 text-orange-500 border border-orange-500/20 px-2 py-1 rounded-md">{p.etapa}</span></td>
+                        <td className="p-4 text-slate-300 text-sm"><span className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-md border border-slate-700">{p.tipo || '—'}</span></td>
                         <td className="p-4 text-slate-400 text-sm flex items-center gap-1"><MapPin size={14}/> {p.ciudad || 'No definida'}</td>
                         <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -499,10 +518,10 @@ export default function AdminPanelPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row pt-16">
+    <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row pt-20 md:pt-24">
       
       {/* SIDEBAR LATERAL */}
-      <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-4 md:h-[calc(100vh-64px)] md:sticky md:top-16 z-10 shrink-0">
+      <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-4 md:h-[calc(100vh-6rem)] md:sticky md:top-24 z-10 shrink-0">
         <div className="mb-8 px-4">
             <h1 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Panel de Control</h1>
             <p className="text-white font-bold flex items-center gap-2"><Shield size={16} className="text-orange-500"/> Master Admin</p>

@@ -54,11 +54,21 @@ export default function CatalogoLocacionesPage() {
   const [loading, setLoading] = useState(true);
   const [filtroCategoria, setFiltroCategoria] = useState("Todas");
   const [busqueda, setBusqueda] = useState("");
-  
+  const [user, setUser] = useState<{ role?: string } | null>(null);
+
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);      
   const filtersRef = useRef<HTMLDivElement>(null);     
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';     
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      setUser(userStr ? JSON.parse(userStr) : null);
+    } catch {
+      setUser(null);
+    }
+  }, []);     
 
   useEffect(() => {
     fetch(`${apiUrl}/locacion`)
@@ -131,10 +141,10 @@ export default function CatalogoLocacionesPage() {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #475569; }
       `}</style>
 
-      {/* --- HEADER --- */}
+      {/* --- HEADER: título | búsqueda | filtros (filtros se extienden a la derecha en escritorio) --- */}
       <div className={`bg-slate-900/90 backdrop-blur-xl border-b border-slate-800 z-30 shrink-0 transition-all duration-500 w-full ${isScrolled ? 'py-4 shadow-2xl' : 'py-6 md:py-8'}`}>
-        <div className="w-full px-6 max-w-[1920px] mx-auto flex flex-wrap gap-y-4 gap-x-8 items-center justify-between">
-          
+        <div className="w-full px-6 max-w-[1920px] mx-auto flex flex-col md:flex-row gap-4 md:gap-6 items-stretch md:items-center">
+          {/* Título */}
           <div className="shrink-0 transition-all duration-500 min-w-fit">
             <h1 className={`font-black tracking-tighter transition-all duration-500 leading-none flex items-center gap-3 ${isScrolled ? 'text-2xl' : 'text-3xl md:text-4xl'}`}>
               <div className="bg-orange-600/20 p-2 rounded-lg border border-orange-500/30">
@@ -144,30 +154,30 @@ export default function CatalogoLocacionesPage() {
             </h1>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-4 items-center flex-1 justify-end min-w-[300px]">
-              <div className="relative group w-full md:max-w-xs transition-all">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-orange-500">
-                  <Search size={18} />
-                </div>
-                <input 
-                  type="text" 
-                  placeholder="Buscar ciudad, nombre..." 
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-11 pr-4 py-2.5 text-sm outline-none text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all shadow-inner placeholder:text-slate-600" 
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBusqueda(e.target.value)} // Tipado añadido aquí
-                />
-              </div>
+          {/* Búsqueda (inmediatamente después del título en escritorio) */}
+          <div className="relative group w-full md:w-64 md:max-w-xs shrink-0">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-orange-500">
+              <Search size={18} />
+            </div>
+            <input 
+              type="text" 
+              placeholder="Buscar ciudad, nombre..." 
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-11 pr-4 py-2.5 text-sm outline-none text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all shadow-inner placeholder:text-slate-600" 
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBusqueda(e.target.value)}
+            />
+          </div>
 
-              <div className="relative flex items-center w-full md:w-auto md:max-w-md group/filters h-10 overflow-hidden border-l border-slate-800 pl-4 md:pl-6 ml-2">
-                <button onClick={() => scrollFilters('left')} className="hidden md:flex absolute left-4 z-20 w-8 h-full bg-gradient-to-r from-slate-900 to-transparent items-center justify-start text-slate-400 hover:text-white"><ChevronLeft size={18} /></button>
-                <div ref={filtersRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 w-full snap-x scroll-smooth items-center h-full">
-                  {categoriasOrdenadas.map((cat) => (
-                    <button key={cat} onClick={() => setFiltroCategoria(cat)} className={`whitespace-nowrap rounded-lg font-bold transition-all border snap-center shrink-0 flex items-center justify-center px-4 py-1.5 text-[11px] uppercase tracking-wide ${filtroCategoria === cat ? 'bg-orange-600 border-orange-600 text-white shadow-lg shadow-orange-900/50' : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'}`}>
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={() => scrollFilters('right')} className="hidden md:flex absolute right-0 z-20 w-8 h-full bg-gradient-to-l from-slate-900 to-transparent items-center justify-end text-slate-400 hover:text-white"><ChevronRight size={18} /></button>
-              </div>
+          {/* Selector de filtros: se extiende hacia la derecha en escritorio */}
+          <div className="relative flex items-center flex-1 min-w-0 h-10 md:border-l md:border-slate-800 md:pl-6">
+            <button onClick={() => scrollFilters('left')} className="hidden md:flex absolute left-0 z-20 w-8 h-full bg-gradient-to-r from-slate-900 to-transparent items-center justify-start text-slate-400 hover:text-white"><ChevronLeft size={18} /></button>
+            <div ref={filtersRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 md:px-4 w-full snap-x scroll-smooth items-center h-full">
+              {categoriasOrdenadas.map((cat) => (
+                <button key={cat} onClick={() => setFiltroCategoria(cat)} className={`whitespace-nowrap rounded-lg font-bold transition-all border snap-center shrink-0 flex items-center justify-center px-4 py-1.5 text-[11px] uppercase tracking-wide ${filtroCategoria === cat ? 'bg-orange-600 border-orange-600 text-white shadow-lg shadow-orange-900/50' : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'}`}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => scrollFilters('right')} className="hidden md:flex absolute right-0 z-20 w-8 h-full bg-gradient-to-l from-slate-900 to-transparent items-center justify-end text-slate-400 hover:text-white"><ChevronRight size={18} /></button>
           </div>
         </div>
       </div>
@@ -184,9 +194,11 @@ export default function CatalogoLocacionesPage() {
                {locacionesFiltradas.length} resultados
              </div>
 
+             {user?.role === 'admin' && (
              <Link href="/locaciones/nueva" className="text-[10px] bg-slate-900 hover:bg-orange-600 hover:text-white border border-slate-700 hover:border-orange-500 text-slate-300 px-4 py-2 rounded-lg transition-all font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg">
-               + Sugerir
+               + Añadir
              </Link>
+             )}
           </div>
 
           {loading ? (
