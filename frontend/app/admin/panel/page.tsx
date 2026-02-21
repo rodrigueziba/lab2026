@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -37,6 +37,7 @@ interface Proyecto {
   id: number;
   titulo: string;
   descripcion?: string;
+  sinopsis?: string;
   tipo?: string;
   ciudad?: string;
   estado?: string;
@@ -81,10 +82,15 @@ export default function AdminPanelPage() {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const headersAuth = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        // CORRECCIÓN HEADERS: Definición explícita para evitar error de sobrecarga en fetch
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
 
         const [resUsers, resPrest, resProj, resLoc] = await Promise.all([
-          fetch(`${apiUrl}/user`, { headers: headersAuth }),
+          fetch(`${apiUrl}/user`, { headers }),
           fetch(`${apiUrl}/prestador`),
           fetch(`${apiUrl}/proyecto`),
           fetch(`${apiUrl}/locacion`)
@@ -335,7 +341,13 @@ export default function AdminPanelPage() {
           <h2 className="text-2xl font-black text-white">Gestión de Usuarios</h2>
           <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
-              <input type="text" placeholder="Buscar usuario o email..." value={searchUsuarios} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchUsuarios(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
+              <input 
+                type="text" 
+                placeholder="Buscar usuario o email..." 
+                value={searchUsuarios} 
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchUsuarios(e.target.value)} 
+                className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"
+              />
           </div>
       </div>
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-xl">
@@ -380,12 +392,22 @@ export default function AdminPanelPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h2 className="text-2xl font-black text-white">Directorio de Prestadores</h2>
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-              <select value={filtroTipoPrestador} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFiltroTipoPrestador(e.target.value)} className="bg-slate-900 border border-slate-800 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-orange-500 transition-colors">
+              <select 
+                value={filtroTipoPrestador} 
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFiltroTipoPrestador(e.target.value)} 
+                className="bg-slate-900 border border-slate-800 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"
+              >
                 {TIPOS_PERFIL.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
               </select>
               <div className="relative w-full md:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
-                  <input type="text" placeholder="Buscar nombre o rubro..." value={searchPrestadores} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchPrestadores(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
+                  <input 
+                    type="text" 
+                    placeholder="Buscar nombre o rubro..." 
+                    value={searchPrestadores} 
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchPrestadores(e.target.value)} 
+                    className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"
+                  />
               </div>
           </div>
       </div>
@@ -437,7 +459,13 @@ export default function AdminPanelPage() {
           <h2 className="text-2xl font-black text-white">Catálogo de Proyectos</h2>
           <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
-              <input type="text" placeholder="Buscar proyecto..." value={searchProyectos} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchProyectos(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
+              <input 
+                type="text" 
+                placeholder="Buscar proyecto..." 
+                value={searchProyectos} 
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchProyectos(e.target.value)} 
+                className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"
+              />
           </div>
       </div>
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-xl">
@@ -455,7 +483,7 @@ export default function AdminPanelPage() {
                     <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
                         <td className="p-4">
                             <p className="text-white font-medium text-sm">{p.titulo}</p>
-                            <p className="text-slate-500 text-[10px] line-clamp-1 max-w-[200px]">{p.descripcion || 'Sin sinopsis'}</p>
+                            <p className="text-slate-500 text-[10px] line-clamp-1 max-w-[200px]">{p.descripcion || p.sinopsis || 'Sin sinopsis'}</p>
                         </td>
                         <td className="p-4 text-slate-300 text-sm"><span className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-md border border-slate-700">{p.tipo || '—'}</span></td>
                         <td className="p-4 text-slate-400 text-sm flex items-center gap-1"><MapPin size={14}/> {p.ciudad || 'No definida'}</td>
@@ -481,7 +509,13 @@ export default function AdminPanelPage() {
           <h2 className="text-2xl font-black text-white">Catálogo de Locaciones</h2>
           <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
-              <input type="text" placeholder="Buscar locación, ciudad..." value={searchLocaciones} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchLocaciones(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
+              <input 
+                type="text" 
+                placeholder="Buscar locación, ciudad..." 
+                value={searchLocaciones} 
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchLocaciones(e.target.value)} 
+                className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"
+              />
           </div>
       </div>
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-xl">
