@@ -32,6 +32,22 @@
 $ npm install
 ```
 
+## Base de datos y seed
+
+Asegúrate de tener `DATABASE_URL` en tu `.env`. Luego:
+
+```bash
+# Crear tablas
+$ npx prisma migrate deploy
+
+# Poblar con datos de ejemplo (usuarios, locaciones, prestadores, proyectos TDF)
+$ npm run seed
+```
+
+El seed crea usuarios (admin@tdffilm.com, productor@tdffilm.com, maria@tdffilm.com con contraseña `password123`), locaciones, prestadores y proyectos. Los usuarios se crean o actualizan siempre (upsert por email). Locaciones, prestadores y proyectos solo se insertan si sus tablas están vacías. Si ya tienes datos y no ves nada nuevo, vacía esas tablas o usa una base de datos limpia antes de ejecutar el seed.
+
+**Alternativa con Supabase:** puedes ejecutar el script SQL desde el panel de Supabase en lugar de `npm run seed`. En la carpeta `prisma` está el archivo `seed-supabase.sql`: en Supabase Dashboard → SQL Editor → New query, pega el contenido del archivo y ejecuta. Crea/actualiza los mismos usuarios y opcionalmente las locaciones (solo si la tabla está vacía). Para prestadores y proyectos, después puedes correr `npm run seed` una vez con `DATABASE_URL` apuntando a Supabase.
+
 ## Compile and run the project
 
 ```bash
