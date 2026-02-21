@@ -7,26 +7,63 @@ import Swal from 'sweetalert2';
 import { 
   Users, Briefcase, Clapperboard, BarChart3, 
   ShieldCheck, MapIcon, Search, Shield, User, 
-  Trash2, Edit, Filter, LayoutGrid, MapPin // <-- MapPin agregado aquí
+  Trash2, Edit, MapPin 
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend 
 } from 'recharts';
 
+// --- INTERFACES DE DATOS ---
+interface Usuario {
+  id: number;
+  nombre: string;
+  email: string;
+  role: string;
+  createdAt: string;
+}
+
+interface Prestador {
+  id: number;
+  nombre: string;
+  email?: string;
+  foto?: string;
+  tipoPerfil: string;
+  rubro: string;
+  ciudad: string;
+}
+
+interface Proyecto {
+  id: number;
+  titulo: string;
+  descripcion?: string;
+  tipo?: string;
+  ciudad?: string;
+  estado?: string;
+}
+
+interface Locacion {
+  id: number;
+  nombre: string;
+  foto?: string;
+  descripcion?: string;
+  categoria: string;
+  ciudad: string;
+  estado?: string;
+}
+
 const TIPOS_PERFIL = ["Todos", "Profesional", "Productora", "Empresa", "Estudiante"];
 const COLORS_PIE = ['#3b82f6', '#a855f7', '#f97316', '#10b981', '#ef4444'];
 
 export default function AdminPanelPage() {
   const router = useRouter();
-  // Agregamos 'locaciones' a los tabs posibles
   const [activeTab, setActiveTab] = useState<'stats' | 'usuarios' | 'prestadores' | 'proyectos' | 'locaciones'>('stats');
 
-  // --- ESTADOS GLOBALES ---
-  const [usuarios, setUsuarios] = useState<any[]>([]);
-  const [prestadores, setPrestadores] = useState<any[]>([]);
-  const [proyectos, setProyectos] = useState<any[]>([]);
-  const [locaciones, setLocaciones] = useState<any[]>([]); // Nuevo estado para locaciones
+  // --- ESTADOS GLOBALES TIPADOS ---
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [prestadores, setPrestadores] = useState<Prestador[]>([]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  const [locaciones, setLocaciones] = useState<Locacion[]>([]);
   const [loading, setLoading] = useState(true);
 
   // --- ESTADOS DE FILTRADO ---
@@ -34,7 +71,9 @@ export default function AdminPanelPage() {
   const [searchPrestadores, setSearchPrestadores] = useState('');
   const [filtroTipoPrestador, setFiltroTipoPrestador] = useState('Todos');
   const [searchProyectos, setSearchProyectos] = useState('');
-  const [searchLocaciones, setSearchLocaciones] = useState(''); // Filtro locaciones
+  const [searchLocaciones, setSearchLocaciones] = useState('');
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   // --- CARGA INICIAL DE DATOS ---
   useEffect(() => {
@@ -42,10 +81,8 @@ export default function AdminPanelPage() {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
         const headersAuth = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-        // Solicitamos todo en paralelo (user requiere token + admin)
         const [resUsers, resPrest, resProj, resLoc] = await Promise.all([
           fetch(`${apiUrl}/user`, { headers: headersAuth }),
           fetch(`${apiUrl}/prestador`),
@@ -58,10 +95,6 @@ export default function AdminPanelPage() {
           setUsuarios(Array.isArray(data) ? data : []);
         } else {
           setUsuarios([]);
-          if (resUsers.status === 401 || resUsers.status === 403) {
-            const err = await resUsers.json().catch(() => ({}));
-            console.warn('Listado de usuarios no disponible:', err?.message || resUsers.status);
-          }
         }
         if (resPrest.ok) setPrestadores(await resPrest.json());
         if (resProj.ok) setProyectos(await resProj.json());
@@ -73,18 +106,18 @@ export default function AdminPanelPage() {
       }
     };
     fetchAllData();
-  }, []);
+  }, [apiUrl]);
 
   // --- CÁLCULO DINÁMICO DE ESTADÍSTICAS ---
   const statsData = useMemo(() => {
-    const ciudadesCount = prestadores.reduce((acc: any, curr: any) => {
+    const ciudadesCount = prestadores.reduce((acc: Record<string, number>, curr: Prestador) => {
       const ciudad = curr.ciudad || 'No especificada';
       acc[ciudad] = (acc[ciudad] || 0) + 1;
       return acc;
     }, {});
     const ciudades = Object.keys(ciudadesCount).map(key => ({ name: key, cantidad: ciudadesCount[key] }));
 
-    const tiposCount = prestadores.reduce((acc: any, curr: any) => {
+    const tiposCount = prestadores.reduce((acc: Record<string, number>, curr: Prestador) => {
       const tipo = curr.tipoPerfil || 'Otro';
       acc[tipo] = (acc[tipo] || 0) + 1;
       return acc;
@@ -99,9 +132,8 @@ export default function AdminPanelPage() {
   const toggleAdminRole = async (id: number, currentRole: string) => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     const token = localStorage.getItem('token');
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-    setUsuarios(usuarios.map(u => u.id === id ? { ...u, role: newRole } : u));
+    setUsuarios(prev => prev.map(u => u.id === id ? { ...u, role: newRole } : u));
     try {
       const res = await fetch(`${apiUrl}/user/${id}/role`, {
         method: 'PATCH',
@@ -111,7 +143,7 @@ export default function AdminPanelPage() {
       if (!res.ok) throw new Error();
     } catch (error) {
       Swal.fire({ title: 'Error', text: 'No se pudo cambiar el rol', icon: 'error', background: '#0f172a', color: '#fff' });
-      setUsuarios(usuarios.map(u => u.id === id ? { ...u, role: currentRole } : u));
+      setUsuarios(prev => prev.map(u => u.id === id ? { ...u, role: currentRole } : u));
     }
   };
 
@@ -124,18 +156,14 @@ export default function AdminPanelPage() {
 
     if (result.isConfirmed) {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
       try {
         const res = await fetch(`${apiUrl}/prestador/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json().catch(() => ({}));
         if (res.ok) {
-          setPrestadores(prestadores.filter(p => p.id !== id));
-          Swal.fire({ title: 'Eliminado', icon: 'success', background: '#0f172a', color: '#fff', confirmButtonColor: '#f97316' });
-        } else {
-          Swal.fire({ title: 'Error', text: data?.message || 'No se pudo eliminar el prestador', icon: 'error', background: '#0f172a', color: '#fff' });
+          setPrestadores(prev => prev.filter(p => p.id !== id));
+          Swal.fire({ title: 'Eliminado', icon: 'success', background: '#0f172a', color: '#fff' });
         }
       } catch (error) {
-        Swal.fire({ title: 'Error', text: 'Error de conexión al eliminar', icon: 'error', background: '#0f172a', color: '#fff' });
+        Swal.fire({ title: 'Error', text: 'Error de conexión', icon: 'error', background: '#0f172a', color: '#fff' });
       }
     }
   };
@@ -149,18 +177,14 @@ export default function AdminPanelPage() {
 
     if (result.isConfirmed) {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
       try {
         const res = await fetch(`${apiUrl}/proyecto/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json().catch(() => ({}));
         if (res.ok) {
-          setProyectos(proyectos.filter(p => p.id !== id));
-          Swal.fire({ title: 'Eliminado', icon: 'success', background: '#0f172a', color: '#fff', confirmButtonColor: '#f97316' });
-        } else {
-          Swal.fire({ title: 'Error', text: data?.message || 'No se pudo eliminar el proyecto', icon: 'error', background: '#0f172a', color: '#fff' });
+          setProyectos(prev => prev.filter(p => p.id !== id));
+          Swal.fire({ title: 'Eliminado', icon: 'success', background: '#0f172a', color: '#fff' });
         }
       } catch (error) {
-        Swal.fire({ title: 'Error', text: 'Error de conexión al eliminar', icon: 'error', background: '#0f172a', color: '#fff' });
+        Swal.fire({ title: 'Error', text: 'Error de conexión', icon: 'error', background: '#0f172a', color: '#fff' });
       }
     }
   };
@@ -174,18 +198,14 @@ export default function AdminPanelPage() {
 
     if (result.isConfirmed) {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
       try {
         const res = await fetch(`${apiUrl}/locacion/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json().catch(() => ({}));
         if (res.ok) {
-          setLocaciones(locaciones.filter(l => l.id !== id));
-          Swal.fire({ title: 'Eliminada', icon: 'success', background: '#0f172a', color: '#fff', confirmButtonColor: '#f97316' });
-        } else {
-          Swal.fire({ title: 'Error', text: data?.message || 'No se pudo eliminar la locación', icon: 'error', background: '#0f172a', color: '#fff' });
+          setLocaciones(prev => prev.filter(l => l.id !== id));
+          Swal.fire({ title: 'Eliminada', icon: 'success', background: '#0f172a', color: '#fff' });
         }
       } catch (error) {
-        Swal.fire({ title: 'Error', text: 'Error de conexión al eliminar', icon: 'error', background: '#0f172a', color: '#fff' });
+        Swal.fire({ title: 'Error', text: 'Error de conexión', icon: 'error', background: '#0f172a', color: '#fff' });
       }
     }
   };
@@ -204,14 +224,12 @@ export default function AdminPanelPage() {
 
   const filteredProyectos = proyectos.filter(p => 
     p.titulo?.toLowerCase().includes(searchProyectos.toLowerCase()) || 
-    (p.tipo && String(p.tipo).toLowerCase().includes(searchProyectos.toLowerCase())) ||
-    (p.estado && String(p.estado).toLowerCase().includes(searchProyectos.toLowerCase()))
+    (p.tipo && String(p.tipo).toLowerCase().includes(searchProyectos.toLowerCase()))
   );
 
   const filteredLocaciones = locaciones.filter(l => 
     l.nombre?.toLowerCase().includes(searchLocaciones.toLowerCase()) || 
-    l.ciudad?.toLowerCase().includes(searchLocaciones.toLowerCase()) ||
-    l.categoria?.toLowerCase().includes(searchLocaciones.toLowerCase())
+    l.ciudad?.toLowerCase().includes(searchLocaciones.toLowerCase())
   );
 
   // --- COMPONENTES DE VISTA ---
@@ -219,7 +237,6 @@ export default function AdminPanelPage() {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
       <h2 className="text-2xl font-black text-white mb-6">Resumen de la Industria</h2>
       
-      {/* Tarjetas KPI ampliadas a 4 columnas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
             <div className="flex justify-between items-start">
@@ -318,13 +335,9 @@ export default function AdminPanelPage() {
           <h2 className="text-2xl font-black text-white">Gestión de Usuarios</h2>
           <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
-              <input type="text" placeholder="Buscar usuario o email..." value={searchUsuarios} onChange={(e) => setSearchUsuarios(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
+              <input type="text" placeholder="Buscar usuario o email..." value={searchUsuarios} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchUsuarios(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
           </div>
       </div>
-
-      {usuarios.length === 0 && !loading && (
-        <p className="text-amber-500/90 text-sm mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">Inicia sesión como administrador para ver el listado de usuarios.</p>
-      )}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-xl">
         <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
@@ -367,16 +380,15 @@ export default function AdminPanelPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h2 className="text-2xl font-black text-white">Directorio de Prestadores</h2>
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-              <select value={filtroTipoPrestador} onChange={(e) => setFiltroTipoPrestador(e.target.value)} className="bg-slate-900 border border-slate-800 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-orange-500 transition-colors">
+              <select value={filtroTipoPrestador} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFiltroTipoPrestador(e.target.value)} className="bg-slate-900 border border-slate-800 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-orange-500 transition-colors">
                 {TIPOS_PERFIL.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
               </select>
               <div className="relative w-full md:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
-                  <input type="text" placeholder="Buscar nombre o rubro..." value={searchPrestadores} onChange={(e) => setSearchPrestadores(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
+                  <input type="text" placeholder="Buscar nombre o rubro..." value={searchPrestadores} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchPrestadores(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
               </div>
           </div>
       </div>
-
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-xl">
         <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
@@ -406,9 +418,9 @@ export default function AdminPanelPage() {
                         <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">
                                 <Link href={`/prestador/${p.id}/editar`}>
-                                    <button className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors border border-transparent hover:border-blue-500/30" title="Editar"><Edit size={16}/></button>
+                                    <button className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors" title="Editar"><Edit size={16}/></button>
                                 </Link>
-                                <button onClick={() => handleDeletePrestador(p.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/30" title="Eliminar"><Trash2 size={16}/></button>
+                                <button onClick={() => handleDeletePrestador(p.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors" title="Eliminar"><Trash2 size={16}/></button>
                             </div>
                         </td>
                     </tr>
@@ -425,10 +437,9 @@ export default function AdminPanelPage() {
           <h2 className="text-2xl font-black text-white">Catálogo de Proyectos</h2>
           <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
-              <input type="text" placeholder="Buscar proyecto..." value={searchProyectos} onChange={(e) => setSearchProyectos(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
+              <input type="text" placeholder="Buscar proyecto..." value={searchProyectos} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchProyectos(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
           </div>
       </div>
-
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-xl">
         <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
@@ -444,16 +455,16 @@ export default function AdminPanelPage() {
                     <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
                         <td className="p-4">
                             <p className="text-white font-medium text-sm">{p.titulo}</p>
-                            <p className="text-slate-500 text-[10px] line-clamp-1 max-w-[200px]">{p.descripcion || p.sinopsis || 'Sin sinopsis'}</p>
+                            <p className="text-slate-500 text-[10px] line-clamp-1 max-w-[200px]">{p.descripcion || 'Sin sinopsis'}</p>
                         </td>
                         <td className="p-4 text-slate-300 text-sm"><span className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-md border border-slate-700">{p.tipo || '—'}</span></td>
                         <td className="p-4 text-slate-400 text-sm flex items-center gap-1"><MapPin size={14}/> {p.ciudad || 'No definida'}</td>
                         <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">
                                 <Link href={`/mis-proyectos/editar/${p.id}`}>
-                                    <button className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors border border-transparent hover:border-blue-500/30"><Edit size={16}/></button>
+                                    <button className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"><Edit size={16}/></button>
                                 </Link>
-                                <button onClick={() => handleDeleteProyecto(p.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/30"><Trash2 size={16}/></button>
+                                <button onClick={() => handleDeleteProyecto(p.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={16}/></button>
                             </div>
                         </td>
                     </tr>
@@ -464,17 +475,15 @@ export default function AdminPanelPage() {
     </motion.div>
   );
 
-  // --- VISTA LOCACIONES ---
   const VistaLocaciones = () => (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h2 className="text-2xl font-black text-white">Catálogo de Locaciones</h2>
           <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
-              <input type="text" placeholder="Buscar locación, ciudad..." value={searchLocaciones} onChange={(e) => setSearchLocaciones(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
+              <input type="text" placeholder="Buscar locación, ciudad..." value={searchLocaciones} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchLocaciones(e.target.value)} className="bg-slate-900 border border-slate-800 text-white w-full text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-orange-500 transition-colors"/>
           </div>
       </div>
-
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-xl">
         <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
@@ -482,7 +491,6 @@ export default function AdminPanelPage() {
                     <th className="p-4 font-bold">Locación</th>
                     <th className="p-4 font-bold">Categoría</th>
                     <th className="p-4 font-bold">Ciudad</th>
-                    <th className="p-4 font-bold">Estado</th>
                     <th className="p-4 font-bold text-right">Acciones</th>
                 </tr>
             </thead>
@@ -500,13 +508,12 @@ export default function AdminPanelPage() {
                         </td>
                         <td className="p-4"><span className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-md border border-slate-700">{l.categoria}</span></td>
                         <td className="p-4 text-slate-400 text-sm flex items-center gap-1 mt-2"><MapPin size={14}/> {l.ciudad}</td>
-                        <td className="p-4 text-slate-400 text-sm">{l.estado || 'Activo'}</td>
                         <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">
                                 <Link href={`/locaciones/editar/${l.id}`}>
-                                    <button className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors border border-transparent hover:border-blue-500/30" title="Editar"><Edit size={16}/></button>
+                                    <button className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors" title="Editar"><Edit size={16}/></button>
                                 </Link>
-                                <button onClick={() => handleDeleteLocacion(l.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/30" title="Eliminar"><Trash2 size={16}/></button>
+                                <button onClick={() => handleDeleteLocacion(l.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors" title="Eliminar"><Trash2 size={16}/></button>
                             </div>
                         </td>
                     </tr>
@@ -519,14 +526,11 @@ export default function AdminPanelPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row pt-20 md:pt-24">
-      
-      {/* SIDEBAR LATERAL */}
       <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-4 md:h-[calc(100vh-6rem)] md:sticky md:top-24 z-10 shrink-0">
         <div className="mb-8 px-4">
             <h1 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Panel de Control</h1>
             <p className="text-white font-bold flex items-center gap-2"><Shield size={16} className="text-orange-500"/> Master Admin</p>
         </div>
-
         <nav className="space-y-2 flex-1">
             <button onClick={() => setActiveTab('stats')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'stats' ? 'bg-orange-600 text-white shadow-lg shadow-orange-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                 <BarChart3 size={18}/> Estadísticas
@@ -540,13 +544,10 @@ export default function AdminPanelPage() {
             <button onClick={() => setActiveTab('proyectos')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'proyectos' ? 'bg-orange-600 text-white shadow-lg shadow-orange-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                 <Clapperboard size={18}/> Proyectos
             </button>
-            {/* NUEVA OPCIÓN: LOCACIONES */}
             <button onClick={() => setActiveTab('locaciones')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'locaciones' ? 'bg-orange-600 text-white shadow-lg shadow-orange-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                 <MapPin size={18}/> Locaciones
             </button>
         </nav>
-
-        {/* Link al Mapa Nodos 3D */}
         <div className="pt-4 border-t border-slate-800 mt-4">
             <button 
                 onClick={() => router.push('/admin/dashboard')} 
@@ -557,7 +558,6 @@ export default function AdminPanelPage() {
         </div>
       </aside>
 
-      {/* ÁREA DE CONTENIDO PRINCIPAL */}
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
         <div className="max-w-6xl mx-auto">
             {loading ? (
@@ -576,7 +576,6 @@ export default function AdminPanelPage() {
             )}
         </div>
       </main>
-
     </div>
   );
 }
