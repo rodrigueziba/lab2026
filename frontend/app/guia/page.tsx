@@ -238,7 +238,7 @@ export default function GuiaPage() {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-[800px]:gap-4 md:gap-6 lg:gap-8"
           >
             <AnimatePresence mode='popLayout'>
               {prestadoresMostrados.map((p) => {
@@ -263,15 +263,15 @@ export default function GuiaPage() {
                         style={{ backgroundColor: tema }}
                       ></div>
 
-                      <div className="relative bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden h-full flex flex-col items-center transition-all duration-300 group-hover:border-[var(--border-color)] group-hover:shadow-2xl pt-8 pb-6 px-6"
+                      <div className="relative bg-slate-900 border border-slate-800 rounded-2xl max-[800px]:rounded-xl md:rounded-3xl overflow-hidden h-full flex flex-col items-center transition-all duration-300 group-hover:border-[var(--border-color)] group-hover:shadow-2xl pt-5 max-[800px]:pt-4 pb-4 max-[800px]:pb-3 px-4 max-[800px]:px-3 md:pt-8 md:pb-6 md:px-6"
                            style={{ ['--border-color' as never]: tema }}>
                         
                         <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: tema }}></div>
 
                         {/* FOTO */}
-                        <div className="relative mb-6">
+                        <div className="relative mb-3 max-[800px]:mb-2 md:mb-6">
                             <div 
-                              className="w-32 h-32 rounded-full border-4 p-1 bg-slate-950 flex items-center justify-center text-3xl font-bold overflow-hidden shadow-2xl group-hover:scale-105 transition-transform duration-500"
+                              className="w-24 h-24 max-[800px]:w-20 max-[800px]:h-20 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full border-2 max-[800px]:border-2 md:border-4 p-1 bg-slate-950 flex items-center justify-center text-xl max-[800px]:text-lg md:text-2xl lg:text-3xl font-bold overflow-hidden shadow-2xl group-hover:scale-105 transition-transform duration-500"
                               style={{ borderColor: tema, color: tema }}
                             >
                               {p.foto ? (
@@ -280,28 +280,28 @@ export default function GuiaPage() {
                                 <span>{getInitials(p.nombre)}</span>
                               )}
                             </div>
-                            <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shadow-md whitespace-nowrap">
+                            <span className="absolute -bottom-2 max-[800px]:-bottom-1.5 left-1/2 -translate-x-1/2 text-[8px] max-[800px]:text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 max-[800px]:px-2 md:px-3 py-0.5 max-[800px]:py-0.5 md:py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shadow-md whitespace-nowrap">
                                 {p.tipoPerfil}
                             </span>
                         </div>
 
                         {/* INFO */}
-                        <div className="text-center w-full flex-1 flex flex-col items-center mt-2">
-                            <h3 className="text-xl font-bold text-white leading-tight mb-2 group-hover:text-[var(--text-color)] transition-colors"
+                        <div className="text-center w-full flex-1 flex flex-col items-center mt-1 max-[800px]:mt-0 md:mt-2">
+                            <h3 className="text-base max-[800px]:text-sm md:text-lg lg:text-xl font-bold text-white leading-tight mb-1 max-[800px]:mb-1 md:mb-2 group-hover:text-[var(--text-color)] transition-colors"
                                 style={{ ['--text-color' as never]: tema }}>
                                 {p.nombre}
                             </h3>
 
-                            <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1 mb-4">
+                            <div className="text-[9px] max-[800px]:text-[9px] md:text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1 mb-2 max-[800px]:mb-2 md:mb-4">
                                 <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tema }}></div>
                                 {p.rubro}
                             </div>
 
-                            <p className="text-slate-400 text-sm mb-6 line-clamp-2 font-light leading-relaxed max-w-[250px]">
+                            <p className="text-slate-400 text-xs max-[800px]:text-[11px] md:text-sm mb-3 max-[800px]:mb-3 md:mb-6 line-clamp-2 font-light leading-relaxed max-w-[220px] max-[800px]:max-w-[180px] md:max-w-[250px]">
                                 {p.descripcion || "Sin descripción disponible."}
                             </p>
 
-                            <div className="mt-auto w-full border-t border-slate-800/50 pt-4 flex justify-between items-center text-xs">
+                            <div className="mt-auto w-full border-t border-slate-800/50 pt-2 max-[800px]:pt-2 md:pt-4 flex justify-between items-center text-[10px] max-[800px]:text-[10px] md:text-xs">
                                 <div className="flex items-center gap-1 text-slate-500">
                                     <MapPin size={12} className="text-orange-500"/>
                                     <span>{p.ciudad || "TDF"}</span>

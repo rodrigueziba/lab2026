@@ -35,25 +35,30 @@ export default function Navbar() {
     const checkUser = async () => {
       const token = localStorage.getItem('token');
       const userStr = localStorage.getItem('user');
-      
-      if (token && userStr) {
-        setUser(JSON.parse(userStr));
-        // Cargar Notificaciones
-        try {
-            const res = await fetch(`${apiUrl}/notificacion`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setNotificaciones(data);
-                setUnreadCount(data.filter((n:any) => !n.leida).length);
-            }
-        } catch (error) {
-            console.error("Error notificaciones:", error);
-        }
-      } else {
+
+      if (!token || !userStr) {
         setUser(null);
         setNotificaciones([]);
+        setUnreadCount(0);
+        return;
+      }
+
+      try {
+        setUser(JSON.parse(userStr));
+        // Solo cargar notificaciones si hay usuario logueado
+        const res = await fetch(`${apiUrl}/notificacion`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setNotificaciones(Array.isArray(data) ? data : []);
+          setUnreadCount((Array.isArray(data) ? data : []).filter((n: any) => !n.leida).length);
+        } else {
+          setNotificaciones([]);
+        }
+      } catch (error) {
+        setNotificaciones([]);
+        setUnreadCount(0);
       }
     };
     

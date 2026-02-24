@@ -328,7 +328,7 @@ export default function CarteleraProyectosPage() {
             layout 
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-[800px]:gap-4 pb-20 max-[800px]:pb-12"
           >
             <AnimatePresence mode='popLayout'>
               {proyectosMostrados.map((p, index) => {
@@ -347,12 +347,12 @@ export default function CarteleraProyectosPage() {
                     key={p.id}
                     onMouseEnter={() => handleMouseEnter(p.id)}
                     onMouseLeave={handleMouseLeave}
-                    className="group relative bg-slate-900 rounded-[2rem] border border-slate-800 hover:border-orange-500/30 transition-all hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] h-full flex flex-col overflow-hidden hover:-translate-y-1 duration-300"
+                    className="group relative bg-slate-900 rounded-xl max-[800px]:rounded-2xl md:rounded-[2rem] border border-slate-800 hover:border-orange-500/30 transition-all hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] h-full flex flex-col overflow-hidden hover:-translate-y-1 duration-300"
                   >
                     <Link href={`/proyectos/${p.id}`} className="flex flex-col h-full">
                       
                       {/* MEDIA AREA */}
-                      <div className="relative h-64 bg-black overflow-hidden">
+                      <div className="relative h-40 max-[800px]:h-36 md:h-56 lg:h-64 bg-black overflow-hidden">
                         
                         {/* Video Overlay on Hover */}
                         {isHovered && youtubeId ? (
@@ -403,26 +403,26 @@ export default function CarteleraProyectosPage() {
                       </div>
 
                       {/* CONTENIDO */}
-                      <div className="p-7 flex-1 flex flex-col bg-slate-900 relative z-10 -mt-12 rounded-t-[2rem]">
+                      <div className="p-4 max-[800px]:p-3 md:p-5 lg:p-7 flex-1 flex flex-col bg-slate-900 relative z-10 -mt-8 max-[800px]:-mt-6 md:-mt-10 lg:-mt-12 rounded-t-xl max-[800px]:rounded-t-2xl md:rounded-t-[2rem]">
                         
                         {/* Título Grande */}
-                        <h3 className="text-3xl font-black text-white mb-3 leading-none group-hover:text-orange-500 transition-colors tracking-tight">
+                        <h3 className="text-lg max-[800px]:text-base md:text-2xl lg:text-3xl font-black text-white mb-2 max-[800px]:mb-2 md:mb-3 leading-none group-hover:text-orange-500 transition-colors tracking-tight">
                             {p.titulo}
                         </h3>
 
                         {/* Ubicación e Inicio */}
-                        <div className="flex items-center gap-4 text-xs text-slate-400 mb-4 font-medium">
+                        <div className="flex items-center gap-2 max-[800px]:gap-2 md:gap-4 text-[10px] max-[800px]:text-[10px] md:text-xs text-slate-400 mb-2 max-[800px]:mb-2 md:mb-4 font-medium">
                             <span className="flex items-center gap-1"><MapPin size={12} className="text-orange-500"/> {p.ciudad}</span>
                             {p.fechaInicio && <span className="flex items-center gap-1"><Calendar size={12}/> {new Date(p.fechaInicio).toLocaleDateString()}</span>}
                         </div>
 
-                        <p className="text-slate-400 text-sm line-clamp-3 mb-6 font-light leading-relaxed">
+                        <p className="text-slate-400 text-xs max-[800px]:text-[11px] md:text-sm line-clamp-2 max-[800px]:line-clamp-2 md:line-clamp-3 mb-3 max-[800px]:mb-3 md:mb-6 font-light leading-relaxed">
                             {p.descripcion}
                         </p>
 
                         {/* Roles */}
-                        <div className="mt-auto pt-4 border-t border-slate-800">
-                            <div className="flex flex-wrap gap-1.5 mb-4">
+                        <div className="mt-auto pt-2 max-[800px]:pt-2 md:pt-4 border-t border-slate-800">
+                            <div className="flex flex-wrap gap-1 max-[800px]:gap-1 md:gap-1.5 mb-2 max-[800px]:mb-2 md:mb-4">
                                 {p.puestos && p.puestos.length > 0 ? (
                                     p.puestos.slice(0, 3).map((puesto: Puesto) => (
                                         <span key={puesto.id} className="text-[10px] font-bold uppercase bg-slate-800 text-slate-300 px-2 py-1 rounded border border-slate-700">

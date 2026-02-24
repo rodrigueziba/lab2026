@@ -85,7 +85,7 @@ El backend usa `ConfigModule` y `ConfigService` para leer estas variables, y `do
 - Esto hace que `npx prisma generate` genere binarios tanto para tu máquina local como para el contenedor de Docker (Linux Alpine ARM64).
 
 Cada vez que clones el repo en otra PC, solo necesitás:
-1. Crear un nuevo `backend/.env` con tus propias claves (`DATABASE_URL`, `JWT_SECRET`, etc.).
+1. Crear un nuevo `backend/.env` con tus propias claves (`DATABASE_URL`, `JWT_SECRET`, etc.). Si ves errores como "Can't reach database server" o "connection pool timeout", consultá la sección **Errores frecuentes de base de datos** en `backend/README.md`.
 2. Ejecutar los pasos del punto **2** (instalar dependencias y `npx prisma generate`).
 3. Levantar con `docker compose up`.
 

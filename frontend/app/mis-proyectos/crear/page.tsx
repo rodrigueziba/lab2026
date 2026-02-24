@@ -36,10 +36,16 @@ export default function CrearProyectoPage() {
   const [imagenes, setImagenes] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
 
+  // Fecha mínima: hoy (solo fechas a futuro)
+  const todayStr = () => new Date().toISOString().split('T')[0];
+
   // --- HANDLERS ---
   const handleChange = (e: any) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setFormData({ ...formData, [e.target.name]: value });
+    const next = { ...formData, [e.target.name]: value };
+    // Si se cambia fecha inicio y queda después de fecha fin, ajustar fecha fin
+    if (e.target.name === 'fechaInicio' && next.fechaFin && next.fechaInicio > next.fechaFin) next.fechaFin = next.fechaInicio;
+    setFormData(next);
   };
 
   // Manejo de Imágenes
@@ -75,6 +81,19 @@ export default function CrearProyectoPage() {
   // --- SUBMIT ---
   const handleSubmit = async (e: any) => {
     e.preventDefault();
+    const today = todayStr();
+    if (formData.fechaInicio && formData.fechaInicio < today) {
+      alert('La fecha de inicio de rodaje debe ser hoy o una fecha futura.');
+      return;
+    }
+    if (formData.fechaFin && formData.fechaFin < today) {
+      alert('La fecha de fin de rodaje debe ser hoy o una fecha futura.');
+      return;
+    }
+    if (formData.fechaInicio && formData.fechaFin && formData.fechaInicio > formData.fechaFin) {
+      alert('La fecha de inicio debe ser anterior o igual a la fecha de fin.');
+      return;
+    }
     setLoading(true);
 
     try {
@@ -230,6 +249,8 @@ export default function CrearProyectoPage() {
                 </label>
                 <input 
                   type="date" name="fechaInicio" 
+                  min={todayStr()}
+                  value={formData.fechaInicio}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 outline-none focus:border-blue-500 text-slate-300 transition-all"
                   onChange={handleChange} 
                 />
@@ -240,6 +261,8 @@ export default function CrearProyectoPage() {
                 </label>
                 <input 
                   type="date" name="fechaFin" 
+                  min={formData.fechaInicio || todayStr()}
+                  value={formData.fechaFin}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 outline-none focus:border-blue-500 text-slate-300 transition-all"
                   onChange={handleChange} 
                 />

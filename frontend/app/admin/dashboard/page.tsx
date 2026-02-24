@@ -579,18 +579,18 @@ export default function AdminDashboardPage() {
           4. PANEL IZQUIERDO
           — posición: left-6, centrado verticalmente (top-1/2 -translate-y-1/2)
           ───────────────────────────────────── */}
-      <div className="absolute left-6 top-1/2 -translate-y-1/2 z-50 pointer-events-none select-none">
-        <div className="bg-slate-950/80 backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.8)] pointer-events-auto w-80 overflow-hidden flex flex-col">
+      <div className="absolute left-2 max-[800px]:left-2 md:left-6 top-1/2 -translate-y-1/2 z-50 pointer-events-none select-none">
+        <div className="bg-slate-950/80 backdrop-blur-xl rounded-xl max-[800px]:rounded-lg md:rounded-2xl border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.8)] pointer-events-auto w-64 max-[800px]:w-52 md:w-72 lg:w-80 overflow-hidden flex flex-col">
 
           {/* Header */}
-          <div className="p-5 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent">
-            <h1 className="text-xl font-black text-white flex items-center gap-3 tracking-tight">
-              <div className="bg-orange-500/10 p-2 rounded-lg border border-orange-500/30 text-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.2)]">
-                <Network size={20}/>
+          <div className="p-3 max-[800px]:p-2.5 md:p-5 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent">
+            <h1 className="text-sm max-[800px]:text-xs md:text-lg lg:text-xl font-black text-white flex items-center gap-2 max-[800px]:gap-1.5 md:gap-3 tracking-tight">
+              <div className="bg-orange-500/10 p-1.5 max-[800px]:p-1 md:p-2 rounded-lg border border-orange-500/30 text-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.2)]">
+                <Network size={16} className="max-[800px]:w-3.5 max-[800px]:h-3.5 md:w-5 md:h-5"/>
               </div>
-              MAPA DE NODOS TDF
+              <span className="max-[800px]:leading-tight">MAPA DE NODOS TDF</span>
             </h1>
-            <div className="flex items-center gap-2 mt-3">
+            <div className="flex items-center gap-2 mt-2 max-[800px]:mt-1.5 md:mt-3">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"/>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"/>
@@ -601,44 +601,44 @@ export default function AdminDashboardPage() {
 
           {/* Stats */}
           {!loading && (
-            <div className="px-5 py-3 grid grid-cols-3 gap-2 border-b border-white/5 bg-black/20">
+            <div className="px-3 max-[800px]:px-2 md:px-5 py-2 max-[800px]:py-1.5 md:py-3 grid grid-cols-3 gap-1 max-[800px]:gap-1 md:gap-2 border-b border-white/5 bg-black/20">
               <div className="text-center">
-                <p className="text-lg font-black text-slate-200">{stats.locaciones}</p>
-                <p className="text-[8px] text-slate-500 uppercase tracking-widest">Locac.</p>
+                <p className="text-sm max-[800px]:text-xs md:text-lg font-black text-slate-200">{stats.locaciones}</p>
+                <p className="text-[7px] max-[800px]:text-[7px] md:text-[8px] text-slate-500 uppercase tracking-widest">Locac.</p>
               </div>
               <div className="text-center border-x border-white/5">
-                <p className="text-lg font-black text-red-400">{stats.proyectos}</p>
-                <p className="text-[8px] text-slate-500 uppercase tracking-widest">Proy.</p>
+                <p className="text-sm max-[800px]:text-xs md:text-lg font-black text-red-400">{stats.proyectos}</p>
+                <p className="text-[7px] max-[800px]:text-[7px] md:text-[8px] text-slate-500 uppercase tracking-widest">Proy.</p>
               </div>
               <div className="text-center">
-                <p className="text-lg font-black text-blue-400">{stats.prestadores}</p>
-                <p className="text-[8px] text-slate-500 uppercase tracking-widest">Prest.</p>
+                <p className="text-sm max-[800px]:text-xs md:text-lg font-black text-blue-400">{stats.prestadores}</p>
+                <p className="text-[7px] max-[800px]:text-[7px] md:text-[8px] text-slate-500 uppercase tracking-widest">Prest.</p>
               </div>
             </div>
           )}
 
-          <div className="p-5 space-y-4">
+          <div className="p-3 max-[800px]:p-2 md:p-5 space-y-3 max-[800px]:space-y-2 md:space-y-4">
 
             {/* Capa prestadores — texto centrado horizontalmente */}
             <div
-              className={`cursor-pointer transition-all duration-300 p-3 rounded-xl border border-white/5 ${visibleLayers.prestador ? 'bg-white/5 opacity-100' : 'bg-white/5 opacity-40 grayscale'}`}
+              className={`cursor-pointer transition-all duration-300 p-2.5 max-[800px]:p-2 md:p-3 rounded-lg max-[800px]:rounded-md md:rounded-xl border border-white/5 ${visibleLayers.prestador ? 'bg-white/5 opacity-100' : 'bg-white/5 opacity-40 grayscale'}`}
               onClick={() => toggleLayer('prestador')}
             >
               {/* título centrado */}
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center justify-center gap-2">
-                <Layers size={10}/> Capa 3 · Talento {visibleLayers.prestador ? '(ON)':'(OFF)'}
+              <p className="text-[8px] max-[800px]:text-[7px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 max-[800px]:mb-1.5 md:mb-3 flex items-center justify-center gap-1 md:gap-2">
+                <Layers size={10} className="max-[800px]:w-2.5 max-[800px]:h-2.5"/> Capa 3 · Talento {visibleLayers.prestador ? '(ON)':'(OFF)'}
               </p>
               {/* grid de leyenda — cada item centrado */}
-              <div className="grid grid-cols-2 gap-y-3 gap-x-2">
+              <div className="grid grid-cols-2 gap-y-2 max-[800px]:gap-y-1.5 md:gap-y-3 gap-x-1 max-[800px]:gap-x-1 md:gap-x-2">
                 {([
                   { key:'profesional',             label:'Profesional',  color:'#3b82f6' },
                   { key:'productora audiovisual',   label:'Productora',   color:'#a855f7' },
                   { key:'empresa',                 label:'Empresa',      color:'#eab308' },
                   { key:'estudiante',              label:'Estudiante',   color:'#10b981' },
                 ] as const).map(({ key, label, color }) => (
-                  <div key={key} className="flex items-center justify-center gap-2">
+                  <div key={key} className="flex items-center justify-center gap-1 max-[800px]:gap-1 md:gap-2">
                     <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{background:color, boxShadow:`0 0 6px ${color}`}}/>
-                    <span className="text-[10px] font-bold text-slate-300">{label}</span>
+                    <span className="text-[9px] max-[800px]:text-[8px] md:text-[10px] font-bold text-slate-300">{label}</span>
                   </div>
                 ))}
               </div>
@@ -647,39 +647,39 @@ export default function AdminDashboardPage() {
             {/* Capa proyectos */}
             <div
               onClick={() => toggleLayer('proyecto')}
-              className={`flex items-center justify-between p-3 rounded-xl border border-white/5 cursor-pointer transition-all duration-300 ${visibleLayers.proyecto ? 'bg-white/5 opacity-100' : 'bg-white/5 opacity-40 grayscale'}`}
+              className={`flex items-center justify-between p-2 max-[800px]:p-1.5 md:p-3 rounded-lg max-[800px]:rounded-md md:rounded-xl border border-white/5 cursor-pointer transition-all duration-300 ${visibleLayers.proyecto ? 'bg-white/5 opacity-100' : 'bg-white/5 opacity-40 grayscale'}`}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-md bg-slate-900 flex items-center justify-center text-red-500 border border-red-500/30"><Clapperboard size={14}/></div>
-                <div><p className="text-[10px] font-bold text-white">Proyectos</p><p className="text-[9px] text-slate-500">Capa 2</p></div>
+              <div className="flex items-center gap-2 max-[800px]:gap-1.5 md:gap-3">
+                <div className="w-6 h-6 max-[800px]:w-5 max-[800px]:h-5 md:w-8 md:h-8 rounded-md bg-slate-900 flex items-center justify-center text-red-500 border border-red-500/30"><Clapperboard size={12} className="max-[800px]:w-3 max-[800px]:h-3 md:w-3.5 md:h-3.5"/></div>
+                <div><p className="text-[9px] max-[800px]:text-[8px] md:text-[10px] font-bold text-white">Proyectos</p><p className="text-[8px] max-[800px]:text-[7px] md:text-[9px] text-slate-500">Capa 2</p></div>
               </div>
               <div className="flex flex-col items-end gap-1">
                 <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"/>
-                <span className="text-[9px] text-slate-600">{visibleLayers.proyecto?'ON':'OFF'}</span>
+                <span className="text-[8px] max-[800px]:text-[7px] md:text-[9px] text-slate-600">{visibleLayers.proyecto?'ON':'OFF'}</span>
               </div>
             </div>
 
             {/* Capa locaciones */}
             <div
               onClick={() => toggleLayer('locacion')}
-              className={`flex items-center justify-between p-3 rounded-xl border border-white/5 cursor-pointer transition-all duration-300 ${visibleLayers.locacion ? 'bg-white/5 opacity-100' : 'bg-white/5 opacity-40 grayscale'}`}
+              className={`flex items-center justify-between p-2 max-[800px]:p-1.5 md:p-3 rounded-lg max-[800px]:rounded-md md:rounded-xl border border-white/5 cursor-pointer transition-all duration-300 ${visibleLayers.locacion ? 'bg-white/5 opacity-100' : 'bg-white/5 opacity-40 grayscale'}`}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-md bg-slate-900 flex items-center justify-center text-slate-200 border border-slate-500/30"><Mountain size={14}/></div>
-                <div><p className="text-[10px] font-bold text-white">Locaciones</p><p className="text-[9px] text-slate-500">Capa 1 · Base</p></div>
+              <div className="flex items-center gap-2 max-[800px]:gap-1.5 md:gap-3">
+                <div className="w-6 h-6 max-[800px]:w-5 max-[800px]:h-5 md:w-8 md:h-8 rounded-md bg-slate-900 flex items-center justify-center text-slate-200 border border-slate-500/30"><Mountain size={12} className="max-[800px]:w-3 max-[800px]:h-3 md:w-3.5 md:h-3.5"/></div>
+                <div><p className="text-[9px] max-[800px]:text-[8px] md:text-[10px] font-bold text-white">Locaciones</p><p className="text-[8px] max-[800px]:text-[7px] md:text-[9px] text-slate-500">Capa 1 · Base</p></div>
               </div>
               <div className="flex flex-col items-end gap-1">
                 <div className="w-2 h-2 rounded-full bg-slate-200 shadow-[0_0_8px_white]"/>
-                <span className="text-[9px] text-slate-600">{visibleLayers.locacion?'ON':'OFF'}</span>
+                <span className="text-[8px] max-[800px]:text-[7px] md:text-[9px] text-slate-600">{visibleLayers.locacion?'ON':'OFF'}</span>
               </div>
             </div>
 
           </div>
 
-          <div className="p-4 bg-slate-900/80 border-t border-white/5">
+          <div className="p-2 max-[800px]:p-1.5 md:p-4 bg-slate-900/80 border-t border-white/5">
             <button onClick={resetCamera}
-              className="w-full py-3 rounded-xl text-xs font-bold transition-all bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white shadow-lg shadow-orange-900/30 flex items-center justify-center gap-2 group border border-white/10">
-              <Focus size={16} className="group-hover:scale-110 transition-transform"/> RECENTRAR VISTA MAPA
+              className="w-full py-2 max-[800px]:py-1.5 md:py-3 rounded-lg max-[800px]:rounded-md md:rounded-xl text-[10px] max-[800px]:text-[9px] md:text-xs font-bold transition-all bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white shadow-lg shadow-orange-900/30 flex items-center justify-center gap-2 group border border-white/10">
+              <Focus size={14} className="max-[800px]:w-3.5 max-[800px]:h-3.5 md:w-4 md:h-4 group-hover:scale-110 transition-transform"/> RECENTRAR VISTA MAPA
             </button>
           </div>
         </div>

@@ -48,6 +48,23 @@ El seed crea usuarios (admin@tdffilm.com, productor@tdffilm.com, maria@tdffilm.c
 
 **Alternativa con Supabase:** puedes ejecutar el script SQL desde el panel de Supabase en lugar de `npm run seed`. En la carpeta `prisma` está el archivo `seed-supabase.sql`: en Supabase Dashboard → SQL Editor → New query, pega el contenido del archivo y ejecuta. Crea/actualiza los mismos usuarios y opcionalmente las locaciones (solo si la tabla está vacía). Para prestadores y proyectos, después puedes correr `npm run seed` una vez con `DATABASE_URL` apuntando a Supabase.
 
+## Errores frecuentes de base de datos
+
+### "Can't reach database server at ... pooler.supabase.com:5432"
+- **Causa:** El backend no puede conectar con Supabase (red, firewall o proyecto pausado).
+- **Qué revisar:**
+  1. **Proyecto pausado:** En Supabase Dashboard → Project Settings, si el proyecto está en plan free y estuvo inactivo, puede estar pausado. Entrá al proyecto y esperá a que reactive.
+  2. **Docker:** Si el backend corre en Docker, el contenedor debe tener salida a internet. Probá desde el host: `curl -v telnet://aws-1-sa-east-1.pooler.supabase.com 5432`. Si falla, revisá red/VPN/firewall.
+  3. **`backend/.env`:** Confirmá que `DATABASE_URL` sea la **Connection pooling** (modo Transaction) de Supabase: en Dashboard → Project Settings → Database → "Connection string" → "URI" con el pooler (puerto 5432). No uses el puerto 6543 si Prisma no está configurado para PgBouncer en ese modo.
+
+### "Timed out fetching a new connection from the connection pool"
+- **Causa:** Se abren demasiadas conexiones y el pool de Supabase se agota.
+- **Solución:** En `backend/.env`, en la `DATABASE_URL` agregá al final (antes de cualquier `#`):  
+  `?connection_limit=5`  
+  Ejemplo:  
+  `DATABASE_URL="postgresql://postgres.xxx:YYY@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?connection_limit=5"`  
+  Reiniciá el backend después de cambiar el `.env`.
+
 ## Compile and run the project
 
 ```bash
