@@ -160,7 +160,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
               {prestador.galeria && prestador.galeria.length > 0 && (
                   <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
                       <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-6 flex items-center gap-2 border-b border-slate-800 pb-2">
-                          <ImageIcon size={20}/> Portafolio
+                          <ImageIcon size={20}/> Portfolio
                       </h3>
                       <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-slate-800 bg-black group">
                           {prestador.galeria.map((img: string, idx: number) => (

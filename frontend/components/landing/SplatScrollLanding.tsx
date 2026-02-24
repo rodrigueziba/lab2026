@@ -35,8 +35,8 @@ const SPLAT_URL = '/splats/10.spz';
 
 const CARDS = [
   { key: 'locaciones', title: 'Locaciones',     subtitle: 'Glaciares, bosques y costa patagónica al alcance de tu producción.',  href: '/locaciones' },
-  { key: 'guia',       title: 'Guía de rodaje', subtitle: 'Todo lo que necesitás para filmar en el fin del mundo, paso a paso.', href: '/guia' },
-  { key: 'proyectos',  title: 'Proyectos',      subtitle: 'Gestión real de producciones audiovisuales en Tierra del Fuego.',     href: '/proyectos' },
+  { key: 'guia',       title: 'Guía de Prestaadores', subtitle: 'Todo lo que necesitás para filmar en el fin del mundo.', href: '/guia' },
+  { key: 'proyectos',  title: 'Proyectos',      subtitle: 'Gestión y busqueda de producciones audiovisuales en Tierra del Fuego.',     href: '/proyectos' },
 ];
 
 function clamp01(n: number) { return Math.max(0, Math.min(1, n)); }
