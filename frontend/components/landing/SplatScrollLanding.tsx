@@ -9,99 +9,46 @@ import Link from 'next/link';
 // CONFIGURACIÓN — Editá con el panel debug y pegá el JSON exportado aquí
 // ═══════════════════════════════════════════════════════════════════════════════
 type V3 = [number, number, number];
-type CamWaypoint = { pos: V3; lookAt: V3 };
 
-const CAM_CONFIG: { splatRotation: V3; waypoints: CamWaypoint[] } = {
-  "splatRotation": [
-    -0.2,
-    2.65,
-    -3.05
-  ],
-  "waypoints": [
-    {
-      "pos": [
-        -1.05,
-        0.1,
-        1.8
-      ],
-      "lookAt": [
-        0,
-        0,
-        0
-      ]
-    },
-    {
-      "pos": [
-        -0.65,
-        0.2,
-        0.55
-      ],
-      "lookAt": [
-        0.05,
-        0,
-        0
-      ]
-    },
-    {
-      "pos": [
-        3,
-        1,
-        4
-      ],
-      "lookAt": [
-        0,
-        0,
-        0
-      ]
-    },
-    {
-      "pos": [
-        -3,
-        3,
-        5
-      ],
-      "lookAt": [
-        0,
-        0,
-        0
-      ]
-    },
-    {
-      "pos": [
-        0,
-        5,
-        3
-      ],
-      "lookAt": [
-        0,
-        0,
-        0
-      ]
-    }
-  ]
+type CamWaypoint = {
+  pos:    V3;   // posición de la cámara
+  lookAt: V3;   // punto hacia donde mira
+  splatPos: V3; // traslación del splat en este waypoint
 };
 
-const SPLAT_URL = '/splats/10.spz'; // ← URL del splat
+const CAM_CONFIG: {
+  splatRotation: V3;
+  waypoints: CamWaypoint[];
+} = {
+  "splatRotation": [-0.2, 2.65, -3.05],
+  "waypoints": [
+    { "pos": [-0.65, 0.15, 0.9],  "lookAt": [0, -0.15, -0.05], "splatPos": [0, 0, 0] },
+    { "pos": [0, 0.35, 0.65],     "lookAt": [0.65, 0.1, 0],    "splatPos": [-0.2, 0.2, 2.9] },
+    { "pos": [3, 0.95, 1.2],      "lookAt": [5.7, -0.45, -4.65],"splatPos": [3.55, 0.45, 0] },
+    { "pos": [-3.3, 1.2, 5],      "lookAt": [0, -0.6, 0.05],   "splatPos": [-1.85, -0.65, 2.6] },
+    { "pos": [-0.65, 0.15, 0.9],  "lookAt": [0, -0.15, -0.05], "splatPos": [0, 0, 0] },
+  ],
+};
+
+const SPLAT_URL = '/splats/10.spz';
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const CARDS = [
-  { key: 'locaciones', title: 'Locaciones',    subtitle: 'Glaciares, bosques y costa patagónica al alcance de tu producción.',       href: '/locaciones' },
-  { key: 'guia',       title: 'Guía de rodaje', subtitle: 'Todo lo que necesitás para filmar en el fin del mundo, paso a paso.',      href: '/guia' },
-  { key: 'proyectos',  title: 'Proyectos',      subtitle: 'Gestión real de producciones audiovisuales en Tierra del Fuego.',          href: '/proyectos' },
+  { key: 'locaciones', title: 'Locaciones',     subtitle: 'Glaciares, bosques y costa patagónica al alcance de tu producción.',  href: '/locaciones' },
+  { key: 'guia',       title: 'Guía de rodaje', subtitle: 'Todo lo que necesitás para filmar en el fin del mundo, paso a paso.', href: '/guia' },
+  { key: 'proyectos',  title: 'Proyectos',      subtitle: 'Gestión real de producciones audiovisuales en Tierra del Fuego.',     href: '/proyectos' },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function clamp01(n: number) { return Math.max(0, Math.min(1, n)); }
 function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
 function easeInOut(t: number) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
 function v3(a: V3) { return new THREE.Vector3(a[0], a[1], a[2]); }
 function fmt(n: number) { return parseFloat(n.toFixed(3)); }
 
-const HERO_TEXT = 'FILMA EN TIERRA DEL FUEGO';
-const N_SECTIONS = CARDS.length + 1; // hero + tarjetas
+const HERO_TEXT  = 'FILMA EN TIERRA DEL FUEGO';
+const N_SECTIONS = CARDS.length + 1;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type LogEntry = { time: string; level: 'info' | 'ok' | 'warn' | 'error'; msg: string };
+type LogEntry      = { time: string; level: 'info'|'ok'|'warn'|'error'; msg: string };
 type RuntimeConfig = typeof CAM_CONFIG;
 
 // ─── Vec3Field ────────────────────────────────────────────────────────────────
@@ -132,7 +79,7 @@ function DebugPanel({
   config, onApply, logs,
   camPos, camLook, isFreeRoam, flySpeed,
   onToggleFreeRoam, onSetSpeed,
-  activeWaypoint, onSavePos, onSaveLook, onJump,
+  activeWaypoint, onSavePos, onSaveLook, onSaveSplatPos, onJump,
 }: {
   config: RuntimeConfig; onApply: (c: RuntimeConfig) => void;
   logs: LogEntry[];
@@ -140,33 +87,32 @@ function DebugPanel({
   isFreeRoam: boolean; flySpeed: number;
   onToggleFreeRoam: () => void; onSetSpeed: (v: number) => void;
   activeWaypoint: number;
-  onSavePos: (i: number) => void; onSaveLook: (i: number) => void; onJump: (i: number) => void;
+  onSavePos: (i: number) => void;
+  onSaveLook: (i: number) => void;
+  onSaveSplatPos: (i: number) => void;
+  onJump: (i: number) => void;
 }) {
-  const [local, setLocal]   = useState<RuntimeConfig>(structuredClone(config));
-  const [open,  setOpen]    = useState(true);
-  const [tab,   setTab]     = useState<'cam'|'splat'|'logs'|'export'>('logs');
+  const [local,  setLocal]  = useState<RuntimeConfig>(structuredClone(config));
+  const [open,   setOpen]   = useState(true);
+  const [tab,    setTab]    = useState<'logs'|'cam'|'splat'|'export'>('logs');
   const [copied, setCopied] = useState(false);
-  const logsEndRef          = useRef<HTMLDivElement>(null);
+  const logsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setLocal(structuredClone(config)); }, [config]);
-  // Auto-scroll logs
   useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
 
-  const updateWP = (idx: number, field: 'pos'|'lookAt', val: V3) => {
+  const updWP = (idx: number, field: keyof CamWaypoint, val: V3) => {
     const next = structuredClone(local);
-    next.waypoints[idx][field] = val;
+    (next.waypoints[idx] as Record<string, V3>)[field] = val;
     setLocal(next); onApply(next);
   };
-  const updateRot = (val: V3) => {
-    const next = { ...local, splatRotation: val };
-    setLocal(next); onApply(next);
-  };
-  const addWP = () => {
+  const updRot = (val: V3) => { const n = { ...local, splatRotation: val }; setLocal(n); onApply(n); };
+  const addWP  = () => {
     const next = structuredClone(local);
-    next.waypoints.push({ pos: [...camPos] as V3, lookAt: [...camLook] as V3 });
+    next.waypoints.push({ pos: [...camPos] as V3, lookAt: [...camLook] as V3, splatPos: [0,0,0] });
     setLocal(next); onApply(next);
   };
-  const removeWP = (idx: number) => {
+  const rmWP = (idx: number) => {
     if (local.waypoints.length <= 2) return;
     const next = structuredClone(local);
     next.waypoints.splice(idx, 1);
@@ -174,137 +120,106 @@ function DebugPanel({
   };
 
   const exportJson = JSON.stringify({ splatRotation: local.splatRotation, waypoints: local.waypoints }, null, 2);
-  const copyJson = () => { navigator.clipboard.writeText(exportJson); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-
-  const levelColor = (l: LogEntry['level']) =>
-    l === 'ok' ? 'text-emerald-400' : l === 'warn' ? 'text-amber-400' : l === 'error' ? 'text-red-400' : 'text-white/50';
+  const copyJson   = () => { navigator.clipboard.writeText(exportJson); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const lvlColor   = (l: LogEntry['level']) =>
+    l==='ok'?'text-emerald-400':l==='warn'?'text-amber-400':l==='error'?'text-red-400':'text-white/45';
 
   return (
     <div data-debug-panel className="absolute left-1/2 -translate-x-1/2 top-32 z-50 w-[22rem] max-w-[calc(100vw-2rem)] pointer-events-auto font-mono select-none">
-      {/* Header */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between rounded-t-2xl bg-[#0a0a18]/97 border border-white/10 px-4 py-2.5 backdrop-blur-2xl text-xs text-white/60 hover:text-white/90 transition-colors"
-      >
+      <button onClick={() => setOpen(o=>!o)}
+        className="w-full flex items-center justify-between rounded-t-2xl bg-[#0a0a18]/97 border border-white/10 px-4 py-2.5 backdrop-blur-2xl text-xs text-white/60 hover:text-white/90 transition-colors">
         <span className="flex items-center gap-2">
           <span className="text-indigo-400">⚙</span>
           <span className="font-bold tracking-wide text-white/80">DEBUG</span>
           <span className="rounded-full bg-indigo-600/30 px-1.5 py-0.5 text-[9px] text-indigo-300 border border-indigo-500/30">WP {activeWaypoint}</span>
-          {logs.some(l => l.level === 'error') && (
-            <span className="rounded-full bg-red-600/30 px-1.5 py-0.5 text-[9px] text-red-300 border border-red-500/30">ERROR</span>
-          )}
+          {logs.some(l=>l.level==='error') && <span className="rounded-full bg-red-600/30 px-1.5 py-0.5 text-[9px] text-red-300 border border-red-500/30">ERROR</span>}
         </span>
-        <span className="text-white/30">{open ? '▲' : '▼'}</span>
+        <span className="text-white/30">{open?'▲':'▼'}</span>
       </button>
 
       {open && (
         <div className="rounded-b-2xl bg-[#0a0a18]/97 border-x border-b border-white/10 backdrop-blur-2xl divide-y divide-white/5 overflow-hidden">
-          {/* Tabs */}
           <div className="flex">
             {(['logs','cam','splat','export'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
-                className={`flex-1 py-2 text-[10px] font-semibold uppercase tracking-widest transition-colors relative ${
-                  tab===t ? 'bg-indigo-600/20 text-indigo-300' : 'text-white/30 hover:text-white/60'
-                }`}>
+                className={`flex-1 py-2 text-[10px] font-semibold uppercase tracking-widest transition-colors relative ${tab===t?'bg-indigo-600/20 text-indigo-300':'text-white/30 hover:text-white/60'}`}>
                 {t}
-                {t==='logs' && logs.some(l=>l.level==='error') && (
-                  <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500" />
-                )}
+                {t==='logs' && logs.some(l=>l.level==='error') && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500"/>}
               </button>
             ))}
           </div>
 
-          {/* ── LOGS ── */}
-          {tab === 'logs' && (
-            <div className="p-2 space-y-1">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] uppercase tracking-widest text-white/30">Registro de eventos</span>
-                <span className="text-[9px] text-white/20">{logs.length} entradas</span>
+          {tab==='logs' && (
+            <div className="p-2 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-widest text-white/30">Eventos</span>
+                <span className="text-[9px] text-white/20">{logs.length}</span>
               </div>
-              <div className="rounded-xl bg-black/50 border border-white/8 p-2 h-52 overflow-y-auto space-y-0.5">
-                {logs.length === 0 && (
-                  <p className="text-[10px] text-white/20 text-center py-4">Sin eventos todavía…</p>
-                )}
-                {logs.map((l, i) => (
+              <div className="rounded-xl bg-black/50 border border-white/8 p-2 h-48 overflow-y-auto space-y-0.5">
+                {logs.length===0 && <p className="text-[10px] text-white/20 text-center py-6">Sin eventos…</p>}
+                {logs.map((l,i) => (
                   <div key={i} className="flex gap-2 text-[10px] leading-relaxed">
                     <span className="text-white/20 shrink-0">{l.time}</span>
-                    <span className={`font-semibold shrink-0 ${levelColor(l.level)}`}>
-                      {l.level === 'ok' ? '✓' : l.level === 'warn' ? '⚠' : l.level === 'error' ? '✗' : '·'}
-                    </span>
-                    <span className={levelColor(l.level)}>{l.msg}</span>
+                    <span className={`font-semibold shrink-0 ${lvlColor(l.level)}`}>{l.level==='ok'?'✓':l.level==='warn'?'⚠':l.level==='error'?'✗':'·'}</span>
+                    <span className={lvlColor(l.level)}>{l.msg}</span>
                   </div>
                 ))}
-                <div ref={logsEndRef} />
+                <div ref={logsEndRef}/>
               </div>
-              {/* Live cam mini-readout */}
-              <div className="grid grid-cols-2 gap-1.5 text-[10px] pt-1">
+              <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                 <div className="rounded-lg bg-black/40 border border-white/8 px-2 py-1.5">
-                  <span className="text-white/25 block text-[9px] mb-0.5">POS</span>
+                  <span className="text-white/25 block text-[9px] mb-0.5">POS CAM</span>
                   <span className="text-emerald-300 font-semibold">[{camPos.map(n=>n.toFixed(2)).join(', ')}]</span>
                 </div>
                 <div className="rounded-lg bg-black/40 border border-white/8 px-2 py-1.5">
-                  <span className="text-white/25 block text-[9px] mb-0.5">MIRA</span>
+                  <span className="text-white/25 block text-[9px] mb-0.5">MIRA A</span>
                   <span className="text-pink-300 font-semibold">[{camLook.map(n=>n.toFixed(2)).join(', ')}]</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── CAM ── */}
-          {tab === 'cam' && (
+          {tab==='cam' && (
             <div className="p-3 space-y-3">
               <button onClick={onToggleFreeRoam}
-                className={`w-full rounded-xl py-2 text-xs font-bold tracking-wide transition-all ${
-                  isFreeRoam
-                    ? 'bg-indigo-600 text-white ring-1 ring-indigo-500 shadow-lg shadow-indigo-900/40'
-                    : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white border border-white/10'
-                }`}>
-                {isFreeRoam ? '🎮 VUELO ACTIVO — WASD + Drag' : '🚀 Activar vuelo libre (WASD)'}
+                className={`w-full rounded-xl py-2 text-xs font-bold tracking-wide transition-all ${isFreeRoam?'bg-indigo-600 text-white ring-1 ring-indigo-500 shadow-lg shadow-indigo-900/40':'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white border border-white/10'}`}>
+                {isFreeRoam?'🎮 VUELO ACTIVO — WASD + Drag':'🚀 Activar vuelo libre (WASD)'}
               </button>
-
               {isFreeRoam && (
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2 text-[10px] text-white/40">
                     <span>Velocidad</span>
                     <input type="range" min="0.02" max="3" step="0.02" value={flySpeed}
-                      onChange={e => onSetSpeed(parseFloat(e.target.value))}
-                      className="flex-1 accent-indigo-500" />
+                      onChange={e=>onSetSpeed(parseFloat(e.target.value))} className="flex-1 accent-indigo-500"/>
                     <span className="text-white/60 w-10 text-right">{flySpeed.toFixed(2)}</span>
                   </div>
                   <p className="text-[9px] text-white/20 text-center">Q sube · E baja · click+drag rota</p>
                 </div>
               )}
-
-              {/* Waypoints */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] uppercase tracking-widest text-white/30">Waypoints</p>
-                  <button onClick={addWP}
-                    className="text-[10px] text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 rounded-lg px-2 py-0.5 hover:bg-indigo-600/10 transition-colors">
-                    + Añadir
-                  </button>
+                  <button onClick={addWP} className="text-[10px] text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 rounded-lg px-2 py-0.5 hover:bg-indigo-600/10 transition-colors">+ Añadir</button>
                 </div>
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
                   {local.waypoints.map((wp, i) => (
-                    <div key={i} className={`rounded-xl p-2.5 space-y-2 border transition-colors ${
-                      i === activeWaypoint ? 'border-indigo-500/40 bg-indigo-950/30' : 'border-white/8 bg-white/3'
-                    }`}>
+                    <div key={i} className={`rounded-xl p-2.5 space-y-2 border transition-colors ${i===activeWaypoint?'border-indigo-500/40 bg-indigo-950/30':'border-white/8 bg-white/3'}`}>
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-semibold text-white/50">
-                          WP {i}{i===0?' — Hero':i===local.waypoints.length-1?' — Final':''}
+                          WP {i}{i===0?' — Hero (inicio free roam)':i===local.waypoints.length-1?' — Final':''}
                           {i===activeWaypoint && <span className="ml-1 text-indigo-400">● activo</span>}
                         </span>
                         <div className="flex gap-1">
-                          <button onClick={() => onJump(i)} className="text-[9px] text-white/30 hover:text-white/70 border border-white/10 rounded px-1.5 py-0.5">ir</button>
-                          <button onClick={() => onSavePos(i)} className="text-[9px] text-emerald-400/70 hover:text-emerald-300 border border-emerald-800/40 rounded px-1.5 py-0.5">pos</button>
-                          <button onClick={() => onSaveLook(i)} className="text-[9px] text-sky-400/70 hover:text-sky-300 border border-sky-800/40 rounded px-1.5 py-0.5">mira</button>
-                          {local.waypoints.length > 2 && (
-                            <button onClick={() => removeWP(i)} className="text-[9px] text-red-400/50 hover:text-red-400 border border-red-900/30 rounded px-1.5 py-0.5">×</button>
-                          )}
+                          <button onClick={()=>onJump(i)}         className="text-[9px] text-white/30      hover:text-white/70    border border-white/10        rounded px-1.5 py-0.5 transition-colors">ir</button>
+                          <button onClick={()=>onSavePos(i)}      className="text-[9px] text-emerald-400/70 hover:text-emerald-300 border border-emerald-800/40   rounded px-1.5 py-0.5 transition-colors">pos</button>
+                          <button onClick={()=>onSaveLook(i)}     className="text-[9px] text-sky-400/70    hover:text-sky-300     border border-sky-800/40      rounded px-1.5 py-0.5 transition-colors">mira</button>
+                          <button onClick={()=>onSaveSplatPos(i)} className="text-[9px] text-violet-400/70 hover:text-violet-300  border border-violet-800/40   rounded px-1.5 py-0.5 transition-colors">splat</button>
+                          {local.waypoints.length>2 && <button onClick={()=>rmWP(i)} className="text-[9px] text-red-400/50 hover:text-red-400 border border-red-900/30 rounded px-1.5 py-0.5 transition-colors">×</button>}
                         </div>
                       </div>
-                      <Vec3Field label="Posición"   value={wp.pos}    onChange={v => updateWP(i,'pos',v)} />
-                      <Vec3Field label="Mira hacia" value={wp.lookAt} onChange={v => updateWP(i,'lookAt',v)} />
+                      <Vec3Field label="Pos cámara" value={wp.pos}      onChange={v=>updWP(i,'pos',v)}/>
+                      <Vec3Field label="Mira hacia" value={wp.lookAt}   onChange={v=>updWP(i,'lookAt',v)}/>
+                      <Vec3Field label="Pos splat"  value={wp.splatPos} onChange={v=>updWP(i,'splatPos',v)}/>
                     </div>
                   ))}
                 </div>
@@ -312,28 +227,23 @@ function DebugPanel({
             </div>
           )}
 
-          {/* ── SPLAT ── */}
-          {tab === 'splat' && (
+          {tab==='splat' && (
             <div className="p-3 space-y-3">
-              <Vec3Field label="Rotación splat (radianes)" value={local.splatRotation} onChange={updateRot} step={0.05} />
+              <Vec3Field label="Rotación splat (radianes)" value={local.splatRotation} onChange={updRot} step={0.05}/>
               <p className="text-[9px] text-white/20">π ≈ 3.14159 · π/2 ≈ 1.5708</p>
               <div className="rounded-xl bg-black/40 border border-white/8 p-2.5 text-[10px] space-y-0.5 text-white/40">
-                <p>URL del splat:</p>
-                <p className="text-indigo-300 break-all">{SPLAT_URL}</p>
+                <p>URL: <span className="text-indigo-300 break-all">{SPLAT_URL}</span></p>
               </div>
             </div>
           )}
 
-          {/* ── EXPORT ── */}
-          {tab === 'export' && (
+          {tab==='export' && (
             <div className="p-3 space-y-2">
               <p className="text-[10px] text-white/30 uppercase tracking-widest">Pegá en CAM_CONFIG</p>
               <pre className="rounded-xl bg-black/50 border border-white/8 p-2.5 text-[9px] text-indigo-200/80 overflow-auto max-h-64 leading-relaxed">{exportJson}</pre>
               <button onClick={copyJson}
-                className={`w-full rounded-xl py-2 text-[10px] font-semibold tracking-wide transition-all ${
-                  copied ? 'bg-emerald-600/80 text-white ring-1 ring-emerald-500' : 'bg-white/6 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white'
-                }`}>
-                {copied ? '✓ Copiado!' : 'Copiar JSON'}
+                className={`w-full rounded-xl py-2 text-[10px] font-semibold tracking-wide transition-all ${copied?'bg-emerald-600/80 text-white ring-1 ring-emerald-500':'bg-white/6 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white'}`}>
+                {copied?'✓ Copiado!':'Copiar JSON'}
               </button>
             </div>
           )}
@@ -354,16 +264,17 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   const sceneRef      = useRef<THREE.Scene | null>(null);
   const cameraRef     = useRef<THREE.PerspectiveCamera | null>(null);
   const splatRef      = useRef<SplatMesh | null>(null);
-  // ✅ Usamos mountId para detectar re-mounts y forzar recarga del splat
   const mountIdRef    = useRef(0);
 
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollProgressRef = useRef(0);
 
   const [atEnd, setAtEnd] = useState(false);
-  const atEndRef          = useRef(false);
+  // ✅ FIX 1: atEndRef se setea DIRECTAMENTE en el scroll handler, no via useEffect.
+  // Esto garantiza que el animation loop lee el valor correcto en el mismo frame
+  // en que se detecta el fin del scroll, sin ningún lag de React.
+  const atEndRef = useRef(false);
 
-  // Debug
   const [debugOpen,  setDebugOpen]  = useState(false);
   const [isFreeRoam, setIsFreeRoam] = useState(false);
   const [flySpeed,   setFlySpeed]   = useState(0.3);
@@ -372,59 +283,62 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   const [activeWP,   setActiveWP]   = useState(0);
   const [logs,       setLogs]       = useState<LogEntry[]>([]);
 
-  // Runtime config
   const [rtConfig, setRtConfig] = useState<RuntimeConfig>(() => structuredClone(CAM_CONFIG));
-  const rtConfigRef   = useRef(rtConfig);
-  const freeRoamRef   = useRef(false);
-  const flySpeedRef   = useRef(0.3);
-  const isDraggingRef = useRef(false);
-  const lastMouseRef  = useRef({ x: 0, y: 0 });
-  const lookAngles    = useRef({ yaw: 0, pitch: 0 });
-  const keys          = useRef<Record<string,boolean>>({ w:false,a:false,s:false,d:false,q:false,e:false });
+  const rtConfigRef  = useRef(rtConfig);
+  const freeRoamRef  = useRef(false);
+  const flySpeedRef  = useRef(0.3);
+  const isDragging   = useRef(false);
+  const lastMouse    = useRef({ x: 0, y: 0 });
+  const lookAngles   = useRef({ yaw: 0, pitch: 0 });
+  const keys         = useRef<Record<string,boolean>>({ w:false, a:false, s:false, d:false, q:false, e:false });
 
   useEffect(() => { freeRoamRef.current = isFreeRoam; }, [isFreeRoam]);
-  useEffect(() => { flySpeedRef.current = flySpeed; },   [flySpeed]);
-  useEffect(() => { rtConfigRef.current = rtConfig; },   [rtConfig]);
-  useEffect(() => { atEndRef.current = atEnd; },         [atEnd]);
+  useEffect(() => { flySpeedRef.current = flySpeed;   }, [flySpeed]);
+  useEffect(() => { rtConfigRef.current = rtConfig;   }, [rtConfig]);
+  // ✅ NO hay useEffect para atEndRef — se maneja directamente
 
-  // Logger
   const log = useCallback((msg: string, level: LogEntry['level'] = 'info') => {
-    const time = new Date().toLocaleTimeString('es', { hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
-    console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'](`[SplatLanding] ${msg}`);
+    const time = new Date().toLocaleTimeString('es', { hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    console[level==='error'?'error':level==='warn'?'warn':'log'](`[SplatLanding] ${msg}`);
     setLogs(prev => [...prev.slice(-99), { time, level, msg }]);
   }, []);
 
-  // ── 1) Init Three.js ──────────────────────────────────────────────────────────
+  // ── Init Three.js ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const wrap = canvasWrapRef.current;
     if (!wrap) return;
 
-    // ✅ Si ya hay renderer (Strict Mode re-mount), lo destruimos y rehacemos
     if (rendererRef.current) {
-      log('Re-mount detectado — reinicializando renderer', 'warn');
+      log('Re-mount — reinicializando', 'warn');
       rendererRef.current.setAnimationLoop(null);
       rendererRef.current.dispose();
-      rendererRef.current = null;
-      sceneRef.current    = null;
-      cameraRef.current   = null;
-      splatRef.current    = null;
+      rendererRef.current = null; sceneRef.current = null;
+      cameraRef.current   = null; splatRef.current  = null;
     }
 
     mountIdRef.current++;
     const thisMountId = mountIdRef.current;
-    log(`Inicializando Three.js (mount #${thisMountId})`);
+    log(`Init Three.js (mount #${thisMountId})`);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#06060f');
     sceneRef.current = scene;
-    log('Scene creada');
 
-    const camera = new THREE.PerspectiveCamera(55, wrap.clientWidth / wrap.clientHeight, 0.01, 10000);
     const wp0 = CAM_CONFIG.waypoints[0];
+    const camera = new THREE.PerspectiveCamera(55, wrap.clientWidth / wrap.clientHeight, 0.01, 10000);
     camera.position.copy(v3(wp0.pos));
     camera.lookAt(v3(wp0.lookAt));
     cameraRef.current = camera;
-    log(`Cámara en [${wp0.pos.join(', ')}]`);
+
+    // ✅ FIX 2: Inicializar lookAngles desde WP0 en el mount.
+    // Si llegamos al free roam antes de que el scroll mode haya sincronizado
+    // los ángulos (p.ej. recargando con scroll al fondo), la cámara ya apunta bien.
+    {
+      const dir = v3(wp0.lookAt).sub(v3(wp0.pos)).normalize();
+      lookAngles.current.yaw   = Math.atan2(dir.x, dir.z);
+      lookAngles.current.pitch = Math.asin(Math.max(-1, Math.min(1, -dir.y)));
+    }
+    log(`Cámara WP0: [${wp0.pos.join(', ')}]`);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -432,21 +346,16 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     renderer.domElement.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
     wrap.appendChild(renderer.domElement);
     rendererRef.current = renderer;
-    log('WebGLRenderer creado');
 
-    // ✅ SparkRenderer — imprescindible para ver splats
     try {
       const spark = new SparkRenderer({ renderer });
       scene.add(spark);
-      log('SparkRenderer inicializado', 'ok');
-    } catch (e) {
-      log(`SparkRenderer ERROR: ${e}`, 'error');
-    }
+      log('SparkRenderer OK', 'ok');
+    } catch(e) { log(`SparkRenderer ERROR: ${e}`, 'error'); }
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.3));
     const dl = new THREE.DirectionalLight(0xffffff, 0.7);
-    dl.position.set(2, 5, 3);
-    scene.add(dl);
+    dl.position.set(2, 5, 3); scene.add(dl);
 
     const onResize = () => {
       renderer.setSize(wrap.clientWidth, wrap.clientHeight);
@@ -455,14 +364,15 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     };
     window.addEventListener('resize', onResize);
 
-    // ── Animation loop ────────────────────────────────────────────────────────
+    // ── Animation loop ─────────────────────────────────────────────────────────
     let frame = 0;
     renderer.setAnimationLoop(() => {
       frame++;
-      const cfg  = rtConfigRef.current;
-      const wps  = cfg.waypoints;
+      const cfg = rtConfigRef.current;
+      const wps = cfg.waypoints;
 
       if (freeRoamRef.current || atEndRef.current) {
+        // ── Free roam ──────────────────────────────────────────────────────────
         const spd = flySpeedRef.current;
         const fwd = new THREE.Vector3();
         camera.getWorldDirection(fwd);
@@ -473,28 +383,34 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
         if (keys.current['d']) camera.position.addScaledVector(right,  spd);
         if (keys.current['q']) camera.position.y += spd;
         if (keys.current['e']) camera.position.y -= spd;
-        camera.quaternion.setFromEuler(new THREE.Euler(lookAngles.current.pitch, lookAngles.current.yaw, 0, 'YXZ'));
+        camera.quaternion.setFromEuler(
+          new THREE.Euler(lookAngles.current.pitch, lookAngles.current.yaw, 0, 'YXZ')
+        );
+        // Splat queda fijo en WP0.splatPos — no se toca
+
       } else {
+        // ── Scroll mode ────────────────────────────────────────────────────────
         const prog  = scrollProgressRef.current;
         const total = wps.length - 1;
         const fIdx  = clamp01(prog) * total;
         const i0    = Math.max(0, Math.min(total - 1, Math.floor(fIdx)));
         const i1    = Math.min(total, i0 + 1);
         const t     = easeInOut(fIdx - i0);
-        const wp0   = wps[i0];
-        const wp1   = wps[i1];
+        const w0    = wps[i0];
+        const w1    = wps[i1];
 
-        const tPos  = new THREE.Vector3(lerp(wp0.pos[0],wp1.pos[0],t), lerp(wp0.pos[1],wp1.pos[1],t), lerp(wp0.pos[2],wp1.pos[2],t));
-        const tLook = new THREE.Vector3(lerp(wp0.lookAt[0],wp1.lookAt[0],t), lerp(wp0.lookAt[1],wp1.lookAt[1],t), lerp(wp0.lookAt[2],wp1.lookAt[2],t));
+        const tPos   = new THREE.Vector3(lerp(w0.pos[0],w1.pos[0],t),          lerp(w0.pos[1],w1.pos[1],t),          lerp(w0.pos[2],w1.pos[2],t));
+        const tLook  = new THREE.Vector3(lerp(w0.lookAt[0],w1.lookAt[0],t),    lerp(w0.lookAt[1],w1.lookAt[1],t),    lerp(w0.lookAt[2],w1.lookAt[2],t));
+        const tSplat = new THREE.Vector3(lerp(w0.splatPos[0],w1.splatPos[0],t),lerp(w0.splatPos[1],w1.splatPos[1],t),lerp(w0.splatPos[2],w1.splatPos[2],t));
 
         camera.position.lerp(tPos, 0.07);
         camera.lookAt(tLook);
+        if (splatRef.current) splatRef.current.position.lerp(tSplat, 0.07);
 
-        // Sync look angles para transición suave a free roam
-        const fd = new THREE.Vector3();
-        camera.getWorldDirection(fd);
+        // ✅ Sync continuo de lookAngles para transición suave al free roam
+        const fd = new THREE.Vector3(); camera.getWorldDirection(fd);
         lookAngles.current.yaw   = Math.atan2(fd.x, fd.z);
-        lookAngles.current.pitch = Math.asin(clamp01(-fd.y));
+        lookAngles.current.pitch = Math.asin(Math.max(-1, Math.min(1, -fd.y)));
 
         if (frame % 20 === 0) setActiveWP(Math.round(clamp01(prog) * total));
       }
@@ -502,54 +418,42 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       if (frame % 4 === 0) {
         const p = camera.position;
         setLiveCamPos([fmt(p.x), fmt(p.y), fmt(p.z)]);
-        const fd = new THREE.Vector3();
-        camera.getWorldDirection(fd);
-        const lp = p.clone().addScaledVector(fd, 15);
+        const fd = new THREE.Vector3(); camera.getWorldDirection(fd);
+        const lp = p.clone().addScaledVector(fd, 3);
         setLiveLookAt([fmt(lp.x), fmt(lp.y), fmt(lp.z)]);
       }
 
       renderer.render(scene, camera);
     });
-    log('Animation loop iniciado', 'ok');
+    log('Loop iniciado', 'ok');
 
-    // ── Cargar splat ──────────────────────────────────────────────────────────
-    log(`Cargando splat: ${SPLAT_URL}`);
+    log(`Cargando: ${SPLAT_URL}`);
     try {
       const splat = new SplatMesh({
         url: SPLAT_URL,
         onLoad: () => {
-          if (mountIdRef.current !== thisMountId) return; // mount viejo, ignorar
-          log('Splat cargado y visible', 'ok');
+          if (mountIdRef.current !== thisMountId) return;
+          log('Splat cargado ✓', 'ok');
         },
       });
       splat.rotation.copy(new THREE.Euler(...CAM_CONFIG.splatRotation));
+      splat.position.copy(v3(CAM_CONFIG.waypoints[0].splatPos));
       scene.add(splat);
       splatRef.current = splat;
-      log('SplatMesh agregado a la scene');
-    } catch (e) {
-      log(`Error creando SplatMesh: ${e}`, 'error');
-    }
+      log('SplatMesh en scene');
+    } catch(e) { log(`SplatMesh ERROR: ${e}`, 'error'); }
 
     return () => {
       log(`Desmontando mount #${thisMountId}`, 'warn');
       renderer.setAnimationLoop(null);
       window.removeEventListener('resize', onResize);
-      if (splatRef.current) {
-        scene.remove(splatRef.current);
-        splatRef.current.dispose?.();
-        splatRef.current = null;
-      }
-      // Remover canvas del DOM antes de dispose
-      if (renderer.domElement.parentNode) {
-        renderer.domElement.parentNode.removeChild(renderer.domElement);
-      }
-      renderer.dispose();
-      rendererRef.current = null;
+      if (splatRef.current) { scene.remove(splatRef.current); splatRef.current.dispose?.(); splatRef.current = null; }
+      if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+      renderer.dispose(); rendererRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Aplicar rotación del splat en tiempo real ─────────────────────────────────
   useEffect(() => {
     if (!splatRef.current) return;
     splatRef.current.rotation.copy(new THREE.Euler(...rtConfig.splatRotation));
@@ -563,21 +467,45 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       scrollProgressRef.current = prog;
       setScrollProgress(prog);
 
-      const end = prog >= 0.97;
-      if (end !== atEndRef.current) {
-        setAtEnd(end);
-        if (end && cameraRef.current) {
-          // Sync look angles desde el ÚLTIMO waypoint para que arranque en la posición correcta
-          const lastWP = rtConfigRef.current.waypoints.at(-1)!;
-          const camPos = v3(lastWP.pos);
-          const lookTarget = v3(lastWP.lookAt);
-          const dir = lookTarget.clone().sub(camPos).normalize();
-          lookAngles.current.yaw   = Math.atan2(dir.x, dir.z);
-          lookAngles.current.pitch = Math.asin(-dir.y);
-          log('Llegaste al final — free roam activado', 'ok');
+      const shouldBeEnd = prog >= 0.97;
+
+      if (shouldBeEnd && !atEndRef.current) {
+        // ✅ FIX 3: atEndRef.current = true PRIMERO, antes de cualquier otra cosa.
+        // El animation loop que está corriendo en paralelo en el mismo thread JS
+        // no puede interrumpir esto (JS es single-threaded), así que el próximo
+        // frame del loop ya verá atEndRef.current === true y NO ejecutará
+        // camera.lookAt() que sobreescribiría los lookAngles.
+        atEndRef.current = true;
+        setAtEnd(true);
+
+        const wp0 = rtConfigRef.current.waypoints[0];
+
+        // Resetear cámara a WP0
+        if (cameraRef.current) {
+          cameraRef.current.position.copy(v3(wp0.pos));
+          cameraRef.current.lookAt(v3(wp0.lookAt));
         }
+
+        // Calcular lookAngles exactos desde WP0.pos → WP0.lookAt
+        const dir = v3(wp0.lookAt).sub(v3(wp0.pos)).normalize();
+        lookAngles.current.yaw   = Math.atan2(dir.x, dir.z);
+        lookAngles.current.pitch = Math.asin(Math.max(-1, Math.min(1, -dir.y)));
+
+        // Snap splat a WP0 instantáneamente (sin lerp)
+        if (splatRef.current) {
+          splatRef.current.position.copy(v3(wp0.splatPos));
+          splatRef.current.rotation.copy(new THREE.Euler(...rtConfigRef.current.splatRotation));
+        }
+
+        log(`Free roam ON — cam [${wp0.pos.join(', ')}] splat [${wp0.splatPos.join(', ')}]`, 'ok');
+
+      } else if (!shouldBeEnd && atEndRef.current) {
+        atEndRef.current = false;
+        setAtEnd(false);
+        log('Free roam OFF', 'info');
       }
     };
+
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -589,50 +517,51 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     const onDown  = (e: PointerEvent) => {
       if (!canDrag()) return;
       if ((e.target as HTMLElement)?.closest('[data-debug-panel]')) return;
-      isDraggingRef.current = true;
-      lastMouseRef.current  = { x: e.clientX, y: e.clientY };
+      isDragging.current = true; lastMouse.current = { x: e.clientX, y: e.clientY };
     };
-    const onUp   = () => { isDraggingRef.current = false; };
+    const onUp   = () => { isDragging.current = false; };
     const onMove = (e: PointerEvent) => {
-      if (!isDraggingRef.current) return;
-      const dx = e.clientX - lastMouseRef.current.x;
-      const dy = e.clientY - lastMouseRef.current.y;
-      lastMouseRef.current = { x: e.clientX, y: e.clientY };
+      if (!isDragging.current) return;
+      const dx = e.clientX - lastMouse.current.x;
+      const dy = e.clientY - lastMouse.current.y;
+      lastMouse.current = { x: e.clientX, y: e.clientY };
       lookAngles.current.yaw   -= dx * 0.003;
       lookAngles.current.pitch  = Math.max(-1.35, Math.min(1.35, lookAngles.current.pitch - dy * 0.003));
     };
     const onKeyDown = (e: KeyboardEvent) => { const k=e.key.toLowerCase(); if(k in keys.current) keys.current[k]=true; };
     const onKeyUp   = (e: KeyboardEvent) => { const k=e.key.toLowerCase(); if(k in keys.current) keys.current[k]=false; };
-
-    window.addEventListener('pointerdown', onDown);
-    window.addEventListener('pointerup',   onUp);
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('keydown',     onKeyDown);
+    window.addEventListener('pointerdown', onDown); window.addEventListener('pointerup',   onUp);
+    window.addEventListener('pointermove', onMove); window.addEventListener('keydown',     onKeyDown);
     window.addEventListener('keyup',       onKeyUp);
     return () => {
-      window.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('pointerup',   onUp);
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('keydown',     onKeyDown);
+      window.removeEventListener('pointerdown', onDown); window.removeEventListener('pointerup',   onUp);
+      window.removeEventListener('pointermove', onMove); window.removeEventListener('keydown',     onKeyDown);
       window.removeEventListener('keyup',       onKeyUp);
     };
   }, []);
 
-  // ── Debug: guardar pos/look ───────────────────────────────────────────────────
+  // ── Debug helpers ─────────────────────────────────────────────────────────────
   const savePos = useCallback((idx: number) => {
     const cam = cameraRef.current; if (!cam) return;
     const val: V3 = [fmt(cam.position.x), fmt(cam.position.y), fmt(cam.position.z)];
-    log(`WP${idx} pos guardada: [${val.join(', ')}]`, 'ok');
+    log(`WP${idx} pos: [${val.join(', ')}]`, 'ok');
     setRtConfig(prev => { const n=structuredClone(prev); if(n.waypoints[idx]) n.waypoints[idx].pos=val; return n; });
   }, [log]);
 
   const saveLook = useCallback((idx: number) => {
     const cam = cameraRef.current; if (!cam) return;
     const fd = new THREE.Vector3(); cam.getWorldDirection(fd);
-    const t  = cam.position.clone().addScaledVector(fd, 15);
+    const t  = cam.position.clone().addScaledVector(fd, 3);
     const val: V3 = [fmt(t.x), fmt(t.y), fmt(t.z)];
-    log(`WP${idx} lookAt guardado: [${val.join(', ')}]`, 'ok');
+    log(`WP${idx} lookAt: [${val.join(', ')}]`, 'ok');
     setRtConfig(prev => { const n=structuredClone(prev); if(n.waypoints[idx]) n.waypoints[idx].lookAt=val; return n; });
+  }, [log]);
+
+  const saveSplatPos = useCallback((idx: number) => {
+    const splat = splatRef.current; if (!splat) return;
+    const val: V3 = [fmt(splat.position.x), fmt(splat.position.y), fmt(splat.position.z)];
+    log(`WP${idx} splatPos: [${val.join(', ')}]`, 'ok');
+    setRtConfig(prev => { const n=structuredClone(prev); if(n.waypoints[idx]) n.waypoints[idx].splatPos=val; return n; });
   }, [log]);
 
   const jumpToWP = useCallback((idx: number) => {
@@ -640,96 +569,117 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     const wp  = rtConfigRef.current.waypoints[idx]; if (!wp) return;
     cam.position.copy(v3(wp.pos));
     cam.lookAt(v3(wp.lookAt));
-    const fd = new THREE.Vector3(); cam.getWorldDirection(fd);
-    lookAngles.current.yaw   = Math.atan2(fd.x, fd.z);
-    lookAngles.current.pitch = Math.asin(-clamp01(fd.y));
+    const dir = v3(wp.lookAt).sub(v3(wp.pos)).normalize();
+    lookAngles.current.yaw   = Math.atan2(dir.x, dir.z);
+    lookAngles.current.pitch = Math.asin(Math.max(-1, Math.min(1, -dir.y)));
+    if (splatRef.current) splatRef.current.position.copy(v3(wp.splatPos));
     log(`Salté a WP${idx}`);
   }, [log]);
 
-  // ── Hero parallax ─────────────────────────────────────────────────────────────
-  const heroLetters = useMemo(() => HERO_TEXT.split(''), []);
+  // ── Hero: repulsión gravitatoria ──────────────────────────────────────────────
+  const heroLetters  = useMemo(() => HERO_TEXT.split(''), []);
   const [heroMouse, setHeroMouse] = useState({ nx:0.5, ny:0.5, hover:false });
+  const smoothMouse  = useRef({ nx:0.5, ny:0.5 });
+  const animFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const tick = () => {
+      smoothMouse.current.nx = lerp(smoothMouse.current.nx, heroMouse.nx, 0.06);
+      smoothMouse.current.ny = lerp(smoothMouse.current.ny, heroMouse.ny, 0.06);
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
+    return () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
+  }, [heroMouse.nx, heroMouse.ny]);
+
+  const getLetterStyle = useCallback((i: number, total: number): React.CSSProperties => {
+    if (!heroMouse.hover) return { transform:'translate3d(0,0,0)', textShadow:'none' };
+    const sm   = smoothMouse.current;
+    const lx   = i / (total - 1);
+    const dx   = lx - sm.nx;
+    const dy   = 0.5 - sm.ny;
+    const dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+    const force = Math.max(0, 38 * (1 - dist * 2.2));
+    const tx = (dx / dist) * force;
+    const ty = (dy / dist) * force * 0.6;
+    return {
+      transform: `translate3d(${tx.toFixed(2)}px,${ty.toFixed(2)}px,0)`,
+      textShadow: `${(-tx*0.4).toFixed(1)}px ${(-ty*0.4+4).toFixed(1)}px 18px rgba(99,102,241,0.35)`,
+    };
+  }, [heroMouse.hover]);
+
   const onHeroMove: React.MouseEventHandler<HTMLDivElement> = e => {
     const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     setHeroMouse(s => ({ ...s, nx:(e.clientX-r.left)/r.width, ny:(e.clientY-r.top)/r.height }));
   };
 
-  const cardSlot     = 1 / N_SECTIONS;
+  const cardSlot      = 1 / N_SECTIONS;
   const isHeroVisible = scrollProgress < cardSlot;
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    // ✅ FIX: altura SOLO en el wrapper exterior — sin div aria-hidden duplicado
     <div className="relative text-white" style={{ height: `${N_SECTIONS * 100}svh` }}>
+      <div ref={canvasWrapRef}
+        className={`fixed inset-0 h-[100svh] w-full ${(atEnd || isFreeRoam) ? 'cursor-crosshair' : 'cursor-default'}`}>
 
-      {/* Canvas fijo — ocupa el viewport completo, no genera scroll */}
-      <div
-        ref={canvasWrapRef}
-        className={`fixed inset-0 h-[100svh] w-full ${(atEnd || isFreeRoam) ? 'cursor-crosshair' : 'cursor-default'}`}
-      >
-        {/* Viñeta pesada — oculta los bordes del splat, deja ver solo el centro */}
+        {/* ✅ FIX 4: Viñeta más abierta en el centro para no tapar el splat.
+            Con coordenadas como [-0.65, 0.15, 0.9] el splat cabe en el centro
+            perfectamente si la zona transparente es suficientemente grande. */}
         <div className="pointer-events-none absolute inset-0 z-10"
-          style={{ background: 'radial-gradient(ellipse 55% 55% at 50% 50%, transparent 0%, transparent 30%, rgba(6,6,15,0.55) 55%, rgba(6,6,15,0.92) 72%, rgba(6,6,15,0.99) 88%, #06060f 100%)' }}
-        />
+          style={{ background: 'radial-gradient(ellipse 55% 55% at 50% 50%, transparent 0%, transparent 35%, rgba(6,6,15,0.35) 55%, rgba(6,6,15,0.82) 72%, rgba(6,6,15,0.97) 86%, #06060f 100%)' }}/>
 
-        {/* ── Botón debug — centrado horizontal, debajo de la navbar ── */}
+        {/* Botón debug */}
         {isAdmin && (
-          <button
-            onClick={() => setDebugOpen(o => !o)}
+          <button onClick={() => setDebugOpen(o=>!o)}
             className={`absolute top-24 left-1/2 -translate-x-1/2 z-50 rounded-xl px-4 py-1.5 text-xs font-semibold border backdrop-blur transition-all duration-200 flex items-center gap-2 ${
               debugOpen
                 ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/40'
                 : 'bg-black/60 border-white/10 text-white/40 hover:text-white hover:border-white/20 hover:bg-black/70'
-            }`}
-          >
-            <span>⚙</span>
-            <span>Debug</span>
-            {logs.some(l => l.level === 'error') && (
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-            )}
+            }`}>
+            <span>⚙</span><span>Debug</span>
+            {logs.some(l=>l.level==='error') && <span className="w-1.5 h-1.5 rounded-full bg-red-500"/>}
           </button>
         )}
 
         {/* Panel debug */}
         {isAdmin && debugOpen && (
           <DebugPanel
-            config={rtConfig} onApply={setRtConfig}
-            logs={logs}
+            config={rtConfig} onApply={setRtConfig} logs={logs}
             camPos={liveCamPos} camLook={liveLookAt}
             isFreeRoam={isFreeRoam} flySpeed={flySpeed}
-            onToggleFreeRoam={() => setIsFreeRoam(o => !o)} onSetSpeed={setFlySpeed}
+            onToggleFreeRoam={() => setIsFreeRoam(o=>!o)} onSetSpeed={setFlySpeed}
             activeWaypoint={activeWP}
-            onSavePos={savePos} onSaveLook={saveLook} onJump={jumpToWP}
+            onSavePos={savePos} onSaveLook={saveLook} onSaveSplatPos={saveSplatPos} onJump={jumpToWP}
           />
         )}
 
         {/* Hero */}
-        <div className={`pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-6 transition-opacity duration-700 ${isHeroVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div
-            className={isHeroVisible ? 'pointer-events-auto' : ''}
-            onMouseEnter={() => setHeroMouse(s => ({ ...s, hover:true }))}
-            onMouseLeave={() => setHeroMouse({ nx:0.5, ny:0.5, hover:false })}
-            onMouseMove={onHeroMove}
-          >
-            <h1 className="select-none text-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight drop-shadow-xl leading-none">
-              {heroLetters.map((ch, i) => {
-                const dx=(heroMouse.nx-0.5)*18, dy=(heroMouse.ny-0.5)*10;
-                const w=((i-heroLetters.length/2)/heroLetters.length)*2;
-                const s=heroMouse.hover?1:0;
-                return (
-                  <span key={`${ch}-${i}`} className="inline-block transition-transform duration-75"
-                    style={{ transform:`translate3d(${dx*w*s}px,${dy*(1-Math.abs(w))*s}px,0)` }}>
-                    {ch===' '?'\u00A0':ch}
-                  </span>
-                );
-              })}
+        <div className={`pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-6 transition-opacity duration-700 ${isHeroVisible?'opacity-100':'opacity-0'}`}>
+          <div className={isHeroVisible?'pointer-events-auto':''}
+            onMouseEnter={() => setHeroMouse(s=>({...s,hover:true}))}
+            onMouseLeave={() => setHeroMouse({nx:0.5,ny:0.5,hover:false})}
+            onMouseMove={onHeroMove}>
+            <h1 className="select-none text-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-none">
+              {heroLetters.map((ch, i) => (
+                <span key={`${ch}-${i}`} className="inline-block"
+                  style={{
+                    ...getLetterStyle(i, heroLetters.length),
+                    transition: heroMouse.hover
+                      ? 'transform 0.18s cubic-bezier(0.23,1,0.32,1), text-shadow 0.18s ease'
+                      : 'transform 0.6s cubic-bezier(0.23,1,0.32,1), text-shadow 0.6s ease',
+                  }}>
+                  {ch===' '?'\u00A0':ch}
+                </span>
+              ))}
             </h1>
             <p className="mt-3 sm:mt-4 text-center text-xs sm:text-sm text-white/50 tracking-widest uppercase">
-              Patagonia · Ushuaia · Tierra del Fuego
+              Patagonia · Argentina
             </p>
-            <div className="mt-8 sm:mt-12 flex flex-col items-center gap-2 animate-bounce">
-              <span className="text-xs text-white/30 uppercase tracking-widest">Scroll</span>
-              <svg width="14" height="22" viewBox="0 0 14 22" className="text-white/30" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <div className="mt-8 sm:mt-12 flex flex-col items-center gap-2"
+              style={{ animation:'scrollBounce 3s ease-in-out infinite' }}>
+              <style>{`@keyframes scrollBounce{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(8px);opacity:.9}}`}</style>
+              <span className="text-xs text-white/40 uppercase tracking-widest">Scroll</span>
+              <svg width="14" height="22" viewBox="0 0 14 22" className="text-white/40" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M7 3 L7 19 M3 15 L7 19 L11 15"/>
               </svg>
             </div>
@@ -744,40 +694,31 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
           return (
             <div key={card.key}
               className="pointer-events-none absolute inset-0 z-20 flex items-end sm:items-center px-5 sm:px-12 md:px-20 pb-20 sm:pb-0"
-              style={{ opacity: inSlot ? 1 : 0, transform: inSlot ? 'translateY(0)' : 'translateY(28px)', transition: 'opacity 0.55s ease, transform 0.55s ease' }}
-            >
-              <div className="w-full max-w-xs sm:max-w-sm pointer-events-auto group">
-                {/* Card */}
-                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 bg-black/30 backdrop-blur-xl shadow-2xl shadow-black/50 transition-all duration-300 group-hover:border-white/20 group-hover:bg-black/40">
-                  {/* Accent top bar */}
-                  <div className="h-px w-full bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent" />
+              style={{ opacity:inSlot?1:0, transform:inSlot?'translateY(0)':'translateY(28px)', transition:'opacity 0.55s ease, transform 0.55s ease' }}>
+              <Link href={card.href} className="w-full max-w-xs sm:max-w-sm pointer-events-auto group block focus:outline-none">
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 bg-black/30 backdrop-blur-xl shadow-2xl shadow-black/50 transition-all duration-300 group-hover:border-white/25 group-hover:bg-black/45 group-hover:scale-[1.02] group-focus-visible:ring-2 group-focus-visible:ring-indigo-500">
+                  <div className="h-px w-full bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent transition-all duration-300 group-hover:via-indigo-400/80"/>
                   <div className="p-6 sm:p-8">
-                    <h2 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight text-white">
-                      {card.title}
-                    </h2>
-                    <p className="mt-2.5 text-sm sm:text-base text-white/55 leading-relaxed">
-                      {card.subtitle}
-                    </p>
-                    <Link
-                      href={card.href}
-                      className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white/8 hover:bg-white/14 border border-white/10 hover:border-white/20 px-4 py-2 text-sm font-medium text-white/70 hover:text-white transition-all duration-200"
-                    >
+                    <h2 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight text-white">{card.title}</h2>
+                    <p className="mt-2.5 text-sm sm:text-base text-white/55 leading-relaxed">{card.subtitle}</p>
+                    <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-indigo-300 group-hover:text-indigo-200 transition-colors">
                       Ver más
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"
+                        className="transition-transform duration-200 group-hover:translate-x-0.5">
                         <path d="M2 6h8M6 2l4 4-4 4"/>
                       </svg>
-                    </Link>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             </div>
           );
         })}
 
         {/* Free roam hint */}
-        <div className={`pointer-events-none absolute bottom-6 sm:bottom-8 inset-x-0 z-20 flex justify-center transition-opacity duration-700 ${atEnd ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`pointer-events-none absolute bottom-6 sm:bottom-8 inset-x-0 z-20 flex justify-center transition-opacity duration-700 ${atEnd?'opacity-100':'opacity-0'}`}>
           <div className="rounded-full bg-black/50 border border-white/10 backdrop-blur px-4 py-2 text-xs text-white/50 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"/>
             <span className="hidden sm:inline">Arrastrá para explorar · WASD para moverte</span>
             <span className="sm:hidden">Drag para explorar</span>
           </div>
