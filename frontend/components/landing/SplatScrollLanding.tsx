@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { SplatMesh, SparkRenderer } from '@sparkjsdev/spark';
+import Link from 'next/link';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN — Editá con el panel debug y pegá el JSON exportado aquí
@@ -12,43 +13,43 @@ type CamWaypoint = { pos: V3; lookAt: V3 };
 
 const CAM_CONFIG: { splatRotation: V3; waypoints: CamWaypoint[] } = {
   "splatRotation": [
-    0,
-    0,
-    3
+    -0.2,
+    2.65,
+    -3.05
   ],
   "waypoints": [
     {
       "pos": [
-        0.3,
-        2.55,
-        1
-      ],
-      "lookAt": [
-        -2.603,
-        -7.611,
-        -9.645
-      ]
-    },
-    {
-      "pos": [
-        0.95,
-        1.5,
-        2.2
-      ],
-      "lookAt": [
+        -1.05,
         0.1,
-        0.4,
-        0.65
+        1.8
+      ],
+      "lookAt": [
+        0,
+        0,
+        0
       ]
     },
     {
       "pos": [
-        3.2,
-        1.2,
-        4.1
+        -0.65,
+        0.2,
+        0.55
       ],
       "lookAt": [
         0.05,
+        0,
+        0
+      ]
+    },
+    {
+      "pos": [
+        3,
+        1,
+        4
+      ],
+      "lookAt": [
+        0,
         0,
         0
       ]
@@ -80,15 +81,13 @@ const CAM_CONFIG: { splatRotation: V3; waypoints: CamWaypoint[] } = {
   ]
 };
 
-
-const SPLAT_URL = '/splats/4.spz'; // ← URL del splat
+const SPLAT_URL = '/splats/10.spz'; // ← URL del splat
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const CARDS = [
-  { key: 'locaciones', title: 'Locaciones',    subtitle: 'Glaciares, bosques y costa patagónica al alcance de tu producción.' },
-  { key: 'talento',    title: 'Talento local', subtitle: 'Técnicos y profesionales audiovisuales conectados con el territorio.' },
-  { key: 'proyectos',  title: 'Proyectos',     subtitle: 'Gestión real de producciones en el fin del mundo.' },
-  { key: 'incentivos', title: 'Incentivos',    subtitle: 'Beneficios fiscales y logística para producir en Tierra del Fuego.' },
+  { key: 'locaciones', title: 'Locaciones',    subtitle: 'Glaciares, bosques y costa patagónica al alcance de tu producción.',       href: '/locaciones' },
+  { key: 'guia',       title: 'Guía de rodaje', subtitle: 'Todo lo que necesitás para filmar en el fin del mundo, paso a paso.',      href: '/guia' },
+  { key: 'proyectos',  title: 'Proyectos',      subtitle: 'Gestión real de producciones audiovisuales en Tierra del Fuego.',          href: '/proyectos' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -181,7 +180,7 @@ function DebugPanel({
     l === 'ok' ? 'text-emerald-400' : l === 'warn' ? 'text-amber-400' : l === 'error' ? 'text-red-400' : 'text-white/50';
 
   return (
-    <div data-debug-panel className="absolute left-1/2 -translate-x-1/2 top-16 z-50 w-96 pointer-events-auto font-mono select-none">
+    <div data-debug-panel className="absolute left-1/2 -translate-x-1/2 top-32 z-50 w-[22rem] max-w-[calc(100vw-2rem)] pointer-events-auto font-mono select-none">
       {/* Header */}
       <button
         onClick={() => setOpen(o => !o)}
@@ -568,10 +567,13 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       if (end !== atEndRef.current) {
         setAtEnd(end);
         if (end && cameraRef.current) {
-          const fd = new THREE.Vector3();
-          cameraRef.current.getWorldDirection(fd);
-          lookAngles.current.yaw   = Math.atan2(fd.x, fd.z);
-          lookAngles.current.pitch = Math.asin(clamp01(-fd.y));
+          // Sync look angles desde el ÚLTIMO waypoint para que arranque en la posición correcta
+          const lastWP = rtConfigRef.current.waypoints.at(-1)!;
+          const camPos = v3(lastWP.pos);
+          const lookTarget = v3(lastWP.lookAt);
+          const dir = lookTarget.clone().sub(camPos).normalize();
+          lookAngles.current.yaw   = Math.atan2(dir.x, dir.z);
+          lookAngles.current.pitch = Math.asin(-dir.y);
           log('Llegaste al final — free roam activado', 'ok');
         }
       }
@@ -665,15 +667,16 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
         ref={canvasWrapRef}
         className={`fixed inset-0 h-[100svh] w-full ${(atEnd || isFreeRoam) ? 'cursor-crosshair' : 'cursor-default'}`}
       >
-        {/* Viñeta */}
-        <div className="pointer-events-none absolute inset-0 z-10
-          bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.4)_60%,rgba(0,0,0,0.82)_100%)]" />
+        {/* Viñeta pesada — oculta los bordes del splat, deja ver solo el centro */}
+        <div className="pointer-events-none absolute inset-0 z-10"
+          style={{ background: 'radial-gradient(ellipse 55% 55% at 50% 50%, transparent 0%, transparent 30%, rgba(6,6,15,0.55) 55%, rgba(6,6,15,0.92) 72%, rgba(6,6,15,0.99) 88%, #06060f 100%)' }}
+        />
 
         {/* ── Botón debug — centrado horizontal, debajo de la navbar ── */}
         {isAdmin && (
           <button
             onClick={() => setDebugOpen(o => !o)}
-            className={`absolute top-16 left-1/2 -translate-x-1/2 z-50 rounded-xl px-4 py-1.5 text-xs font-semibold border backdrop-blur transition-all duration-200 flex items-center gap-2 ${
+            className={`absolute top-24 left-1/2 -translate-x-1/2 z-50 rounded-xl px-4 py-1.5 text-xs font-semibold border backdrop-blur transition-all duration-200 flex items-center gap-2 ${
               debugOpen
                 ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/40'
                 : 'bg-black/60 border-white/10 text-white/40 hover:text-white hover:border-white/20 hover:bg-black/70'
@@ -708,7 +711,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
             onMouseLeave={() => setHeroMouse({ nx:0.5, ny:0.5, hover:false })}
             onMouseMove={onHeroMove}
           >
-            <h1 className="select-none text-center text-5xl font-black tracking-tight drop-shadow-xl md:text-7xl">
+            <h1 className="select-none text-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight drop-shadow-xl leading-none">
               {heroLetters.map((ch, i) => {
                 const dx=(heroMouse.nx-0.5)*18, dy=(heroMouse.ny-0.5)*10;
                 const w=((i-heroLetters.length/2)/heroLetters.length)*2;
@@ -721,10 +724,10 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
                 );
               })}
             </h1>
-            <p className="mt-4 text-center text-sm text-white/50 tracking-widest uppercase">
+            <p className="mt-3 sm:mt-4 text-center text-xs sm:text-sm text-white/50 tracking-widest uppercase">
               Patagonia · Ushuaia · Tierra del Fuego
             </p>
-            <div className="mt-12 flex flex-col items-center gap-2 animate-bounce">
+            <div className="mt-8 sm:mt-12 flex flex-col items-center gap-2 animate-bounce">
               <span className="text-xs text-white/30 uppercase tracking-widest">Scroll</span>
               <svg width="14" height="22" viewBox="0 0 14 22" className="text-white/30" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M7 3 L7 19 M3 15 L7 19 L11 15"/>
@@ -740,23 +743,43 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
           const inSlot    = scrollProgress >= slotStart && scrollProgress < slotEnd;
           return (
             <div key={card.key}
-              className="pointer-events-none absolute inset-0 z-20 flex items-center px-8 md:px-16"
-              style={{ opacity: inSlot?1:0, transform: inSlot?'translateY(0)':'translateY(20px)', transition:'opacity 0.6s ease, transform 0.6s ease' }}
+              className="pointer-events-none absolute inset-0 z-20 flex items-end sm:items-center px-5 sm:px-12 md:px-20 pb-20 sm:pb-0"
+              style={{ opacity: inSlot ? 1 : 0, transform: inSlot ? 'translateY(0)' : 'translateY(28px)', transition: 'opacity 0.55s ease, transform 0.55s ease' }}
             >
-              <div className="max-w-sm rounded-3xl border border-white/10 bg-black/40 p-8 shadow-2xl backdrop-blur-md pointer-events-auto">
-                <div className="text-[10px] uppercase tracking-widest text-white/35 mb-2">0{i+1} — {card.key}</div>
-                <div className="text-3xl font-semibold leading-tight">{card.title}</div>
-                <div className="mt-3 text-white/65 leading-relaxed text-sm">{card.subtitle}</div>
+              <div className="w-full max-w-xs sm:max-w-sm pointer-events-auto group">
+                {/* Card */}
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 bg-black/30 backdrop-blur-xl shadow-2xl shadow-black/50 transition-all duration-300 group-hover:border-white/20 group-hover:bg-black/40">
+                  {/* Accent top bar */}
+                  <div className="h-px w-full bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent" />
+                  <div className="p-6 sm:p-8">
+                    <h2 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight text-white">
+                      {card.title}
+                    </h2>
+                    <p className="mt-2.5 text-sm sm:text-base text-white/55 leading-relaxed">
+                      {card.subtitle}
+                    </p>
+                    <Link
+                      href={card.href}
+                      className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white/8 hover:bg-white/14 border border-white/10 hover:border-white/20 px-4 py-2 text-sm font-medium text-white/70 hover:text-white transition-all duration-200"
+                    >
+                      Ver más
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d="M2 6h8M6 2l4 4-4 4"/>
+                      </svg>
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
           );
         })}
 
         {/* Free roam hint */}
-        <div className={`pointer-events-none absolute bottom-6 inset-x-0 z-20 flex justify-center transition-opacity duration-700 ${atEnd ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`pointer-events-none absolute bottom-6 sm:bottom-8 inset-x-0 z-20 flex justify-center transition-opacity duration-700 ${atEnd ? 'opacity-100' : 'opacity-0'}`}>
           <div className="rounded-full bg-black/50 border border-white/10 backdrop-blur px-4 py-2 text-xs text-white/50 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-            Arrastrá para explorar · WASD para moverte
+            <span className="hidden sm:inline">Arrastrá para explorar · WASD para moverte</span>
+            <span className="sm:hidden">Drag para explorar</span>
           </div>
         </div>
       </div>
