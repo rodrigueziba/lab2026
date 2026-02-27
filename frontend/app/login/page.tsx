@@ -64,7 +64,7 @@ function LoginForm() {
 
   // Función para iniciar el viaje a Google
   const handleGoogleLogin = () => {
-    window.location.href = `${apiUrl}/auth/login`;
+    window.location.href = `${apiUrl}/auth/google`;
   };
 
   return (
