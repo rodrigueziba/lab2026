@@ -150,8 +150,8 @@ export default function GuiaPage() {
               {/* Filtros y botones (derecha) */}
               <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end shrink-0">
                       
-                      {/* Filtros Tipo (Scrollable) */}
-                      <div className="flex gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-hide flex-1 md:flex-none md:max-w-[250px] min-w-0">
+                      {/* Filtros Tipo: en móvil ocupan todo el ancho con más espacio entre iconos */}
+                      <div className="flex flex-1 md:flex-none w-full md:max-w-[250px] min-w-0 gap-4 md:gap-2 bg-slate-900 p-2 md:p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-hide justify-between md:justify-start">
                           {TIPOS_PERFIL.map((tipo) => {
                               const Icon = tipo.icon;
                               const isActive = tipoSeleccionado === tipo.value;
@@ -159,7 +159,7 @@ export default function GuiaPage() {
                                   <button
                                       key={tipo.value}
                                       onClick={() => setTipoSeleccionado(tipo.value)}
-                                      className={`p-2 rounded-lg transition-all flex items-center justify-center shrink-0 ${
+                                      className={`flex-1 min-w-0 md:flex-none md:shrink-0 p-2 rounded-lg transition-all flex items-center justify-center ${
                                           isActive ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'
                                       }`}
                                       title={tipo.label}

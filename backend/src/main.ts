@@ -18,7 +18,18 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document); // La web estará en /api
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
   // Habilitar que el Frontend (en otro puerto) pueda hablar con el Backend
-  app.enableCors();
+  
+
+
+  // 1. FUNDAMENTAL PARA RENDER: Confiar en el proxy para el login de Google
+  const httpAdapter = app.getHttpAdapter().getInstance();
+  httpAdapter.set('trust proxy', 1);
+
+  // 2. CORS: Permitir peticiones desde Vercel
+  app.enableCors({
+    origin: ['https://lab2026.vercel.app', 'http://localhost:3000'],
+    credentials: true,
+  });
 
   await app.listen(3000);
 }

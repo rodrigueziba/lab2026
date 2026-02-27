@@ -87,6 +87,7 @@ export default function CarteleraProyectosPage() {
 
   // UI
   const [isScrolled, setIsScrolled] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef<HTMLDivElement>(null); 
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -162,8 +163,8 @@ export default function CarteleraProyectosPage() {
   };
 
   return (
-    // FIX DE ALTURA: pt-80 (320px) en móvil asegura espacio para las 3 filas + navbar
-    <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-500/30 pt-80 md:pt-64 flex flex-col overscroll-y-none">
+    // Móvil: pt reducido cuando filtros colapsados; al expandir filtros se usa más espacio
+    <div className={`min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-500/30 flex flex-col overscroll-y-none pt-52 md:pt-64 ${mobileFiltersOpen ? 'max-md:pt-80' : ''}`}>
       
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -228,8 +229,21 @@ export default function CarteleraProyectosPage() {
               </div>
           </div>
 
-          {/* ================= FILA 2: FILTROS ESTADO + FECHAS + CIUDADES (Centrado) ================= */}
-          <div className="flex flex-wrap justify-center items-center gap-3 border-t border-slate-800/50 pt-3 pb-1">
+          {/* Solo móvil: botón Filtros que expande/colapsa las filas de filtros */}
+          <div className="md:hidden border-t border-slate-800/50 pt-2 pb-1">
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-bold text-sm"
+            >
+              <Filter size={18} />
+              {mobileFiltersOpen ? 'Ocultar filtros' : 'Filtros'}
+              <ChevronRight size={18} className={`transition-transform ${mobileFiltersOpen ? 'rotate-90' : ''}`} />
+            </button>
+          </div>
+
+          {/* ================= FILA 2: FILTROS ESTADO + FECHAS + CIUDADES (Centrado). En móvil solo visibles si Filtros expandido ================= */}
+          <div className={`flex flex-wrap justify-center items-center gap-3 border-t border-slate-800/50 pt-3 pb-1 ${mobileFiltersOpen ? 'flex' : 'hidden md:flex'}`}>
               
               <button 
                 onClick={() => setFiltroEstudiante(!filtroEstudiante)} 
@@ -282,8 +296,8 @@ export default function CarteleraProyectosPage() {
               </div>
           </div>
 
-          {/* ================= FILA 3: CATEGORÍAS (Centradas) ================= */}
-          <div className="relative group/filters overflow-hidden pt-1 w-full max-w-4xl mx-auto border-t border-slate-800/30 mt-1">
+          {/* ================= FILA 3: CATEGORÍAS (Centradas). En móvil solo visibles si Filtros expandido ================= */}
+          <div className={`relative group/filters overflow-hidden pt-1 w-full max-w-4xl mx-auto border-t border-slate-800/30 mt-1 ${mobileFiltersOpen ? 'block' : 'hidden md:block'}`}>
               <button onClick={() => scrollFilters('left')} className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-slate-900/80 p-1 rounded-full text-slate-400 border border-slate-700"><ChevronLeft size={12}/></button>
               
               <div ref={filtersRef} className="flex gap-2 overflow-x-auto scrollbar-hide w-full snap-x scroll-smooth px-4 justify-start md:justify-center">

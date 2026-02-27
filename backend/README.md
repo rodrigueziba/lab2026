@@ -32,6 +32,13 @@
 $ npm install
 ```
 
+## Variables de entorno
+
+En tu `.env` del backend conviene tener al menos:
+
+- **`DATABASE_URL`** – Conexión a PostgreSQL (obligatoria).
+- **`DEEPSEEK_API_KEY`** (opcional) – Para: (1) **Generar con IA** en **Crear perfil profesional** (`/mi-perfil/crear`) — si no tenés `GEMINI_API_KEY`, se usa DeepSeek para la biografía; (2) **Sugerir puestos** en **Crear proyecto** (`/mis-proyectos/crear`) — la IA sugiere vacantes según sinopsis y tipo de producción. [DeepSeek](https://platform.deepseek.com/) tiene tier gratuito.
+
 ## Base de datos y seed
 
 Asegúrate de tener `DATABASE_URL` en tu `.env`. Luego:

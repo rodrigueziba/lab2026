@@ -85,6 +85,14 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // En móvil: bloquear scroll del body cuando el menú está abierto para evitar conflictos al hacer scroll
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [isMobileMenuOpen]);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -151,7 +159,7 @@ export default function Navbar() {
   const navHeight = 'min-h-[64px] md:min-h-0';
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-50 ${navHeight} ${navPadding} ${navBg}`}>
+    <nav className={`fixed top-0 left-0 w-full z-[100] ${navHeight} ${navPadding} ${navBg}`}>
       <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full min-h-[64px] md:min-h-0">
         
         <div className="flex items-center gap-2">
@@ -297,7 +305,13 @@ export default function Navbar() {
           )}
         </div>
 
-        <button className="md:hidden text-white" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+        <button
+          type="button"
+          className="md:hidden relative z-[110] text-white p-2 -m-2 touch-manipulation"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          aria-expanded={isMobileMenuOpen}
+          aria-label={isMobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+        >
           {isMobileMenuOpen ? <X size={28}/> : <Menu size={28}/>}
         </button>
 
@@ -306,8 +320,8 @@ export default function Navbar() {
       {/* MENÚ MÓVIL: overlay completo bajo la barra, z-index alto para no superponerse con login/contenido */}
       {isMobileMenuOpen && (
         <>
-          <div className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[45]" onClick={() => setIsMobileMenuOpen(false)} aria-hidden />
-          <div className="md:hidden fixed top-16 left-0 right-0 bottom-0 z-[48] bg-slate-950 overflow-y-auto flex flex-col animate-in slide-in-from-right duration-300">
+          <div className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[90]" onClick={() => setIsMobileMenuOpen(false)} aria-hidden />
+          <div className="md:hidden fixed top-16 left-0 right-0 bottom-0 z-[95] bg-slate-950 overflow-y-auto flex flex-col animate-in slide-in-from-right duration-300">
             {/* Botón cerrar menú bien visible arriba */}
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 shrink-0">
               <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Menú</span>

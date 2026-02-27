@@ -62,6 +62,7 @@ export default function AdminPanelPage() {
 
   // --- ESTADOS GLOBALES TIPADOS ---
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [errorUsuarios, setErrorUsuarios] = useState<string | null>(null);
   const [prestadores, setPrestadores] = useState<Prestador[]>([]);
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [locaciones, setLocaciones] = useState<Locacion[]>([]);
@@ -99,14 +100,24 @@ export default function AdminPanelPage() {
         if (resUsers.ok) {
           const data = await resUsers.json();
           setUsuarios(Array.isArray(data) ? data : []);
+          setErrorUsuarios(null);
         } else {
           setUsuarios([]);
+          if (resUsers.status === 401) {
+            setErrorUsuarios('Inicia sesión para ver los usuarios.');
+          } else if (resUsers.status === 403) {
+            setErrorUsuarios('Solo los administradores pueden listar usuarios.');
+          } else {
+            const errBody = await resUsers.json().catch(() => ({}));
+            setErrorUsuarios(errBody?.message || `Error ${resUsers.status} al cargar usuarios.`);
+          }
         }
         if (resPrest.ok) setPrestadores(await resPrest.json());
         if (resProj.ok) setProyectos(await resProj.json());
         if (resLoc.ok) setLocaciones(await resLoc.json());
       } catch (error) {
         console.error("Error conectando con el servidor:", error);
+        setErrorUsuarios("Error de conexión. Verifica que el backend esté en marcha.");
       } finally {
         setLoading(false);
       }
@@ -350,6 +361,11 @@ export default function AdminPanelPage() {
               />
           </div>
       </div>
+      {errorUsuarios && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-xl px-4 py-3 text-sm font-medium">
+          {errorUsuarios}
+        </div>
+      )}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-xl">
         <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>

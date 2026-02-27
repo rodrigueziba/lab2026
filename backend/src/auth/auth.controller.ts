@@ -56,7 +56,8 @@ export class AuthController {
     // Redirigimos al Frontend (puerto 3001) pasando el token en la URL
     // Usamos encodeURIComponent para que los datos viajen seguros
     const userData = encodeURIComponent(JSON.stringify(user));
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/login?token=${access_token}&user=${userData}`);
     
-    res.redirect(`http://localhost:3001/login?token=${access_token}&user=${userData}`);
   }
 }

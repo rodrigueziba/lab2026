@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Plus, Trash2, Link as LinkIcon, Calendar, DollarSign, 
-  GraduationCap, Film, Briefcase, X, Image as ImageIcon, Loader2, MapPin, ArrowLeft 
+  GraduationCap, Film, Briefcase, X, Image as ImageIcon, Loader2, MapPin, ArrowLeft, Sparkles 
 } from 'lucide-react';
 
 // Inicializar Supabase
@@ -16,6 +16,7 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 export default function CrearProyectoPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [sugerirPuestosLoading, setSugerirPuestosLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     titulo: '',
@@ -77,6 +78,43 @@ export default function CrearProyectoPage() {
 
   const addItem = (setter: any, list: any[], item: any) => setter([...list, item]);
   const removeItem = (setter: any, list: any[], index: number) => setter(list.filter((_, i) => i !== index));
+
+  // --- SUGERIR PUESTOS CON IA (según sinopsis y tipo de producción) ---
+  const sugerirPuestosIA = async () => {
+    if (!formData.descripcion?.trim()) {
+      alert('Escribí la sinopsis del proyecto para que la IA sugiera vacantes.');
+      return;
+    }
+    setSugerirPuestosLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${apiUrl}/proyecto/sugerir-puestos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          descripcion: formData.descripcion,
+          tipo: formData.tipo,
+        }),
+      });
+      const data = await res.json();
+      if (data?.puestos && Array.isArray(data.puestos) && data.puestos.length > 0) {
+        setPuestos(data.puestos.map((p: { nombre?: string; descripcion?: string }) => ({
+          nombre: p.nombre || '',
+          descripcion: p.descripcion || '',
+        })));
+      } else {
+        alert(data?.message || 'No se pudieron generar sugerencias. Escribí la sinopsis e intentá de nuevo.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error al conectar con la IA. Verificá que el backend esté en marcha.');
+    } finally {
+      setSugerirPuestosLoading(false);
+    }
+  };
 
   // --- SUBMIT ---
   const handleSubmit = async (e: any) => {
@@ -276,6 +314,7 @@ export default function CrearProyectoPage() {
               </label>
               <textarea 
                 name="descripcion" required rows={5}
+                value={formData.descripcion}
                 placeholder="Escribe aquí la historia..."
                 className="w-full bg-slate-950 border-l-4 border-slate-800 rounded-r-lg p-6 text-base text-slate-300 outline-none focus:border-orange-500 transition-all resize-none placeholder:text-slate-700 leading-relaxed"
                 onChange={handleChange}
@@ -385,17 +424,28 @@ export default function CrearProyectoPage() {
              {/* Decoración de fondo */}
              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-orange-600/10 to-transparent rounded-bl-full pointer-events-none"></div>
 
-            <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-2 relative z-10">
+            <div className="flex flex-wrap justify-between items-center gap-3 mb-6 border-b border-slate-800 pb-2 relative z-10">
               <h2 className="text-xs font-bold uppercase text-slate-500 tracking-widest">
                 Vacantes del Equipo
               </h2>
-              <button 
-                type="button" 
-                onClick={() => addItem(setPuestos, puestos, { nombre: '', descripcion: '' })} 
-                className="text-xs font-bold bg-slate-800 hover:bg-orange-600 text-slate-300 hover:text-white px-4 py-2 rounded-full flex items-center gap-2 transition-all"
-              >
-                <Plus size={14} /> Agregar Puesto
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={sugerirPuestosIA}
+                  disabled={sugerirPuestosLoading || !formData.descripcion?.trim()}
+                  className="text-xs font-bold bg-slate-800 hover:bg-orange-600/80 text-slate-300 hover:text-white px-4 py-2 rounded-full flex items-center gap-2 transition-all border border-slate-700 hover:border-orange-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sugerirPuestosLoading ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} className="text-orange-400" />}
+                  {sugerirPuestosLoading ? 'Generando...' : 'Sugerir puestos'}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => addItem(setPuestos, puestos, { nombre: '', descripcion: '' })} 
+                  className="text-xs font-bold bg-slate-800 hover:bg-orange-600 text-slate-300 hover:text-white px-4 py-2 rounded-full flex items-center gap-2 transition-all"
+                >
+                  <Plus size={14} /> Agregar Puesto
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4 relative z-10">

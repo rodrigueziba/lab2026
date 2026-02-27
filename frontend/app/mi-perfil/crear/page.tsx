@@ -84,31 +84,37 @@ export default function CrearPerfilPage() {
     setExperiencias(list);
   };
 
-  // --- IA: GENERAR BIO ---
+  // --- IA: GENERAR BIO (nombre, edad, formación, tipo de perfil, rubro, experiencia previa) ---
   const generarDescripcionIA = async () => {
     if (!formData.nombre || !formData.rubro) return alert("Completa al menos tu nombre y rubro primero.");
     setGenerandoIA(true);
-    
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${apiUrl}/prestador/generar-bio-ia`, {
         method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` 
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-            nombre: formData.nombre,
-            fechaNacimiento,
-            formacion,
-            rubro: formData.rubro,
-            experiencias
-        })
+          nombre: formData.nombre,
+          fechaNacimiento,
+          formacion,
+          tipoPerfil: formData.tipoPerfil,
+          rubro: formData.rubro,
+          experiencias,
+        }),
       });
       const data = await res.json();
-      setFormData(prev => ({ ...prev, descripcion: data.bio }));
+      if (data.bio) {
+        setFormData((prev) => ({ ...prev, descripcion: data.bio }));
+      }
+      if (data.error) {
+        console.warn('IA devolvió error:', data.error);
+      }
     } catch (e) {
-      alert("Error conectando con la IA. Verifica que el backend esté corriendo.");
+      console.error(e);
+      alert("Error conectando con la IA. Verificá que el backend esté en marcha y que DEEPSEEK_API_KEY esté en el .env del backend.");
     } finally {
       setGenerandoIA(false);
     }
