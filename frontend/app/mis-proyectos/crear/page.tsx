@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { 
@@ -17,6 +17,17 @@ export default function CrearProyectoPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [sugerirPuestosLoading, setSugerirPuestosLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Verificar que el usuario esté logueado antes de mostrar el formulario
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.replace('/login');
+      return;
+    }
+    setCheckingAuth(false);
+  }, [router]);
   
   const [formData, setFormData] = useState({
     titulo: '',
@@ -187,9 +198,17 @@ export default function CrearProyectoPage() {
     }
   };
 
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-white pt-28 pb-12 px-6 font-sans flex justify-center">
-      
+
       {/* Estilos para forzar el calendario oscuro */}
       <style jsx global>{`
         ::-webkit-calendar-picker-indicator {
