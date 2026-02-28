@@ -14,7 +14,6 @@ import {
   PieChart, Pie, Cell, Legend 
 } from 'recharts';
 
-// --- INTERFACES DE DATOS ---
 interface Usuario {
   id: number;
   nombre: string;
@@ -60,7 +59,6 @@ export default function AdminPanelPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'stats' | 'usuarios' | 'prestadores' | 'proyectos' | 'locaciones'>('stats');
 
-  // --- ESTADOS GLOBALES TIPADOS ---
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [errorUsuarios, setErrorUsuarios] = useState<string | null>(null);
   const [prestadores, setPrestadores] = useState<Prestador[]>([]);
@@ -68,7 +66,6 @@ export default function AdminPanelPage() {
   const [locaciones, setLocaciones] = useState<Locacion[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // --- ESTADOS DE FILTRADO ---
   const [searchUsuarios, setSearchUsuarios] = useState('');
   const [searchPrestadores, setSearchPrestadores] = useState('');
   const [filtroTipoPrestador, setFiltroTipoPrestador] = useState('Todos');
@@ -77,14 +74,12 @@ export default function AdminPanelPage() {
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-  // --- CARGA INICIAL DE DATOS ---
   useEffect(() => {
     const fetchAllData = async () => {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
         
-        // CORRECCIÓN HEADERS: Definición explícita para evitar error de sobrecarga en fetch
         const headers: Record<string, string> = {};
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
@@ -125,7 +120,6 @@ export default function AdminPanelPage() {
     fetchAllData();
   }, [apiUrl]);
 
-  // --- CÁLCULO DINÁMICO DE ESTADÍSTICAS ---
   const statsData = useMemo(() => {
     const ciudadesCount = prestadores.reduce((acc: Record<string, number>, curr: Prestador) => {
       const ciudad = curr.ciudad || 'No especificada';
@@ -143,8 +137,6 @@ export default function AdminPanelPage() {
 
     return { ciudades, tiposPrestador };
   }, [prestadores]);
-
-  // --- ACCIONES CRUD ---
 
   const toggleAdminRole = async (id: number, currentRole: string) => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
@@ -227,7 +219,6 @@ export default function AdminPanelPage() {
     }
   };
 
-  // --- FILTRADO EN TIEMPO REAL ---
   const filteredUsuarios = usuarios.filter(u => 
     u.nombre?.toLowerCase().includes(searchUsuarios.toLowerCase()) || 
     u.email?.toLowerCase().includes(searchUsuarios.toLowerCase())
@@ -249,7 +240,6 @@ export default function AdminPanelPage() {
     l.ciudad?.toLowerCase().includes(searchLocaciones.toLowerCase())
   );
 
-  // --- COMPONENTES DE VISTA ---
   const VistaStats = () => (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
       <h2 className="text-2xl font-black text-white mb-6">Resumen de la Industria</h2>

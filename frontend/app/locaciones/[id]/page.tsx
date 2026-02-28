@@ -26,7 +26,6 @@ export default function DetalleLocacionPage({ params }: { params: Promise<{ id: 
   };
 
   useEffect(() => {
-    // 1. Verificamos el usuario (de forma segura)
     const checkUserRole = () => {
         const userStr = localStorage.getItem('user');
         if (userStr) {
@@ -40,7 +39,6 @@ export default function DetalleLocacionPage({ params }: { params: Promise<{ id: 
     };
     checkUserRole();
 
-    // 2. Cargamos los datos de la locación
     let isMounted = true; // Para evitar actualizaciones si el componente se desmonta
 
     params.then(unwrap => {

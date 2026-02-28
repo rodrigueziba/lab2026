@@ -38,7 +38,6 @@ export class PrestadorController {
       : 'Sin experiencia previa registrada';
     const prompt = `Escribe una presentación profesional en primera persona (máximo 80 palabras, tono serio y conciso) para un perfil de la Film Commission de Tierra del Fuego. Incluye estos datos: Nombre: ${nombre}. Tipo de perfil: ${tipoPerfil || 'Profesional'}. Rubro principal: ${rubro}. Edad: ${edad}. Formación académica: ${formacion || 'Autodidacta'}. Experiencia previa: ${expTexto}. No repitas literalmente la lista; redacta una biografía fluida que integre nombre, edad, formación, tipo de perfil, rubro y experiencia.`;
 
-    // 1) Intentar Gemini si está configurado
     const geminiKey = this.config.get<string>('GEMINI_API_KEY')?.trim();
     if (geminiKey) {
       try {
@@ -58,7 +57,6 @@ export class PrestadorController {
       }
     }
 
-    // 2) Fallback: DeepSeek
     const deepseekKey = this.config.get<string>('DEEPSEEK_API_KEY')?.trim();
     if (!deepseekKey) {
       console.warn('DEEPSEEK_API_KEY no configurada en .env');
@@ -90,17 +88,13 @@ export class PrestadorController {
     }
     return { bio: `Soy ${nombre}, profesional en ${rubro}.` };
   }
-  // --- 2. ENDPOINT SOLICITAR CONTACTO  ---
+
   @Post('solicitar-contacto/:id')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   async solicitarContacto(@Param('id') id: string, @Request() req: any) {
-    // req.user.userId es el solicitante
-    // id es el ID del PRESTADOR
     return this.prestadorService.solicitarContacto(+req.user.userId, +id);
   }
-
-  // --- 3. CRUD NORMAL ---
 
   @Get()
   findAll() {

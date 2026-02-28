@@ -36,7 +36,6 @@ export class MailService {
     }
   }
 
-  // 👇 ESTE ES EL MÉTODO QUE FALTABA PARA QUE FUNCIONE PRESTADOR
   async sendSolicitudContacto(destinatario: string, nombrePrestador: string, nombreSolicitante: string, emailSolicitante: string) {
     const asunto = `🔔 Nueva solicitud de contacto para ${nombrePrestador}`;
     

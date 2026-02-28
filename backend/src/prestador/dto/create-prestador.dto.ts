@@ -17,7 +17,6 @@ export class ExperienciaDto {
 }
 
 export class CreatePrestadorDto {
-  // --- CAMPOS OBLIGATORIOS ---
   @IsString()
   @IsNotEmpty()
   nombre: string;
@@ -38,7 +37,6 @@ export class CreatePrestadorDto {
   @IsNotEmpty()
   email: string;
 
-  // --- CAMPOS OPCIONALES ---
   @IsString()
   @IsOptional()
   telefono?: string;

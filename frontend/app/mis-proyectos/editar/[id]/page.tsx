@@ -42,7 +42,6 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
   const [archivo, setArchivo] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
-  // 1. CARGAR DATOS DEL PROYECTO
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem('token');
@@ -82,7 +81,6 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
     fetchData();
   }, [id, router]);
 
-  // --- HANDLERS ---
   const handleChange = (e: any) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setFormData({ ...formData, [e.target.name]: value });
@@ -111,7 +109,6 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
     setter(list.filter((_, i) => i !== index));
   };
 
-  // --- SUBMIT (UPDATE) ---
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     setSaving(true);
@@ -119,7 +116,6 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
     try {
       const token = localStorage.getItem('token');
       
-      // 1. Subir Imagen Nueva si existe
       let fotoUrl = formData.foto;
       if (archivo) {
         const fileExt = archivo.name.split('.').pop();
@@ -131,7 +127,6 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
         }
       }
 
-      // 2. Payload
       const payload = {
         ...formData,
         foto: fotoUrl,
@@ -142,7 +137,6 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
         fechaFin: formData.fechaFin ? new Date(formData.fechaFin).toISOString() : null,
       };
 
-      // 3. Request PATCH
       const res = await fetch(`${apiUrl}/proyecto/${id}`, {
         method: 'PATCH',
         headers: { 

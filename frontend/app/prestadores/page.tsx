@@ -32,12 +32,10 @@ export default function PrestadoresPage() {
     }
   }
 
-    // 2. EFECTO: Cargar prestadores al entrar a la página
   useEffect(() => {
     fetchPrestadores();
   }, []);
 
-  // 3. ACCIÓN: Guardar un prestador nuevo
   async function handleSubmit(e: any) {
     e.preventDefault(); // Evita que se recargue la página
     

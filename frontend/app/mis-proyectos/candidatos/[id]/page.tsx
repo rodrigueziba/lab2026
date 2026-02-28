@@ -20,12 +20,10 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
       if (!token) return router.push('/login');
 
       try {
-        // 1. Obtener nombre del proyecto (opcional, para el título)
         const resProj = await fetch(`${apiUrl}/proyecto/${id}`);
         const dataProj = await resProj.json();
         setProyectoTitulo(dataProj.titulo);
 
-        // 2. Obtener Postulaciones
         const resPost = await fetch(`${apiUrl}/postulacion/proyecto/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -43,7 +41,6 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
     fetchData();
   }, [id, router]);
 
-  // --- FUNCIÓN PARA CAMBIAR ESTADO (NUEVA) ---
   const handleUpdateEstado = async (postulacionId: number, nuevoEstado: 'Aceptada' | 'Rechazada') => {
     const token = localStorage.getItem('token');
     if (!token) return;

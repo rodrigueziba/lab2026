@@ -22,7 +22,6 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   const [loading, setLoading] = useState(true);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   
-  // NUEVO: Estado para saber mis postulaciones
   const [misPostulaciones, setMisPostulaciones] = useState<number[]>([]); 
 
   useEffect(() => {
@@ -30,22 +29,17 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
       try {
         const token = localStorage.getItem('token');
 
-        // 1. Datos del Proyecto
         const resProj = await fetch(`${apiUrl}/proyecto/${id}`);
         const dataProj = await resProj.json();
         setProyecto(dataProj);
 
-        // 2. Smart Match (Público)
         const resMatch = await fetch(`${apiUrl}/proyecto/${id}/matches`);
         if (resMatch.ok) {
            const dataMatch = await resMatch.json();
            setCandidatos(dataMatch);
         }
 
-        // 3. NUEVO: Verificar mis postulaciones (si estoy logueado)
         if (token) {
-           // Truco: Usamos el endpoint de "candidatos" y filtramos en el frontend por mi email/id
-           // O idealmente crearíamos un endpoint específico, pero esto funciona para el MVP.
            const userStr = localStorage.getItem('user');
            if (userStr) {
              const user = JSON.parse(userStr);

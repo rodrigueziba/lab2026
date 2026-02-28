@@ -15,7 +15,6 @@ export class PostulacionController {
     return this.postulacionService.findAllByUser(+req.user.userId);
   }
 
-  // --- Otros métodos específicos ---
   @Get('proyecto/:id')
   findAllByProject(@Param('id') id: string) {
     return this.postulacionService.findAllByProject(Number(id));
@@ -27,14 +26,12 @@ export class PostulacionController {
     return this.postulacionService.create(createPostulacionDto, +req.user.userId);
   }
 
-  // --- Rutas Genéricas (Van al final) ---
 
   @Get()
   findAll() {
     return this.postulacionService.findAll();
   }
 
-  // 👇 ESTE ES EL CULPABLE: Si pones algo debajo de él, Nest cree que es un ID.
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.postulacionService.findOne(+id);

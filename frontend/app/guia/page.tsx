@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-// Importamos 'Variants'
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
   MapPin, Search, Filter, Briefcase, Users, Clapperboard, GraduationCap, 
@@ -12,7 +11,6 @@ const getInitials = (name: string) => {
   return name ? name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() : 'NN';
 };
 
-// --- CONFIGURACIÓN DE FILTROS ---
 const TIPOS_PERFIL = [
   { label: "Todos", value: "Todos", icon: LayoutGrid },
   { label: "Profesionales", value: "Profesional", icon: Users },
@@ -21,7 +19,6 @@ const TIPOS_PERFIL = [
   { label: "Estudiantes", value: "Estudiante", icon: GraduationCap },
 ];
 
-// --- ANIMACIONES (AHORA TIPADAS COMO VARIANTS) ---
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
@@ -33,7 +30,6 @@ const cardVariants: Variants = {
   exit: { opacity: 0, scale: 0.9, transition: { duration: 0.2 } }
 };
 
-// --- TIPADO PARA EVITAR 'ANY' ---
 interface Prestador {
   id: string | number;
   nombre: string;
@@ -68,7 +64,7 @@ export default function GuiaPage() {
           setLoading(false); 
       })
       .catch(err => console.error(err));
-  }, [apiUrl]); // Añadido apiUrl a las dependencias
+  }, [apiUrl]);
 
   useEffect(() => {
     const filtrados = prestadores.filter(p => {

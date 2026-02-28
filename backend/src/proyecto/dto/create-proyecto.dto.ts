@@ -28,7 +28,6 @@ export class CreateProyectoDto {
   @IsOptional()
   foto?: string;
 
-  // --- NUEVOS CAMPOS ---
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

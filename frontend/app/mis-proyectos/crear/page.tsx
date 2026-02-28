@@ -51,7 +51,6 @@ export default function CrearProyectoPage() {
   // Fecha mínima: hoy (solo fechas a futuro)
   const todayStr = () => new Date().toISOString().split('T')[0];
 
-  // --- HANDLERS ---
   const handleChange = (e: any) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     const next = { ...formData, [e.target.name]: value };
@@ -90,7 +89,6 @@ export default function CrearProyectoPage() {
   const addItem = (setter: any, list: any[], item: any) => setter([...list, item]);
   const removeItem = (setter: any, list: any[], index: number) => setter(list.filter((_, i) => i !== index));
 
-  // --- SUGERIR PUESTOS CON IA (según sinopsis y tipo de producción) ---
   const sugerirPuestosIA = async () => {
     if (!formData.descripcion?.trim()) {
       alert('Escribí la sinopsis del proyecto para que la IA sugiera vacantes.');
@@ -127,7 +125,6 @@ export default function CrearProyectoPage() {
     }
   };
 
-  // --- SUBMIT ---
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     const today = todayStr();
@@ -149,7 +146,6 @@ export default function CrearProyectoPage() {
       const token = localStorage.getItem('token');
       if (!token) return router.push('/login');
 
-      // 1. Subir Imágenes a Supabase (si hay)
       const galeriaUrls: string[] = [];
       for (const file of imagenes) {
         const fileExt = file.name.split('.').pop();
@@ -162,7 +158,6 @@ export default function CrearProyectoPage() {
         }
       }
 
-      // 2. Preparar Payload (la primera imagen de la galería se usa como foto/portada)
       const payload = {
         ...formData,
         referencias: referencias.filter(r => r.trim() !== ''),
@@ -173,7 +168,6 @@ export default function CrearProyectoPage() {
         fechaFin: formData.fechaFin ? new Date(formData.fechaFin).toISOString() : null,
       };
 
-      // 3. Enviar al Backend
       const res = await fetch(`${apiUrl}/proyecto`, {
         method: 'POST',
         headers: { 

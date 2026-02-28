@@ -10,16 +10,13 @@ export default function NotificationDropdown() {
   const [notificaciones, setNotificaciones] = useState<any[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 1. Cargar datos iniciales
   useEffect(() => {
     fetchUnreadCount();
-    // Opcional: Polling cada 60s para actualizar el numerito
     const interval = setInterval(fetchUnreadCount, 60000);
     return () => clearInterval(interval);
   }, []);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-  // 2. Cerrar dropdown si hago clic afuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -30,7 +27,6 @@ export default function NotificationDropdown() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- API CALLS ---
 
   const fetchUnreadCount = async () => {
     const token = localStorage.getItem('token');
@@ -41,7 +37,7 @@ export default function NotificationDropdown() {
       });
       if (res.ok) {
         const count = await res.json();
-        setUnreadCount(count); // Asume que el backend devuelve un número directo o { count: 5 }
+        setUnreadCount(count);
       }
     } catch (e) { console.error(e); }
   };
@@ -62,7 +58,7 @@ export default function NotificationDropdown() {
 
   const handleToggle = () => {
     if (!isOpen) {
-      fetchNotifications(); // Cargar lista al abrir
+      fetchNotifications();
     }
     setIsOpen(!isOpen);
   };
@@ -70,20 +66,17 @@ export default function NotificationDropdown() {
   const handleNotificationClick = async (notif: any) => {
     const token = localStorage.getItem('token');
     
-    // 1. Marcar como leída en backend
     if (!notif.leida) {
         try {
             await fetch(`${apiUrl}/notificacion/${notif.id}/leer`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            // Actualizar estado local
             setUnreadCount(prev => Math.max(0, prev - 1));
             setNotificaciones(prev => prev.map(n => n.id === notif.id ? { ...n, leida: true } : n));
         } catch (e) { console.error(e); }
     }
 
-    // 2. Navegar al link
     setIsOpen(false);
     if (notif.link) {
         router.push(notif.link);
@@ -93,7 +86,6 @@ export default function NotificationDropdown() {
   return (
     <div className="relative" ref={dropdownRef}>
       
-      {/* --- BOTÓN CAMPANITA --- */}
       <button 
         onClick={handleToggle}
         className="relative p-2 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-slate-800"

@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-// 1. IMPORTAR Variants
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
   Film, DollarSign, GraduationCap, Users, Calendar, 
@@ -16,7 +15,6 @@ const getYoutubeId = (url: string) => {
 };
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-// --- CONFIGURACIÓN ---
 const TIPOS = ['Todos', 'Cortometraje', 'Largometraje', 'Documental', 'Videoclip', 'Publicidad'];
 
 const CIUDADES_OPCIONES = [
@@ -26,7 +24,6 @@ const CIUDADES_OPCIONES = [
     { id: 'Tolhuin', label: 'TOLHUIN', short: 'TOL' },
 ];
 
-// 2. TIPAR cardVariants COMO Variants
 const cardVariants: Variants = {
   hidden: { opacity: 0, scale: 0.8, y: 50 },
   visible: (i: number) => ({
@@ -43,7 +40,6 @@ const cardVariants: Variants = {
   exit: { opacity: 0, scale: 0.9, transition: { duration: 0.2 } }
 };
 
-// 3. DEFINIR INTERFACES PARA EVITAR 'any'
 interface Puesto {
   id: number | string;
   nombre: string;
@@ -71,12 +67,10 @@ interface Proyecto {
 }
 
 export default function CarteleraProyectosPage() {
-  // 4. USAR LAS INTERFACES EN EL ESTADO
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [proyectosMostrados, setProyectosMostrados] = useState<Proyecto[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // --- FILTROS ---
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('Todos');
   const [filtroCiudad, setFiltroCiudad] = useState('Todas');
@@ -92,7 +86,6 @@ export default function CarteleraProyectosPage() {
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. CARGA INICIAL
   useEffect(() => {
     fetch(`${apiUrl}/proyecto`)
       .then(res => res.json())
@@ -104,7 +97,6 @@ export default function CarteleraProyectosPage() {
       .catch(err => console.error(err));
   }, []);
 
-  // 2. LÓGICA DE FILTRADO
   useEffect(() => {
     const filtrados = proyectos.filter(p => {
       const coincideTexto = p.titulo.toLowerCase().includes(busqueda.toLowerCase()) || 
@@ -130,7 +122,6 @@ export default function CarteleraProyectosPage() {
     setProyectosMostrados(filtrados);
   }, [busqueda, filtroTipo, filtroCiudad, filtroEstudiante, filtroRemunerado, fechaDesde, fechaHasta, proyectos]);
 
-  // 3. ALEATORIEDAD
   const handleRandomize = () => {
       const shuffled = [...proyectosMostrados];
       for (let i = shuffled.length - 1; i > 0; i--) {

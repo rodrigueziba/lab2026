@@ -5,7 +5,6 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export class NotificacionService {
   constructor(private prisma: PrismaService) {}
 
-  // 1. Crear una notificación (Uso interno)
   async crear(usuarioId: number, titulo: String, mensaje: String, link?: string) {
     return this.prisma.notificacion.create({
       data: {
@@ -17,16 +16,14 @@ export class NotificacionService {
     });
   }
 
-  // 2. Obtener mis notificaciones (Para el Frontend)
   async findAllByUser(usuarioId: number) {
     return this.prisma.notificacion.findMany({
       where: { usuarioId },
       orderBy: { createdAt: 'desc' },
-      take: 20 // Traemos solo las últimas 20
+      take: 20
     });
   }
 
-  // 3. Marcar como leída
   async marcarLeida(id: number) {
     return this.prisma.notificacion.update({
       where: { id },
@@ -34,7 +31,6 @@ export class NotificacionService {
     });
   }
 
-  // 4. Contar no leídas 
   async contarNoLeidas(usuarioId: number) {
     return this.prisma.notificacion.count({
       where: { usuarioId, leida: false }

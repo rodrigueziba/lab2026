@@ -15,9 +15,6 @@ export class AuthService {
     private mailService: MailService,
   ) {}
 
-  // --- HELPER PRIVADO: GENERAR TOKEN JWT ---
-  // Este método solo crea el token, no verifica contraseñas.
-  // Lo usaremos para Login Normal Y para Login Google.
   private async generateToken(user: any) {
     const payload = { email: user.email, sub: user.id, role: user.role };
     
@@ -28,12 +25,11 @@ export class AuthService {
         nombre: user.nombre,
         email: user.email,
         role: user.role,
-        avatar: user.avatar // Incluimos la foto si existe
+        avatar: user.avatar
       },
     };
   }
 
-  // --- REGISTRO ---
   async register(registerAuthDto: RegisterAuthDto) {
     const { email, password, nombre } = registerAuthDto;
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -48,7 +44,6 @@ export class AuthService {
     });
   }
 
-  // --- LOGIN NORMAL (EMAIL Y PASSWORD) ---
   async login(loginAuthDto: LoginAuthDto) {
     const { email, password } = loginAuthDto;
     
@@ -66,36 +61,28 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    // Si la contraseña es correcta, generamos el token
     return this.generateToken(user);
   }
 
-  // --- LOGIN CON GOOGLE ---
   async validateGoogleUser(googleUser: any) {
     const { email, firstName, lastName, picture, googleId } = googleUser;
 
-    // 1. Buscamos usuario
     let user = await this.prisma.user.findUnique({
       where: { email },
     });
 
     if (user) {
-      // SI EXISTE: Actualizamos GoogleID si falta y generamos token
       if (!user.googleId) {
          await this.prisma.user.update({
             where: { id: user.id },
             data: { googleId }
          });
       }
-      // ⚠️ AQUÍ ESTABA EL ERROR: Antes llamábamos a this.login(user)
-      // Ahora llamamos directamente a generateToken, saltando la verificación de password.
       return this.generateToken(user);
-    } 
-    
-    // SI NO EXISTE: Lo creamos
+    }
     console.log(`Creando usuario nuevo de Google: ${email}`);
     
-    const randomPassword = uuidv4(); // Contraseña aleatoria
+    const randomPassword = uuidv4();
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
     const newUser = await this.prisma.user.create({
@@ -112,7 +99,6 @@ export class AuthService {
     return this.generateToken(newUser);
   }
 
-  // --- RECUPERAR CONTRASEÑA ---
   async forgotPassword(email: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) throw new NotFoundException('No existe un usuario con este email.');

@@ -14,21 +14,15 @@ function LoginForm() {
   const [error, setError] = useState('');
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-  // 1. DETECTOR DE GOOGLE 🕵️‍♂️
-  // Si la URL tiene ?token=... es porque volvemos de Google
+  // Tras login con Google, el backend redirige aquí con ?token= y ?user=; los guardamos y redirigimos al home.
   useEffect(() => {
     const token = searchParams.get('token');
     const userStr = searchParams.get('user');
 
     if (token && userStr) {
-      // Guardamos en el navegador
       localStorage.setItem('token', token);
       localStorage.setItem('user', decodeURIComponent(userStr));
-      
-      // Forzamos un evento para que el Navbar se entere que nos logueamos
       window.dispatchEvent(new Event('storage'));
-      
-      // Redirigimos al home
       router.push('/'); 
     }
   }, [searchParams, router]);

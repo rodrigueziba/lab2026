@@ -20,13 +20,11 @@ export class AuthController {
 
   @Post('register')
   register(@Body() registerAuthDto: RegisterAuthDto) {
-    // Pasamos el OBJETO entero, no las variables sueltas
     return this.authService.register(registerAuthDto);
   }
 
   @Post('login')
   login(@Body() loginAuthDto: LoginAuthDto) {
-    // Pasamos el OBJETO entero
     return this.authService.login(loginAuthDto);
   }
   @Post('forgot-password')
@@ -39,18 +37,13 @@ export class AuthController {
     return this.authService.resetPassword(body.token, body.password);
   }
 
-  // 1. RUTA PARA INICIAR (Lleva a Google)
   @Get('google')
   @UseGuards(AuthGuard('google'))
-  async googleAuth(@Req() req) {
-    // No hace nada, el Guard redirige automáticamente
-  }
+  async googleAuth(@Req() req) {}
 
-  // 2. RUTA DE RETORNO (Vuelve de Google)
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res) {
-    // req.user ya tiene el token generado por AuthService
     const { access_token, user } = req.user;
     
     // Redirigimos al Frontend (puerto 3001) pasando el token en la URL

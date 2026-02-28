@@ -90,7 +90,6 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // --- MANEJO DE FOTOS ---
 
   const handleMainPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {

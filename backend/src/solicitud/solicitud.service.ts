@@ -5,30 +5,22 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export class SolicitudService {
   constructor(private prisma: PrismaService) {}
 
-  // 1. Crear solicitud
   async create(solicitanteId: number, prestadorId: number) {
     const existe = await this.prisma.solicitudContacto.findFirst({
       where: { solicitanteId, prestadorId }
     });
     
-    // 👇 CAMBIO: Usamos BadRequestException para que el frontend reciba el mensaje
     if (existe) throw new BadRequestException('Ya has enviado una solicitud a este profesional.');
-
-    // Validar que no se pida a sí mismo
     const prestador = await this.prisma.prestador.findUnique({ where: { id: prestadorId } });
     if (!prestador) throw new NotFoundException('El perfil no existe');
-
-    // 👇 CAMBIO: Usamos BadRequestException
     if (prestador.userId === solicitanteId) {
         throw new BadRequestException('No puedes solicitar contacto a tu propio perfil.');
     }
 
-    // Crear Solicitud
     const solicitud = await this.prisma.solicitudContacto.create({
       data: { solicitanteId, prestadorId, estado: 'Pendiente' }
     });
 
-    // Notificar al dueño del perfil
     await this.prisma.notificacion.create({
         data: {
             usuarioId: prestador.userId,
@@ -42,7 +34,6 @@ export class SolicitudService {
     return solicitud;
   }
 
-  // 2. Verificar acceso (Para el candado)
   async checkAccess(solicitanteId: number, prestadorId: number) {
     const solicitud = await this.prisma.solicitudContacto.findFirst({
       where: { solicitanteId, prestadorId }
@@ -51,7 +42,7 @@ export class SolicitudService {
     if (solicitud && solicitud.estado === 'Aprobada') {
       const prestador = await this.prisma.prestador.findUnique({
         where: { id: prestadorId },
-        select: { email: true, telefono: true } // Datos reales
+        select: { email: true, telefono: true }
       });
       return { status: 'Aprobada', datos: prestador };
     }
@@ -59,7 +50,6 @@ export class SolicitudService {
     return { status: solicitud ? solicitud.estado : 'Ninguna', datos: null };
   }
 
-  // 3. Listar solicitudes recibidas (Dashboard)
   async findMyRequests(userId: number) {
     const misPrestadores = await this.prisma.prestador.findMany({ 
         where: { userId },

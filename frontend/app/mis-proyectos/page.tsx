@@ -12,7 +12,6 @@ export default function MisProyectosPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   useEffect(() => {
-    // 1. Verificar Sesión
     const userStr = localStorage.getItem('user');
     const token = localStorage.getItem('token');
 
@@ -23,12 +22,9 @@ export default function MisProyectosPage() {
     
     const userData = JSON.parse(userStr);
     setUser(userData);
-
-    // 2. Traer Proyectos del Usuario
     fetch(`${apiUrl}/proyecto`)
       .then(res => res.json())
       .then(data => {
-        // Filtramos por ID de usuario
         const misProyectos = data.filter((p: any) => p.userId === userData.id);
         setProyectos(misProyectos);
         setLoading(false);

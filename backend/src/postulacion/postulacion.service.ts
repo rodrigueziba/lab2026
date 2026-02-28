@@ -9,13 +9,11 @@ import { MailService } from 'src/mail/mail.service';
 export class PostulacionService {
   constructor(
     private prisma: PrismaService,
-    private notificacionService: NotificacionService, // 🔔 Inyectamos notificaciones
+    private notificacionService: NotificacionService,
     private mailService: MailService // 📧 Inyectamos servicio de email
   ) {}
 
-  // --- CREAR POSTULACIÓN (Con Notificación al Productor) ---
   async create(createPostulacionDto: CreatePostulacionDto, userId: number) {
-    // 1. Verificar duplicados
     const existe = await this.prisma.postulacion.findFirst({
       where: {
         puestoId: createPostulacionDto.puestoId,
@@ -27,7 +25,6 @@ export class PostulacionService {
       throw new Error("Ya te has postulado a este puesto.");
     }
 
-    // 2. Guardar en Base de Datos
     const nuevaPostulacion = await this.prisma.postulacion.create({
       data: {
         ...createPostulacionDto,
@@ -36,7 +33,6 @@ export class PostulacionService {
       }
     });
 
-    // 3. 🔔 NOTIFICAR AL PRODUCTOR
     // Buscamos el proyecto para saber quién es el dueño (userId)
     const proyecto = await this.prisma.proyecto.findUnique({
       where: { id: createPostulacionDto.proyectoId }
@@ -76,9 +72,7 @@ export class PostulacionService {
     return nuevaPostulacion;
   }
 
-  // --- ACTUALIZAR ESTADO (Con Notificación al Talento) ---
   async update(id: number, updatePostulacionDto: UpdatePostulacionDto) {
-    // 1. Actualizar el estado
     const postulacionActualizada = await this.prisma.postulacion.update({
       where: { id },
       data: {
@@ -90,7 +84,6 @@ export class PostulacionService {
       }
     });
 
-    // 2. 🔔 NOTIFICAR SI FUE ACEPTADO
     if (updatePostulacionDto.estado === 'Aceptada') {
       
       // A. Notificación Interna (Campana)
@@ -121,7 +114,6 @@ export class PostulacionService {
     return postulacionActualizada;
   }
 
-  // --- LISTAR POR PROYECTO (Con Privacidad de Datos) ---
   async findAllByProject(proyectoId: number) {
     console.log(`🔎 Buscando postulaciones para Proyecto ID: ${proyectoId}`);
 
@@ -153,7 +145,6 @@ export class PostulacionService {
     });
   }
 
-  // --- OTROS MÉTODOS ---
 
   async findAllByUser(userId: number) {
     return this.prisma.postulacion.findMany({

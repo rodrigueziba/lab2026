@@ -24,7 +24,6 @@ const COORDS_BASE: { [key: string]: [number, number] } = {
   "Default": [-54.5, -67.5]
 };
 
-// 1. SOLUCIÓN AL ERROR DE VARIANTS: Tipamos explícitamente los objetos de animación
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.08 } }
@@ -74,7 +73,6 @@ export default function CatalogoLocacionesPage() {
     fetch(`${apiUrl}/locacion`)
       .then(res => res.json())
       .then(data => {
-        // 2. SOLUCIÓN AL ANY: Tipamos el mapeo de los datos recibidos
         const dataConCoords = data.map((loc: Locacion) => {
           const base = COORDS_BASE[loc.ciudad] || COORDS_BASE["Default"];
           let lat = typeof loc.lat === 'string' ? parseFloat(loc.lat) : Number(loc.lat);
@@ -89,7 +87,7 @@ export default function CatalogoLocacionesPage() {
         setLoading(false);
       })
       .catch(err => console.error(err));
-  }, [apiUrl]); // 3. SOLUCIÓN AL EXHAUSTIVE DEPS: Añadimos apiUrl a las dependencias
+  }, [apiUrl]);
 
   useEffect(() => {
     const el = scrollRef.current;

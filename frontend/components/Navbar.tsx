@@ -11,13 +11,10 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-  
-  // Estados
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   
-  // Estados de Notificación 🔔
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notificaciones, setNotificaciones] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -27,7 +24,6 @@ export default function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  // 1. Cargar Usuario y Notificaciones
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
@@ -45,7 +41,6 @@ export default function Navbar() {
 
       try {
         setUser(JSON.parse(userStr));
-        // Solo cargar notificaciones si hay usuario logueado
         const res = await fetch(`${apiUrl}/notificacion`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -63,9 +58,7 @@ export default function Navbar() {
     };
     
     checkUser();
-    window.addEventListener('storage', checkUser); // Escuchar cambios en login
-
-    // Polling: Actualizar notificaciones cada 30 segundos
+    window.addEventListener('storage', checkUser);
     const interval = setInterval(checkUser, 30000);
 
     return () => {
@@ -75,7 +68,6 @@ export default function Navbar() {
     };
   }, []);
 
-  // Cerrar menús al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsUserMenuOpen(false);
@@ -85,7 +77,6 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // En móvil: bloquear scroll del body cuando el menú está abierto para evitar conflictos al hacer scroll
   useEffect(() => {
     if (!isMobileMenuOpen) return;
     const prev = document.body.style.overflow;

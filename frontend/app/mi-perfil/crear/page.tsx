@@ -8,7 +8,6 @@ import {
   Trash2, ArrowLeft, PlusCircle, Sparkles
 } from 'lucide-react';
 
-// --- CONFIGURACIÓN SUPABASE ---
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -57,7 +56,6 @@ export default function CrearPerfilPage() {
   const [archivosGaleria, setArchivosGaleria] = useState<File[]>([]);
   const [previewsGaleria, setPreviewsGaleria] = useState<string[]>([]);
 
-  // 1. Verificar sesión
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) router.push('/login');
@@ -67,7 +65,6 @@ export default function CrearPerfilPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // --- MANEJO DE EXPERIENCIAS DINÁMICAS ---
   const addExperiencia = () => {
     setExperiencias([...experiencias, { proyecto: '', anio: '', rol: '' }]);
   };
@@ -84,7 +81,6 @@ export default function CrearPerfilPage() {
     setExperiencias(list);
   };
 
-  // --- IA: GENERAR BIO (nombre, edad, formación, tipo de perfil, rubro, experiencia previa) ---
   const generarDescripcionIA = async () => {
     if (!formData.nombre || !formData.rubro) return alert("Completa al menos tu nombre y rubro primero.");
     setGenerandoIA(true);
@@ -120,7 +116,6 @@ export default function CrearPerfilPage() {
     }
   };
 
-  // --- MANEJO DE ARCHIVOS ---
   const handleMainFileChange = (e: any) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -159,7 +154,6 @@ export default function CrearPerfilPage() {
     return data.publicUrl;
   };
 
-  // --- SUBMIT ---
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);

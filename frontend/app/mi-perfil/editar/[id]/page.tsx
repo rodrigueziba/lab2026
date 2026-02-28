@@ -8,7 +8,6 @@ import {
   Image as ImageIcon, Trash2, Plus, Youtube 
 } from 'lucide-react';
 
-// --- CONFIGURACIÓN SUPABASE ---
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -55,7 +54,6 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
   const [newGaleriaFiles, setNewGaleriaFiles] = useState<File[]>([]);
   const [previewNewGaleria, setPreviewNewGaleria] = useState<string[]>([]);
 
-  // 1. Desempaquetar params y Cargar datos
   useEffect(() => {
     params.then((unwrap) => {
         setProfileId(unwrap.id);
@@ -98,12 +96,10 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  // --- HANDLERS DE FORMULARIO ---
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // --- HANDLERS DE ARCHIVOS ---
   const handleFileChange = (e: any) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -153,7 +149,6 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
     return data.publicUrl;
   };
 
-  // --- SUBMIT ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!profileId) return;
@@ -167,19 +162,16 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
       let finalFoto = formData.foto;
       let finalGaleria = [...formData.galeria]; // Empezamos con las que ya existían
 
-      // 1. Subir nueva foto de perfil si se seleccionó una
       if (newFoto) {
         finalFoto = await uploadImageToSupabase(newFoto);
       }
 
-      // 2. Subir nuevas fotos de galería
       if (newGaleriaFiles.length > 0) {
         const uploadPromises = newGaleriaFiles.map(file => uploadImageToSupabase(file));
         const uploadedUrls = await Promise.all(uploadPromises);
         finalGaleria = [...finalGaleria, ...uploadedUrls];
       }
 
-      // 3. Enviar al Backend
       const res = await fetch(`${apiUrl}/prestador/${profileId}`, {
         method: 'PATCH',
         headers: { 

@@ -6,7 +6,6 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Configuración del Totem (Swagger)
   const config = new DocumentBuilder()
     .setTitle('Film Commission TDF')
     .setDescription('Documentación de la API')
@@ -15,17 +14,11 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document); // La web estará en /api
+  SwaggerModule.setup('api', app, document);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
-  // Habilitar que el Frontend (en otro puerto) pueda hablar con el Backend
-  
 
-
-  // 1. FUNDAMENTAL PARA RENDER: Confiar en el proxy para el login de Google
   const httpAdapter = app.getHttpAdapter().getInstance();
   httpAdapter.set('trust proxy', 1);
-
-  // 2. CORS: Permitir peticiones desde Vercel
   app.enableCors({
     origin: ['https://lab2026.vercel.app', 'http://localhost:3000'],
     credentials: true,

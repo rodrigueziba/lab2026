@@ -26,7 +26,6 @@ export default function MiCuentaPage() {
     setEmail(userData.email);
   }, [router]);
 
-  // --- FUNCIÓN: CAMBIAR EMAIL ---
   const handleUpdateEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!confirm("⚠️ Al cambiar tu email, se cerrará la sesión y tendrás que ingresar con el nuevo correo. ¿Continuar?")) return;
@@ -60,7 +59,6 @@ export default function MiCuentaPage() {
     }
   };
 
-  // --- FUNCIÓN: CAMBIAR PASSWORD ---
   const handleUpdatePass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passData.newPass !== passData.confirmPass) return alert("❌ Las contraseñas no coinciden.");

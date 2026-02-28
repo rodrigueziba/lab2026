@@ -32,18 +32,14 @@ export default function EditarPrestadorPage() {
     telefono: '',
     web: '',
     foto: '',
-    // --- NUEVOS CAMPOS ---
-    colorTema: '#ea580c', // Valor por defecto (Naranja)
+    colorTema: '#ea580c',
     videoReel: '',
-    // ---------------------
   });
 
   const [nuevoArchivo, setNuevoArchivo] = useState<File | null>(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-  // 1. CARGAR DATOS AL ENTRAR 📥
   useEffect(() => {
-    // Verificamos token
     const token = localStorage.getItem('token');
     if (!token) router.push('/login');
 
@@ -51,7 +47,6 @@ export default function EditarPrestadorPage() {
       fetch(`${apiUrl}/prestador/${id}`)
         .then(res => res.json())
         .then(data => {
-          // Rellenamos el estado con lo que viene de la BD
           setFormData({
             nombre: data.nombre || '',
             tipoPerfil: data.tipoPerfil || 'Profesional',
@@ -78,14 +73,13 @@ export default function EditarPrestadorPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // 2. SUBIR FOTO NUEVA (Solo si el usuario eligió una) ☁️
   const uploadImage = async (file: File) => {
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-edit-perfil.${fileExt}`;
       
       const { error } = await supabase.storage
-        .from('profesionales') // Bucket correcto
+        .from('profesionales')
         .upload(fileName, file);
 
       if (error) throw error;
@@ -97,14 +91,11 @@ export default function EditarPrestadorPage() {
     }
   };
 
-  // 3. GUARDAR CAMBIOS (PATCH) 💾
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     setSaving(true);
 
-    let fotoFinal = formData.foto; // Mantenemos la vieja por defecto
-
-    // Si hay archivo nuevo, subimos y reemplazamos
+    let fotoFinal = formData.foto;
     if (nuevoArchivo) {
       const urlNueva = await uploadImage(nuevoArchivo);
       if (urlNueva) fotoFinal = urlNueva;

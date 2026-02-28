@@ -1,12 +1,11 @@
 'use client';
-import { useState, useEffect, use } from 'react'; // 'use' es necesario en Next 14/15 para params
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, Briefcase, Mail, Phone, Globe, MapPin, Camera, Save, Loader2, ArrowLeft, Palette } from 'lucide-react';
 
 export default function EditarPerfilPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   
-  // Estado para desempaquetar params (Next.js 15 requirement)
   const [profileId, setProfileId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -27,7 +26,6 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
     colorTema: '#ea580c'
   });
 
-  // 1. Desempaquetar params y Cargar datos
   useEffect(() => {
     params.then((unwrap) => {
         setProfileId(unwrap.id);

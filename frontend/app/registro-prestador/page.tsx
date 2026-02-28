@@ -41,7 +41,6 @@ export default function RegistroPrestadorPage() {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
-  // 1. Verificar si está logueado
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -62,7 +61,6 @@ export default function RegistroPrestadorPage() {
     }
   };
 
-  // 2. Subir Foto a Supabase
   const uploadImage = async (file: File) => {
     try {
       setUploading(true);
@@ -86,7 +84,6 @@ export default function RegistroPrestadorPage() {
     }
   };
 
-  // 3. Enviar Datos al Backend
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);

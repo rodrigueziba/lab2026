@@ -34,7 +34,6 @@ export class CreateLocacionDto {
   @IsOptional()
   galeria?: string[];
 
-  // 👇 AGREGAR ESTOS
   @IsNumber()
   @IsOptional()
   lat?: number;

@@ -94,7 +94,6 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
                 showConfirmButton: false
             });
         } else {
-            // 👇 AQUÍ MOSTRAMOS EL MENSAJE QUE VIENE DEL BACKEND (Ej: "No puedes solicitar a tu propio perfil")
             Swal.fire({
                 title: 'Atención',
                 text: data.message || "No se pudo realizar la solicitud.",

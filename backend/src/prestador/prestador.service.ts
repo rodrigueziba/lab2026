@@ -11,7 +11,6 @@ export class PrestadorService {
     private mailService: MailService,
   ) {}
 
-  // --- 1. GESTIÓN DE PERFILES (CREAR/EDITAR) ---
 
   async create(createPrestadorDto: CreatePrestadorDto, userId: number) {
     const { experiencias, fechaNacimiento, ...restData } = createPrestadorDto;
@@ -51,7 +50,6 @@ export class PrestadorService {
     });
   }
 
-  // --- 2. SISTEMA DE SOLICITUDES Y NOTIFICACIONES (Con Email 📧) ---
   async solicitarContacto(solicitanteId: number, prestadorId: number) {
     // a) Buscar Prestador y su Dueño (incluyendo email del usuario)
     const prestador = await this.prisma.prestador.findUnique({
@@ -114,7 +112,6 @@ export class PrestadorService {
 
     return { message: 'Solicitud enviada. Se ha notificado al profesional.' };
   }
-  // --- 3. MÉTODOS DE BÚSQUEDA ---
 
   findAll() {
     return this.prisma.prestador.findMany({

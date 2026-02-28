@@ -5,11 +5,9 @@ import L from 'leaflet';
 import { useEffect } from 'react';
 import Link from 'next/link';
 
-// --- CENTRO INICIAL: Tierra del Fuego (Ushuaia / canal Beagle) ---
 const CENTRO_TDF: [number, number] = [-54.8019, -68.303];
 const ZOOM_INICIAL = 8;
 
-// --- CONFIGURACIÓN DE ICONOS ---
 const iconUrl = 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png';
 const iconRetinaUrl = 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png';
 const shadowUrl = 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png';
@@ -25,12 +23,10 @@ const customIcon = L.icon({
   shadowSize: [41, 41]
 });
 
-// --- HELPER PARA VALIDAR NÚMEROS ---
 const isValidCoord = (n: any) => {
   return typeof n === 'number' && !isNaN(n) && isFinite(n);
 };
 
-// --- Fija la vista inicial en Tierra del Fuego al montar el mapa ---
 function SetInitialViewTDF() {
   const map = useMap();
   useEffect(() => {
@@ -39,7 +35,6 @@ function SetInitialViewTDF() {
   return null;
 }
 
-// --- Ajusta el centro solo cuando hay locaciones con coordenadas válidas en TDF ---
 function UpdateMapCenter({ locations }: { locations: any[] }) {
   const map = useMap();
 
@@ -66,7 +61,6 @@ function UpdateMapCenter({ locations }: { locations: any[] }) {
   return null;
 }
 
-// --- Overlay de texto "Islas Malvinas" (posición aproximada de las islas) ---
 const MALVINAS_POS: [number, number] = [-51.7, -59.5];
 const malvinasLabelIcon = L.divIcon({
   className: 'malvinas-label-leaflet',
