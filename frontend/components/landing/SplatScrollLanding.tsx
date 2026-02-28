@@ -157,6 +157,7 @@ function quatFromPosLookAt(pos: V3, lookAt: V3) {
 }
 
 const HERO_TEXT = 'FILMA EN TIERRA DEL FUEGO';
+const HERO_LINE1_END = 'FILMA EN '.length; // En móvil: primera fila "FILMA EN", segunda "TIERRA DEL FUEGO"
 const N_SECTIONS = CARDS.length + 1;
 
 type LogEntry = { time: string; level: 'info' | 'ok' | 'warn' | 'error'; msg: string };
@@ -1066,20 +1067,42 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
             onMouseMove={onHeroMove}
           >
             <h1 className="select-none text-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-none">
-              {heroLetters.map((ch, i) => (
-                <span
-                  key={`${ch}-${i}`}
-                  className="inline-block"
-                  style={{
-                    ...getLetterStyle(i, heroLetters.length),
-                    transition: heroMouse.hover
-                      ? 'transform 0.18s cubic-bezier(0.23,1,0.32,1), text-shadow 0.18s ease'
-                      : 'transform 0.6s cubic-bezier(0.23,1,0.32,1), text-shadow 0.6s ease',
-                  }}
-                >
-                  {ch === ' ' ? '\u00A0' : ch}
-                </span>
-              ))}
+              {/* En móvil: dos filas "FILMA EN" / "TIERRA DEL FUEGO"; en desktop una sola línea */}
+              <span className="block md:inline">
+                {heroLetters.slice(0, HERO_LINE1_END).map((ch, i) => (
+                  <span
+                    key={`${ch}-${i}`}
+                    className="inline-block"
+                    style={{
+                      ...getLetterStyle(i, heroLetters.length),
+                      transition: heroMouse.hover
+                        ? 'transform 0.18s cubic-bezier(0.23,1,0.32,1), text-shadow 0.18s ease'
+                        : 'transform 0.6s cubic-bezier(0.23,1,0.32,1), text-shadow 0.6s ease',
+                    }}
+                  >
+                    {ch === ' ' ? '\u00A0' : ch}
+                  </span>
+                ))}
+              </span>
+              <span className="block md:inline">
+                {heroLetters.slice(HERO_LINE1_END).map((ch, j) => {
+                  const i = HERO_LINE1_END + j;
+                  return (
+                    <span
+                      key={`${ch}-${i}`}
+                      className="inline-block"
+                      style={{
+                        ...getLetterStyle(i, heroLetters.length),
+                        transition: heroMouse.hover
+                          ? 'transform 0.18s cubic-bezier(0.23,1,0.32,1), text-shadow 0.18s ease'
+                          : 'transform 0.6s cubic-bezier(0.23,1,0.32,1), text-shadow 0.6s ease',
+                      }}
+                    >
+                      {ch === ' ' ? '\u00A0' : ch}
+                    </span>
+                  );
+                })}
+              </span>
             </h1>
 
             <p className="mt-3 sm:mt-4 text-center text-xs sm:text-sm text-white/50 tracking-widest uppercase">
