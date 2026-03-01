@@ -524,7 +524,7 @@ function MobileTooltip({ node, onClose }: { node: TooltipData | null; onClose: (
    COMPONENTE PRINCIPAL
 ═══════════════════════════════════════════════════════════════ */
 export default function AdminDashboardPage() {
-  const graphRef        = useRef<any>();
+  const graphRef        = useRef<any>(null); // ¡CORRECCIÓN APLICADA AQUÍ! Se añadió (null)
   const iframeRef       = useRef<HTMLIFrameElement>(null);
   const waveCounterRef  = useRef(0);
   const speedRef        = useRef(1.0);
