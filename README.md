@@ -76,17 +76,5 @@ Backend en http://localhost:3000, frontend en http://localhost:3001.
   - `JWT_SECRET` (clave secreta para firmar los tokens JWT)
   - Credenciales de correo y OAuth que uses en producción/desarrollo.
 
-El backend usa `ConfigModule` y `ConfigService` para leer estas variables, y `docker-compose.yml` carga automáticamente `backend/.env` en el contenedor (`env_file: ./backend/.env`).  
-⚠️ **No comprometas `backend/.env` al repositorio**; mantenelo solo en tu máquina/servidor.
 
-### 5. Prisma y Docker
-- El archivo `backend/prisma/schema.prisma` ya está configurado con:
-  - `binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]`
-- Esto hace que `npx prisma generate` genere binarios tanto para tu máquina local como para el contenedor de Docker (Linux Alpine ARM64).
 
-Cada vez que clones el repo en otra PC, solo necesitás:
-1. Crear un nuevo `backend/.env` con tus propias claves (`DATABASE_URL`, `JWT_SECRET`, etc.). Si ves errores como "Can't reach database server" o "connection pool timeout", consultá la sección **Errores frecuentes de base de datos** en `backend/README.md`.
-2. Ejecutar los pasos del punto **2** (instalar dependencias y `npx prisma generate`).
-3. Levantar con `docker compose up`.
-
-Con eso, la configuración de Docker, Prisma y JWT que ya está en el código debería evitar los errores que estuvimos corrigiendo.
