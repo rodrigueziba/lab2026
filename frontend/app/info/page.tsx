@@ -57,14 +57,16 @@ const featIconClass = {
 // ─── Topology Canvas Background ─────────────────────────────────────────────
 
 function TopologyCanvas() {
-  const canvasRef = useRef(null);
-  const rafRef    = useRef(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rafRef    = useRef<number | null>(null);
   const scrollRef = useRef(0);
   const targetScrollRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const ctx    = canvas.getContext("2d");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
     // ── resize ──
     const resize = () => {
@@ -200,7 +202,8 @@ function TopologyCanvas() {
     draw();
 
     return () => {
-      cancelAnimationFrame(rafRef.current);
+      const id = rafRef.current;
+      if (id != null) cancelAnimationFrame(id);
       window.removeEventListener("resize", resize);
       window.removeEventListener("scroll", onScroll);
     };
@@ -335,7 +338,7 @@ export default function GuiaPrestadorPage() {
                     className="flex gap-6 py-7 opacity-0 -translate-x-5 transition-all duration-500"
                     style={{ transitionDelay: `${i * 100}ms` }}
                   >
-                    <div className={`flex-shrink-0 w-14 h-14 rounded-full border-2 flex items-center justify-center font-extrabold text-base relative z-10 ${stepNumClass[s.color]}`}>
+                    <div className={`flex-shrink-0 w-14 h-14 rounded-full border-2 flex items-center justify-center font-extrabold text-base relative z-10 ${stepNumClass[s.color as keyof typeof stepNumClass] ?? ""}`}>
                       {s.num}
                     </div>
                     <div>
@@ -373,7 +376,7 @@ export default function GuiaPrestadorPage() {
                   className="bg-[#111827]/80 backdrop-blur-sm border border-white/7 rounded-2xl p-7 opacity-0 translate-y-5 transition-all duration-500 hover:border-[#4f9cf9]/30 hover:shadow-[0_12px_48px_rgba(0,0,0,.5)]"
                   style={{ transitionDelay: `${i * 80}ms` }}
                 >
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5 ${featIconClass[f.color]}`}>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5 ${featIconClass[f.color as keyof typeof featIconClass] ?? ""}`}>
                     {f.icon}
                   </div>
                   <h3 className="font-bold mb-2">{f.title}</h3>
