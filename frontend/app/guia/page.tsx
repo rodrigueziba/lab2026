@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
   MapPin, Search, Filter, Briefcase, Users, Clapperboard, GraduationCap, 
-  ChevronLeft, ChevronRight, ArrowRight, LayoutGrid, Plus, Dice5 
+  ChevronLeft, ChevronRight, ArrowRight, LayoutGrid, Plus, Dice5, HelpCircle 
 } from 'lucide-react';
 
 const getInitials = (name: string) => {
@@ -132,22 +132,24 @@ export default function GuiaPage() {
                   </h1>
               </div>
 
-              {/* Buscador centrado, ocupa todo el ancho que sobra (solo escritorio) */}
-              <div className="relative group w-full md:flex-1 md:min-w-0 md:max-w-xl md:mx-4 flex justify-center">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500" size={16} />
-                <input 
-                  type="text" 
-                  placeholder="Buscar..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white focus:border-orange-500 transition-all"
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltroTexto(e.target.value)}
-                />
+              {/* Buscador: centrado en escritorio, más ancho */}
+              <div className="relative group w-full md:flex-1 md:min-w-0 flex justify-center md:px-4">
+                <div className="w-full max-w-3xl relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500" size={18} />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 md:py-3 text-sm md:text-base outline-none text-white focus:border-orange-500 transition-all"
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltroTexto(e.target.value)}
+                  />
+                </div>
               </div>
 
-              {/* Filtros y botones (derecha) */}
+              {/* Filtros y botones (derecha): caja de filtros más estrecha y con espacio respecto al buscador */}
               <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end shrink-0">
                       
-                      {/* Filtros Tipo: en móvil ocupan todo el ancho con más espacio entre iconos */}
-                      <div className="flex flex-1 md:flex-none w-full md:max-w-[250px] min-w-0 gap-4 md:gap-2 bg-slate-900 p-2 md:p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-hide justify-between md:justify-start">
+                      {/* Filtros Tipo: en móvil ocupan todo el ancho; en PC caja más estrecha a la derecha */}
+                      <div className="flex flex-1 md:flex-none w-full md:w-[220px] min-w-0 gap-4 md:gap-0 bg-slate-900 p-2 md:p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-hide justify-between md:justify-between">
                           {TIPOS_PERFIL.map((tipo) => {
                               const Icon = tipo.icon;
                               const isActive = tipoSeleccionado === tipo.value;
@@ -171,6 +173,11 @@ export default function GuiaPage() {
 
                       {/* Botones Acción */}
                       <div className="flex gap-2 shrink-0">
+                          <Link href="/info">
+                            <button className="bg-blue-500 hover:bg-blue-400 text-white p-2.5 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 border border-blue-400/40 flex items-center justify-center" title="Información">
+                                <HelpCircle size={20} strokeWidth={2.5} />
+                            </button>
+                          </Link>
                           <Link href="/mi-perfil/crear">
                             <button className="bg-cyan-600 hover:bg-cyan-500 text-white p-2.5 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 border border-cyan-500/30 flex items-center justify-center">
                                 <Plus size={20} strokeWidth={3} />
