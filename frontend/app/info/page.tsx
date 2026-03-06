@@ -129,7 +129,7 @@ export default function GuiaPrestadorPage() {
               <div className="flex flex-col gap-0">
                 {STEPS.map((s, i) => (
                   <div key={s.num} data-animate className="flex gap-6 py-7 opacity-0 -translate-x-5 transition-all duration-500" style={{ transitionDelay: `${i * 100}ms` }}>
-                    <div className={`flex-shrink-0 w-14 h-14 rounded-full border-2 flex items-center justify-center font-extrabold text-base relative z-10 ${stepNumClass[s.color]}`}>{s.num}</div>
+                    <div className={`flex-shrink-0 w-14 h-14 rounded-full border-2 flex items-center justify-center font-extrabold text-base relative z-10 ${stepNumClass[s.color as keyof typeof stepNumClass] ?? ""}`}>{s.num}</div>
                     <div>
                       <h3 className="font-bold text-lg mb-1">{s.title}</h3>
                       <p className="text-slate-400 text-sm mb-3">{s.desc}</p>
@@ -157,7 +157,7 @@ export default function GuiaPrestadorPage() {
             <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {FEATURES.map((f, i) => (
                 <div key={f.title} data-animate className="bg-[#111827]/80 backdrop-blur-sm border border-white/7 rounded-2xl p-7 opacity-0 translate-y-5 transition-all duration-500 hover:border-[#4f9cf9]/30 hover:shadow-[0_12px_48px_rgba(0,0,0,.5)]" style={{ transitionDelay: `${i * 80}ms` }}>
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5 ${featIconClass[f.color]}`}>{f.icon}</div>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5 ${featIconClass[f.color as keyof typeof featIconClass] ?? ""}`}>{f.icon}</div>
                   <h3 className="font-bold mb-2">{f.title}</h3>
                   <p className="text-slate-400 text-sm">{f.desc}</p>
                 </div>
