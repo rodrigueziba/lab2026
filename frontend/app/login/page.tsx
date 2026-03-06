@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Loader2, AlertCircle, Settings2, X } from 'lucide-react';
 
 // Importaciones de Three.js
 import * as THREE from 'three';
@@ -152,30 +152,81 @@ function LoginForm() {
   );
 }
 
+const LOGIN_MUSIC_URL = "/music.mp3";
+
+const DEFAULT_LOGIN_DEBUG = {
+  topColor: '#0a198c',
+  bottomColor: '#11133b',
+  bloomStrength: 1.0,
+  speed: 0.2,
+  lightIntensity: 1.2,
+  rgbShiftAmount: 0.001,
+};
+
 // --- Página Principal (Wrapper con Suspense y Three.js) ---
 export default function LoginPage() {
   const mountRef = useRef<HTMLDivElement>(null);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
+  const loginParamsRef = useRef({ ...DEFAULT_LOGIN_DEBUG });
+  const [showDebugButton, setShowDebugButton] = useState(false);
+  const [debugMenuOpen, setDebugMenuOpen] = useState(false);
+  const [loginDebugParams, setLoginDebugParams] = useState(DEFAULT_LOGIN_DEBUG);
+  const [hideLoginCard, setHideLoginCard] = useState(false);
+
+  // Sincronizar params del debug al ref que usa el bucle de animación
+  useEffect(() => {
+    loginParamsRef.current = { ...loginDebugParams };
+  }, [loginDebugParams]);
+
+  // En escritorio: Shift muestra/oculta el botón Debug
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "ShiftLeft" && e.code !== "ShiftRight") return;
+      if (typeof window !== "undefined" && window.innerWidth < 768) return;
+      setShowDebugButton((v) => !v);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // En escritorio (≥768px): barra espaciadora activa/pausa la música de fondo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      if (typeof window !== "undefined" && window.innerWidth < 768) return;
+      if (!musicRef.current) {
+        const audio = new Audio(LOGIN_MUSIC_URL);
+        musicRef.current = audio;
+      }
+      const audio = musicRef.current;
+      if (audio.paused) audio.play().catch(() => {});
+      else audio.pause();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (window.innerWidth < 768 || !mountRef.current) return;
 
     const currentMount = mountRef.current;
+    const p = loginParamsRef.current;
 
     const params = {
       warpDrive: false,
-      speed: 0.2, // Velocidad inicial base
+      speed: p.speed,
       cameraOffsetY: 3.0,
       angleOffset: -0.25,
-      topColor: '#0a198c',
-      bottomColor: '#11133b',
-      bloomStrength: 1.0,
+      topColor: p.topColor,
+      bottomColor: p.bottomColor,
+      bloomStrength: p.bloomStrength,
       bloomRadius: 0.2,
       bloomThreshold: 0.15,
-      lightIntensity: 1.2,
+      lightIntensity: p.lightIntensity,
       depthFade: 0.001,
       showRings: true,
       ringCount: 10.0,
-      rgbShiftAmount: 0.001,
+      rgbShiftAmount: p.rgbShiftAmount,
       reflectionStrength: 0.35,
       mouseParallax: 5.0,
       ghostIntensity: 1.0,
@@ -540,7 +591,7 @@ export default function LoginPage() {
     const onClick = () => {
       currentPaletteIndex = (currentPaletteIndex + 1) % colorPalettes.length;
       const newColors = colorPalettes[currentPaletteIndex];
-      
+      loginParamsRef.current = { ...loginParamsRef.current, topColor: newColors.top, bottomColor: newColors.bottom };
       tubeMaterial.uniforms.uTopColor.value.set(newColors.top);
       tubeMaterial.uniforms.uBottomColor.value.set(newColors.bottom);
       if (scene.fog) {
@@ -551,8 +602,8 @@ export default function LoginPage() {
     // --- Control de Velocidad con la Rueda del Mouse (Scroll) ---
     const onWheel = (e: WheelEvent) => {
       const scrollSensibility = 0.0015;
-      params.speed -= e.deltaY * scrollSensibility;
-      params.speed = Math.max(0.02, Math.min(params.speed, 5.0));
+      const r = loginParamsRef.current;
+      r.speed = Math.max(0.02, Math.min(r.speed - e.deltaY * scrollSensibility, 5.0));
       if (params.warpDrive) params.warpDrive = false;
     };
 
@@ -580,13 +631,18 @@ export default function LoginPage() {
       animationId = requestAnimationFrame(animate);
       const dt = clock.getDelta();
       const time = clock.getElapsedTime();
+      const live = loginParamsRef.current;
 
       tubeMaterial.uniforms.uTime.value = time;
+      tubeMaterial.uniforms.uTopColor.value.set(live.topColor);
+      tubeMaterial.uniforms.uBottomColor.value.set(live.bottomColor);
+      tubeMaterial.uniforms.uIntensity.value = live.lightIntensity;
+      if (scene.fog) (scene.fog as THREE.FogExp2).color.set(live.topColor);
 
-      const targetSpeed = params.warpDrive ? 1.2 : params.speed;
+      const targetSpeed = params.warpDrive ? 1.2 : live.speed;
       const targetFOV = params.warpDrive ? 130 : 85;
-      const targetRGB = params.warpDrive ? 0.008 : params.rgbShiftAmount;
-      const targetBloom = params.warpDrive ? 2.5 : params.bloomStrength;
+      const targetRGB = params.warpDrive ? 0.008 : live.rgbShiftAmount;
+      const targetBloom = params.warpDrive ? 2.5 : live.bloomStrength;
 
       currentSpeed = THREE.MathUtils.lerp(currentSpeed, targetSpeed, dt * 2.0);
       camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, dt * 3.0);
@@ -644,6 +700,137 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Debug (solo escritorio): Shift para mostrar; mismo estilo que /info */}
+      {showDebugButton && (
+        <div className="hidden md:block fixed left-6 top-[38%] -translate-y-1/2 z-[60] flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDebugMenuOpen((o) => !o)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950/90 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-white hover:border-orange-500/40 hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] transition-all font-bold text-sm"
+          >
+            <Settings2 size={18} />
+            Debug
+          </button>
+          {debugMenuOpen && (
+            <div className="fixed left-24 top-1/2 -translate-y-1/2 w-72 rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[61]">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Fondo Login</span>
+                <button
+                  type="button"
+                  onClick={() => setDebugMenuOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                <label className="flex items-center justify-between gap-3 cursor-pointer py-2 border-b border-white/5">
+                  <span className="text-xs font-bold text-slate-400">Ocultar tarjeta de login (solo fondo)</span>
+                  <input
+                    type="checkbox"
+                    checked={hideLoginCard}
+                    onChange={(e) => setHideLoginCard(e.target.checked)}
+                    className="w-4 h-4 rounded border-white/20 bg-slate-800 text-orange-500 focus:ring-orange-500/50"
+                  />
+                </label>
+                <div>
+                  <span className="text-xs font-bold text-slate-400 block mb-1">Color superior</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={loginDebugParams.topColor}
+                      onChange={(e) => setLoginDebugParams((p) => ({ ...p, topColor: e.target.value }))}
+                      className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent"
+                    />
+                    <span className="text-xs font-mono text-slate-500">{loginDebugParams.topColor}</span>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-400 block mb-1">Color inferior</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={loginDebugParams.bottomColor}
+                      onChange={(e) => setLoginDebugParams((p) => ({ ...p, bottomColor: e.target.value }))}
+                      className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent"
+                    />
+                    <span className="text-xs font-mono text-slate-500">{loginDebugParams.bottomColor}</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="flex justify-between items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-slate-400">Bloom</span>
+                    <span className="text-xs font-mono text-orange-400">{loginDebugParams.bloomStrength.toFixed(2)}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={3}
+                    step={0.05}
+                    value={loginDebugParams.bloomStrength}
+                    onChange={(e) => setLoginDebugParams((p) => ({ ...p, bloomStrength: parseFloat(e.target.value) }))}
+                    className="w-full h-2 rounded-full bg-slate-800 accent-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="flex justify-between items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-slate-400">Velocidad</span>
+                    <span className="text-xs font-mono text-orange-400">{loginDebugParams.speed.toFixed(2)}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={0.02}
+                    max={2}
+                    step={0.01}
+                    value={loginDebugParams.speed}
+                    onChange={(e) => setLoginDebugParams((p) => ({ ...p, speed: parseFloat(e.target.value) }))}
+                    className="w-full h-2 rounded-full bg-slate-800 accent-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="flex justify-between items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-slate-400">Intensidad luz</span>
+                    <span className="text-xs font-mono text-orange-400">{loginDebugParams.lightIntensity.toFixed(2)}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={0.2}
+                    max={3}
+                    step={0.05}
+                    value={loginDebugParams.lightIntensity}
+                    onChange={(e) => setLoginDebugParams((p) => ({ ...p, lightIntensity: parseFloat(e.target.value) }))}
+                    className="w-full h-2 rounded-full bg-slate-800 accent-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="flex justify-between items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-slate-400">RGB Shift</span>
+                    <span className="text-xs font-mono text-orange-400">{loginDebugParams.rgbShiftAmount.toFixed(4)}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={0.02}
+                    step={0.0005}
+                    value={loginDebugParams.rgbShiftAmount}
+                    onChange={(e) => setLoginDebugParams((p) => ({ ...p, rgbShiftAmount: parseFloat(e.target.value) }))}
+                    className="w-full h-2 rounded-full bg-slate-800 accent-orange-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLoginDebugParams(DEFAULT_LOGIN_DEBUG)}
+                  className="w-full py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:border-orange-500/30 transition-colors"
+                >
+                  Restaurar valores
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Contenedor del fondo Three.js */}
       <div ref={mountRef} className="hidden md:block absolute inset-0 z-0"></div>
 
@@ -658,8 +845,10 @@ export default function LoginPage() {
       {/* Decoración original que actúa como fallback en móviles */}
       <div className="absolute md:hidden top-0 left-0 w-[500px] h-[500px] bg-orange-600/20 blur-[120px] rounded-full pointer-events-none -translate-x-1/2 -translate-y-1/2 z-0"></div>
         
-      {/* Contenedor del Formulario centrado usando Suspense */}
-      <div className="relative z-10 w-full max-w-md">
+      {/* Contenedor del Formulario centrado usando Suspense (ocultable desde Debug) */}
+      <div
+        className={`relative z-10 w-full max-w-md transition-opacity duration-200 ${hideLoginCard ? "opacity-0 pointer-events-none" : ""}`}
+      >
         <Suspense fallback={<div className="text-white text-center">Cargando login...</div>}>
           <LoginForm />
         </Suspense>

@@ -2,8 +2,26 @@
 
 import { useEffect, useRef } from "react";
 
-export default function TopologyBackground() {
+const DEFAULT_CONFIG = {
+  LINES: 18,
+  STEPS: 140,
+  BASE_SPEED: 0.855,
+  WAVE_AMP: 35,
+  MOUSE_RADIUS: 160,
+  MOUSE_FORCE: 38,
+  gradientColors: null, // si es array de 7 hex, las líneas usan gradiente izquierda→derecha
+};
+
+export default function TopologyBackground(props = {}) {
   const canvasRef = useRef(null);
+  const configRef = useRef({
+    ...DEFAULT_CONFIG,
+    ...props,
+  });
+
+  useEffect(() => {
+    configRef.current = { ...DEFAULT_CONFIG, ...props };
+  }, [props.LINES, props.STEPS, props.BASE_SPEED, props.WAVE_AMP, props.MOUSE_RADIUS, props.MOUSE_FORCE, props.gradientColors]);
 
   useEffect(() => {
     if (window.innerWidth < 1024) return;
@@ -26,17 +44,24 @@ export default function TopologyBackground() {
     const onMove = (e) => { mouse.x = e.clientX; mouse.y = e.clientY; };
     window.addEventListener("mousemove", onMove, { passive: true });
 
-    // ── Config ────────────────────────────────────────────────────────────────
-    const LINES       = 18;
-    const STEPS       = 140;
-    const BASE_SPEED  = 0.855;   // constant serpentine speed — never stops
-    const WAVE_AMP    = 35;      // base swell amplitude
-    const MOUSE_RADIUS= 160;     // px around cursor that repels lines
-    const MOUSE_FORCE = 38;      // max px displacement from mouse
-
-    // ── Draw ──────────────────────────────────────────────────────────────────
+    // ── Draw (lee config en vivo desde configRef) ─────────────────────────────
     const draw = () => {
       raf = requestAnimationFrame(draw);
+      const cfg = configRef.current;
+      const LINES = cfg.LINES ?? DEFAULT_CONFIG.LINES;
+      const STEPS = cfg.STEPS ?? DEFAULT_CONFIG.STEPS;
+      const BASE_SPEED = cfg.BASE_SPEED ?? DEFAULT_CONFIG.BASE_SPEED;
+      const WAVE_AMP = cfg.WAVE_AMP ?? DEFAULT_CONFIG.WAVE_AMP;
+      const MOUSE_RADIUS = cfg.MOUSE_RADIUS ?? DEFAULT_CONFIG.MOUSE_RADIUS;
+      const MOUSE_FORCE = cfg.MOUSE_FORCE ?? DEFAULT_CONFIG.MOUSE_FORCE;
+      const gradientColors = cfg.gradientColors ?? null;
+
+      // Gradiente izquierda→derecha (7 colores) para las líneas, si está definido
+      let lineGradient = null;
+      if (gradientColors && Array.isArray(gradientColors) && gradientColors.length >= 7) {
+        lineGradient = ctx.createLinearGradient(0, 0, W, 0);
+        for (let i = 0; i < 7; i++) lineGradient.addColorStop(i / 6, gradientColors[i]);
+      }
 
       // time drives the serpentine — completely independent of any input
       const t    = performance.now() / 1000;
@@ -75,6 +100,9 @@ export default function TopologyBackground() {
         const sat   = 75  + normLi * 15;
         const lit   = 42  + (1 - normLi) * 28;
         const alpha = 0.22 + (1 - normLi) * 0.38;
+
+        if (lineGradient) ctx.strokeStyle = lineGradient;
+        else ctx.strokeStyle = `hsla(${hue},${sat}%,${lit}%,${alpha})`;
 
         ctx.beginPath();
 
@@ -115,8 +143,7 @@ export default function TopologyBackground() {
           else          ctx.lineTo(fx, fy);
         }
 
-        ctx.strokeStyle = `hsla(${hue},${sat}%,${lit}%,${alpha})`;
-        ctx.lineWidth   = 0.7 + (1 - normLi) * 0.9;
+        ctx.lineWidth = 0.7 + (1 - normLi) * 0.9;
         ctx.stroke();
       }
 

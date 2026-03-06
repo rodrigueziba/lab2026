@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { X, Settings2 } from "lucide-react";
 import TopologyBackground from "./TopologyBackground";
+
+// Ruta del audio: colocar el archivo MP3 en frontend/public/music.mp3 (o cambiar la ruta aquí)
+const INFO_PAGE_MUSIC_URL = "/music.mp3";
 
 const WHO_CARDS = [
   { icon: "🎬", title: "Productoras",          desc: "Empresas de producción local o nacional con actividad en la provincia." },
@@ -51,7 +55,68 @@ const featIconClass = {
   green:  "bg-[#10b981]/10",
 };
 
+const DEFAULT_TOPOLOGY = {
+  LINES: 18,
+  STEPS: 140,
+  BASE_SPEED: 0.855,
+  WAVE_AMP: 35,
+  MOUSE_RADIUS: 160,
+  MOUSE_FORCE: 38,
+  gradientBaseColor: null as string | null,
+};
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+  }
+  return [h * 360, s * 100, l * 100];
+}
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100; l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))));
+  };
+  return "#" + [f(0), f(8), f(4)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+/** A partir de un color base hex genera 7 colores para el gradiente (base + 6 con hue rotado). */
+function gradientColorsFromBase(baseHex: string): string[] {
+  const [r, g, b] = hexToRgb(baseHex);
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const out: string[] = [];
+  for (let i = 0; i < 7; i++) out.push(hslToHex((h + (i * 360) / 7) % 360, s, l));
+  return out;
+}
+
 export default function GuiaPrestadorPage() {
+  const musicRef = useRef<HTMLAudioElement | null>(null);
+  const [showDebugButton, setShowDebugButton] = useState(false);
+  const [debugMenuOpen, setDebugMenuOpen] = useState(false);
+  const [topologyParams, setTopologyParams] = useState(DEFAULT_TOPOLOGY);
+
+  // En escritorio: Shift muestra/oculta el botón Debug
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "ShiftLeft" && e.code !== "ShiftRight") return;
+      if (typeof window !== "undefined" && window.innerWidth < 768) return;
+      setShowDebugButton((v) => !v);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add("opacity-100","translate-x-0","translate-y-0")),
@@ -61,9 +126,136 @@ export default function GuiaPrestadorPage() {
     return () => observer.disconnect();
   }, []);
 
+  // En escritorio (≥768px): barra espaciadora activa/pausa la música de fondo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      if (typeof window !== "undefined" && window.innerWidth < 768) return;
+
+      if (!musicRef.current) {
+        const audio = new Audio(INFO_PAGE_MUSIC_URL);
+        musicRef.current = audio;
+      }
+      const audio = musicRef.current;
+      if (audio.paused) audio.play().catch(() => {});
+      else audio.pause();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const topologyProps = {
+    ...topologyParams,
+    gradientColors:
+      topologyParams.gradientBaseColor != null
+        ? gradientColorsFromBase(topologyParams.gradientBaseColor)
+        : undefined,
+  };
+
   return (
     <main className="bg-[#060810] text-slate-200 overflow-x-hidden">
-      <TopologyBackground />
+      <TopologyBackground {...(topologyProps as Record<string, unknown>)} />
+
+      {/* Debug (solo escritorio): botón más arriba; menú centrado verticalmente; Shift para mostrar */}
+      {showDebugButton && (
+        <div className="hidden md:block fixed left-6 top-[38%] -translate-y-1/2 z-[60] flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDebugMenuOpen((o) => !o)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950/90 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-white hover:border-orange-500/40 hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] transition-all font-bold text-sm"
+          >
+            <Settings2 size={18} />
+            Debug
+          </button>
+          {debugMenuOpen && (
+            <div className="fixed left-24 top-1/2 -translate-y-1/2 w-72 rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[61]">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">TopologyBackground</span>
+                <button
+                  type="button"
+                  onClick={() => setDebugMenuOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div>
+                  <span className="text-xs font-bold text-slate-400 block mb-2">Color base del gradiente (izq. → der.)</span>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={topologyParams.gradientBaseColor ?? "#3b82f6"}
+                      onChange={(e) =>
+                        setTopologyParams((p) => ({ ...p, gradientBaseColor: e.target.value }))
+                      }
+                      className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent"
+                    />
+                    <span className="text-xs font-mono text-slate-500">
+                      {topologyParams.gradientBaseColor ?? "Por defecto"}
+                    </span>
+                    {topologyParams.gradientBaseColor != null && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setTopologyParams((p) => ({ ...p, gradientBaseColor: null }))
+                        }
+                        className="text-xs text-slate-500 hover:text-white"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-600 mt-1">
+                    Genera 7 colores (base + 6 por rotación de tono) de izquierda a derecha.
+                  </p>
+                </div>
+                {[
+                  { key: "LINES", label: "Líneas", min: 4, max: 40, step: 1 },
+                  { key: "STEPS", label: "Pasos", min: 40, max: 280, step: 10 },
+                  { key: "BASE_SPEED", label: "Velocidad base", min: 0.2, max: 2, step: 0.05 },
+                  { key: "WAVE_AMP", label: "Amplitud onda", min: 5, max: 80, step: 1 },
+                  { key: "MOUSE_RADIUS", label: "Radio mouse (px)", min: 40, max: 320, step: 10 },
+                  { key: "MOUSE_FORCE", label: "Fuerza mouse", min: 10, max: 80, step: 2 },
+                ].map(({ key, label, min, max, step }) => (
+                  <div key={key}>
+                    <label className="flex justify-between items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-slate-400">{label}</span>
+                      <span className="text-xs font-mono text-orange-400 tabular-nums">
+                        {typeof topologyParams[key as keyof typeof topologyParams] === "number"
+                          ? topologyParams[key as keyof typeof topologyParams]
+                          : ""}
+                      </span>
+                    </label>
+                    <input
+                      type="range"
+                      min={min}
+                      max={max}
+                      step={step}
+                      value={(topologyParams[key as keyof typeof topologyParams] as number) ?? min}
+                      onChange={(e) =>
+                        setTopologyParams((p) => ({
+                          ...p,
+                          [key]: step >= 1 ? parseInt(e.target.value, 10) : parseFloat(e.target.value),
+                        }))
+                      }
+                      className="w-full h-2 rounded-full bg-slate-800 accent-orange-500"
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setTopologyParams(DEFAULT_TOPOLOGY)}
+                  className="w-full py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:border-orange-500/30 transition-colors"
+                >
+                  Restaurar valores
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ position: "relative", zIndex: 1 }}>
 

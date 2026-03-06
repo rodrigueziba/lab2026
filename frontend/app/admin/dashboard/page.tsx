@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import * as THREE from 'three';
 import {
   Network, RefreshCw, Maximize, MapPin, Layers,
-  Clapperboard, Focus, Zap, Wind, Mountain,
+  Clapperboard, Focus, Zap, Wind, Mountain, X, PanelRightOpen,
 } from 'lucide-react';
 
 const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), { ssr: false });
@@ -373,6 +373,7 @@ function NeuralCanvas2D({
 ═══════════════════════════════════════════════════════════════ */
 function LeftPanel({
   loading, stats, visibleLayers, toggleLayer, resetCamera, isMobile,
+  mobileExpanded, onMobileClose,
 }: {
   loading: boolean;
   stats: { locaciones: number; proyectos: number; prestadores: number };
@@ -380,26 +381,40 @@ function LeftPanel({
   toggleLayer: (l: 'prestador' | 'proyecto' | 'locacion') => void;
   resetCamera: () => void;
   isMobile: boolean;
+  mobileExpanded?: boolean;
+  onMobileClose?: () => void;
 }) {
   return (
-    <div className={`absolute left-3 z-50 pointer-events-none select-none ${isMobile ? 'top-3 w-[calc(100vw-24px)] max-w-xs' : 'top-1/2 -translate-y-1/2'}`}>
-      <div className="bg-slate-950/80 backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.8)] pointer-events-auto overflow-hidden flex flex-col w-72">
+    <div className={`z-50 pointer-events-none select-none ${isMobile && mobileExpanded ? 'fixed inset-0 flex items-center justify-center p-4' : `absolute left-3 ${isMobile ? 'top-3 w-[calc(100vw-24px)] max-w-xs' : 'top-1/2 -translate-y-1/2'}`}`}>
+      <div className="bg-slate-950/80 backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.8)] pointer-events-auto overflow-hidden flex flex-col w-72 max-w-[calc(100vw-2rem)] relative">
 
         {/* Header */}
-        <div className="p-4 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent">
-          <h1 className="text-lg font-black text-white flex items-center gap-3 tracking-tight">
-            <div className="bg-orange-500/10 p-2 rounded-lg border border-orange-500/30 text-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.2)]">
-              <Network size={18}/>
+        <div className="p-4 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-black text-white flex items-center gap-3 tracking-tight">
+              <div className="bg-orange-500/10 p-2 rounded-lg border border-orange-500/30 text-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.2)]">
+                <Network size={18}/>
+              </div>
+              NODOS TDF
+            </h1>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"/>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"/>
+              </span>
+              <span className="text-[10px] font-bold text-emerald-500 tracking-widest uppercase">Sistema Online</span>
             </div>
-            NODOS TDF
-          </h1>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"/>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"/>
-            </span>
-            <span className="text-[10px] font-bold text-emerald-500 tracking-widest uppercase">Sistema Online</span>
           </div>
+          {isMobile && mobileExpanded && onMobileClose && (
+            <button
+              type="button"
+              onClick={onMobileClose}
+              className="shrink-0 p-2 -m-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors touch-manipulation"
+              aria-label="Cerrar menú"
+            >
+              <X size={22} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
 
         {/* Stats */}
@@ -542,6 +557,7 @@ export default function AdminDashboardPage() {
   const [mobileTooltip, setMobileTooltip] = useState<TooltipData | null>(null);
   const [stats, setStats]                 = useState({ locaciones: 0, proyectos: 0, prestadores: 0 });
   const [isMobile, setIsMobile]           = useState(false);
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   // Solo renderizar iframe en cliente (mismo HTML en server y primer paint del client = sin hydration mismatch)
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
@@ -819,15 +835,51 @@ export default function AdminDashboardPage() {
       {/* 3. FILTRO TV */}
       <TVOverlay/>
 
-      {/* 4. PANEL IZQUIERDO */}
-      <LeftPanel
-        loading={loading}
-        stats={stats}
-        visibleLayers={visibleLayers}
-        toggleLayer={toggleLayer}
-        resetCamera={resetCamera}
-        isMobile={isMobile}
-      />
+      {/* 4. PANEL IZQUIERDO — en móvil: minimizado con botón para abrir; al abrir, centrado y con cerrar */}
+      {isMobile ? (
+        <>
+          {mobilePanelOpen && (
+            <>
+              <button
+                type="button"
+                className="fixed inset-0 z-[48] bg-black/50 backdrop-blur-sm"
+                onClick={() => setMobilePanelOpen(false)}
+                aria-label="Cerrar menú"
+              />
+              <LeftPanel
+                loading={loading}
+                stats={stats}
+                visibleLayers={visibleLayers}
+                toggleLayer={toggleLayer}
+                resetCamera={resetCamera}
+                isMobile={isMobile}
+                mobileExpanded
+                onMobileClose={() => setMobilePanelOpen(false)}
+              />
+            </>
+          )}
+          {!mobilePanelOpen && (
+            <button
+              type="button"
+              onClick={() => setMobilePanelOpen(true)}
+              className="fixed left-3 top-20 z-50 flex items-center gap-2 px-4 py-3 rounded-xl bg-slate-950/90 backdrop-blur-xl border border-white/10 shadow-lg text-white font-bold text-sm touch-manipulation active:scale-95 transition-transform"
+              aria-label="Abrir menú de capas"
+            >
+              <PanelRightOpen size={20} className="text-orange-500" />
+              Menú
+            </button>
+          )}
+        </>
+      ) : (
+        <LeftPanel
+          loading={loading}
+          stats={stats}
+          visibleLayers={visibleLayers}
+          toggleLayer={toggleLayer}
+          resetCamera={resetCamera}
+          isMobile={isMobile}
+        />
+      )}
 
       {/* 5. HUD SHADER (solo desktop) */}
       {!isMobile && <ShaderHUD speed={speed} distortion={distortion}/>}

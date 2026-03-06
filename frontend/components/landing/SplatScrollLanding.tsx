@@ -156,8 +156,11 @@ function quatFromPosLookAt(pos: V3, lookAt: V3) {
   return cam.quaternion.clone();
 }
 
-const HERO_TEXT = 'FILMA EN TIERRA DEL FUEGO';
-const HERO_LINE1_END = 'FILMA EN '.length; // En móvil: primera fila "FILMA EN", segunda "TIERRA DEL FUEGO"
+const HERO_TEXT = 'FILMÁ EN TIERRA DEL FUEGO';
+const HERO_LINE1_END = 'FILMÁ EN '.length; // En móvil: primera fila "FILMA EN", segunda "TIERRA DEL FUEGO"
+const HERO_FILMA_END = 5; // "FILMA" = índices 0-4 → color naranja como navbar FILM
+const HERO_OUTLINE = '0.5px 0.5px 0 rgba(0,0,0,0.45), -0.5px -0.5px 0 rgba(0,0,0,0.45), 0.5px -0.5px 0 rgba(0,0,0,0.45), -0.5px 0.5px 0 rgba(0,0,0,0.45), 0.5px 0 0 rgba(0,0,0,0.45), -0.5px 0 0 rgba(0,0,0,0.45), 0 0.5px 0 rgba(0,0,0,0.45), 0 -0.5px 0 rgba(0,0,0,0.45)';
+const HERO_GLASS_HIGHLIGHT = '0 1px 0 rgba(255,255,255,0.15), -1px -1px 0 rgba(255,255,255,0.06)'; // brillo sutil tipo cristal
 const N_SECTIONS = CARDS.length + 1;
 
 type LogEntry = { time: string; level: 'info' | 'ok' | 'warn' | 'error'; msg: string };
@@ -975,7 +978,10 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
 
   const getLetterStyle = useCallback(
     (i: number, total: number): React.CSSProperties => {
-      if (!heroMouse.hover) return { transform: 'translate3d(0,0,0)', textShadow: 'none' };
+      const outline = HERO_OUTLINE;
+      const glass = HERO_GLASS_HIGHLIGHT;
+      const baseShadow = `${outline}, ${glass}`;
+      if (!heroMouse.hover) return { transform: 'translate3d(0,0,0)', textShadow: baseShadow };
 
       const sm = smoothMouse.current;
       const lx = i / (total - 1);
@@ -985,10 +991,11 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       const force = Math.max(0, 38 * (1 - dist * 2.2));
       const tx = (dx / dist) * force;
       const ty = (dy / dist) * force * 0.6;
+      const glow = `${(-tx * 0.4).toFixed(1)}px ${(-ty * 0.4 + 4).toFixed(1)}px 18px rgba(49,46,129,0.5)`;
 
       return {
         transform: `translate3d(${tx.toFixed(2)}px,${ty.toFixed(2)}px,0)`,
-        textShadow: `${(-tx * 0.4).toFixed(1)}px ${(-ty * 0.4 + 4).toFixed(1)}px 18px rgba(99,102,241,0.35)`,
+        textShadow: `${baseShadow}, ${glow}`,
       };
     },
     [heroMouse.hover]
@@ -1013,11 +1020,18 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
         ref={canvasWrapRef}
         className={`fixed inset-0 h-[100svh] w-full ${isFreeRoam ? 'cursor-crosshair' : 'cursor-default'}`}
       >
+        <style>{`
+          @media (max-width: 767px) {
+            .hero-vignette {
+              background: radial-gradient(ellipse 50% 50% at 50% 50%, transparent 0%, transparent 55%, rgba(6,6,15,0.2) 68%, rgba(6,6,15,0.6) 82%, rgba(6,6,15,0.92) 92%, #06060f 100%) !important;
+            }
+          }
+        `}</style>
         <div
-          className="pointer-events-none absolute inset-0 z-10"
+          className="pointer-events-none absolute inset-0 z-10 hero-vignette"
           style={{
             background:
-              'radial-gradient(ellipse 55% 55% at 50% 50%, transparent 0%, transparent 35%, rgba(6,6,15,0.35) 55%, rgba(6,6,15,0.82) 72%, rgba(6,6,15,0.97) 86%, #06060f 100%)',
+              'radial-gradient(ellipse 68% 68% at 50% 50%, transparent 0%, transparent 26%, rgba(6,6,15,0.58) 48%, rgba(6,6,15,0.92) 64%, rgba(6,6,15,0.99) 78%, #06060f 100%)',
           }}
         />
 
@@ -1075,6 +1089,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
                     className="inline-block"
                     style={{
                       ...getLetterStyle(i, heroLetters.length),
+                      color: i < HERO_FILMA_END ? 'rgba(234,88,12,0.92)' : 'rgba(255,255,255,0.88)',
                       transition: heroMouse.hover
                         ? 'transform 0.18s cubic-bezier(0.23,1,0.32,1), text-shadow 0.18s ease'
                         : 'transform 0.6s cubic-bezier(0.23,1,0.32,1), text-shadow 0.6s ease',
@@ -1093,6 +1108,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
                       className="inline-block"
                       style={{
                         ...getLetterStyle(i, heroLetters.length),
+                        color: i < HERO_FILMA_END ? 'rgba(234,88,12,0.92)' : 'rgba(255,255,255,0.88)',
                         transition: heroMouse.hover
                           ? 'transform 0.18s cubic-bezier(0.23,1,0.32,1), text-shadow 0.18s ease'
                           : 'transform 0.6s cubic-bezier(0.23,1,0.32,1), text-shadow 0.6s ease',

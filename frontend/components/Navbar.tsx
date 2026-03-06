@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
   Menu, X, ChevronDown, LogOut, Film, User, 
-  Briefcase, MapPin, Users, Clapperboard, Bell, Shield, Inbox, Atom
+  Briefcase, MapPin, Users, Clapperboard, Bell, Shield, Inbox, Atom, Info
 } from 'lucide-react';
+
+const RAINBOW_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 export default function Navbar() {
   const router = useRouter();
@@ -20,9 +22,14 @@ export default function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const [user, setUser] = useState<any>(null);
+  const [userBlockHover, setUserBlockHover] = useState(false);
+  const [beamColorIndex, setBeamColorIndex] = useState(0);
+  const [userGlowProgress, setUserGlowProgress] = useState(0); // 0 = recién hover, 1 = 60s
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const userHoverStartRef = useRef<number>(0);
+  const userLastColorAdvanceRef = useRef<number>(0);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -83,6 +90,35 @@ export default function Navbar() {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
   }, [isMobileMenuOpen]);
+
+  // Bloque usuario: brillo con transición suave; a más tiempo hover, más rápido el cambio de color y más brillo (a 1 min ilumina toda la pantalla)
+  useEffect(() => {
+    if (!userBlockHover) {
+      setUserGlowProgress(0);
+      return;
+    }
+    userHoverStartRef.current = Date.now();
+    userLastColorAdvanceRef.current = Date.now();
+
+    const tick = () => {
+      const now = Date.now();
+      const elapsed = now - userHoverStartRef.current;
+      const progress = Math.min(elapsed / 60000, 1); // 60 s = 1
+
+      setUserGlowProgress(progress);
+
+      // Velocidad variable: cuanto más tiempo, más rápido el cambio (650ms → ~120ms)
+      const intervalMs = 650 * (1 - progress * 0.82) + 120;
+      if (now - userLastColorAdvanceRef.current >= intervalMs) {
+        userLastColorAdvanceRef.current = now;
+        setBeamColorIndex((i) => (i + 1) % RAINBOW_COLORS.length);
+      }
+    };
+
+    tick();
+    const t = setInterval(tick, 100);
+    return () => clearInterval(t);
+  }, [userBlockHover]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -153,16 +189,16 @@ export default function Navbar() {
 
   return (
     <nav className={`fixed top-0 left-0 w-full z-[100] ${navHeight} ${navPadding} ${navBg}`}>
-      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full min-h-[64px] md:min-h-0">
+      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full min-h-[64px] md:min-h-0 relative">
         
         <div className="flex items-center gap-2">
           <Link href="/" className="text-2xl font-black tracking-tighter text-white group">
             TDF<span className="text-orange-600 group-hover:text-orange-500 transition-colors duration-300 drop-shadow-[0_0_10px_rgba(234,88,12,0.5)]">FILM</span>
           </Link>
-          {/* Easter egg: icono átomo casi invisible, enlace a /nodos (solo escritorio) */}
+          {/* Easter egg: icono átomo, enlace a /nodos — hover brilla violeta */}
           <Link
             href="/nodos"
-            className="hidden md:flex items-center justify-center opacity-[0.12] hover:opacity-30 transition-opacity duration-300 text-white rounded-full p-1 hover:ring-1 hover:ring-white/20"
+            className="hidden md:flex items-center justify-center opacity-[0.12] hover:opacity-100 transition-opacity duration-300 text-white hover:text-violet-400 rounded-full p-1 hover:ring-1 hover:ring-violet-400/60 hover:drop-shadow-[0_0_10px_rgba(139,92,246,0.9)]"
             title="Nodos 3D"
             aria-label="Nodos 3D"
           >
@@ -170,13 +206,23 @@ export default function Navbar() {
           </Link>
         </div>
 
-        <div className="hidden md:flex items-center gap-2 bg-black/20 backdrop-blur-sm p-1.5 rounded-full border border-white/5">
+        {/* Centro: Locaciones, Prestadores, Proyectos — siempre centrados en el ancho de la página (solo escritorio) */}
+        <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-2 bg-black/20 backdrop-blur-sm p-1.5 rounded-full border border-white/5">
           <NavLink href="/locaciones" icon={MapPin} label="Locaciones" />
           <NavLink href="/guia" icon={Users} label="Prestadores" />
           <NavLink href="/proyectos" icon={Clapperboard} label="Proyectos" />
         </div>
 
         <div className="hidden md:flex items-center gap-4">
+          {/* Icono info: mismo estilo/opacidad que átomo, al hover ilumina azul brillante, enlace a /info */}
+          <Link
+            href="/info"
+            className="hidden md:flex items-center justify-center opacity-[0.12] hover:opacity-100 transition-opacity duration-300 text-white hover:text-blue-400 rounded-full p-1 hover:ring-1 hover:ring-blue-400/50 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.8)]"
+            title="Información"
+            aria-label="Información"
+          >
+            <Info size={20} strokeWidth={2} />
+          </Link>
           {user ? (
             <div className="flex items-center gap-4">
                 
@@ -184,7 +230,7 @@ export default function Navbar() {
                 <div className="relative" ref={notifRef}>
                     <button 
                         onClick={() => setIsNotifOpen(!isNotifOpen)}
-                        className="relative p-2 text-slate-400 hover:text-white transition rounded-full hover:bg-white/10"
+                        className="relative p-2 text-slate-400 hover:text-yellow-400 transition rounded-full hover:bg-white/10 hover:drop-shadow-[0_0_12px_rgba(250,204,21,0.95)]"
                     >
                         <Bell size={20}/>
                         {unreadCount > 0 && (
@@ -222,20 +268,57 @@ export default function Navbar() {
                     )}
                 </div>
 
-                {/* MENU USUARIO */}
+                {/* MENU USUARIO — hover: brillo extendido; cambio de color suave; a más tiempo, más rápido y más luz (1 min = ilumina pantalla) */}
                 <div className="relative" ref={dropdownRef}>
-                <button 
-                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    className={`flex items-center gap-3 border py-1.5 pl-1.5 pr-4 rounded-full transition-all duration-300 group ${isUserMenuOpen ? 'bg-slate-800 border-slate-600' : 'bg-transparent border-slate-800 hover:border-slate-600'}`}
+                {userBlockHover && userGlowProgress > 0.12 && (
+                  <div
+                    className="fixed inset-0 pointer-events-none z-[99] transition-opacity duration-500"
+                    style={{
+                      opacity: Math.min(1, (userGlowProgress - 0.12) / 0.88) * (0.5 + 0.5 * userGlowProgress),
+                      background: (() => {
+                        const c = RAINBOW_COLORS[beamColorIndex];
+                        const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
+                        const radius = 60 + 340 * userGlowProgress;
+                        return `radial-gradient(circle at 85% 50%, rgba(${r},${g},${b},${0.12 + 0.5 * userGlowProgress}) 0%, transparent ${radius}%)`;
+                      })(),
+                    }}
+                    aria-hidden
+                  />
+                )}
+                <div
+                  className="relative min-w-0"
+                  onMouseEnter={() => setUserBlockHover(true)}
+                  onMouseLeave={() => setUserBlockHover(false)}
                 >
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-600 to-red-600 flex items-center justify-center text-white font-bold text-sm shadow-lg">
+                  <button 
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className={`relative flex items-center gap-3 border py-1.5 pl-1.5 pr-4 rounded-full duration-300 group ${isUserMenuOpen ? 'bg-slate-800 border-slate-600' : 'bg-transparent border-slate-800 hover:border-slate-600'}`}
+                    style={{
+                      transition: 'border-color 0.7s ease, box-shadow 0.7s ease',
+                      ...(userBlockHover ? (() => {
+                        const c = RAINBOW_COLORS[beamColorIndex];
+                        const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
+                        const p = userGlowProgress;
+                        const spread = 1 + p * 2.5;
+                        const op1 = 0.75 + p * 0.25;
+                        const op2 = 0.6 + p * 0.35;
+                        const op3 = 0.4 + p * 0.5;
+                        return {
+                          borderColor: c,
+                          boxShadow: `0 0 ${24 * spread}px ${c}, 0 0 ${48 * spread}px rgba(${r},${g},${b},${op1}), 0 0 ${90 * spread}px rgba(${r},${g},${b},${op2}), 0 0 ${140 * spread}px rgba(${r},${g},${b},${op3})`,
+                        };
+                      })() : {}),
+                    }}
+                  >
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-600 to-red-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shrink-0">
                     {user.nombre ? user.nombre[0].toUpperCase() : 'U'}
                     </div>
                     <span className="text-sm font-bold text-slate-300 group-hover:text-white truncate max-w-[100px]">
                     {user.nombre?.split(' ')[0] ?? 'Usuario'}
                     </span>
-                    <ChevronDown size={14} className={`text-slate-500 transition-transform ${isUserMenuOpen ? 'rotate-180 text-white' : ''}`}/>
-                </button>
+                    <ChevronDown size={14} className={`text-slate-500 transition-transform shrink-0 ${isUserMenuOpen ? 'rotate-180 text-white' : ''}`}/>
+                  </button>
+                </div>
 
                 {isUserMenuOpen && (
                     <div className="absolute right-0 mt-4 w-72 bg-slate-900 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95 duration-200 ring-1 ring-white/10">
