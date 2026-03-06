@@ -559,6 +559,8 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   const smoothScrollRef = useRef(0);
 
   const [debugOpen, setDebugOpen] = useState(false);
+  const [showDebugByShift, setShowDebugByShift] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
   const [isFreeRoam, setIsFreeRoam] = useState(false);
   const [flySpeed, setFlySpeed] = useState(0.3);
   const [liveCamPos, setLiveCamPos] = useState<V3>([0, 0, 0]);
@@ -581,6 +583,23 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     q: false,
     e: false,
   });
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'ShiftLeft' && e.code !== 'ShiftRight') return;
+      if (typeof window !== 'undefined' && window.innerWidth < 768) return;
+      setShowDebugByShift(v => !v);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     freeRoamRef.current = isFreeRoam;
@@ -1035,7 +1054,15 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
           }}
         />
 
-        {isAdmin && (
+        {/* Filtro estilo TV (solo escritorio): oscurece un poco el fondo como en /login */}
+        <div
+          className="hidden md:block pointer-events-none absolute inset-0 z-[11] bg-black/50 shadow-[inset_0_0_150px_rgba(0,0,0,0.6)]"
+          style={{
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 4px)',
+          }}
+        />
+
+        {(isAdmin || (isDesktop && showDebugByShift)) && (
           <button
             onClick={() => setDebugOpen(o => !o)}
             className={`absolute top-24 left-1/2 -translate-x-1/2 z-50 rounded-xl px-4 py-1.5 text-xs font-semibold border backdrop-blur transition-all duration-200 flex items-center gap-2 ${
@@ -1050,7 +1077,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
           </button>
         )}
 
-        {isAdmin && debugOpen && (
+        {(isAdmin || showDebugByShift) && debugOpen && (
           <DebugPanel
             config={rtConfig}
             onApply={setRtConfig}
