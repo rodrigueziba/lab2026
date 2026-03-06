@@ -28,8 +28,20 @@ export default function Navbar() {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const mobileMenuPanelRef = useRef<HTMLDivElement>(null);
   const userHoverStartRef = useRef<number>(0);
   const userLastColorAdvanceRef = useRef<number>(0);
+
+  // Al abrir el menú móvil, resetear scroll del panel para evitar hueco cuando la página estaba scrolleada
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const el = mobileMenuPanelRef.current;
+    if (el) {
+      el.scrollTop = 0;
+      const t = requestAnimationFrame(() => { el.scrollTop = 0; });
+      return () => cancelAnimationFrame(t);
+    }
+  }, [isMobileMenuOpen]);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -188,8 +200,8 @@ export default function Navbar() {
   const navHeight = 'min-h-[64px] md:min-h-0';
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-[100] ${navHeight} ${navPadding} ${navBg}`}>
-      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full min-h-[64px] md:min-h-0 relative">
+    <nav className={`fixed top-0 left-0 w-full z-[9999] md:z-[100] ${navHeight} ${navPadding} ${navBg}`}>
+      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full min-h-[64px] md:min-h-0 relative z-[9992]">
         
         <div className="flex items-center gap-2">
           <Link href="/" className="text-2xl font-black tracking-tighter text-white group">
@@ -393,13 +405,16 @@ export default function Navbar() {
 
       </div>
       
-      {/* MENÚ MÓVIL: overlay completo bajo la barra, z-index alto para no superponerse con login/contenido */}
+      {/* MENÚ MÓVIL: overlay y panel con z-index alto dentro del nav para que funcionen en cualquier scroll */}
       {isMobileMenuOpen && (
         <>
-          <div className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[90]" onClick={() => setIsMobileMenuOpen(false)} aria-hidden />
-          <div className="md:hidden fixed top-16 left-0 right-0 bottom-0 z-[95] bg-slate-950 overflow-y-auto flex flex-col animate-in slide-in-from-right duration-300">
-            {/* Botón cerrar menú bien visible arriba */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 shrink-0">
+          <div className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[9990]" onClick={() => setIsMobileMenuOpen(false)} aria-hidden />
+          <div
+            ref={mobileMenuPanelRef}
+            className="md:hidden fixed inset-0 z-[9991] bg-slate-950 overflow-y-auto overflow-x-hidden flex flex-col animate-in slide-in-from-right duration-300 pt-16"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 shrink-0 bg-slate-950 sticky top-0 z-10">
               <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Menú</span>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -410,17 +425,18 @@ export default function Navbar() {
               </button>
             </div>
             <div className="p-6 flex flex-col gap-6">
-            {/* Enlaces principales: mismo criterio de activo que en desktop */}
             <MobileNavLink href="/locaciones" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={MapPin} label="Locaciones" />
             <MobileNavLink href="/guia" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Users} label="Prestadores" />
             <MobileNavLink href="/proyectos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Clapperboard} label="Proyectos" />
+
+            <div className="h-px bg-slate-700 my-2" />
+            <MobileNavLink href="/nodos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Atom} label="Nodos" />
 
             {user?.role === 'admin' && (
               <>
                 <div className="h-px bg-slate-700 my-2" />
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Admin</p>
                 <MobileNavLink href="/admin/panel" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label="Panel Admin" />
-                {/* Nodos 3D solo en escritorio; en móvil no se muestra */}
               </>
             )}
 

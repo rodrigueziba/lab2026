@@ -106,7 +106,7 @@ export default function GuiaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-500/30 pt-64 md:pt-48 flex flex-col">
+    <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-500/30 pt-80 md:pt-48 flex flex-col">
       
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -148,8 +148,8 @@ export default function GuiaPage() {
               {/* Filtros y botones (derecha): caja de filtros más estrecha y con espacio respecto al buscador */}
               <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end shrink-0">
                       
-                      {/* Filtros Tipo: en móvil ocupan todo el ancho; en PC caja más estrecha a la derecha */}
-                      <div className="flex flex-1 md:flex-none w-full md:w-[220px] min-w-0 gap-4 md:gap-0 bg-slate-900 p-2 md:p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-hide justify-between md:justify-between">
+                      {/* Filtros Tipo: iconos más grandes; en móvil ocupan todo el ancho */}
+                      <div className="flex flex-1 md:flex-none w-full md:w-[240px] min-w-0 min-h-10 gap-2 md:gap-0 bg-slate-900 p-1.5 md:p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-hide justify-between md:justify-between items-center">
                           {TIPOS_PERFIL.map((tipo) => {
                               const Icon = tipo.icon;
                               const isActive = tipoSeleccionado === tipo.value;
@@ -157,12 +157,12 @@ export default function GuiaPage() {
                                   <button
                                       key={tipo.value}
                                       onClick={() => setTipoSeleccionado(tipo.value)}
-                                      className={`flex-1 min-w-0 md:flex-none md:shrink-0 p-2 rounded-lg transition-all flex items-center justify-center ${
+                                      className={`flex-1 min-w-0 md:flex-none md:shrink-0 p-2.5 md:p-2 rounded-lg transition-all flex items-center justify-center ${
                                           isActive ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'
                                       }`}
                                       title={tipo.label}
                                   >
-                                      {Icon && <Icon size={18}/>}
+                                      {Icon && <Icon size={22} />}
                                   </button>
                               )
                           })}
@@ -171,24 +171,24 @@ export default function GuiaPage() {
                       {/* Separador */}
                       <div className="h-8 w-px bg-slate-800 mx-1 hidden md:block"></div>
 
-                      {/* Botones Acción */}
-                      <div className="flex gap-2 shrink-0">
+                      {/* Botones Acción: algo más compactos para equilibrar la fila */}
+                      <div className="flex gap-1.5 shrink-0 items-center">
                           <Link href="/info">
-                            <button className="bg-blue-500 hover:bg-blue-400 text-white p-2.5 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 border border-blue-400/40 flex items-center justify-center" title="Información">
-                                <HelpCircle size={20} strokeWidth={2.5} />
+                            <button className="bg-blue-500 hover:bg-blue-400 text-white p-2 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 border border-blue-400/40 flex items-center justify-center h-10 w-10" title="Información">
+                                <HelpCircle size={18} strokeWidth={2.5} />
                             </button>
                           </Link>
                           <Link href="/mi-perfil/crear">
-                            <button className="bg-cyan-600 hover:bg-cyan-500 text-white p-2.5 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 border border-cyan-500/30 flex items-center justify-center">
-                                <Plus size={20} strokeWidth={3} />
+                            <button className="bg-cyan-600 hover:bg-cyan-500 text-white p-2 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 border border-cyan-500/30 flex items-center justify-center h-10 w-10">
+                                <Plus size={18} strokeWidth={3} />
                             </button>
                           </Link>
 
                           <button 
                             onClick={handleRandomize}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white p-2.5 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 group border border-emerald-500/30 flex items-center justify-center"
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white p-2 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 group border border-emerald-500/30 flex items-center justify-center h-10 w-10"
                           >
-                              <Dice5 size={20} className="group-hover:rotate-180 transition-transform duration-500"/>
+                              <Dice5 size={18} className="group-hover:rotate-180 transition-transform duration-500"/>
                           </button>
                       </div>
                   </div>
