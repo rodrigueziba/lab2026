@@ -29,8 +29,8 @@ export default function TopologyBackground() {
     // ── Config ────────────────────────────────────────────────────────────────
     const LINES       = 18;
     const STEPS       = 140;
-    const BASE_SPEED  = 1.055;   // constant serpentine speed — never stops
-    const WAVE_AMP    = 60;      // base swell amplitude
+    const BASE_SPEED  = 0.855;   // constant serpentine speed — never stops
+    const WAVE_AMP    = 35;      // base swell amplitude
     const MOUSE_RADIUS= 160;     // px around cursor that repels lines
     const MOUSE_FORCE = 38;      // max px displacement from mouse
 

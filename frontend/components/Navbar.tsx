@@ -144,9 +144,11 @@ export default function Navbar() {
     );
   };
 
-  // En móvil la barra mantiene siempre la misma altura; en escritorio no se retrae ni anima al hacer scroll
+  // En móvil al hacer scroll aparece fondo; en escritorio el fondo se mantiene siempre transparente
   const navPadding = 'py-4 md:py-6';
-  const navBg = isScrolled ? 'bg-slate-950/95 md:bg-slate-950/80 backdrop-blur-xl border-b border-white/5 shadow-2xl' : 'bg-transparent';
+  const navBg = isScrolled
+    ? 'bg-slate-950/95 backdrop-blur-xl border-b border-white/5 shadow-2xl md:bg-transparent md:backdrop-blur-none md:shadow-none'
+    : 'bg-transparent';
   const navHeight = 'min-h-[64px] md:min-h-0';
 
   return (
