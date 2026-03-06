@@ -12,9 +12,9 @@ const WHO_CARDS = [
 ];
 
 const STEPS = [
-  { num: 1, title: "Creá tu cuenta",                  desc: "Ingresá a la plataforma y completá el formulario con tu email y contraseña. El acceso es gratuito y tus datos están protegidos con cifrado bcrypt y autenticación JWT.",                    tags: ["Email + contraseña","Verificación segura","Sin costo"],                color: "gold"   },
+  { num: 1, title: "Creá tu cuenta",                  desc: "Ingresá a la plataforma y completá el formulario con tu email y contraseña. El acceso es gratuito y tus datos están protegidos con cifrado bcrypt y autenticación JWT. Tus datos de contacto nunca son públicos",                    tags: ["Email + contraseña","Verificación segura","Sin costo"],                color: "gold"   },
   { num: 2, title: "Completá tu perfil de prestador", desc: "Cargá tu categoría, especialidad, descripción de servicios, zona de trabajo (Ushuaia, Tolhuin, Río Grande) y datos de contacto.",                                                             tags: ["Categoría profesional","Zona geográfica","Portfolio","Contacto"],       color: "blue"   },
-  { num: 3, title: "Aparecés en el directorio",       desc: "Tu perfil queda visible en la Guía de Prestadores. Cualquier producción que busque servicios en TDF puede encontrarte y contactarte directamente.",                                            tags: ["Directorio público","Búsqueda por categoría","Contacto directo"],       color: "purple" },
+  { num: 3, title: "Aparecés en el directorio",       desc: "Tu perfil queda visible en la Guía de Prestadores. Cualquier producción que busque servicios en TDF puede encontrarte y solicitarte los datos de contacto.",                                            tags: ["Directorio público","Búsqueda por categoría","Solicitud de contacto"],       color: "purple" },
   { num: 4, title: "Explorá el mapa nodal 3D",        desc: "Visualizá en tiempo real cómo tu nodo se conecta con proyectos, locaciones y otros prestadores mediante físicas de grafos 3D y shaders WebGL.",                                               tags: ["Grafo 3D interactivo","Conexiones en tiempo real","WebGL"],             color: "gold"   },
   { num: 5, title: "Conectate con proyectos",         desc: "Explorá la Cartelera de Proyectos: producciones audiovisuales activas que buscan servicios, técnicos o locaciones con sus etapas y roles.",                                                   tags: ["Estado del proyecto","Roles disponibles","Tipo de producción"],         color: "blue"   },
   { num: 6, title: "Gestioná tu presencia",           desc: "Actualizá tu perfil en cualquier momento: nuevos servicios, información de contacto y mantené tu nodo activo dentro de la red de la Film Commission.",                                        tags: ["Edición de perfil","Historial de actividad","Panel personal"],          color: "purple" },
@@ -22,7 +22,7 @@ const STEPS = [
 
 const FEATURES = [
   { icon: "📋", color: "gold",   title: "Perfil de Prestador",    desc: "Creá tu ficha profesional con categoría, servicios, zona de cobertura y datos de contacto. Aparecés en búsquedas." },
-  { icon: "🗺️", color: "blue",   title: "Directorio Público",     desc: "Formá parte de la guía oficial de prestadores de TDF. Filtrá por especialidad, zona o tipo de servicio." },
+  { icon: "🗺️", color: "blue",   title: "Directorio Público",     desc: "Formá parte de la guía de prestadores de TDF. Filtrá por especialidad, zona o tipo de servicio." },
   { icon: "🌐", color: "purple", title: "Mapa Nodal 3D",           desc: "Visualización interactiva que muestra tu nodo y sus conexiones con proyectos, locaciones y otros prestadores." },
   { icon: "🎞️", color: "green",  title: "Cartelera de Proyectos", desc: "Accedé al catálogo de producciones activas: largometrajes, series, documentales, publicidades y más." },
   { icon: "📍", color: "gold",   title: "Catálogo de Locaciones",  desc: "Explorá los espacios disponibles para filmación en Ushuaia, Tolhuin y Río Grande." },
@@ -31,7 +31,7 @@ const FEATURES = [
 
 const TIPS = [
   { icon: "📝", title: "Completá todos los campos",      body: "Los perfiles completos aparecen primero en las búsquedas." },
-  { icon: "📍", title: "Indicá tu zona de cobertura",   body: "Seleccioná si trabajás en Ushuaia, Tolhuin, Río Grande o toda la provincia." },
+  { icon: "📍", title: "Indicá tu zona de cobertura",   body: "Seleccioná si trabajás en Ushuaia, Tolhuin, Río Grande." },
   { icon: "🔄", title: "Mantené el perfil actualizado", body: "Actualizá tu disponibilidad y servicios para mantenerte activo en el grafo nodal." },
   { icon: "🎯", title: "Elegí bien tu categoría",       body: "La categoría define en qué búsquedas aparecer. Detallá el resto en la descripción." },
   { icon: "🌐", title: "Revisá la cartelera",           body: "Los proyectos en preproducción son los que más buscan prestadores nuevos." },
