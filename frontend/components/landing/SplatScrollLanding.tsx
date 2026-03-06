@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three';
 import { SplatMesh, SparkRenderer } from '@sparkjsdev/spark';
 import Link from 'next/link';
+import { MapPin, Users, Clapperboard } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN
@@ -106,24 +107,37 @@ const SPLAT_RESPONSE = 2.4;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const CARDS = [
+const CARDS: {
+  key: string;
+  title: string;
+  subtitle: string;
+  href: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  hoverGlow: string; // Tailwind drop-shadow / ring color class
+}[] = [
   {
     key: 'locaciones',
     title: 'Locaciones',
     subtitle: 'Glaciares, bosques y costa patagónica al alcance de tu producción.',
     href: '/locaciones',
+    icon: MapPin,
+    hoverGlow: 'group-hover:drop-shadow-[0_0_12px_rgba(34,197,94,0.8)] group-hover:text-emerald-400',
   },
   {
     key: 'guia',
     title: 'Guía de Prestadores',
     subtitle: 'Todo lo que necesitás para filmar en el fin del mundo.',
     href: '/guia',
+    icon: Users,
+    hoverGlow: 'group-hover:drop-shadow-[0_0_12px_rgba(249,115,22,0.9)] group-hover:text-orange-400',
   },
   {
     key: 'proyectos',
     title: 'Proyectos',
     subtitle: 'Gestión y busqueda de producciones audiovisuales en Tierra del Fuego.',
     href: '/proyectos',
+    icon: Clapperboard,
+    hoverGlow: 'group-hover:drop-shadow-[0_0_12px_rgba(139,92,246,0.9)] group-hover:text-violet-400',
   },
 ];
 
@@ -1045,6 +1059,13 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
               background: radial-gradient(ellipse 50% 50% at 50% 50%, transparent 0%, transparent 55%, rgba(6,6,15,0.2) 68%, rgba(6,6,15,0.6) 82%, rgba(6,6,15,0.92) 92%, #06060f 100%) !important;
             }
           }
+          @keyframes card-icon-glow {
+            0%, 100% { opacity: 1; transform: scale(1.1); }
+            50% { opacity: 0.85; transform: scale(1.15); }
+          }
+          .group:hover .card-icon-glow-pulse {
+            animation: card-icon-glow 2s ease-in-out infinite;
+          }
         `}</style>
         <div
           className="pointer-events-none absolute inset-0 z-10 hero-vignette"
@@ -1097,12 +1118,12 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
         )}
 
         <div
-          className={`pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-6 transition-opacity duration-700 ${
-            isHeroVisible ? 'opacity-100' : 'opacity-0'
+          className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-opacity duration-700 ${
+            isHeroVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
         >
           <div
-            className={isHeroVisible ? 'pointer-events-auto' : ''}
+            className={isHeroVisible ? 'pointer-events-auto' : 'pointer-events-none'}
             onMouseEnter={() => setHeroMouse(s => ({ ...s, hover: true }))}
             onMouseLeave={() => setHeroMouse({ nx: 0.5, ny: 0.5, hover: false })}
             onMouseMove={onHeroMove}
@@ -1149,7 +1170,9 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
             </h1>
 
             <p className="mt-3 sm:mt-4 text-center text-xs sm:text-sm text-white/50 tracking-widest uppercase">
-              Patagonia · Argentina
+              <span className="transition-all duration-300 hover:text-orange-400 hover:drop-shadow-[0_0_10px_rgba(249,115,22,0.9)] cursor-default">Patagonia</span>
+              <span className="mx-1.5">·</span>
+              <span className="transition-all duration-300 hover:text-blue-400 hover:drop-shadow-[0_0_10px_rgba(30,64,175,0.9)] cursor-default">Argentina</span>
             </p>
 
             <div
@@ -1177,28 +1200,37 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
           const slotStart = (i + 1) * cardSlot;
           const slotEnd = (i + 2) * cardSlot;
           const inSlot = scrollProgress >= slotStart && scrollProgress < slotEnd;
+          const Icon = card.icon;
 
           return (
             <div
               key={card.key}
-              className="pointer-events-none absolute inset-0 z-20 flex items-end sm:items-center px-5 sm:px-12 md:px-20 pb-20 sm:pb-0"
+              className={`absolute inset-0 z-20 flex items-end sm:items-center justify-center sm:justify-start px-5 sm:px-12 md:px-20 pb-20 sm:pb-0 ${inSlot ? 'pointer-events-auto' : 'pointer-events-none'} group`}
               style={{
                 opacity: inSlot ? 1 : 0,
                 transform: inSlot ? 'translateY(0)' : 'translateY(28px)',
                 transition: 'opacity 0.55s ease, transform 0.55s ease',
               }}
             >
-              <Link href={card.href} className="w-full max-w-xs sm:max-w-sm pointer-events-auto group block focus:outline-none">
-                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 bg-black/30 backdrop-blur-xl shadow-2xl shadow-black/50 transition-all duration-300 group-hover:border-white/25 group-hover:bg-black/45 group-hover:scale-[1.02] group-focus-visible:ring-2 group-focus-visible:ring-indigo-500">
-                  <div className="h-px w-full bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent transition-all duration-300 group-hover:via-indigo-400/80" />
-                  <div className="p-6 sm:p-8">
-                    <h2 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight text-white">
+              <Link
+                href={card.href}
+                className="w-full max-w-xs sm:max-w-sm mx-auto sm:mx-0 md:absolute md:inset-0 md:max-w-none md:mx-0 flex items-end sm:items-center justify-center sm:justify-start px-5 sm:px-12 md:px-20 pb-20 sm:pb-0 focus:outline-none"
+              >
+                <span className="sr-only">{card.title}</span>
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_10px_30px_rgba(0,0,0,0.3)] transition-all duration-500 group-hover:border-orange-500/40 group-hover:bg-slate-900/80 group-hover:scale-[1.02] group-hover:-translate-y-1 group-hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.15),_0_0_40px_rgba(249,115,22,0.2),_0_20px_40px_rgba(0,0,0,0.4)] group-focus-visible:ring-2 group-focus-visible:ring-orange-500 w-full max-w-xs sm:max-w-sm mx-auto sm:mx-0">
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                  <div className="h-px w-full bg-gradient-to-r from-transparent via-orange-500/30 to-transparent transition-all duration-300 group-hover:via-orange-400/70" />
+                  <div className="relative z-10 p-6 sm:p-8">
+                    <div className={`card-icon-glow-pulse mb-4 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center text-slate-400 transition-all duration-500 group-hover:scale-110 ${card.hoverGlow}`}>
+                      <Icon size={26} className="sm:w-7 sm:h-7" />
+                    </div>
+                    <h2 className="text-3xl sm:text-4xl font-bold leading-tight tracking-tight text-white">
                       {card.title}
                     </h2>
-                    <p className="mt-2.5 text-sm sm:text-base text-white/55 leading-relaxed">
+                    <p className="mt-2.5 text-sm sm:text-base text-white/70 leading-relaxed text-justify">
                       {card.subtitle}
                     </p>
-                    <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-indigo-300 group-hover:text-indigo-200 transition-colors">
+                    <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-orange-400 group-hover:text-orange-300 transition-colors group-hover:drop-shadow-[0_0_8px_rgba(249,115,22,0.4)]">
                       Ver más
                       <svg
                         width="12"

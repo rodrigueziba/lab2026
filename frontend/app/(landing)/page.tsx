@@ -114,7 +114,7 @@ function ComoFuncionaSection() {
                 <UserPlus size={28} />
               </div>
               <h4 className="relative z-10 text-xl font-bold text-white mb-3">1. Creá tu Perfil</h4>
-              <p className="relative z-10 text-sm text-slate-400 leading-relaxed">
+              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">
                 Registrate y armá tu currículum digital. Podés crear múltiples perfiles (ej. como Sonidista freelance y como Productora). Utilizá nuestra IA integrada para redactar tu biografía profesional.
               </p>
             </motion.div>
@@ -127,7 +127,7 @@ function ComoFuncionaSection() {
                 <Search size={28} />
               </div>
               <h4 className="relative z-10 text-xl font-bold text-white mb-3">2. Hacete Visible</h4>
-              <p className="relative z-10 text-sm text-slate-400 leading-relaxed">
+              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">
                 Al activar tu perfil, vas a aparecer automáticamente en la <strong>Guía de Talento</strong> pública. Directores y productoras van a poder filtrarte por ciudad y rubro para contratarte directamente.
               </p>
             </motion.div>
@@ -140,7 +140,7 @@ function ComoFuncionaSection() {
                 <Briefcase size={28} />
               </div>
               <h4 className="relative z-10 text-xl font-bold text-white mb-3">3. Encontrá Trabajo</h4>
-              <p className="relative z-10 text-sm text-slate-400 leading-relaxed">
+              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">
                 Revisá la <strong>Cartelera de Proyectos</strong>. Vas a poder ver los rodajes activos en la provincia y postularte con un solo clic a los puestos que las productoras están solicitando.
               </p>
             </motion.div>
@@ -153,7 +153,7 @@ function ComoFuncionaSection() {
                 <Bell size={28} />
               </div>
               <h4 className="relative z-10 text-xl font-bold text-white mb-3">4. Conectá</h4>
-              <p className="relative z-10 text-sm text-slate-400 leading-relaxed">
+              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">
                 Recibí notificaciones en tiempo real cuando un proyecto acepte tu postulación o cuando alguien solicite tus datos de contacto para una producción.
               </p>
             </motion.div>
@@ -174,7 +174,7 @@ function ComoFuncionaSection() {
               <span className="p-2 bg-slate-800 rounded-lg text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"><MapPin size={20}/></span>
               Catálogo de Locaciones
             </h4>
-            <p className="text-slate-400 mb-6 relative z-10 leading-relaxed">
+            <p className="text-slate-400 mb-6 relative z-10 leading-relaxed text-justify">
               ¿Conocés un lugar increíble para filmar? Como usuario registrado, podés proponer escenarios naturales, urbanos o abandonados. Subí fotos, sumá coordenadas y ayudá a enriquecer el mapa interactivo de Tierra del Fuego.
             </p>
             <Link href="/locaciones">
@@ -195,7 +195,7 @@ function ComoFuncionaSection() {
               <span className="p-2 bg-slate-800 rounded-lg text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"><Video size={20}/></span>
               Si sos Productora
             </h4>
-            <p className="text-slate-400 mb-6 relative z-10 leading-relaxed">
+            <p className="text-slate-400 mb-6 relative z-10 leading-relaxed text-justify">
               Usá la plataforma para publicar tus propios proyectos. Definí qué perfiles técnicos o artísticos necesitás, especificá si es un proyecto remunerado o colaborativo, y gestioná cómodamente a todos tus postulantes.
             </p>
             <Link href="/proyectos">
