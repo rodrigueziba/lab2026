@@ -28,6 +28,13 @@ const ORBIT_SPEED_3D  = { locacion: 0.009, proyecto: 0.006, prestador: 0.003 };
 const ORBIT_RADIUS_2D = { locacion: 48,  proyecto: 82,  prestador: 118 };
 const ORBIT_SPEED_2D  = { locacion: 0.012, proyecto: 0.007, prestador: 0.004 };
 
+// Optimización 3D: ratio limitado + resolución dinámica por FPS
+const MAX_PIXEL_RATIO_3D = 1.5;
+const FPS_LOW_3D = 30;
+const FPS_HIGH_3D = 55;
+const FPS_SAMPLES_3D = 60;
+const PIXEL_RATIO_DROP_3D = 0.5;
+
 function normalizarCiudad(ciudad?: string): string {
   if (!ciudad) return 'Ushuaia';
   const l = ciudad.toLowerCase();
@@ -539,12 +546,17 @@ function MobileTooltip({ node, onClose }: { node: TooltipData | null; onClose: (
    COMPONENTE PRINCIPAL
 ═══════════════════════════════════════════════════════════════ */
 export default function AdminDashboardPage() {
-  const graphRef        = useRef<any>(null); // ¡CORRECCIÓN APLICADA AQUÍ! Se añadió (null)
+  const graphRef        = useRef<any>(null);
   const iframeRef       = useRef<HTMLIFrameElement>(null);
   const waveCounterRef  = useRef(0);
   const speedRef        = useRef(1.0);
   const distortionRef   = useRef(0.0);
   const boostRef        = useRef(0);
+  const renderer3DRef   = useRef<THREE.WebGLRenderer | null>(null);
+  const frameTime3DRef  = useRef<number[]>([]);
+  const pixelRatio3DRef = useRef(MAX_PIXEL_RATIO_3D);
+  const lowFps3DRef     = useRef(0);
+  const highFps3DRef    = useRef(0);
 
   const [loading, setLoading]             = useState(true);
   const [graphData, setGraphData]         = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
@@ -568,6 +580,22 @@ export default function AdminDashboardPage() {
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  // ── 3D: limitar pixel ratio y preparar resolución dinámica (cuando el grafo está listo)
+  useEffect(() => {
+    if (loading || isMobile) return;
+    const t = setTimeout(() => {
+      const g = graphRef.current;
+      const renderer = typeof g?.renderer === 'function' ? g.renderer() : null;
+      if (renderer && renderer.setPixelRatio) {
+        renderer3DRef.current = renderer;
+        const initial = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, MAX_PIXEL_RATIO_3D);
+        pixelRatio3DRef.current = initial;
+        renderer.setPixelRatio(initial);
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [loading, isMobile]);
 
   // ── Carga de datos ─────────────────────────────────────────
   useEffect(() => {
@@ -751,10 +779,54 @@ export default function AdminDashboardPage() {
     setHoveredNode({ name:node.name, type:node.type, subTipo:node.subTipo, ciudad:node.ciudad, categoria:node.categoria, tipo:node.tipo });
   }, []);
 
-  // ── onEngineTick: órbita real alrededor del ancla ──────────
+  // ── onEngineTick: órbita + optimización resolución dinámica por FPS ──────────
   const handleEngineTick = useCallback(() => {
     const now = performance.now();
     const boosting = now < boostRef.current;
+
+    // Obtener renderer 3D una vez (por si no estaba listo en el useEffect)
+    let renderer = renderer3DRef.current;
+    if (!renderer && graphRef.current) {
+      const g = graphRef.current;
+      renderer = typeof g.renderer === 'function' ? g.renderer() : null;
+      if (renderer) {
+        renderer3DRef.current = renderer;
+        const initial = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, MAX_PIXEL_RATIO_3D);
+        pixelRatio3DRef.current = initial;
+        renderer.setPixelRatio(initial);
+      }
+    }
+    if (renderer) {
+      const ft = frameTime3DRef.current;
+      ft.push(now);
+      if (ft.length > FPS_SAMPLES_3D) ft.shift();
+      const fps = ft.length >= 10 ? 1000 / ((ft[ft.length - 1] - ft[0]) / (ft.length - 1)) : 60;
+      const maxRatio = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, MAX_PIXEL_RATIO_3D);
+      if (fps < FPS_LOW_3D) {
+        lowFps3DRef.current++;
+        highFps3DRef.current = 0;
+        if (lowFps3DRef.current >= FPS_SAMPLES_3D && pixelRatio3DRef.current > 0.5) {
+          pixelRatio3DRef.current = Math.max(0.5, pixelRatio3DRef.current * PIXEL_RATIO_DROP_3D);
+          renderer.setPixelRatio(pixelRatio3DRef.current);
+          const size = new THREE.Vector2();
+          renderer.getSize(size);
+          if (size.x && size.y) renderer.setSize(size.x, size.y);
+        }
+      } else if (fps > FPS_HIGH_3D) {
+        highFps3DRef.current++;
+        lowFps3DRef.current = 0;
+        if (highFps3DRef.current >= FPS_SAMPLES_3D * 2 && pixelRatio3DRef.current < maxRatio) {
+          pixelRatio3DRef.current = Math.min(maxRatio, pixelRatio3DRef.current * 1.25);
+          renderer.setPixelRatio(pixelRatio3DRef.current);
+          const size = new THREE.Vector2();
+          renderer.getSize(size);
+          if (size.x && size.y) renderer.setSize(size.x, size.y);
+        }
+      } else {
+        lowFps3DRef.current = 0;
+        highFps3DRef.current = 0;
+      }
+    }
 
     // Mapa de posiciones de anclas
     const anclas: Record<string, { x:number; y:number; z:number }> = {};

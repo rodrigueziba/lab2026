@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
       poll: 1000,
       aggregateTimeout: 300,
     };
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "onnxruntime-node$": false,
+    };
 
     /**
      * FIX: evita que Next/Webpack aplique generator.filename a asset/inline

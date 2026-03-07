@@ -1,5 +1,6 @@
 # frontend/Dockerfile
 FROM node:20-alpine AS builder
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
@@ -10,6 +11,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
 FROM node:20-alpine AS runner
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.next ./.next
