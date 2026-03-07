@@ -256,7 +256,7 @@ export default function Page() {
   }, []);
 
   return (
-    <main className="relative bg-transparent">
+    <main className="relative min-h-[100dvh] bg-slate-950">
       {/* 1. Componente 3D principal */}
       <SplatScrollLanding isAdmin={isAdmin} />
 

@@ -1115,10 +1115,10 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="relative text-white" style={{ height: `${N_SECTIONS * 100}svh` }}>
+    <div className="relative text-white bg-slate-950 min-h-[100dvh] md:min-h-0" style={{ height: `${N_SECTIONS * 100}svh` }}>
       <div
         ref={canvasWrapRef}
-        className={`fixed inset-0 h-[100svh] w-full ${isFreeRoam ? 'cursor-crosshair' : 'cursor-default'}`}
+        className={`fixed inset-0 h-[100dvh] w-full min-h-[100dvh] ${isFreeRoam ? 'cursor-crosshair' : 'cursor-default'}`}
       >
         <style>{`
           @media (max-width: 767px) {
