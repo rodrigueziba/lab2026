@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { ChevronLeft, ChevronRight, Search, MapPin, Mountain, ArrowRight, Filter } from 'lucide-react';
+import DepthAwareImage from '@/components/DepthAwareImage';
 
 // Cargamos el mapa solo en el cliente
 const MapaTDF = dynamic(() => import('../../components/MapaTDF'), { 
@@ -213,7 +214,13 @@ export default function CatalogoLocacionesPage() {
                         <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-600/50 to-red-600/50 rounded-2xl opacity-0 group-hover:opacity-100 blur transition duration-500"></div>
                         <div className="relative flex bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-orange-500/30 transition-all shadow-xl h-40 md:h-48 group-hover:bg-slate-900/90">
                           <div className="w-2/5 relative overflow-hidden">
-                            <img src={loc.foto || 'https://via.placeholder.com/400x400'} alt={loc.nombre} className="w-full h-full object-cover group-hover:scale-110 transition duration-700 brightness-90 group-hover:brightness-110"/>
+                            <DepthAwareImage
+                              imageUrl={loc.foto || 'https://via.placeholder.com/400x400'}
+                              depthUrl={loc.fotoProfundidad}
+                              alt={loc.nombre}
+                              className="w-full h-full object-cover group-hover:scale-110 transition duration-700 brightness-90 group-hover:brightness-110"
+                              containerClassName="w-full h-full overflow-hidden"
+                            />
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent to-slate-900 mix-blend-multiply opacity-50"></div>
                           </div>
                           <div className="w-3/5 p-6 flex flex-col justify-center relative z-10">

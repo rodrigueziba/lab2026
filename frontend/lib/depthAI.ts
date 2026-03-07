@@ -3,6 +3,18 @@ import { pipeline, env } from '@xenova/transformers';
 // Le decimos a la librería que no busque modelos locales y los descargue de HuggingFace
 env.allowLocalModels = false;
 
+/** Convierte data URL (base64) de la IA a File para subir a Supabase */
+export function dataURLtoFile(dataurl: string, filename: string): File {
+  const arr = dataurl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const bstr = atob(arr[1] ?? '');
+  const n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  for (let i = 0; i < n; i++) u8arr[i] = bstr.charCodeAt(i);
+  return new File([u8arr], filename, { type: mime });
+}
+
 class DepthPipeline {
   static task = 'depth-estimation' as const;
   static model = 'Xenova/depth-anything-small-hf';

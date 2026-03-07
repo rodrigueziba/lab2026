@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { 
   User, Briefcase, MapPin, Mail, Phone, Globe, 
-  Image as ImageIcon, Loader2, CheckCircle, Tag
+  Image as ImageIcon, Loader2, CheckCircle, Tag, Palette
 } from 'lucide-react';
 
 // Inicializamos Supabase
@@ -34,8 +34,14 @@ export default function RegistroPrestadorPage() {
     email: '',
     telefono: '',
     web: '',
+    instagram: '',
+    facebook: '',
+    twitter: '',
+    linkedin: '',
+    tiktok: '',
     foto: '',
-    ciudad: 'Ushuaia', // Valor por defecto
+    ciudad: 'Ushuaia',
+    colorTema: '#ea580c',
   });
 
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -89,10 +95,19 @@ export default function RegistroPrestadorPage() {
     setLoading(true);
 
     let fotoUrl = formData.foto;
-
+    let fotoProfundidad: string | undefined;
     if (archivo) {
       const urlSubida = await uploadImage(archivo);
       if (urlSubida) fotoUrl = urlSubida;
+      try {
+        const objectUrl = URL.createObjectURL(archivo);
+        const { generateDepthMap, dataURLtoFile } = await import('@/lib/depthAI');
+        const depthBase64 = await generateDepthMap(objectUrl);
+        URL.revokeObjectURL(objectUrl);
+        const depthFile = dataURLtoFile(depthBase64, `depth_${archivo.name}`);
+        const dUrl = await uploadImage(depthFile);
+        if (dUrl) fotoProfundidad = dUrl;
+      } catch (_) {}
     }
 
     try {
@@ -103,7 +118,17 @@ export default function RegistroPrestadorPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ ...formData, foto: fotoUrl })
+        body: JSON.stringify({
+          ...formData,
+          foto: fotoUrl,
+          fotoProfundidad,
+          instagram: formData.instagram || undefined,
+          facebook: formData.facebook || undefined,
+          twitter: formData.twitter || undefined,
+          linkedin: formData.linkedin || undefined,
+          tiktok: formData.tiktok || undefined,
+          colorTema: formData.colorTema || undefined,
+        })
       });
 
       if (res.ok) {
@@ -200,8 +225,16 @@ export default function RegistroPrestadorPage() {
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">▼</div>
               </div>
             </div>
-            {/* --------------------------- */}
 
+            <div className="group">
+              <label className="block text-xs font-bold uppercase text-slate-500 mb-2 pl-1 group-focus-within:text-blue-400 transition-colors flex items-center gap-2">
+                <Palette size={14}/> Color de tu tarjeta en la guía
+              </label>
+              <div className="flex items-center gap-4 bg-slate-950 border border-slate-800 p-3 rounded-xl max-w-xs">
+                <input type="color" name="colorTema" value={formData.colorTema} onChange={handleChange} className="w-12 h-10 rounded cursor-pointer border border-slate-700 bg-transparent p-0" />
+                <span className="text-slate-400 text-sm font-mono">{formData.colorTema}</span>
+              </div>
+            </div>
           </div>
 
           {/* SECCIÓN 2: BIOGRAFÍA */}
@@ -241,6 +274,17 @@ export default function RegistroPrestadorPage() {
               <input name="web" type="text" placeholder="https://..."
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition-all text-sm"
                 onChange={handleChange} />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-xs font-bold uppercase text-slate-500 mb-3 pl-1">Redes sociales (URL o @usuario)</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <input name="instagram" type="text" value={formData.instagram} placeholder="Instagram" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-pink-500 transition-all text-sm placeholder:text-slate-600" onChange={handleChange} />
+              <input name="facebook" type="text" value={formData.facebook} placeholder="Facebook" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition-all text-sm placeholder:text-slate-600" onChange={handleChange} />
+              <input name="twitter" type="text" value={formData.twitter} placeholder="X / Twitter" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-sky-400 transition-all text-sm placeholder:text-slate-600" onChange={handleChange} />
+              <input name="linkedin" type="text" value={formData.linkedin} placeholder="LinkedIn" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-blue-600 transition-all text-sm placeholder:text-slate-600" onChange={handleChange} />
+              <input name="tiktok" type="text" value={formData.tiktok} placeholder="TikTok" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-slate-300 transition-all text-sm placeholder:text-slate-600" onChange={handleChange} />
             </div>
           </div>
 

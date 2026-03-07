@@ -2,6 +2,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
+import DepthAwareImage from '@/components/DepthAwareImage';
 import { 
   Save, Trash2, Link as LinkIcon, Calendar, DollarSign, 
   GraduationCap, Film, Briefcase, X, Image as ImageIcon, Loader2, MapPin, ArrowLeft 
@@ -32,6 +33,7 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
     esEstudiante: false,
     esRemunerado: false,
     foto: '', // Poster principal
+    fotoProfundidad: '',
   });
 
   const [referencias, setReferencias] = useState(['']);
@@ -63,7 +65,8 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
           fechaFin: data.fechaFin ? data.fechaFin.split('T')[0] : '',
           esEstudiante: data.esEstudiante,
           esRemunerado: data.esRemunerado,
-          foto: data.foto || ''
+          foto: data.foto || '',
+          fotoProfundidad: data.fotoProfundidad || ''
         });
 
         // Rellenar listas
@@ -117,6 +120,7 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
       const token = localStorage.getItem('token');
       
       let fotoUrl = formData.foto;
+      let fotoProfundidad: string | undefined = formData.fotoProfundidad || undefined;
       if (archivo) {
         const fileExt = archivo.name.split('.').pop();
         const fileName = `poster-${Date.now()}.${fileExt}`;
@@ -125,11 +129,26 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
           const { data } = supabase.storage.from('proyectos').getPublicUrl(fileName);
           fotoUrl = data.publicUrl;
         }
+        try {
+          const objectUrl = URL.createObjectURL(archivo);
+          const { generateDepthMap, dataURLtoFile } = await import('@/lib/depthAI');
+          const depthBase64 = await generateDepthMap(objectUrl);
+          URL.revokeObjectURL(objectUrl);
+          const depthFile = dataURLtoFile(depthBase64, `depth_${archivo.name}`);
+          const dExt = depthFile.name.split('.').pop();
+          const dName = `depth-${Date.now()}.${dExt}`;
+          const { error: errD } = await supabase.storage.from('proyectos').upload(dName, depthFile);
+          if (!errD) {
+            const { data: dData } = supabase.storage.from('proyectos').getPublicUrl(dName);
+            fotoProfundidad = dData.publicUrl;
+          }
+        } catch (_) {}
       }
 
       const payload = {
         ...formData,
         foto: fotoUrl,
+        fotoProfundidad,
         referencias: referencias.filter(r => r.trim() !== ''),
         // Nota: La actualización de puestos anidados compleja se omite en este MVP simple,
         // Enviamos los datos básicos. Para puestos, lo ideal es una gestión separada o un backend avanzado.
@@ -185,7 +204,9 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
             {/* FOTO POSTER */}
             <div className="mb-8 flex gap-6 items-start">
                <div className="w-32 h-48 bg-slate-950 border border-slate-800 rounded-lg overflow-hidden shrink-0">
-                  {preview ? <img src={preview} className="w-full h-full object-cover"/> : <div className="flex h-full items-center justify-center text-xs text-slate-600">Sin Foto</div>}
+                  {preview ? (
+                    <DepthAwareImage imageUrl={preview} depthUrl={preview === formData.foto ? formData.fotoProfundidad : undefined} alt="Poster" className="w-full h-full object-cover" containerClassName="w-full h-full overflow-hidden" />
+                  ) : <div className="flex h-full items-center justify-center text-xs text-slate-600">Sin Foto</div>}
                </div>
                <div>
                  <label className="block text-xs font-bold text-slate-400 mb-2">PORTADA / POSTER</label>

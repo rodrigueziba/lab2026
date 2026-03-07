@@ -2,6 +2,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
+import DepthAwareImage from '@/components/DepthAwareImage';
 import { 
   User, Briefcase, Mail, Phone, Globe, MapPin, 
   Camera, Save, Loader2, ArrowLeft, Palette, 
@@ -40,7 +41,13 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
     email: '',
     telefono: '',
     web: '',
+    instagram: '',
+    facebook: '',
+    twitter: '',
+    linkedin: '',
+    tiktok: '',
     foto: '',
+    fotoProfundidad: '',
     videoReel: '',
     ciudad: 'Ushuaia',
     colorTema: '#ea580c',
@@ -78,7 +85,13 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
                 email: data.email || '',
                 telefono: data.telefono || '',
                 web: data.web || '',
+                instagram: data.instagram || '',
+                facebook: data.facebook || '',
+                twitter: data.twitter || '',
+                linkedin: data.linkedin || '',
+                tiktok: data.tiktok || '',
                 foto: data.foto || '',
+                fotoProfundidad: data.fotoProfundidad || '',
                 videoReel: data.videoReel || '',
                 ciudad: data.ciudad || 'Ushuaia',
                 colorTema: data.colorTema || '#ea580c',
@@ -160,10 +173,19 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
     
     try {
       let finalFoto = formData.foto;
-      let finalGaleria = [...formData.galeria]; // Empezamos con las que ya existían
+      let finalFotoProfundidad: string | undefined = formData.fotoProfundidad || undefined;
+      let finalGaleria = [...formData.galeria];
 
       if (newFoto) {
         finalFoto = await uploadImageToSupabase(newFoto);
+        try {
+          const objectUrl = URL.createObjectURL(newFoto);
+          const { generateDepthMap, dataURLtoFile } = await import('@/lib/depthAI');
+          const depthBase64 = await generateDepthMap(objectUrl);
+          URL.revokeObjectURL(objectUrl);
+          const depthFile = dataURLtoFile(depthBase64, `depth_${newFoto.name}`);
+          finalFotoProfundidad = await uploadImageToSupabase(depthFile);
+        } catch (_) {}
       }
 
       if (newGaleriaFiles.length > 0) {
@@ -181,6 +203,7 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
         body: JSON.stringify({
             ...formData,
             foto: finalFoto,
+            fotoProfundidad: finalFotoProfundidad,
             galeria: finalGaleria
         })
       });
@@ -232,7 +255,7 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
                     <div className="shrink-0 flex flex-col items-center gap-3">
                         <div className="w-32 h-32 rounded-full bg-slate-950 border-2 border-slate-700 overflow-hidden flex items-center justify-center relative group">
                             {previewFoto ? (
-                                <img src={previewFoto} className="w-full h-full object-cover"/>
+                                <DepthAwareImage imageUrl={previewFoto} depthUrl={previewFoto === formData.foto ? formData.fotoProfundidad : undefined} alt="Perfil" className="w-full h-full object-cover" containerClassName="w-full h-full rounded-full overflow-hidden" />
                             ) : (
                                 <User size={40} className="text-slate-600"/>
                             )}
@@ -382,6 +405,16 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
                             <option value="Tolhuin">Tolhuin</option>
                             <option value="Antártida">Antártida</option>
                         </select>
+                    </div>
+                </div>
+                <div className="mt-6">
+                    <label className="block text-sm font-bold text-slate-400 mb-3">Redes sociales (URL o @usuario)</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <input name="instagram" type="text" value={formData.instagram} placeholder="Instagram" onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl focus:border-pink-500 outline-none transition placeholder:text-slate-600" />
+                        <input name="facebook" type="text" value={formData.facebook} placeholder="Facebook" onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl focus:border-blue-500 outline-none transition placeholder:text-slate-600" />
+                        <input name="twitter" type="text" value={formData.twitter} placeholder="X / Twitter" onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl focus:border-sky-400 outline-none transition placeholder:text-slate-600" />
+                        <input name="linkedin" type="text" value={formData.linkedin} placeholder="LinkedIn" onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl focus:border-blue-600 outline-none transition placeholder:text-slate-600" />
+                        <input name="tiktok" type="text" value={formData.tiktok} placeholder="TikTok" onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl focus:border-slate-300 outline-none transition placeholder:text-slate-600" />
                     </div>
                 </div>
             </div>

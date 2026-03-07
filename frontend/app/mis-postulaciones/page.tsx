@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { 
   Loader2, Briefcase, Calendar, CheckCircle, XCircle, Clock, ArrowRight 
 } from 'lucide-react';
+import DepthAwareImage from '@/components/DepthAwareImage';
 
 export default function MisPostulacionesPage() {
   const router = useRouter();
@@ -65,7 +66,7 @@ export default function MisPostulacionesPage() {
                 {/* Imagen del Proyecto */}
                 <div className="w-full md:w-24 h-24 md:h-24 bg-slate-950 rounded-xl overflow-hidden shrink-0 border border-slate-800 relative">
                   {post.proyecto.foto ? (
-                    <img src={post.proyecto.foto} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
+                    <DepthAwareImage imageUrl={post.proyecto.foto} depthUrl={post.proyecto.fotoProfundidad} alt={post.proyecto.titulo} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" containerClassName="w-full h-full overflow-hidden" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs text-slate-600 font-bold bg-slate-950">
                         {post.proyecto.titulo[0]}

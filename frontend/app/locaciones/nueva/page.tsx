@@ -121,8 +121,17 @@ export default function NuevaLocacionPage() {
 
     try {
       let finalFotoUrl = '';
+      let finalFotoProfundidad: string | undefined;
       if (archivoPrincipal) {
         finalFotoUrl = await uploadToSupabase(archivoPrincipal);
+        try {
+          const objectUrl = URL.createObjectURL(archivoPrincipal);
+          const { generateDepthMap, dataURLtoFile } = await import('@/lib/depthAI');
+          const depthBase64 = await generateDepthMap(objectUrl);
+          URL.revokeObjectURL(objectUrl);
+          const depthFile = dataURLtoFile(depthBase64, `depth_${archivoPrincipal.name}`);
+          finalFotoProfundidad = await uploadToSupabase(depthFile);
+        } catch (_) {}
       }
 
       let galeriaUrls: string[] = [];
@@ -134,6 +143,7 @@ export default function NuevaLocacionPage() {
       const payload = {
         ...formData,
         foto: finalFotoUrl,
+        fotoProfundidad: finalFotoProfundidad,
         galeria: galeriaUrls, 
         lat: formData.lat ? parseFloat(formData.lat) : null,
         lng: formData.lng ? parseFloat(formData.lng) : null

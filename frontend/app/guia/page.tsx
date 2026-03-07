@@ -6,6 +6,7 @@ import {
   MapPin, Search, Filter, Briefcase, Users, Clapperboard, GraduationCap, 
   ChevronLeft, ChevronRight, ArrowRight, LayoutGrid, Plus, Dice5, HelpCircle 
 } from 'lucide-react';
+import DepthAwareImage from '@/components/DepthAwareImage';
 
 const getInitials = (name: string) => {
   return name ? name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() : 'NN';
@@ -37,6 +38,7 @@ interface Prestador {
   tipoPerfil: string;
   descripcion?: string;
   foto?: string | null;
+  fotoProfundidad?: string | null;
   ciudad?: string;
   colorTema?: string;
   [key: string]: unknown;
@@ -278,7 +280,13 @@ export default function GuiaPage() {
                               style={{ borderColor: tema, color: tema }}
                             >
                               {p.foto ? (
-                                <img src={p.foto} alt={p.nombre} className="w-full h-full rounded-full object-cover" />
+                                <DepthAwareImage
+                                  imageUrl={p.foto}
+                                  depthUrl={p.fotoProfundidad}
+                                  alt={p.nombre}
+                                  className="w-full h-full rounded-full object-cover"
+                                  containerClassName="w-full h-full rounded-full overflow-hidden"
+                                />
                               ) : (
                                 <span>{getInitials(p.nombre)}</span>
                               )}

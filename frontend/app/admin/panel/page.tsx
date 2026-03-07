@@ -9,6 +9,7 @@ import {
   ShieldCheck, MapIcon, Search, Shield, User, 
   Trash2, Edit, MapPin 
 } from 'lucide-react';
+import DepthAwareImage from '@/components/DepthAwareImage';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend 
@@ -27,6 +28,7 @@ interface Prestador {
   nombre: string;
   email?: string;
   foto?: string;
+  fotoProfundidad?: string;
   tipoPerfil: string;
   rubro: string;
   ciudad: string;
@@ -46,6 +48,7 @@ interface Locacion {
   id: number;
   nombre: string;
   foto?: string;
+  fotoProfundidad?: string;
   descripcion?: string;
   categoria: string;
   ciudad: string;
@@ -433,7 +436,7 @@ export default function AdminPanelPage() {
                     <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
                         <td className="p-4 flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden shrink-0 border border-slate-700">
-                                {p.foto ? <img src={p.foto} alt="foto" className="w-full h-full object-cover"/> : <User className="m-2 text-slate-500"/>}
+                                {p.foto ? <DepthAwareImage imageUrl={p.foto} depthUrl={p.fotoProfundidad} alt="foto" className="w-full h-full object-cover" containerClassName="w-full h-full rounded-full overflow-hidden"/> : <User className="m-2 text-slate-500"/>}
                             </div>
                             <div>
                                 <p className="text-white font-medium text-sm leading-tight">{p.nombre}</p>
@@ -539,7 +542,7 @@ export default function AdminPanelPage() {
                     <tr key={l.id} className="hover:bg-slate-800/30 transition-colors">
                         <td className="p-4 flex items-center gap-3">
                             <div className="w-12 h-10 rounded-md bg-slate-800 overflow-hidden shrink-0 border border-slate-700">
-                                {l.foto ? <img src={l.foto} alt="locacion" className="w-full h-full object-cover"/> : <MapPin className="m-2 text-slate-500"/>}
+                                {l.foto ? <DepthAwareImage imageUrl={l.foto} depthUrl={l.fotoProfundidad} alt="locacion" className="w-full h-full object-cover" containerClassName="w-full h-full rounded-md overflow-hidden"/> : <MapPin className="m-2 text-slate-500"/>}
                             </div>
                             <div>
                                 <p className="text-white font-medium text-sm leading-tight">{l.nombre}</p>

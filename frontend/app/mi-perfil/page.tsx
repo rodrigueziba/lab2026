@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { User, Briefcase, Plus, Edit, Trash2, Loader2, MapPin } from 'lucide-react';
+import DepthAwareImage from '@/components/DepthAwareImage';
 
 export default function MisPerfilesPage() {
   const router = useRouter();
@@ -100,7 +101,15 @@ export default function MisPerfilesPage() {
                         {/* Cabecera Color */}
                         <div className="h-24 w-full relative" style={{ backgroundColor: perfil.colorTema || '#ea580c' }}>
                             {perfil.foto && (
-                                <img src={perfil.foto} alt={perfil.nombre} className="absolute -bottom-8 left-6 w-16 h-16 rounded-xl border-4 border-slate-900 object-cover shadow-lg"/>
+                                <div className="absolute -bottom-8 left-6 w-16 h-16 rounded-xl border-4 border-slate-900 overflow-hidden shadow-lg bg-slate-900">
+                                    <DepthAwareImage
+                                        imageUrl={perfil.foto}
+                                        depthUrl={perfil.fotoProfundidad}
+                                        alt={perfil.nombre}
+                                        className="w-full h-full object-cover"
+                                        containerClassName="w-full h-full rounded-xl overflow-hidden"
+                                    />
+                                </div>
                             )}
                         </div>
                         

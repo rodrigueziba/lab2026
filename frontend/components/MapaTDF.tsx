@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect } from 'react';
 import Link from 'next/link';
+import DepthAwareImage from '@/components/DepthAwareImage';
 
 const CENTRO_TDF: [number, number] = [-54.8019, -68.303];
 const ZOOM_INICIAL = 8;
@@ -144,10 +145,12 @@ export default function MapaTDF({ locaciones }: { locaciones: any[] }) {
                 <div className="flex flex-col">
                   <div className="relative h-32 w-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent z-10 opacity-80"></div>
-                    <img 
-                      src={loc.foto || 'https://via.placeholder.com/300x200'} 
-                      alt={loc.nombre} 
+                    <DepthAwareImage
+                      imageUrl={loc.foto || 'https://via.placeholder.com/300x200'}
+                      depthUrl={loc.fotoProfundidad}
+                      alt={loc.nombre}
                       className="w-full h-full object-cover group-hover:scale-110 transition duration-700"
+                      containerClassName="w-full h-full overflow-hidden"
                     />
                     <span className="absolute bottom-2 left-3 z-20 text-[10px] font-black uppercase tracking-widest text-blue-400 bg-slate-950/80 px-2 py-0.5 rounded backdrop-blur-sm">
                       {loc.categoria}

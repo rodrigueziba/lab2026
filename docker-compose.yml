@@ -9,7 +9,8 @@ services:
       - ./backend/.env
     volumes:
       - ./backend:/app  
-    command: npm run start:dev
+    # Regenerar cliente Prisma al arrancar para que reconozca schema actual (ej. redes sociales)
+    command: sh -c "npx prisma generate && npm run start:dev"
     ports:
       - "3000:3000"
     

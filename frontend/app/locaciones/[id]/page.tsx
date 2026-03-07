@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { 
   MapPin, Info, Navigation, Edit, Calendar, Image as ImageIcon, Maximize2 
 } from 'lucide-react';
+import DepthAwareImage from '@/components/DepthAwareImage';
 
 const MapaTDF = dynamic(() => import('../../../components/MapaTDF'), { 
   ssr: false,
@@ -77,7 +78,7 @@ export default function DetalleLocacionPage({ params }: { params: Promise<{ id: 
       {/* --- HERO SECTION --- */}
       <div className="relative h-[50vh] md:h-[60vh] w-full overflow-hidden group">
         {locacion.foto ? (
-            <img src={locacion.foto} className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition duration-[3s]" />
+            <DepthAwareImage imageUrl={locacion.foto} depthUrl={locacion.fotoProfundidad} alt={locacion.nombre} className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition duration-[3s]" containerClassName="w-full h-full overflow-hidden" />
         ) : (
             <div className="w-full h-full bg-slate-900 flex items-center justify-center opacity-30"><MapPin size={100}/></div>
         )}
@@ -222,10 +223,16 @@ export default function DetalleLocacionPage({ params }: { params: Promise<{ id: 
       {/* LIGHTBOX DE GALERÍA */}
       {selectedImage && (
           <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setSelectedImage(null)}>
-              <button className="absolute top-6 right-6 text-white/50 hover:text-white transition">
+              <button className="absolute top-6 right-6 text-white/50 hover:text-white transition z-10">
                   <div className="bg-white/10 p-2 rounded-full"><span className="text-2xl font-bold">✕</span></div>
               </button>
-              <img src={selectedImage} className="max-w-full max-h-[90vh] rounded-xl shadow-2xl object-contain animate-in zoom-in-95 duration-300" />
+              {selectedImage === locacion.foto && locacion.fotoProfundidad ? (
+                <div className="w-full max-w-4xl h-[80vh] rounded-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+                  <DepthAwareImage imageUrl={selectedImage} depthUrl={locacion.fotoProfundidad} alt={locacion.nombre} className="w-full h-full object-contain" containerClassName="w-full h-full overflow-hidden" />
+                </div>
+              ) : (
+                <img src={selectedImage} alt="" className="max-w-full max-h-[90vh] rounded-xl shadow-2xl object-contain animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()} />
+              )}
           </div>
       )}
 

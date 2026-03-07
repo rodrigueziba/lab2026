@@ -3,6 +3,7 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import Swal from 'sweetalert2';
+import DepthAwareImage from '@/components/DepthAwareImage';
 import { 
   MapPin, Image as ImageIcon, FileText, Save, Loader2, 
   ArrowLeft, UploadCloud, Plus, Trash2, Camera
@@ -35,7 +36,7 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
   const [formData, setFormData] = useState({
     nombre: '', ciudad: 'Ushuaia', categoria: '', subcategoria: '',
     descripcion: '', direccion: '', accesibilidad: '',
-    lat: '', lng: '', foto: ''
+    lat: '', lng: '', foto: '', fotoProfundidad: ''
   });
 
   const [archivoPrincipal, setArchivoPrincipal] = useState<File | null>(null);
@@ -74,7 +75,8 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
           accesibilidad: (data.accesibilidad as string) ?? '',
           lat: data.lat != null ? String(data.lat) : '',
           lng: data.lng != null ? String(data.lng) : '',
-          foto: (data.foto as string) ?? ''
+          foto: (data.foto as string) ?? '',
+          fotoProfundidad: (data.fotoProfundidad as string) ?? ''
         });
         if (data.foto) setPreviewPrincipal(data.foto as string);
         const galeria = Array.isArray(data.galeria) ? (data.galeria as string[]) : [];
@@ -152,7 +154,18 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
     setUploading(true);
     try {
       let finalFotoUrl = formData.foto;
-      if (archivoPrincipal) finalFotoUrl = await uploadToSupabase(archivoPrincipal);
+      let finalFotoProfundidad: string | undefined = formData.fotoProfundidad || undefined;
+      if (archivoPrincipal) {
+        finalFotoUrl = await uploadToSupabase(archivoPrincipal);
+        try {
+          const objectUrl = URL.createObjectURL(archivoPrincipal);
+          const { generateDepthMap, dataURLtoFile } = await import('@/lib/depthAI');
+          const depthBase64 = await generateDepthMap(objectUrl);
+          URL.revokeObjectURL(objectUrl);
+          const depthFile = dataURLtoFile(depthBase64, `depth_${archivoPrincipal.name}`);
+          finalFotoProfundidad = await uploadToSupabase(depthFile);
+        } catch (_) {}
+      }
 
       let galeriaUrls: string[] = [...initialGaleriaUrls];
       if (archivosGaleria.length > 0) {
@@ -163,6 +176,7 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
       const payload = {
         ...formData,
         foto: finalFotoUrl,
+        fotoProfundidad: finalFotoProfundidad,
         galeria: galeriaUrls,
         lat: formData.lat ? parseFloat(formData.lat) : null,
         lng: formData.lng ? parseFloat(formData.lng) : null
@@ -307,7 +321,7 @@ export default function EditarLocacionPage({ params }: { params: Promise<{ id: s
                     <div className="relative aspect-video w-full rounded-2xl bg-slate-950 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center overflow-hidden group hover:border-orange-500/50 hover:bg-slate-900 transition-all cursor-pointer">
                         {previewPrincipal ? (
                             <>
-                                <img src={previewPrincipal} className="w-full h-full object-cover"/>
+                                <DepthAwareImage imageUrl={previewPrincipal} depthUrl={previewPrincipal === formData.foto ? formData.fotoProfundidad : undefined} alt="Portada" className="w-full h-full object-cover" containerClassName="w-full h-full overflow-hidden" />
                                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <span className="text-xs font-bold text-white flex items-center gap-2"><Camera size={16}/> Cambiar</span>
                                 </div>

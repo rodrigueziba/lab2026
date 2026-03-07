@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { generateDepthMap } from '@/lib/depthAI';
 import Parallax3D from '@/components/Parallax3D';
 
 export default function Prueba3DPage() {
@@ -23,7 +22,7 @@ export default function Prueba3DPage() {
 
     try {
       setStatus('Iniciando IA (la primera descarga del modelo toma unos segundos)...');
-      
+      const { generateDepthMap } = await import('@/lib/depthAI');
       const generatedDepthUrl = await generateDepthMap(objectUrl, (info: any) => {
          if (info.status === 'progress') {
             setProgress(Math.round(info.progress));

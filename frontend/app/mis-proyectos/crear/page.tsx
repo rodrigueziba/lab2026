@@ -151,11 +151,28 @@ export default function CrearProyectoPage() {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
         const { error } = await supabase.storage.from('proyectos').upload(fileName, file);
-        
         if (!error) {
           const { data } = supabase.storage.from('proyectos').getPublicUrl(fileName);
           galeriaUrls.push(data.publicUrl);
         }
+      }
+
+      let fotoProfundidad: string | undefined;
+      if (imagenes[0]) {
+        try {
+          const objectUrl = URL.createObjectURL(imagenes[0]);
+          const { generateDepthMap, dataURLtoFile } = await import('@/lib/depthAI');
+          const depthBase64 = await generateDepthMap(objectUrl);
+          URL.revokeObjectURL(objectUrl);
+          const depthFile = dataURLtoFile(depthBase64, `depth_${imagenes[0].name}`);
+          const fileExt = depthFile.name.split('.').pop();
+          const fileName = `depth-${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+          const { error } = await supabase.storage.from('proyectos').upload(fileName, depthFile);
+          if (!error) {
+            const { data } = supabase.storage.from('proyectos').getPublicUrl(fileName);
+            fotoProfundidad = data.publicUrl;
+          }
+        } catch (_) {}
       }
 
       const payload = {
@@ -164,6 +181,7 @@ export default function CrearProyectoPage() {
         puestos: puestos.filter(p => p.nombre.trim() !== ''),
         galeria: galeriaUrls,
         foto: galeriaUrls[0] ?? undefined,
+        fotoProfundidad,
         fechaInicio: formData.fechaInicio ? new Date(formData.fechaInicio).toISOString() : null,
         fechaFin: formData.fechaFin ? new Date(formData.fechaFin).toISOString() : null,
       };

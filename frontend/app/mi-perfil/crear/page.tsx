@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   User, Briefcase, MapPin, Mail, Phone, Globe, 
   Image as ImageIcon, Loader2, Youtube, Plus, 
-  Trash2, ArrowLeft, PlusCircle, Sparkles
+  Trash2, ArrowLeft, PlusCircle, Sparkles, Palette
 } from 'lucide-react';
 
 const supabase = createClient(
@@ -26,6 +26,8 @@ export default function CrearPerfilPage() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [generandoIA, setGenerandoIA] = useState(false);
+  const [depthStatus, setDepthStatus] = useState('');
+  const [depthFailed, setDepthFailed] = useState(false);
 
   // Estados del Formulario
   const [formData, setFormData] = useState({
@@ -36,6 +38,11 @@ export default function CrearPerfilPage() {
     email: '',
     telefono: '',
     web: '',
+    instagram: '',
+    facebook: '',
+    twitter: '',
+    linkedin: '',
+    tiktok: '',
     foto: '', 
     videoReel: '',
     ciudad: 'Ushuaia',
@@ -158,23 +165,40 @@ export default function CrearPerfilPage() {
     e.preventDefault();
     setLoading(true);
     setUploading(true);
+    setDepthFailed(false);
 
     try {
       let finalFotoPrincipal = formData.foto;
-      let finalGaleria = [...formData.galeria];
+      let finalFotoProfundidad: string | undefined;
 
       if (archivoPrincipal) {
         const url = await uploadImageToSupabase(archivoPrincipal);
         if (url) finalFotoPrincipal = url;
+        try {
+          setDepthStatus('Generando mapa de profundidad (efecto 3D)...');
+          setDepthFailed(false);
+          const objectUrl = URL.createObjectURL(archivoPrincipal);
+          const { generateDepthMap, dataURLtoFile } = await import('@/lib/depthAI');
+          const depthBase64 = await generateDepthMap(objectUrl, (info: any) => {
+            if (info?.status === 'progress') setDepthStatus(`Procesando... ${Math.round(info.progress ?? 0)}%`);
+          });
+          URL.revokeObjectURL(objectUrl);
+          const depthFile = dataURLtoFile(depthBase64, `depth_${archivoPrincipal.name}`);
+          const depthUrl = await uploadImageToSupabase(depthFile);
+          if (depthUrl) finalFotoProfundidad = depthUrl;
+        } catch (e) {
+          setDepthFailed(true);
+        }
+        setDepthStatus('');
       }
 
+      let finalGaleria = [...formData.galeria];
       if (archivosGaleria.length > 0) {
         const uploadPromises = archivosGaleria.map(file => uploadImageToSupabase(file));
         const uploadedUrls = await Promise.all(uploadPromises);
         finalGaleria = [...finalGaleria, ...uploadedUrls];
       }
 
-      // Filtramos experiencias vacías
       const experienciasFiltradas = experiencias.filter(e => e.proyecto && e.anio);
 
       const token = localStorage.getItem('token');
@@ -187,14 +211,22 @@ export default function CrearPerfilPage() {
         body: JSON.stringify({ 
             ...formData, 
             foto: finalFotoPrincipal,
+            fotoProfundidad: finalFotoProfundidad ?? undefined,
             galeria: finalGaleria,
             fechaNacimiento,
             formacion,
-            experiencias: experienciasFiltradas
+            experiencias: experienciasFiltradas,
+            instagram: formData.instagram || undefined,
+            facebook: formData.facebook || undefined,
+            twitter: formData.twitter || undefined,
+            linkedin: formData.linkedin || undefined,
+            tiktok: formData.tiktok || undefined,
+            colorTema: formData.colorTema || undefined,
         })
       });
 
       if (res.ok) {
+        if (depthFailed) alert('Perfil guardado. No se pudo generar el efecto 3D (la primera vez puede tardar; podés editar el perfil y cambiar la foto para intentar de nuevo).');
         router.push('/mi-perfil');
         router.refresh();
       } else {
@@ -206,6 +238,7 @@ export default function CrearPerfilPage() {
       console.error(error);
       alert("Ocurrió un error al guardar el perfil.");
     } finally {
+      setDepthStatus('');
       setLoading(false);
       setUploading(false);
     }
@@ -400,7 +433,7 @@ export default function CrearPerfilPage() {
             </div>
           </div>
 
-          {/* SECCIÓN 3: CONTACTO */}
+          {/* SECCIÓN 3: CONTACTO Y COLOR */}
           <div className="space-y-6 pt-6 border-t border-slate-800/50">
             <h3 className="text-emerald-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
                 <Mail size={16}/> Datos de Contacto
@@ -419,8 +452,28 @@ export default function CrearPerfilPage() {
                     <input name="web" type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-all" onChange={handleChange} />
                 </div>
             </div>
+            <div className="mt-6">
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-2 flex items-center gap-2"><Palette size={14}/> Color de tu tarjeta en la guía</label>
+                <div className="flex items-center gap-4 bg-slate-950 border border-slate-800 p-3 rounded-xl max-w-xs">
+                    <input type="color" name="colorTema" value={formData.colorTema} onChange={handleChange} className="w-12 h-10 rounded cursor-pointer border border-slate-700 bg-transparent p-0" />
+                    <span className="text-slate-400 text-sm font-mono">{formData.colorTema}</span>
+                </div>
+            </div>
+            <div className="mt-6">
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-3">Redes sociales (URL o @usuario)</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <input name="instagram" type="text" value={formData.instagram} placeholder="Instagram" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-pink-500 transition-all placeholder:text-slate-600" onChange={handleChange} />
+                    <input name="facebook" type="text" value={formData.facebook} placeholder="Facebook" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition-all placeholder:text-slate-600" onChange={handleChange} />
+                    <input name="twitter" type="text" value={formData.twitter} placeholder="X / Twitter" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-sky-400 transition-all placeholder:text-slate-600" onChange={handleChange} />
+                    <input name="linkedin" type="text" value={formData.linkedin} placeholder="LinkedIn" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-blue-600 transition-all placeholder:text-slate-600" onChange={handleChange} />
+                    <input name="tiktok" type="text" value={formData.tiktok} placeholder="TikTok" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-slate-300 transition-all placeholder:text-slate-600" onChange={handleChange} />
+                </div>
+            </div>
           </div>
 
+          {depthStatus && (
+            <p className="text-cyan-400 text-sm font-medium">{depthStatus}</p>
+          )}
           <div className="pt-6">
             <button 
               type="submit" 

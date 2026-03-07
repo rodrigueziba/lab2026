@@ -5,6 +5,7 @@ import {
   Calendar, MapPin, Clock, DollarSign, GraduationCap, 
   Users, ChevronLeft, Mail, Star, CheckCircle 
 } from 'lucide-react';
+import DepthAwareImage from '@/components/DepthAwareImage';
 
 const getYoutubeId = (url: string) => {
   if (!url) return null;
@@ -121,7 +122,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
                allow="autoplay"
              />
           ) : (
-             <img src={proyecto.foto || proyecto.galeria?.[0] || '/placeholder-dark.jpg'} alt={proyecto.titulo} className="w-full h-full object-cover opacity-50" />
+             <DepthAwareImage imageUrl={proyecto.foto || proyecto.galeria?.[0] || '/placeholder-dark.jpg'} depthUrl={proyecto.fotoProfundidad} alt={proyecto.titulo} className="w-full h-full object-cover opacity-50" containerClassName="w-full h-full overflow-hidden" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent"></div>
         </div>
@@ -134,10 +135,12 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
              
              <div className="flex flex-col md:flex-row gap-8 items-end">
                 <div className="hidden md:block w-48 h-72 rounded-xl overflow-hidden shadow-2xl border-4 border-slate-800 shrink-0 bg-slate-900 flex items-center justify-center">
-                   <img 
-                     src={proyecto.foto || proyecto.galeria?.[0] || `https://placehold.co/300x450/0f172a/38bdf8?text=${encodeURIComponent(proyecto.titulo)}`} 
+                   <DepthAwareImage 
+                     imageUrl={proyecto.foto || proyecto.galeria?.[0] || `https://placehold.co/300x450/0f172a/38bdf8?text=${encodeURIComponent(proyecto.titulo)}`} 
+                     depthUrl={proyecto.fotoProfundidad}
                      alt={proyecto.titulo}
-                     className="w-full h-full object-cover" 
+                     className="w-full h-full object-cover"
+                     containerClassName="w-full h-full overflow-hidden"
                    />
                 </div>
 

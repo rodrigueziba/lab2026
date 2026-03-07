@@ -7,6 +7,7 @@ import {
   PlayCircle, X, MapPin, Search, Clapperboard, 
   ChevronLeft, ChevronRight, Plus, Dice5, Eye, Filter 
 } from 'lucide-react';
+import DepthAwareImage from '@/components/DepthAwareImage';
 
 const getYoutubeId = (url: string) => {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -376,7 +377,13 @@ export default function CarteleraProyectosPage() {
                         ) : (
                             <>
                                 {(p.foto || p.galeria?.[0]) ? (
-                                    <img src={p.foto || p.galeria?.[0]} alt={p.titulo} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                    <DepthAwareImage
+                                      imageUrl={p.foto || p.galeria?.[0]!}
+                                      depthUrl={p.fotoProfundidad}
+                                      alt={p.titulo}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                      containerClassName="w-full h-full overflow-hidden"
+                                    />
                                 ) : (
                                     <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-600"><Film size={40}/></div>
                                 )}

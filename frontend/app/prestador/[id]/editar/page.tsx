@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
+import DepthAwareImage from '@/components/DepthAwareImage';
 
 // Inicializamos Supabase
 const supabase = createClient(
@@ -31,7 +32,13 @@ export default function EditarPrestadorPage() {
     email: '',
     telefono: '',
     web: '',
+    instagram: '',
+    facebook: '',
+    twitter: '',
+    linkedin: '',
+    tiktok: '',
     foto: '',
+    fotoProfundidad: '',
     colorTema: '#ea580c',
     videoReel: '',
   });
@@ -55,7 +62,13 @@ export default function EditarPrestadorPage() {
             email: data.email || '',
             telefono: data.telefono || '',
             web: data.web || '',
+            instagram: data.instagram || '',
+            facebook: data.facebook || '',
+            twitter: data.twitter || '',
+            linkedin: data.linkedin || '',
+            tiktok: data.tiktok || '',
             foto: data.foto || '',
+            fotoProfundidad: data.fotoProfundidad || '',
             colorTema: data.colorTema || '#ea580c',
             videoReel: data.videoReel || ''
           });
@@ -96,20 +109,30 @@ export default function EditarPrestadorPage() {
     setSaving(true);
 
     let fotoFinal = formData.foto;
+    let fotoProfundidad: string | undefined = formData.fotoProfundidad || undefined;
     if (nuevoArchivo) {
       const urlNueva = await uploadImage(nuevoArchivo);
       if (urlNueva) fotoFinal = urlNueva;
+      try {
+        const objectUrl = URL.createObjectURL(nuevoArchivo);
+        const { generateDepthMap, dataURLtoFile } = await import('@/lib/depthAI');
+        const depthBase64 = await generateDepthMap(objectUrl);
+        URL.revokeObjectURL(objectUrl);
+        const depthFile = dataURLtoFile(depthBase64, `depth_${nuevoArchivo.name}`);
+        const dUrl = await uploadImage(depthFile);
+        if (dUrl) fotoProfundidad = dUrl;
+      } catch (_) {}
     }
 
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${apiUrl}/prestador/${id}`, {
-        method: 'PATCH', // <--- Importante: PATCH para editar
+        method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ ...formData, foto: fotoFinal })
+        body: JSON.stringify({ ...formData, foto: fotoFinal, fotoProfundidad })
       });
 
       if (res.ok) {
@@ -193,6 +216,17 @@ export default function EditarPrestadorPage() {
             </div>
           </div>
 
+          <div className="mt-6">
+            <label className="block text-xs font-bold uppercase text-slate-500 mb-3">Redes sociales (URL o @usuario)</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <input name="instagram" type="text" value={formData.instagram} placeholder="Instagram" onChange={handleChange} className="w-full bg-slate-950 border border-slate-700 rounded p-3 focus:border-pink-500 outline-none placeholder:text-slate-600" />
+              <input name="facebook" type="text" value={formData.facebook} placeholder="Facebook" onChange={handleChange} className="w-full bg-slate-950 border border-slate-700 rounded p-3 focus:border-blue-500 outline-none placeholder:text-slate-600" />
+              <input name="twitter" type="text" value={formData.twitter} placeholder="X / Twitter" onChange={handleChange} className="w-full bg-slate-950 border border-slate-700 rounded p-3 focus:border-sky-400 outline-none placeholder:text-slate-600" />
+              <input name="linkedin" type="text" value={formData.linkedin} placeholder="LinkedIn" onChange={handleChange} className="w-full bg-slate-950 border border-slate-700 rounded p-3 focus:border-blue-600 outline-none placeholder:text-slate-600" />
+              <input name="tiktok" type="text" value={formData.tiktok} placeholder="TikTok" onChange={handleChange} className="w-full bg-slate-950 border border-slate-700 rounded p-3 focus:border-slate-300 outline-none placeholder:text-slate-600" />
+            </div>
+          </div>
+
           {/* --- PERSONALIZACIÓN --- */}
           <div className="bg-slate-950 p-6 rounded-xl border border-slate-800">
             <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
@@ -243,7 +277,7 @@ export default function EditarPrestadorPage() {
             <div className="flex items-center gap-6 mb-4">
                {formData.foto && (
                  <div className="w-20 h-20 relative rounded-full overflow-hidden border-2 border-slate-700">
-                    <img src={formData.foto} className="object-cover w-full h-full" alt="Actual" />
+                    <DepthAwareImage imageUrl={formData.foto} depthUrl={formData.fotoProfundidad} alt="Actual" className="object-cover w-full h-full" containerClassName="w-full h-full rounded-full overflow-hidden" />
                  </div>
                )}
                <div className="text-sm text-slate-400">

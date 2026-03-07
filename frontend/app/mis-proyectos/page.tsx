@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Edit, Trash2, Plus, Film, Users, Eye, MapPin, Calendar } from 'lucide-react';
+import DepthAwareImage from '@/components/DepthAwareImage';
 
 export default function MisProyectosPage() {
   const router = useRouter();
@@ -100,7 +101,7 @@ export default function MisProyectosPage() {
                 {/* 1. IMAGEN (Izquierda) */}
                 <div className="w-full md:w-48 h-48 md:h-auto relative overflow-hidden bg-slate-950 shrink-0">
                    {p.foto ? (
-                     <img src={p.foto} className="w-full h-full object-cover group-hover:scale-105 transition duration-700 opacity-80 group-hover:opacity-100" />
+                     <DepthAwareImage imageUrl={p.foto} depthUrl={p.fotoProfundidad} alt={p.titulo} className="w-full h-full object-cover group-hover:scale-105 transition duration-700 opacity-80 group-hover:opacity-100" containerClassName="w-full h-full overflow-hidden" />
                    ) : (
                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-700 bg-slate-950/50">
                         <Film size={24} className="mb-2 opacity-50"/>
