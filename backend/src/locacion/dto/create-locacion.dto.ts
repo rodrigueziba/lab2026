@@ -30,6 +30,10 @@ export class CreateLocacionDto {
   @IsOptional()
   foto?: string;
 
+  @IsString()
+  @IsOptional()
+  fotoProfundidad?: string;
+
   @IsArray()
   @IsOptional()
   galeria?: string[];

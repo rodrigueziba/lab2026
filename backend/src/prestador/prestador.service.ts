@@ -18,35 +18,34 @@ export class PrestadorService {
     return this.prisma.prestador.create({
       data: {
         ...restData,
-        userId: userId,
+        userId,
         fechaNacimiento: fechaNacimiento ? new Date(fechaNacimiento) : null,
         experiencias: experiencias ? {
           create: experiencias
         } : undefined
-      },
+      } as Parameters<PrismaService['prestador']['create']>[0]['data'],
     });
   }
 
   async update(id: number, updatePrestadorDto: UpdatePrestadorDto, userId: number, role?: string) {
-    await this.findOneMine(id, userId, role); // Pasamos el rol aquí también
+    await this.findOneMine(id, userId, role);
 
     const { experiencias, fechaNacimiento, ...restData } = updatePrestadorDto;
 
-    const dataToUpdate: any = {
+    const dataToUpdate = {
       ...restData,
       fechaNacimiento: fechaNacimiento ? new Date(fechaNacimiento) : undefined,
+      ...(experiencias && {
+        experiencias: {
+          deleteMany: {},
+          create: experiencias
+        }
+      })
     };
-
-    if (experiencias) {
-      dataToUpdate.experiencias = {
-        deleteMany: {}, 
-        create: experiencias
-      };
-    }
 
     return this.prisma.prestador.update({
       where: { id },
-      data: dataToUpdate,
+      data: dataToUpdate as Parameters<PrismaService['prestador']['update']>[0]['data'],
     });
   }
 

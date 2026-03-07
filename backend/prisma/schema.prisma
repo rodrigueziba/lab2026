@@ -48,7 +48,13 @@ model Prestador {
   email       String   // 
   telefono    String?
   web         String?
+  instagram   String?  // URL o @usuario
+  facebook    String?
+  twitter     String?  // X
+  linkedin    String?
+  tiktok      String?
   foto        String?  // URL de Supabase
+  fotoProfundidad String?  // URL del mapa de profundidad (efecto 3D)
 
   colorTema   String?  @default("#ea580c") // Naranja por defecto
   videoReel   String?  // URL de YouTube/Vimeo
@@ -79,6 +85,7 @@ model Locacion {
   subcategoria String?  
   accesibilidad String?
   foto         String?
+  fotoProfundidad String?  // Mapa de profundidad para efecto 3D
   galeria      String[]
   lat          Float?   
   lng          Float?
@@ -102,6 +109,7 @@ model Proyecto {
   tipo        String    // Ej: Largometraje, Corto, Videoclip
   estado      String    @default("Abierto") // Abierto, En Producción, Finalizado
   foto        String?   // Poster o Concept Art
+  fotoProfundidad String?  // Mapa de profundidad para efecto 3D
   ciudad       String   @default("Ushuaia")
   referencias String[]  // Links a referencias (YouTube, Vimeo, Behance)
   galeria     String[]  // Fotos de moodboard o locaciones

@@ -47,7 +47,31 @@ export class CreatePrestadorDto {
 
   @IsString()
   @IsOptional()
+  instagram?: string;
+
+  @IsString()
+  @IsOptional()
+  facebook?: string;
+
+  @IsString()
+  @IsOptional()
+  twitter?: string;
+
+  @IsString()
+  @IsOptional()
+  linkedin?: string;
+
+  @IsString()
+  @IsOptional()
+  tiktok?: string;
+
+  @IsString()
+  @IsOptional()
   foto?: string;
+
+  @IsString()
+  @IsOptional()
+  fotoProfundidad?: string;
 
   @IsString()
   @IsOptional()

@@ -28,6 +28,10 @@ export class CreateProyectoDto {
   @IsOptional()
   foto?: string;
 
+  @IsString()
+  @IsOptional()
+  fotoProfundidad?: string;
+
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
