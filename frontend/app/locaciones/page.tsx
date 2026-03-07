@@ -44,6 +44,7 @@ interface Locacion {
   categoria: string;
   descripcion: string;
   foto: string | null;
+  fotoProfundidad?: string | null;
   lat: number | string;
   lng: number | string;
   [key: string]: unknown; // Permite otras propiedades adicionales de forma segura
