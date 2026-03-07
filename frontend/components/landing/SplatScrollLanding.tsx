@@ -105,6 +105,19 @@ const SCROLL_RESPONSE = 3.2;
 const CAMERA_RESPONSE = 2.8;
 const SPLAT_RESPONSE = 2.4;
 
+// Límite de pixel ratio (móvil más bajo para mejor rendimiento)
+const MOBILE_BREAKPOINT = 768;
+const MAX_PIXEL_RATIO_DESKTOP = 1.5;
+const MAX_PIXEL_RATIO_MOBILE = 1.25;
+// Resolución dinámica: si FPS < umbral, bajar ratio (bajada más fuerte)
+const FPS_LOW_THRESHOLD = 30;
+const FPS_HIGH_THRESHOLD = 55;
+const FPS_SAMPLES = 60;
+const PIXEL_RATIO_DROP_FACTOR = 0.5; // al bajar: ratio *= 0.5 (más agresivo que 0.8)
+const IDLE_MS = 400;
+const IDLE_RENDER_INTERVAL = 20;
+const IDLE_RENDER_INTERVAL_MOBILE = 30; // en móvil render menos cuando idle
+
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const CARDS: {
@@ -571,6 +584,12 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollProgressRef = useRef(0);
   const smoothScrollRef = useRef(0);
+  const lastScrollTimeRef = useRef(0);
+  const frameTimeRef = useRef<number[]>([]);
+  const pixelRatioRef = useRef(MAX_PIXEL_RATIO_DESKTOP);
+  const lowFpsFramesRef = useRef(0);
+  const highFpsFramesRef = useRef(0);
+  const idleFrameCountRef = useRef(0);
 
   const [debugOpen, setDebugOpen] = useState(false);
   const [showDebugByShift, setShowDebugByShift] = useState(false);
@@ -639,10 +658,13 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     setLogs(prev => [...prev.slice(-99), { time, level, msg }]);
   }, []);
 
-  // ── Init Three.js ───────────────────────────────────────────────────────────
+  // ── Init Three.js (escritorio y móvil; optimizado por dispositivo) ───────────
   useEffect(() => {
     const wrap = canvasWrapRef.current;
     if (!wrap) return;
+
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT;
+    const maxRatio = isMobile ? MAX_PIXEL_RATIO_MOBILE : MAX_PIXEL_RATIO_DESKTOP;
 
     if (rendererRef.current) {
       log('Re-mount — reinicializando', 'warn');
@@ -677,12 +699,14 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     smoothScrollRef.current = scrollProgressRef.current;
 
     const renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: !isMobile,
       alpha: false,
       powerPreference: 'high-performance',
     });
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const initialRatio = Math.min(window.devicePixelRatio, maxRatio);
+    pixelRatioRef.current = initialRatio;
+    renderer.setPixelRatio(initialRatio);
     renderer.setSize(wrap.clientWidth, wrap.clientHeight);
     renderer.domElement.style.cssText =
       'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
@@ -702,22 +726,61 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     dl.position.set(2, 5, 3);
     scene.add(dl);
 
+    let resizeTick: number | null = null;
     const onResize = () => {
-      renderer.setSize(wrap.clientWidth, wrap.clientHeight);
-      camera.aspect = wrap.clientWidth / wrap.clientHeight;
-      camera.updateProjectionMatrix();
+      if (resizeTick != null) cancelAnimationFrame(resizeTick);
+      resizeTick = requestAnimationFrame(() => {
+        resizeTick = null;
+        renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+        renderer.setPixelRatio(pixelRatioRef.current);
+        camera.aspect = wrap.clientWidth / wrap.clientHeight;
+        camera.updateProjectionMatrix();
+      });
     };
     window.addEventListener('resize', onResize);
 
     const clock = new THREE.Clock();
     let frame = 0;
     const tmpQuat = new THREE.Quaternion();
+    const maxRatioCap = Math.min(window.devicePixelRatio, maxRatio);
+    const idleInterval = isMobile ? IDLE_RENDER_INTERVAL_MOBILE : IDLE_RENDER_INTERVAL;
 
     renderer.setAnimationLoop(() => {
       frame++;
+      const now = performance.now();
       const dt = Math.min(clock.getDelta(), 0.05);
       const cfg = rtConfigRef.current;
       const wps = cfg.waypoints;
+
+      // FPS para resolución dinámica (reactiva)
+      const ft = frameTimeRef.current;
+      ft.push(now);
+      if (ft.length > FPS_SAMPLES) ft.shift();
+      const fps = ft.length >= 10 ? 1000 / ((ft[ft.length - 1] - ft[0]) / (ft.length - 1)) : 60;
+      if (fps < FPS_LOW_THRESHOLD) {
+        lowFpsFramesRef.current++;
+        highFpsFramesRef.current = 0;
+        if (lowFpsFramesRef.current >= FPS_SAMPLES && pixelRatioRef.current > 0.5) {
+          pixelRatioRef.current = Math.max(0.5, pixelRatioRef.current * PIXEL_RATIO_DROP_FACTOR);
+          renderer.setPixelRatio(pixelRatioRef.current);
+          renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+        }
+      } else if (fps > FPS_HIGH_THRESHOLD) {
+        highFpsFramesRef.current++;
+        lowFpsFramesRef.current = 0;
+        if (highFpsFramesRef.current >= FPS_SAMPLES * 2 && pixelRatioRef.current < maxRatioCap) {
+          pixelRatioRef.current = Math.min(maxRatioCap, pixelRatioRef.current * 1.25);
+          renderer.setPixelRatio(pixelRatioRef.current);
+          renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+        }
+      } else {
+        lowFpsFramesRef.current = 0;
+        highFpsFramesRef.current = 0;
+      }
+
+      const idle = !freeRoamRef.current && (now - lastScrollTimeRef.current > IDLE_MS);
+      if (idle) idleFrameCountRef.current++;
+      else idleFrameCountRef.current = 0;
 
       if (freeRoamRef.current) {
         const spd = flySpeedRef.current;
@@ -795,7 +858,9 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
         setLiveLookAt([fmt(lp.x), fmt(lp.y), fmt(lp.z)]);
       }
 
-      renderer.render(scene, camera);
+      // Render cuando interactúa: si idle, solo dibujar cada idleInterval frames para ahorrar GPU
+      const shouldRender = !idle || idleFrameCountRef.current % idleInterval === 0;
+      if (shouldRender) renderer.render(scene, camera);
     });
 
     log('Loop iniciado', 'ok');
@@ -822,6 +887,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     return () => {
       log(`Desmontando mount #${thisMountId}`, 'warn');
       renderer.setAnimationLoop(null);
+      if (resizeTick != null) cancelAnimationFrame(resizeTick);
       window.removeEventListener('resize', onResize);
 
       if (splatRef.current) {
@@ -847,6 +913,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   // ── Scroll ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const onScroll = () => {
+      lastScrollTimeRef.current = performance.now();
       const maxY = document.documentElement.scrollHeight - window.innerHeight;
       const prog = maxY > 0 ? clamp01(window.scrollY / maxY) : 0;
       scrollProgressRef.current = prog;
