@@ -60,6 +60,7 @@ interface Proyecto {
   esRemunerado: boolean;
   fechaInicio?: string;
   foto?: string;
+  fotoProfundidad?: string | null;
   galeria?: string[];
   referencias?: string[];
   puestos?: Puesto[];
