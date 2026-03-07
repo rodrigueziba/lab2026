@@ -28,12 +28,17 @@ const ORBIT_SPEED_3D  = { locacion: 0.009, proyecto: 0.006, prestador: 0.003 };
 const ORBIT_RADIUS_2D = { locacion: 48,  proyecto: 82,  prestador: 118 };
 const ORBIT_SPEED_2D  = { locacion: 0.012, proyecto: 0.007, prestador: 0.004 };
 
-// Optimización 3D: ratio limitado + resolución dinámica por FPS
-const MAX_PIXEL_RATIO_3D = 1.5;
+// Optimización 3D: ratio limitado + resolución dinámica agresiva por FPS
+const MAX_PIXEL_RATIO_3D = 1.2;
 const FPS_LOW_3D = 30;
+const FPS_VERY_LOW_3D = 15;
 const FPS_HIGH_3D = 55;
 const FPS_SAMPLES_3D = 60;
-const PIXEL_RATIO_DROP_3D = 0.5;
+const PIXEL_RATIO_DROP_LOW_3D = 0.45;   // FPS < 30: bajar más
+const PIXEL_RATIO_DROP_VERY_LOW_3D = 0.35; // FPS < 15: mucho más agresivo
+const SLOW_LOAD_FRAMES_3D = 90;         // primeros ~1.5s
+const SLOW_LOAD_FPS_THRESHOLD_3D = 25;  // si FPS medio en carga < esto, bajar ratio al inicio
+const MIN_PIXEL_RATIO_3D = 0.4;
 
 function normalizarCiudad(ciudad?: string): string {
   if (!ciudad) return 'Ushuaia';
@@ -557,6 +562,8 @@ export default function AdminDashboardPage() {
   const pixelRatio3DRef = useRef(MAX_PIXEL_RATIO_3D);
   const lowFps3DRef     = useRef(0);
   const highFps3DRef    = useRef(0);
+  const slowLoadDoneRef = useRef(false);
+  const frameCount3DRef = useRef(0);
 
   const [loading, setLoading]             = useState(true);
   const [graphData, setGraphData]         = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
@@ -800,13 +807,37 @@ export default function AdminDashboardPage() {
       const ft = frameTime3DRef.current;
       ft.push(now);
       if (ft.length > FPS_SAMPLES_3D) ft.shift();
+      frameCount3DRef.current++;
       const fps = ft.length >= 10 ? 1000 / ((ft[ft.length - 1] - ft[0]) / (ft.length - 1)) : 60;
       const maxRatio = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, MAX_PIXEL_RATIO_3D);
-      if (fps < FPS_LOW_3D) {
+
+      // Carga lenta: si en los primeros frames el FPS es bajo, bajar ratio de golpe
+      if (!slowLoadDoneRef.current && frameCount3DRef.current >= SLOW_LOAD_FRAMES_3D) {
+        slowLoadDoneRef.current = true;
+        if (fps < SLOW_LOAD_FPS_THRESHOLD_3D && pixelRatio3DRef.current > 0.65) {
+          pixelRatio3DRef.current = Math.max(MIN_PIXEL_RATIO_3D, Math.min(0.65, pixelRatio3DRef.current * 0.6));
+          renderer.setPixelRatio(pixelRatio3DRef.current);
+          const size = new THREE.Vector2();
+          renderer.getSize(size);
+          if (size.x && size.y) renderer.setSize(size.x, size.y);
+        }
+      }
+
+      if (fps < FPS_VERY_LOW_3D) {
         lowFps3DRef.current++;
         highFps3DRef.current = 0;
-        if (lowFps3DRef.current >= FPS_SAMPLES_3D && pixelRatio3DRef.current > 0.5) {
-          pixelRatio3DRef.current = Math.max(0.5, pixelRatio3DRef.current * PIXEL_RATIO_DROP_3D);
+        if (lowFps3DRef.current >= 25 && pixelRatio3DRef.current > MIN_PIXEL_RATIO_3D) {
+          pixelRatio3DRef.current = Math.max(MIN_PIXEL_RATIO_3D, pixelRatio3DRef.current * PIXEL_RATIO_DROP_VERY_LOW_3D);
+          renderer.setPixelRatio(pixelRatio3DRef.current);
+          const size = new THREE.Vector2();
+          renderer.getSize(size);
+          if (size.x && size.y) renderer.setSize(size.x, size.y);
+        }
+      } else if (fps < FPS_LOW_3D) {
+        lowFps3DRef.current++;
+        highFps3DRef.current = 0;
+        if (lowFps3DRef.current >= 40 && pixelRatio3DRef.current > MIN_PIXEL_RATIO_3D) {
+          pixelRatio3DRef.current = Math.max(MIN_PIXEL_RATIO_3D, pixelRatio3DRef.current * PIXEL_RATIO_DROP_LOW_3D);
           renderer.setPixelRatio(pixelRatio3DRef.current);
           const size = new THREE.Vector2();
           renderer.getSize(size);
@@ -816,7 +847,7 @@ export default function AdminDashboardPage() {
         highFps3DRef.current++;
         lowFps3DRef.current = 0;
         if (highFps3DRef.current >= FPS_SAMPLES_3D * 2 && pixelRatio3DRef.current < maxRatio) {
-          pixelRatio3DRef.current = Math.min(maxRatio, pixelRatio3DRef.current * 1.25);
+          pixelRatio3DRef.current = Math.min(maxRatio, pixelRatio3DRef.current * 1.2);
           renderer.setPixelRatio(pixelRatio3DRef.current);
           const size = new THREE.Vector2();
           renderer.getSize(size);
