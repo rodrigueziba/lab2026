@@ -61,6 +61,11 @@ export default function CatalogoLocacionesPage() {
   const scrollRef = useRef<HTMLDivElement>(null);      
   const filtersRef = useRef<HTMLDivElement>(null);     
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const [disable3D, setDisable3D] = useState(false);
+
+  useEffect(() => {
+    setDisable3D(typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent));
+  }, []);
 
   useEffect(() => {
     try {
@@ -221,6 +226,7 @@ export default function CatalogoLocacionesPage() {
                               alt={loc.nombre}
                               className="w-full h-full object-cover group-hover:scale-110 transition duration-700 brightness-90 group-hover:brightness-110"
                               containerClassName="w-full h-full overflow-hidden"
+                              force2D={disable3D}
                             />
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent to-slate-900 mix-blend-multiply opacity-50"></div>
                           </div>

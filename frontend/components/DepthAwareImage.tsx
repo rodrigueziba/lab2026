@@ -14,6 +14,8 @@ type Props = {
   className?: string;
   /** Clase extra para el contenedor cuando se usa Parallax (ej. rounded-full overflow-hidden) */
   containerClassName?: string;
+  /** Si true, siempre muestra la imagen 2D (útil en iPhone para evitar permisos que tapan la página) */
+  force2D?: boolean;
 };
 
 /**
@@ -25,10 +27,11 @@ export default function DepthAwareImage({
   alt,
   className = '',
   containerClassName = 'w-full h-full overflow-hidden',
+  force2D = false,
 }: Props) {
   if (!imageUrl) return null;
 
-  if (depthUrl) {
+  if (depthUrl && !force2D) {
     return (
       <div className={containerClassName || 'w-full h-full overflow-hidden'}>
         <Parallax3D imageUrl={imageUrl} depthUrl={depthUrl} />

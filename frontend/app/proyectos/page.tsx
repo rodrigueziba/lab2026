@@ -87,6 +87,11 @@ export default function CarteleraProyectosPage() {
   const filtersRef = useRef<HTMLDivElement>(null); 
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [disable3D, setDisable3D] = useState(false);
+
+  useEffect(() => {
+    setDisable3D(typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent));
+  }, []);
 
   useEffect(() => {
     fetch(`${apiUrl}/proyecto`)
@@ -384,6 +389,7 @@ export default function CarteleraProyectosPage() {
                                       alt={p.titulo}
                                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                       containerClassName="w-full h-full overflow-hidden"
+                                      force2D={disable3D}
                                     />
                                 ) : (
                                     <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-600"><Film size={40}/></div>

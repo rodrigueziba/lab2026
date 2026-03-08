@@ -55,7 +55,12 @@ export default function GuiaPage() {
 
   const [isScrolled, setIsScrolled] = useState(false);
   const filtersRef = useRef<HTMLDivElement>(null);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';     
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const [disable3D, setDisable3D] = useState(false);
+
+  useEffect(() => {
+    setDisable3D(typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent));
+  }, []);
 
   useEffect(() => {
     fetch(`${apiUrl}/prestador`)
@@ -286,6 +291,7 @@ export default function GuiaPage() {
                                   alt={p.nombre}
                                   className="w-full h-full rounded-full object-cover"
                                   containerClassName="w-full h-full rounded-full overflow-hidden"
+                                  force2D={disable3D}
                                 />
                               ) : (
                                 <span>{getInitials(p.nombre)}</span>
