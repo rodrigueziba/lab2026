@@ -14,9 +14,9 @@ services:
     ports:
       - "3000:3000"
     
-#  Frontend (Next.js)
+#  Frontend (Next.js) — bookworm-slim para que lightningcss (Tailwind/PostCSS) tenga el binario correcto
   frontend:
-    image: node:20-alpine
+    image: node:20-bookworm-slim
     container_name: filmtdf_frontend
     working_dir: /app
     volumes:
@@ -24,8 +24,7 @@ services:
     environment:
       - WATCHPACK_POLLING=true
       - NODE_OPTIONS=--max-old-space-size=4096
-    
-    command: npm run dev -- --webpack
+    command: sh -c "npm install --legacy-peer-deps && npm run dev -- --webpack"
     ports:
       - "3001:3000" 
 

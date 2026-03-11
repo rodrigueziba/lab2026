@@ -231,11 +231,11 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Centro: Locaciones, Prestadores, Proyectos — siempre centrados en el ancho de la página (solo escritorio) */}
+        {/* Centro: Locaciones, Prestadores, Proyectos — siempre centrados (solo escritorio); IDs para Tour de Bienvenida */}
         <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-2 bg-black/20 backdrop-blur-sm p-1.5 rounded-full border border-white/5">
-          <NavLink href="/locaciones" icon={MapPin} label="Locaciones" />
-          <NavLink href="/guia" icon={Users} label="Prestadores" />
-          <NavLink href="/proyectos" icon={Clapperboard} label="Proyectos" />
+          <div id="tour-locaciones"><NavLink href="/locaciones" icon={MapPin} label="Locaciones" /></div>
+          <div id="tour-guia"><NavLink href="/guia" icon={Users} label="Prestadores" /></div>
+          <div id="tour-proyectos"><NavLink href="/proyectos" icon={Clapperboard} label="Proyectos" /></div>
         </div>
 
         <div className="hidden md:flex items-center gap-4">
@@ -316,7 +316,8 @@ export default function Navbar() {
                   onMouseEnter={() => setUserBlockHover(true)}
                   onMouseLeave={() => setUserBlockHover(false)}
                 >
-                  <button 
+                  <button
+                    id="tour-user-menu"
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                     className={`relative flex items-center gap-3 border py-1.5 pl-1.5 pr-4 rounded-full duration-300 group ${isUserMenuOpen ? 'bg-slate-800 border-slate-600' : 'bg-transparent border-slate-800 hover:border-slate-600'}`}
                     style={{

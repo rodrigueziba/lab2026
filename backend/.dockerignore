@@ -1,0 +1,18 @@
+# Dependencies and build output
+node_modules
+dist
+.git
+.gitignore
+*.md
+.env
+.env.*
+!.env.example
+.DS_Store
+npm-debug.log*
+.npm
+.cursor
+*.tsbuildinfo
+coverage
+.nyc_output
+.vscode
+.idea

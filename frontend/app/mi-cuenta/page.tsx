@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Shield, Mail, Lock, Save, AlertTriangle, 
-  CheckCircle, Loader2, LogOut 
+  CheckCircle, Loader2, LogOut, BookOpen 
 } from 'lucide-react';
 
 export default function MiCuentaPage() {
@@ -186,8 +186,22 @@ export default function MiCuentaPage() {
 
         </div>
 
+        {/* Ayuda: volver a ver el tour de bienvenida */}
+        <div className="mt-10 flex justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem('tdffilm_tour_completed');
+              router.push('/');
+            }}
+            className="text-slate-500 hover:text-orange-500 text-sm font-medium flex items-center gap-2 transition-colors"
+          >
+            <BookOpen size={16} /> Volver a ver el tutorial
+          </button>
+        </div>
+
         {/* Botón de Cerrar Sesión General */}
-        <div className="mt-12 pt-8 border-t border-slate-800 flex justify-end">
+        <div className="mt-8 pt-8 border-t border-slate-800 flex justify-end">
             <button onClick={handleLogout} className="text-red-500 hover:text-red-400 font-bold flex items-center gap-2 text-sm px-6 py-3 hover:bg-red-500/10 rounded-xl transition border border-transparent hover:border-red-500/20">
                 <LogOut size={18}/> Cerrar Sesión en este dispositivo
             </button>

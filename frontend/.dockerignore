@@ -1,0 +1,17 @@
+# Dependencies and build output (se instalan/copian en el builder)
+node_modules
+.next
+.git
+.gitignore
+*.md
+.env*
+.DS_Store
+npm-debug.log*
+.npm
+.cursor
+*.tsbuildinfo
+# Tests y herramientas de desarrollo (no necesarios en imagen final)
+coverage
+.nyc_output
+.vscode
+.idea
