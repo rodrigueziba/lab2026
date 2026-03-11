@@ -48,7 +48,7 @@ export default function PageTransitionWrapper({ children }: { children: React.Re
   }
 
   const slideDistance = 72;
-  const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] };
+  const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] as const };
 
   return (
     <div className="flex-1 min-h-0 overflow-hidden relative bg-slate-950 w-full">
