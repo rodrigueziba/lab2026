@@ -127,6 +127,11 @@ export default function CatalogoLocacionesPage() {
     return () => el.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // En móvil, la barra superior (Navbar) no recibe scroll de window; avisamos para que se oculte/muestre al bajar/subir
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('tdffilm-mobile-nav-visibility', { detail: { visible: headerVisible } }));
+  }, [headerVisible]);
+
   const categoriasOrdenadas = useMemo(() => {
     if (locaciones.length === 0) return CATEGORIAS_BASE;
     const counts: {[key: string]: number} = {};
@@ -169,14 +174,33 @@ export default function CatalogoLocacionesPage() {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #475569; }
         .locaciones-page-header[data-header-hidden="true"] {
           opacity: 0;
+          visibility: hidden;
           pointer-events: none;
+          background: transparent;
+          backdrop-filter: none;
+        }
+        .locaciones-resultados-bar {
+          max-height: 6rem;
+          overflow: hidden;
+        }
+        .locaciones-resultados-bar[data-header-hidden="true"] {
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+          background: transparent;
+          backdrop-filter: none;
+          transform: translateY(-100%);
+          max-height: 0;
+          padding-top: 0;
+          padding-bottom: 0;
+          border-bottom-color: transparent;
         }
       `}</style>
 
       {/* --- HEADER: título | búsqueda | filtros; se disuelve al bajar scroll y reaparece al subir (móvil y escritorio) --- */}
       <div
         data-header-hidden={!headerVisible}
-        className={`locaciones-page-header fixed top-16 md:top-20 left-0 right-0 z-30 bg-slate-900/90 backdrop-blur-xl border-b border-slate-800 transition-[opacity,box-shadow,padding] duration-300 ease-out ${isScrolled ? 'py-4 shadow-2xl' : 'py-6 md:py-8'}`}
+        className={`locaciones-page-header fixed top-16 md:top-20 left-0 right-0 z-30 border-b border-slate-800 transition-[opacity,visibility,background,backdrop-filter,box-shadow,padding] duration-300 ease-out ${isScrolled ? 'py-4 shadow-2xl' : 'py-6 md:py-8'} ${headerVisible ? 'bg-slate-900/90 backdrop-blur-xl' : ''}`}
       >
         <div className="w-full px-6 max-w-[1920px] mx-auto flex flex-col md:flex-row gap-4 md:gap-6 items-stretch md:items-center">
           {/* Título */}
@@ -222,8 +246,10 @@ export default function CatalogoLocacionesPage() {
         
         <div ref={scrollRef} className="custom-scrollbar w-full md:w-[45%] lg:w-[40%] xl:w-[35%] h-full overflow-y-auto bg-slate-950 z-10 shadow-[5px_0_30px_rgba(0,0,0,0.5)] flex flex-col relative">
           
-          <div className="sticky top-0 bg-slate-950/95 backdrop-blur z-20 px-6 py-4 border-b border-slate-800 flex justify-between items-center">
-             
+          <div
+            data-header-hidden={!headerVisible}
+            className={`locaciones-resultados-bar sticky top-0 z-20 px-6 py-4 border-b border-slate-800 flex justify-between items-center transition-[opacity,visibility,transform,max-height,padding,border-color] duration-300 ease-out ${headerVisible ? 'bg-slate-950/95 backdrop-blur' : ''}`}
+          >
              <div className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
                <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
                {locacionesFiltradas.length} resultados
@@ -248,7 +274,7 @@ export default function CatalogoLocacionesPage() {
                     <motion.div layout key={loc.id} variants={cardVariants} initial="hidden" animate="visible" exit="exit" whileHover={{ scale: 1.02, x: 4 }} className="group">
                       <Link href={`/locaciones/${loc.id}`} className="block relative">
                         <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-600/50 to-red-600/50 rounded-2xl opacity-0 group-hover:opacity-100 blur transition duration-500"></div>
-                        <div className="relative flex bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-orange-500/30 transition-all shadow-xl h-40 md:h-48 group-hover:bg-slate-900/90">
+                        <div className="relative flex bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-orange-500/30 transition-all shadow-xl min-h-[11rem] h-48 md:h-52 group-hover:bg-slate-900/90">
                           <div className="w-2/5 relative overflow-hidden">
                             <DepthAwareImage
                               imageUrl={loc.foto || 'https://via.placeholder.com/400x400'}
@@ -260,17 +286,17 @@ export default function CatalogoLocacionesPage() {
                             />
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent to-slate-900 mix-blend-multiply opacity-50"></div>
                           </div>
-                          <div className="w-3/5 p-6 flex flex-col justify-center relative z-10">
-                             <div className="flex justify-between items-start mb-3">
-                                <span className="text-[9px] font-black uppercase text-orange-400 tracking-wider bg-orange-500/10 px-2 py-1 rounded border border-orange-500/20 truncate max-w-[70%]">{loc.categoria}</span>
-                                <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium bg-black/30 px-2 py-1 rounded-full"><MapPin size={10} className="text-orange-500"/> {loc.ciudad}</span>
+                          <div className="w-3/5 flex flex-col justify-center relative z-10 px-5 py-5 md:px-6 md:py-6">
+                             <div className="mb-3 md:mb-4">
+                                <span className="text-[9px] font-black uppercase text-orange-400 tracking-wider bg-orange-500/10 px-2 py-1 rounded border border-orange-500/20 inline-block max-w-full truncate">{loc.categoria}</span>
                              </div>
-                             <div className="mb-2">
+                             <div className="mb-3 md:mb-4">
                                 <h3 className="text-lg font-bold text-white leading-tight group-hover:text-orange-400 transition-colors line-clamp-1 mb-2">{loc.nombre}</h3>
                                 <p className="text-slate-400 text-xs line-clamp-2 font-light leading-relaxed group-hover:text-slate-300">{loc.descripcion}</p>
                              </div>
-                             <div className="mt-2 pt-3 border-t border-slate-800/50 flex justify-end">
-                               <span className="text-[10px] font-bold text-slate-500 group-hover:text-white flex items-center gap-1 transition-colors uppercase tracking-wider">Ver Ficha <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform text-orange-500"/></span>
+                             <div className="mt-auto pt-3 border-t border-slate-800/50 flex justify-between items-center gap-3">
+                               <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium bg-black/30 px-2 py-1 rounded-full shrink-0"><MapPin size={10} className="text-orange-500"/> {loc.ciudad}</span>
+                               <span className="text-[10px] font-bold text-slate-500 group-hover:text-white flex items-center gap-1 transition-colors uppercase tracking-wider shrink-0">Ver Ficha <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform text-orange-500"/></span>
                              </div>
                           </div>
                         </div>

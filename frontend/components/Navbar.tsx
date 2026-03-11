@@ -124,6 +124,20 @@ export default function Navbar() {
     if (isMobileMenuOpen) setMobileNavVisible(true);
   }, [isMobileMenuOpen]);
 
+  // En /locaciones el scroll es del contenedor interno, no de window: la página emite este evento para ocultar/mostrar la barra al bajar/subir
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ visible: boolean }>) => {
+      if (typeof e.detail?.visible === 'boolean') setMobileNavVisible(e.detail.visible);
+    };
+    window.addEventListener('tdffilm-mobile-nav-visibility', handler as EventListener);
+    return () => window.removeEventListener('tdffilm-mobile-nav-visibility', handler as EventListener);
+  }, []);
+
+  // Al salir de /locaciones volver a mostrar la barra superior en móvil
+  useEffect(() => {
+    if (pathname !== '/locaciones' && typeof window !== 'undefined' && window.innerWidth < 768) setMobileNavVisible(true);
+  }, [pathname]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsUserMenuOpen(false);
@@ -510,10 +524,8 @@ export default function Navbar() {
       )}
     </nav>
 
-    {/* Barra inferior móvil: Locaciones, Guía, Proyectos — solo iconos, estilo glass, misma visibilidad que el nav */}
-    <div
-      className={`md:hidden fixed bottom-0 left-0 right-0 z-[9998] flex justify-center pb-6 px-4 transition-all duration-300 ${mobileNavVisible ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-8'}`}
-    >
+    {/* Barra inferior móvil: Locaciones, Guía, Proyectos — siempre visible (en /locaciones el scroll es interno, no window, y no debe quedar oculta) */}
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-[9998] flex justify-center pb-6 px-4">
       <div className="flex items-center gap-2 bg-black/20 backdrop-blur-xl p-1.5 rounded-full border border-white/5 shadow-xl">
         <Link
           href="/locaciones"
