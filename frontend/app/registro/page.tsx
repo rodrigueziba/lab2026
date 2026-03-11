@@ -42,9 +42,34 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (res.ok) {
+        // Auto-login: iniciar sesión con las mismas credenciales y redirigir a registro-prestador
+        try {
+          const loginRes = await fetch(`${apiUrl}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: form.email, password: form.password }),
+          });
+          if (loginRes.ok) {
+            const loginData = await loginRes.json();
+            localStorage.setItem('token', loginData.access_token);
+            localStorage.setItem('user', JSON.stringify(loginData.user));
+            window.dispatchEvent(new Event('storage'));
+            await Swal.fire({
+              title: '¡Cuenta creada!',
+              text: 'Ahora completá tu perfil profesional para aparecer en la Guía.',
+              icon: 'success',
+              confirmButtonColor: '#ea580c',
+              confirmButtonText: 'Continuar',
+            });
+            router.push('/registro-prestador');
+            return;
+          }
+        } catch (_) {
+          // Si el auto-login falla, redirigir al login como antes
+        }
         await Swal.fire({
             title: '¡Bienvenido!',
-            text: 'Tu cuenta ha sido creada exitosamente.',
+            text: 'Tu cuenta ha sido creada. Iniciá sesión para continuar.',
             icon: 'success',
             confirmButtonColor: '#ea580c',
             confirmButtonText: 'Iniciar Sesión'

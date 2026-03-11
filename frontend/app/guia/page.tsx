@@ -54,6 +54,8 @@ export default function GuiaPage() {
   const [rubroSeleccionado, setRubroSeleccionado] = useState("Todos");
 
   const [isScrolled, setIsScrolled] = useState(false);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastScrollY = useRef(0);
   const filtersRef = useRef<HTMLDivElement>(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   const [disable3D, setDisable3D] = useState(false);
@@ -100,6 +102,34 @@ export default function GuiaPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Cabecera se disuelve al bajar y reaparece al subir (solo en escritorio, ≥768px)
+  useEffect(() => {
+    const SCROLL_THRESHOLD = 60;
+    const handleScrollDirection = () => {
+      const w = typeof window !== 'undefined' ? window.innerWidth : 1920;
+      if (w < 768) {
+        setHeaderVisible(true);
+        lastScrollY.current = window.scrollY;
+        return;
+      }
+      const y = window.scrollY;
+      if (y <= SCROLL_THRESHOLD) {
+        setHeaderVisible(true);
+      } else if (y > lastScrollY.current) {
+        setHeaderVisible(false);
+      } else {
+        setHeaderVisible(true);
+      }
+      lastScrollY.current = y;
+    };
+    window.addEventListener('scroll', handleScrollDirection, { passive: true });
+    window.addEventListener('resize', handleScrollDirection);
+    return () => {
+      window.removeEventListener('scroll', handleScrollDirection);
+      window.removeEventListener('resize', handleScrollDirection);
+    };
+  }, []);
+
   const rubrosDisponibles = ["Todos", ...Array.from(new Set(prestadores
     .filter(p => tipoSeleccionado === "Todos" || p.tipoPerfil === tipoSeleccionado)
     .map(p => p.rubro)
@@ -117,11 +147,18 @@ export default function GuiaPage() {
       
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
+        @media (min-width: 768px) {
+          .guia-page-header[data-header-hidden="true"] {
+            opacity: 0;
+            pointer-events: none;
+          }
+        }
       `}</style>
 
-      {/* --- HEADER FLUIDO --- */}
+      {/* --- HEADER FLUIDO --- (en escritorio se disuelve al bajar, reaparece al subir) */}
       <div 
-        className={`fixed top-20 left-0 right-0 z-40 transition-all duration-500 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/95 ${
+        data-header-hidden={!headerVisible}
+        className={`guia-page-header fixed top-20 left-0 right-0 z-40 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/95 transition-[opacity,box-shadow] duration-300 ease-out ${
           isScrolled ? 'shadow-2xl' : ''
         }`}
       >

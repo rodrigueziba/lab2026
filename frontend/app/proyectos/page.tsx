@@ -83,6 +83,8 @@ export default function CarteleraProyectosPage() {
 
   // UI
   const [isScrolled, setIsScrolled] = useState(false);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastScrollY = useRef(0);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef<HTMLDivElement>(null); 
   const [hoveredId, setHoveredId] = useState<number | null>(null);
@@ -144,6 +146,34 @@ export default function CarteleraProyectosPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Cabecera se disuelve al bajar y reaparece al subir (solo en escritorio, ≥768px)
+  useEffect(() => {
+    const SCROLL_THRESHOLD = 60;
+    const handleScrollDirection = () => {
+      const w = typeof window !== 'undefined' ? window.innerWidth : 1920;
+      if (w < 768) {
+        setHeaderVisible(true);
+        lastScrollY.current = window.scrollY;
+        return;
+      }
+      const y = window.scrollY;
+      if (y <= SCROLL_THRESHOLD) {
+        setHeaderVisible(true);
+      } else if (y > lastScrollY.current) {
+        setHeaderVisible(false);
+      } else {
+        setHeaderVisible(true);
+      }
+      lastScrollY.current = y;
+    };
+    window.addEventListener('scroll', handleScrollDirection, { passive: true });
+    window.addEventListener('resize', handleScrollDirection);
+    return () => {
+      window.removeEventListener('scroll', handleScrollDirection);
+      window.removeEventListener('resize', handleScrollDirection);
+    };
+  }, []);
+
   const handleMouseEnter = (id: number) => {
     hoverTimerRef.current = setTimeout(() => setHoveredId(id), 600);
   };
@@ -167,11 +197,18 @@ export default function CarteleraProyectosPage() {
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         ::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; cursor: pointer; }
+        @media (min-width: 768px) {
+          .proyectos-page-header[data-header-hidden="true"] {
+            opacity: 0;
+            pointer-events: none;
+          }
+        }
       `}</style>
 
-      {/* --- HEADER FLUIDO --- */}
+      {/* --- HEADER FLUIDO --- (en escritorio se disuelve al bajar, reaparece al subir) */}
       <div 
-        className={`fixed top-20 left-0 right-0 z-40 transition-all duration-500 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/95 pb-3 ${
+        data-header-hidden={!headerVisible}
+        className={`proyectos-page-header fixed top-20 left-0 right-0 z-40 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/95 pb-3 transition-[opacity,box-shadow] duration-300 ease-out ${
           isScrolled ? 'shadow-2xl' : ''
         }`}
       >

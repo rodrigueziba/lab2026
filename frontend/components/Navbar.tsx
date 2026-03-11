@@ -22,6 +22,7 @@ export default function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const [user, setUser] = useState<any>(null);
+  const [tienePerfilPrestador, setTienePerfilPrestador] = useState<boolean | null>(null);
   const [userBlockHover, setUserBlockHover] = useState(false);
   const [beamColorIndex, setBeamColorIndex] = useState(0);
   const [userGlowProgress, setUserGlowProgress] = useState(0); // 0 = recién hover, 1 = 60s
@@ -53,6 +54,7 @@ export default function Navbar() {
 
       if (!token || !userStr) {
         setUser(null);
+        setTienePerfilPrestador(null);
         setNotificaciones([]);
         setUnreadCount(0);
         return;
@@ -70,9 +72,20 @@ export default function Navbar() {
         } else {
           setNotificaciones([]);
         }
+        // Comprobar si tiene al menos un perfil de prestador para mostrar CTA
+        const perfilesRes = await fetch(`${apiUrl}/prestador/mis-perfiles`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (perfilesRes.ok) {
+          const perfiles = await perfilesRes.json();
+          setTienePerfilPrestador(Array.isArray(perfiles) && perfiles.length > 0);
+        } else {
+          setTienePerfilPrestador(false);
+        }
       } catch (error) {
         setNotificaciones([]);
         setUnreadCount(0);
+        setTienePerfilPrestador(null);
       }
     };
     
@@ -184,7 +197,7 @@ export default function Navbar() {
       <Link
         href={href}
         onClick={onClick}
-        className={`flex items-center gap-3 text-xl font-bold transition-colors ${isActive ? 'text-orange-500' : 'text-slate-300 hover:text-white'}`}
+        className={`flex items-center gap-3 text-xl font-bold transition-colors min-h-[44px] py-3 touch-manipulation ${isActive ? 'text-orange-500' : 'text-slate-300 hover:text-white'}`}
       >
         <Icon size={22} className={isActive ? 'text-orange-500' : ''} />
         {label}
@@ -242,7 +255,8 @@ export default function Navbar() {
                 <div className="relative" ref={notifRef}>
                     <button 
                         onClick={() => setIsNotifOpen(!isNotifOpen)}
-                        className="relative p-2 text-slate-400 hover:text-yellow-400 transition rounded-full hover:bg-white/10 hover:drop-shadow-[0_0_12px_rgba(250,204,21,0.95)]"
+                        className="relative min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-slate-400 hover:text-yellow-400 transition rounded-full hover:bg-white/10 hover:drop-shadow-[0_0_12px_rgba(250,204,21,0.95)]"
+                        aria-label={unreadCount > 0 ? `Notificaciones (${unreadCount} sin leer)` : 'Notificaciones'}
                     >
                         <Bell size={20}/>
                         {unreadCount > 0 && (
@@ -340,6 +354,11 @@ export default function Navbar() {
                     </div>
 
                     <div className="p-3 space-y-1">
+                        {tienePerfilPrestador === false && (
+                          <Link href="/registro-prestador" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-400 font-bold text-sm hover:bg-orange-500/30 transition mb-2">
+                            ¡Aún no apareces en la Guía! Creá tu perfil de prestador ahora →
+                          </Link>
+                        )}
                         <Link href="/mis-proyectos" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition">
                         <Film size={18} className="text-orange-500"/> Gestionar Proyectos
                         </Link>
@@ -395,7 +414,7 @@ export default function Navbar() {
 
         <button
           type="button"
-          className="md:hidden relative z-[110] text-white p-2 -m-2 touch-manipulation"
+          className="md:hidden relative z-[110] text-white min-w-[44px] min-h-[44px] flex items-center justify-center p-2 -m-2 touch-manipulation"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           aria-expanded={isMobileMenuOpen}
           aria-label={isMobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
@@ -444,6 +463,11 @@ export default function Navbar() {
 
             {user ? (
               <>
+                {tienePerfilPrestador === false && (
+                  <Link href="/registro-prestador" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 p-4 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-400 font-bold text-sm hover:bg-orange-500/30 transition mb-2 min-h-[44px]">
+                    ¡Aún no apareces en la Guía! Creá tu perfil de prestador ahora →
+                  </Link>
+                )}
                 <div className="flex items-center gap-3 mb-4 bg-slate-900 p-4 rounded-xl">
                   <div className="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center text-white font-bold">{user.nombre?.[0] ?? 'U'}</div>
                   <div><p className="font-bold text-white">{user.nombre}</p><p className="text-xs text-slate-500">{user.email}</p></div>

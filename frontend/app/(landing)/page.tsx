@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { 
   UserPlus, 
@@ -25,24 +25,24 @@ const SplatScrollLanding = dynamic(
 
 // --- SECCIÓN: CÓMO FUNCIONA ---
 function ComoFuncionaSection() {
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.15 }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 40, scale: 0.95 },
-    show: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: { type: "spring" as const, stiffness: 80, damping: 15 }
-    }
-  };
-
+  const shouldReduceMotion = useReducedMotion();
+  const containerVariants = shouldReduceMotion
+    ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
+    : {
+        hidden: { opacity: 0 },
+        show: { opacity: 1, transition: { staggerChildren: 0.15 } }
+      };
+  const itemVariants = shouldReduceMotion
+    ? { hidden: { opacity: 1, y: 0, scale: 1 }, show: { opacity: 1, y: 0, scale: 1 } }
+    : {
+        hidden: { opacity: 0, y: 40, scale: 0.95 },
+        show: {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          transition: { type: "spring" as const, stiffness: 80, damping: 15 }
+        }
+      };
   return (
     // Quitamos el background sólido de aquí para controlarlo en el wrapper principal
     <div className="text-slate-300 relative overflow-hidden pb-10">
@@ -55,22 +55,22 @@ function ComoFuncionaSection() {
         
         {/* ENCABEZADO */}
         <motion.div 
-          initial={{ opacity: 0, y: -20 }}
+          initial={shouldReduceMotion ? false : { opacity: 0, y: -20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.6 }}
           className="text-center max-w-3xl mx-auto mb-16"
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/50 text-orange-500 text-xs font-bold tracking-widest uppercase mb-6 shadow-lg">
             <Sparkles size={14} />
             Guía de la Plataforma
           </div>
-          <h2 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight">
+          <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight">
             Impulsá tu carrera en el <br className="hidden md:block"/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-500">
               Sector Audiovisual
             </span>
-          </h2>
+          </h1>
           <p className="text-lg text-slate-400">
             Descubrí cómo la Film Commission TDF conecta tu talento con las mejores producciones de la provincia. Todo lo que necesitás saber si sos un prestador de servicios.
           </p>
@@ -78,9 +78,10 @@ function ComoFuncionaSection() {
 
         {/* BOTÓN DE MÁS INFORMACIÓN */}
         <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
+          initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.9 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.5 }}
           className="flex justify-center mb-20"
         >
           <Link href="/info">
@@ -164,9 +165,10 @@ function ComoFuncionaSection() {
         {/* CARACTERÍSTICAS ADICIONALES */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-24">
           <motion.div 
-            initial={{ opacity: 0, x: -30 }}
+            initial={shouldReduceMotion ? false : { opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.5 }}
             className="bg-gradient-to-br from-slate-900/60 to-slate-950/60 backdrop-blur-md border border-slate-700/50 rounded-3xl p-10 overflow-hidden relative shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_10px_30px_rgba(0,0,0,0.3)] transition-transform hover:-translate-y-1"
           >
             <MapPin size={120} className="absolute -bottom-10 -right-10 text-slate-800/50 rotate-12" />
@@ -185,9 +187,10 @@ function ComoFuncionaSection() {
           </motion.div>
 
           <motion.div 
-            initial={{ opacity: 0, x: 30 }}
+            initial={shouldReduceMotion ? false : { opacity: 0, x: 30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.5 }}
             className="bg-gradient-to-bl from-slate-900/60 to-slate-950/60 backdrop-blur-md border border-slate-700/50 rounded-3xl p-10 overflow-hidden relative shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_10px_30px_rgba(0,0,0,0.3)] transition-transform hover:-translate-y-1"
           >
             <Clapperboard size={120} className="absolute -bottom-10 -right-10 text-slate-800/50 -rotate-12" />
@@ -208,9 +211,10 @@ function ComoFuncionaSection() {
 
         {/* CALL TO ACTION */}
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.5 }}
           className="bg-gradient-to-r from-orange-600/90 to-red-600/90 backdrop-blur-md rounded-[3rem] p-12 text-center relative overflow-hidden shadow-[0_20px_40px_rgba(234,88,12,0.3)] border border-orange-500/50"
         >
           <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
@@ -223,7 +227,7 @@ function ComoFuncionaSection() {
           <div className="flex flex-col sm:flex-row justify-center gap-4 relative z-10">
             <Link href="/registro">
               <button className="px-8 py-4 bg-white text-orange-600 rounded-xl font-bold hover:bg-slate-100 hover:scale-105 transition-all shadow-xl w-full sm:w-auto">
-                Crear cuenta gratis
+                Crear mi Perfil Profesional
               </button>
             </Link>
             <Link href="/guia">
