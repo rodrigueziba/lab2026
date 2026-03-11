@@ -6,6 +6,7 @@ import { motion, AnimatePresence, Variants } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { ChevronLeft, ChevronRight, Search, MapPin, Mountain, ArrowRight, Filter } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
+import { getSectionCache, setSectionCache, SECTION_KEYS } from '@/lib/sectionCache';
 
 // Cargamos el mapa solo en el cliente
 const MapaTDF = dynamic(() => import('../../components/MapaTDF'), { 
@@ -77,6 +78,12 @@ export default function CatalogoLocacionesPage() {
   }, []);     
 
   useEffect(() => {
+    const cached = getSectionCache<Locacion[]>(SECTION_KEYS.locaciones);
+    if (cached != null) {
+      setLocaciones(cached);
+      setLoading(false);
+      return;
+    }
     fetch(`${apiUrl}/locacion`)
       .then(res => res.json())
       .then(data => {
@@ -91,6 +98,7 @@ export default function CatalogoLocacionesPage() {
           return { ...loc, lat, lng };
         });
         setLocaciones(dataConCoords);
+        setSectionCache(SECTION_KEYS.locaciones, dataConCoords);
         setLoading(false);
       })
       .catch(err => console.error(err));

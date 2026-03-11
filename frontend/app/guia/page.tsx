@@ -7,6 +7,7 @@ import {
   ChevronLeft, ChevronRight, ArrowRight, LayoutGrid, Plus, Dice5, HelpCircle 
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
+import { getSectionCache, setSectionCache, SECTION_KEYS } from '@/lib/sectionCache';
 
 const getInitials = (name: string) => {
   return name ? name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() : 'NN';
@@ -65,12 +66,20 @@ export default function GuiaPage() {
   }, []);
 
   useEffect(() => {
+    const cached = getSectionCache<Prestador[]>(SECTION_KEYS.guia);
+    if (cached != null) {
+      setPrestadores(cached);
+      setPrestadoresMostrados(cached);
+      setLoading(false);
+      return;
+    }
     fetch(`${apiUrl}/prestador`)
       .then(res => res.json())
-      .then(data => { 
-          setPrestadores(data); 
-          setPrestadoresMostrados(data); 
-          setLoading(false); 
+      .then(data => {
+          setPrestadores(data);
+          setPrestadoresMostrados(data);
+          setSectionCache(SECTION_KEYS.guia, data);
+          setLoading(false);
       })
       .catch(err => console.error(err));
   }, [apiUrl]);

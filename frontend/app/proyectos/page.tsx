@@ -8,6 +8,7 @@ import {
   ChevronLeft, ChevronRight, Plus, Dice5, Eye, Filter 
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
+import { getSectionCache, setSectionCache, SECTION_KEYS } from '@/lib/sectionCache';
 
 const getYoutubeId = (url: string) => {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -96,15 +97,23 @@ export default function CarteleraProyectosPage() {
   }, []);
 
   useEffect(() => {
+    const cached = getSectionCache<Proyecto[]>(SECTION_KEYS.proyectos);
+    if (cached != null) {
+      setProyectos(cached);
+      setProyectosMostrados(cached);
+      setLoading(false);
+      return;
+    }
     fetch(`${apiUrl}/proyecto`)
       .then(res => res.json())
-      .then(data => { 
-          setProyectos(data); 
-          setProyectosMostrados(data); 
-          setLoading(false); 
+      .then(data => {
+          setProyectos(data);
+          setProyectosMostrados(data);
+          setSectionCache(SECTION_KEYS.proyectos, data);
+          setLoading(false);
       })
       .catch(err => console.error(err));
-  }, []);
+  }, [apiUrl]);
 
   useEffect(() => {
     const filtrados = proyectos.filter(p => {
