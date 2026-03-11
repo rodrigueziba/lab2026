@@ -229,8 +229,8 @@ export default function Navbar() {
     );
   };
 
-  const navPadding = 'py-4 md:py-6';
-  const navHeight = 'min-h-[64px] md:min-h-0';
+  const navPadding = 'py-2.5 md:py-6';
+  const navHeight = 'min-h-[52px] md:min-h-0';
   // Móvil: siempre glass cuando visible; se oculta al bajar scroll y reaparece al subir
   const mobileGlass = 'bg-black/20 backdrop-blur-xl border-b border-white/5';
   const mobileHiddenVisual = !mobileNavVisible ? 'opacity-0 -translate-y-full' : '';
@@ -242,7 +242,7 @@ export default function Navbar() {
     <nav
       className={`fixed top-0 left-0 w-full z-[9999] md:z-[100] ${navHeight} ${navPadding} transition-all duration-300 ${mobileGlass} ${mobileHiddenVisual} ${mobilePointer} md:opacity-100 md:pointer-events-auto md:translate-y-0 md:bg-transparent md:backdrop-blur-none md:border-b-0 ${mdBg}`}
     >
-      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full min-h-[64px] md:min-h-0 relative z-[9993]">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 flex justify-between items-center h-full min-h-[48px] md:min-h-0 relative z-[9993]">
         
         <div className="flex items-center gap-2">
           <Link href="/" className="text-2xl font-black tracking-tighter text-white group">
@@ -453,67 +453,57 @@ export default function Navbar() {
 
       </div>
       
-      {/* MENÚ MÓVIL: overlay y panel con z-index alto dentro del nav para que funcionen en cualquier scroll */}
+      {/* MENÚ MÓVIL: dropdown bajo la barra (no full-screen); altura limitada para no tapar cabeceras */}
       {isMobileMenuOpen && (
         <>
-          <div className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[9990]" onClick={() => setIsMobileMenuOpen(false)} aria-hidden />
+          <div
+            className="md:hidden fixed inset-0 z-[9990] bg-black/30"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-hidden
+          />
           <div
             ref={mobileMenuPanelRef}
-            className="md:hidden fixed inset-0 z-[9991] bg-slate-950 overflow-y-auto overflow-x-hidden flex flex-col animate-in slide-in-from-right duration-300 pt-16"
+            className="md:hidden absolute top-full left-0 right-0 z-[9992] max-h-[65vh] overflow-y-auto overflow-x-hidden border-b border-slate-700/80 bg-slate-900/98 backdrop-blur-xl shadow-2xl animate-in slide-in-from-top-2 duration-200"
             style={{ WebkitOverflowScrolling: 'touch' }}
           >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 shrink-0 bg-slate-950 sticky top-0 z-10">
-              <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Menú</span>
-              <button
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-slate-200 transition-colors"
-                aria-label="Cerrar menú"
-              >
-                Cerrar
-              </button>
-            </div>
-            <div className="p-6 flex flex-col gap-6">
-            <MobileNavLink href="/locaciones" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={MapPin} label="Locaciones" />
-            <MobileNavLink href="/guia" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Users} label="Prestadores" />
-            <MobileNavLink href="/proyectos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Clapperboard} label="Proyectos" />
-
-            <div className="h-px bg-slate-700 my-2" />
-            <MobileNavLink href="/nodos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Atom} label="Nodos" />
-
-            {user?.role === 'admin' && (
-              <>
-                <div className="h-px bg-slate-700 my-2" />
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Admin</p>
-                <MobileNavLink href="/admin/panel" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label="Panel Admin" />
-              </>
-            )}
-
-            <div className="h-px bg-slate-800 my-2"></div>
-
-            {user ? (
-              <>
-                {tienePerfilPrestador === false && (
-                  <Link href="/registro-prestador" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 p-4 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-400 font-bold text-sm hover:bg-orange-500/30 transition mb-2 min-h-[44px]">
-                    ¡Aún no apareces en la Guía! Creá tu perfil de prestador ahora →
-                  </Link>
-                )}
-                <div className="flex items-center gap-3 mb-4 bg-slate-900 p-4 rounded-xl">
-                  <div className="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center text-white font-bold">{user.nombre?.[0] ?? 'U'}</div>
-                  <div><p className="font-bold text-white">{user.nombre}</p><p className="text-xs text-slate-500">{user.email}</p></div>
-                </div>
-                <MobileNavLink href="/mis-proyectos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Film} label="Mis Proyectos" />
-                <MobileNavLink href="/mis-postulaciones" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Briefcase} label="Mis Postulaciones" />
-                <MobileNavLink href="/mis-perfiles/solicitudes" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Inbox} label="Solicitudes Recibidas" />
-                <MobileNavLink href="/mi-perfil" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={User} label="Mi Perfil" />
-                <MobileNavLink href="/mi-cuenta" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label="Mi Cuenta" />
-                <button onClick={handleLogout} className="text-lg text-red-500 font-bold mt-4 flex items-center gap-2"><LogOut size={18}/> Cerrar Sesión</button>
-              </>
-            ) : (
-              <div className="flex flex-col gap-4">
-                <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-4 rounded-xl border border-slate-700 text-white font-bold">Ingresar</Link>
-                <Link href="/registro" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-4 rounded-xl bg-orange-600 text-white font-bold">Registrarse</Link>
-              </div>
-            )}
+            <div className="p-4 flex flex-col gap-1">
+              {user?.role === 'admin' && (
+                <>
+                  <p className="px-2 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Admin</p>
+                  <MobileNavLink href="/admin/panel" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label="Panel Admin" />
+                  <div className="h-px bg-slate-700 my-1" />
+                </>
+              )}
+              {user ? (
+                <>
+                  {tienePerfilPrestador === false && (
+                    <Link href="/registro-prestador" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-400 font-bold text-sm min-h-[44px]">
+                      Crear perfil de prestador →
+                    </Link>
+                  )}
+                  <div className="flex items-center gap-3 py-2 px-2 rounded-xl bg-slate-800/50">
+                    <div className="w-9 h-9 rounded-full bg-orange-600 flex items-center justify-center text-white font-bold text-sm">{user.nombre?.[0] ?? 'U'}</div>
+                    <div className="min-w-0"><p className="font-bold text-white truncate text-sm">{user.nombre}</p><p className="text-xs text-slate-500 truncate">{user.email}</p></div>
+                  </div>
+                  <MobileNavLink href="/mis-proyectos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Film} label="Mis Proyectos" />
+                  <MobileNavLink href="/mis-postulaciones" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Briefcase} label="Mis Postulaciones" />
+                  <MobileNavLink href="/mis-perfiles/solicitudes" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Inbox} label="Solicitudes Recibidas" />
+                  <MobileNavLink href="/mi-perfil" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={User} label="Mi Perfil" />
+                  <MobileNavLink href="/mi-cuenta" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label="Mi Cuenta" />
+                  <div className="h-px bg-slate-700 my-1" />
+                  <MobileNavLink href="/nodos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Atom} label="Nodos" />
+                  <button onClick={handleLogout} className="text-left text-red-400 font-bold py-3 px-4 flex items-center gap-2 text-sm mt-1"><LogOut size={18}/> Cerrar sesión</button>
+                </>
+              ) : (
+                <>
+                  <div className="h-px bg-slate-700 my-1" />
+                  <MobileNavLink href="/nodos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Atom} label="Nodos" />
+                  <div className="flex flex-col gap-2 pt-2">
+                    <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-3 rounded-xl border border-slate-600 text-white font-bold text-sm">Ingresar</Link>
+                    <Link href="/registro" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-3 rounded-xl bg-orange-600 text-white font-bold text-sm">Registrarse</Link>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </>
