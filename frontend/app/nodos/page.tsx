@@ -85,7 +85,9 @@ const aPos=gl.getAttribLocation(prog,'a_position');
 gl.useProgram(prog);gl.enableVertexAttribArray(aPos);
 gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
 const loc={res:gl.getUniformLocation(prog,'u_resolution'),time:gl.getUniformLocation(prog,'u_time'),spd:gl.getUniformLocation(prog,'u_speed'),dist:gl.getUniformLocation(prog,'u_distortion')};
-function resize(){const dpr=window.devicePixelRatio||1;canvas.width=Math.round(canvas.clientWidth*dpr);canvas.height=Math.round(canvas.clientHeight*dpr);}
+var shaderMaxDpr=0.5;
+var shaderResScale=0.6;
+function resize(){var dpr=window.devicePixelRatio||1;dpr=Math.min(dpr,shaderMaxDpr)*shaderResScale;canvas.width=Math.round(canvas.clientWidth*dpr);canvas.height=Math.round(canvas.clientHeight*dpr);}
 window.addEventListener('resize',resize);resize();
 const start=performance.now();
 (function loop(now){requestAnimationFrame(loop);curSpeed+=(targetSpeed-curSpeed)*LERP;curDist+=(targetDist-curDist)*LERP;resize();const t=(now-start)/1000;gl.viewport(0,0,canvas.width,canvas.height);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.time,t);gl.uniform1f(loc.spd,curSpeed);gl.uniform1f(loc.dist,curDist);gl.drawArrays(gl.TRIANGLES,0,6);})(performance.now());
@@ -261,14 +263,19 @@ interface Node2D {
   _angle: number; _tilt: number;
 }
 
+const BASE_SCALE_2D = 420;
+const ZOOM_OUT_2D_FALLBACK = 1.45;
+
 function NeuralCanvas2D({
   nodes,
   visibleLayers,
   onNodeClick,
+  zoomOut = 1,
 }: {
   nodes: Node2D[];
   visibleLayers: { prestador: boolean; proyecto: boolean; locacion: boolean };
   onNodeClick?: (node: Node2D) => void;
+  zoomOut?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
@@ -283,7 +290,7 @@ function NeuralCanvas2D({
     const my = (e.clientY - rect.top)  * (canvas.height / rect.height);
     const cx = canvas.width / 2;
     const W  = canvas.width; const H = canvas.height;
-    const scale = W / 420;
+    const scale = W / (BASE_SCALE_2D * zoomOut);
 
     for (const node of nodesRef.current) {
       const ciudad = normalizarCiudad(node.ciudad);
@@ -294,7 +301,7 @@ function NeuralCanvas2D({
       const nr = (node.type === 'proyecto' ? 7 : node.type === 'locacion' ? 5 : 4) * scale;
       if (Math.hypot(mx - nx, my - ny) < nr * 2.5) { onNodeClick(node); return; }
     }
-  }, [onNodeClick]);
+  }, [onNodeClick, zoomOut]);
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
@@ -302,12 +309,13 @@ function NeuralCanvas2D({
     const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
     resize();
     window.addEventListener('resize', resize);
+    const zoom = zoomOut;
 
     const loop = () => {
       const W = canvas.width; const H = canvas.height; const cx = W / 2;
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = '#000010'; ctx.fillRect(0, 0, W, H);
-      const scale = W / 420;
+      const scale = W / (BASE_SCALE_2D * zoom);
 
       const ciudades = ['Río Grande', 'Tolhuin', 'Ushuaia'];
       ciudades.forEach(ciudad => {
@@ -372,7 +380,7 @@ function NeuralCanvas2D({
 
     rafRef.current = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(rafRef.current); window.removeEventListener('resize', resize); };
-  }, [visibleLayers]);
+  }, [visibleLayers, zoomOut]);
 
   return (
     <canvas
@@ -955,8 +963,8 @@ export default function AdminDashboardPage() {
       {/* 3. FILTRO TV */}
       <TVOverlay/>
 
-      {/* 4. PANEL IZQUIERDO — en móvil: minimizado con botón para abrir; al abrir, centrado y con cerrar */}
-      {isMobile ? (
+      {/* 4. PANEL — móvil o fallback 2D: menú con botón; escritorio 3D: panel fijo */}
+      {(isMobile || force2D) ? (
         <>
           {mobilePanelOpen && (
             <>
@@ -972,7 +980,7 @@ export default function AdminDashboardPage() {
                 visibleLayers={visibleLayers}
                 toggleLayer={toggleLayer}
                 resetCamera={resetCamera}
-                isMobile={isMobile}
+                isMobile={true}
                 mobileExpanded
                 onMobileClose={() => setMobilePanelOpen(false)}
               />
@@ -997,7 +1005,7 @@ export default function AdminDashboardPage() {
           visibleLayers={visibleLayers}
           toggleLayer={toggleLayer}
           resetCamera={resetCamera}
-          isMobile={isMobile}
+          isMobile={false}
         />
       )}
 
@@ -1065,13 +1073,14 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* 7B. CANVAS 2D — Mobile o fallback por timeout (bajo recursos) */}
+      {/* 7B. CANVAS 2D — Mobile o fallback por timeout (bajo recursos); en fallback cámara más lejos */}
       {(isMobile || force2D) && !loading && (
         <div className="absolute inset-0 z-20">
           <NeuralCanvas2D
             nodes={nodes2D}
             visibleLayers={visibleLayers}
             onNodeClick={n => setMobileTooltip({ name:n.name??'', type:n.type, subTipo:n.subTipo, ciudad:n.ciudad })}
+            zoomOut={force2D ? ZOOM_OUT_2D_FALLBACK : 1}
           />
           <MobileTooltip node={mobileTooltip} onClose={() => setMobileTooltip(null)}/>
         </div>
@@ -1085,19 +1094,17 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* 8. MARCAS DE AGUA (desktop: 3D y 2D) */}
-      {!isMobile && <CityWatermarks/>}
+      {/* 8. MARCAS DE AGUA (solo desktop 3D) */}
+      {!isMobile && !force2D && <CityWatermarks/>}
 
-      {/* 9. BOTONES INFERIORES (desktop) */}
-      {!isMobile && (
+      {/* 9. BOTONES INFERIORES (solo desktop 3D) */}
+      {!isMobile && !force2D && (
         <div className="absolute bottom-8 right-8 z-50 flex gap-2">
-          {!force2D && (
-            <button
-              onClick={() => graphRef.current?.zoomToFit(400)}
-              className="bg-slate-900/80 backdrop-blur p-3 rounded-full text-white hover:bg-orange-600 transition shadow-lg border border-white/10"
-              title="Zoom para ver todo"
-            ><Maximize size={20}/></button>
-          )}
+          <button
+            onClick={() => graphRef.current?.zoomToFit(400)}
+            className="bg-slate-900/80 backdrop-blur p-3 rounded-full text-white hover:bg-orange-600 transition shadow-lg border border-white/10"
+            title="Zoom para ver todo"
+          ><Maximize size={20}/></button>
           <button
             onClick={() => window.location.reload()}
             className="bg-slate-900/80 backdrop-blur p-3 rounded-full text-white hover:bg-orange-600 transition shadow-lg border border-white/10"
