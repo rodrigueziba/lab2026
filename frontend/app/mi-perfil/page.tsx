@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { User, Briefcase, Plus, Edit, Trash2, Loader2, MapPin } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
+import ProfileHealth from '@/components/ProfileHealth';
 
 export default function MisPerfilesPage() {
   const router = useRouter();
@@ -62,13 +63,13 @@ export default function MisPerfilesPage() {
       <div className="max-w-5xl mx-auto">
         
         {/* ENCABEZADO */}
-        <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-12 border-b border-slate-800 pb-8">
+        <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8 border-b border-slate-800 pb-8">
             <div>
                 <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
                     <Briefcase className="text-orange-500" size={32}/> Mis Perfiles Profesionales
                 </h1>
                 <p className="text-slate-400 text-lg">
-                    Gestiona tus identidades en la plataforma. Puedes tener un perfil personal y otros empresariales.
+                    Gestiona tus identidades en la plataforma. Podés tener un perfil personal y otros empresariales.
                 </p>
             </div>
             
@@ -79,6 +80,12 @@ export default function MisPerfilesPage() {
                 <Plus size={20}/> Nuevo Perfil
             </Link>
         </div>
+
+        {perfiles.length > 0 && (
+          <div className="mb-10">
+            <ProfileHealth perfiles={perfiles} />
+          </div>
+        )}
 
         {/* LISTA DE PERFILES */}
         {perfiles.length === 0 ? (

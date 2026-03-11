@@ -58,6 +58,14 @@ export class CreateProyectoDto {
   @IsOptional()
   esRemunerado?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  esBorrador?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  esPlantilla?: boolean;
+
   @IsString()
   @IsNotEmpty()
   ciudad: string;

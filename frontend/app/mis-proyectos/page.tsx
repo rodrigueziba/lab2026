@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Edit, Trash2, Plus, Film, Users, Eye, MapPin, Calendar } from 'lucide-react';
+import { Edit, Trash2, Plus, Film, Users, Eye, MapPin, Calendar, Copy, Bookmark } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
 
 export default function MisProyectosPage() {
@@ -23,19 +23,19 @@ export default function MisProyectosPage() {
     
     const userData = JSON.parse(userStr);
     setUser(userData);
-    fetch(`${apiUrl}/proyecto`)
+    fetch(`${apiUrl}/proyecto/mis-proyectos`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
       .then(res => res.json())
       .then(data => {
-        const misProyectos = data.filter((p: any) => p.userId === userData.id);
-        setProyectos(misProyectos);
+        setProyectos(Array.isArray(data) ? data : []);
         setLoading(false);
       })
-      .catch(err => console.error(err));
+      .catch(() => setLoading(false));
   }, [router]);
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Estás seguro de eliminar este proyecto? Esta acción es irreversible.')) return;
-
     try {
       const token = localStorage.getItem('token');
       await fetch(`${apiUrl}/proyecto/${id}`, {
@@ -43,8 +43,46 @@ export default function MisProyectosPage() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setProyectos(proyectos.filter(p => p.id !== id));
-    } catch (error) {
-      alert("Error al eliminar");
+    } catch {
+      alert('Error al eliminar');
+    }
+  };
+
+  const handleDuplicar = async (id: number) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${apiUrl}/proyecto/duplicar/${id}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const copia = await res.json();
+        setProyectos([copia, ...proyectos]);
+        router.push(`/mis-proyectos/editar/${copia.id}`);
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Error al duplicar');
+      }
+    } catch {
+      alert('Error de conexión');
+    }
+  };
+
+  const handleGuardarComoPlantilla = async (id: number) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${apiUrl}/proyecto/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ esPlantilla: true }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setProyectos(proyectos.map(pr => pr.id === id ? updated : pr));
+        alert('Guardado como plantilla. Podés usarlo para crear nuevos proyectos.');
+      } else alert('Error al guardar como plantilla');
+    } catch {
+      alert('Error de conexión');
     }
   };
 
@@ -118,11 +156,21 @@ export default function MisProyectosPage() {
 
                 {/* 2. INFO (Centro) */}
                 <div className="flex-1 p-6 md:p-8 flex flex-col justify-center">
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
                     <h3 className="text-2xl font-bold text-white group-hover:text-orange-500 transition">
                       {p.titulo}
                     </h3>
-                    {p.estado === 'Abierto' && (
+                    {p.esBorrador && (
+                      <span className="text-[10px] font-bold uppercase text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+                        Borrador
+                      </span>
+                    )}
+                    {p.esPlantilla && (
+                      <span className="text-[10px] font-bold uppercase text-violet-400 bg-violet-400/10 px-2 py-0.5 rounded border border-violet-400/20 flex items-center gap-1">
+                        <Bookmark size={10}/> Plantilla
+                      </span>
+                    )}
+                    {!p.esBorrador && !p.esPlantilla && p.estado === 'Abierto' && (
                       <span className="text-[10px] font-bold uppercase text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Activo
                       </span>
@@ -142,36 +190,56 @@ export default function MisProyectosPage() {
                   </div>
 
                   {/* Acciones Rápidas */}
-                  <div className="flex gap-3 mt-auto pt-4 border-t border-slate-800/50">
-                     <Link 
-                       href={`/proyectos/${p.id}`} 
-                       className="text-xs font-bold text-slate-300 hover:text-white flex items-center gap-1 transition"
-                     >
-                       <Eye size={14}/> Ver como Visitante
-                     </Link>
+                  <div className="flex flex-wrap gap-3 mt-auto pt-4 border-t border-slate-800/50">
+                     {!p.esBorrador && !p.esPlantilla && (
+                       <Link 
+                         href={`/proyectos/${p.id}`} 
+                         className="text-xs font-bold text-slate-300 hover:text-white flex items-center gap-1 transition"
+                       >
+                         <Eye size={14}/> Ver como Visitante
+                       </Link>
+                     )}
                   </div>
                 </div>
 
                 {/* 3. BOTONES ACCIÓN (Derecha) */}
-                <div className="p-6 md:border-l border-slate-800 flex md:flex-col justify-center gap-3 bg-slate-900/50">
+                <div className="p-6 md:border-l border-slate-800 flex flex-wrap md:flex-col justify-center gap-3 bg-slate-900/50">
                  <Link 
-                href={`/mis-proyectos/editar/${p.id}`}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white px-4 py-2 rounded-lg transition text-xs font-bold"
-                    >
-                    <Edit size={16} /> Editar
-                </Link>
-                <Link 
-  href={`/mis-proyectos/candidatos/${p.id}`}
-  className="flex items-center gap-2 bg-slate-800 hover:bg-orange-600 text-slate-300 hover:text-white px-4 py-2 rounded-lg transition text-xs font-bold"
->
-  <Users size={16} /> Ver Candidatos
-</Link>
-                  <button 
-                    onClick={() => handleDelete(p.id)} 
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-red-600 text-slate-300 hover:text-white px-4 py-2 rounded-lg transition text-xs font-bold"
-                  >
-                    <Trash2 size={16} /> Borrar
-                  </button>
+                   href={`/mis-proyectos/editar/${p.id}`}
+                   className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white px-4 py-2 rounded-lg transition text-xs font-bold"
+                 >
+                   <Edit size={16} /> Editar
+                 </Link>
+                 {!p.esBorrador && (
+                   <Link 
+                     href={`/mis-proyectos/candidatos/${p.id}`}
+                     className="flex items-center gap-2 bg-slate-800 hover:bg-orange-600 text-slate-300 hover:text-white px-4 py-2 rounded-lg transition text-xs font-bold"
+                   >
+                     <Users size={16} /> Ver Candidatos
+                   </Link>
+                 )}
+                 <button 
+                   onClick={() => handleDuplicar(p.id)} 
+                   className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-cyan-600 text-slate-300 hover:text-white px-4 py-2 rounded-lg transition text-xs font-bold"
+                   title="Duplicar proyecto"
+                 >
+                   <Copy size={16} /> Duplicar
+                 </button>
+                 {!p.esPlantilla && (
+                   <button 
+                     onClick={() => handleGuardarComoPlantilla(p.id)} 
+                     className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-violet-600 text-slate-300 hover:text-white px-4 py-2 rounded-lg transition text-xs font-bold"
+                     title="Guardar como plantilla"
+                   >
+                     <Bookmark size={16} /> Plantilla
+                   </button>
+                 )}
+                 <button 
+                   onClick={() => handleDelete(p.id)} 
+                   className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-red-600 text-slate-300 hover:text-white px-4 py-2 rounded-lg transition text-xs font-bold"
+                 >
+                   <Trash2 size={16} /> Borrar
+                 </button>
                 </div>
 
               </div>

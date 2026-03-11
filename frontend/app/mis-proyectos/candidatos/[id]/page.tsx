@@ -2,7 +2,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, User, Mail, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Mail, CheckCircle, XCircle, Loader2, MessageCircle } from 'lucide-react';
 
 export default function GestionCandidatosPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -31,6 +31,14 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
         if (resPost.ok) {
           const data = await resPost.json();
           setCandidatos(data);
+          data.forEach((post: any) => {
+            if (post.estado === 'Pendiente') {
+              fetch(`${apiUrl}/postulacion/${post.id}/vista`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}` },
+              }).then(() => {}).catch(() => {});
+            }
+          });
         }
       } catch (error) {
         console.error(error);
@@ -41,7 +49,7 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
     fetchData();
   }, [id, router]);
 
-  const handleUpdateEstado = async (postulacionId: number, nuevoEstado: 'Aceptada' | 'Rechazada') => {
+  const handleUpdateEstado = async (postulacionId: number, nuevoEstado: 'Aceptada' | 'Rechazada' | 'En consideración') => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -56,14 +64,10 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
       });
 
       if (res.ok) {
-        // Actualizamos la lista localmente para ver el cambio instantáneo
         setCandidatos(prev => prev.map(c => 
           c.id === postulacionId ? { ...c, estado: nuevoEstado } : c
         ));
-        
-        if(nuevoEstado === 'Aceptada') {
-            alert("¡Postulación Aceptada! 🎉");
-        }
+        if (nuevoEstado === 'Aceptada') alert('¡Postulación aceptada! 🎉');
       } else {
         alert("Error al actualizar el estado.");
       }
@@ -143,18 +147,28 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
                       </button>
                   )}
 
-                  {/* Botón Rechazar (Solo si NO está rechazada ya) */}
+                  {c.estado !== 'Rechazada' && c.estado !== 'Aceptada' && (
+                    <button
+                      onClick={() => handleUpdateEstado(c.id, 'En consideración')}
+                      title="En consideración / Entrevista"
+                      className="p-3 bg-slate-800 hover:bg-amber-600 text-amber-400 hover:text-white rounded-full transition border border-slate-700"
+                    >
+                      <MessageCircle size={18}/>
+                    </button>
+                  )}
                   {c.estado !== 'Rechazada' && (
-                      <button 
-                        onClick={() => handleUpdateEstado(c.id, 'Rechazada')}
-                        title="Rechazar" 
-                        className="p-3 bg-slate-800 hover:bg-red-600 text-red-500 hover:text-white rounded-full transition border border-slate-700"
-                      >
-                        <XCircle size={18}/>
-                      </button>
+                    <button 
+                      onClick={() => handleUpdateEstado(c.id, 'Rechazada')}
+                      title="Rechazar" 
+                      className="p-3 bg-slate-800 hover:bg-red-600 text-red-500 hover:text-white rounded-full transition border border-slate-700"
+                    >
+                      <XCircle size={18}/>
+                    </button>
                   )}
 
                   {/* Badges de Estado */}
+                  {c.estado === 'Vista' && <span className="text-slate-400 font-bold text-xs px-2 py-1.5 bg-slate-700/50 rounded-lg">Vista</span>}
+                  {c.estado === 'En consideración' && <span className="text-amber-400 font-bold text-sm px-3 py-2 bg-amber-500/10 rounded-lg border border-amber-500/20 flex items-center gap-2"><MessageCircle size={14}/> En consideración</span>}
                   {c.estado === 'Aceptada' && <span className="text-emerald-400 font-bold text-sm px-3 py-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20 flex items-center gap-2"><CheckCircle size={14}/> Aceptado</span>}
                   {c.estado === 'Rechazada' && <span className="text-red-400 font-bold text-sm px-3 py-2 bg-red-500/10 rounded-lg border border-red-500/20 flex items-center gap-2"><XCircle size={14}/> Rechazado</span>}
                   

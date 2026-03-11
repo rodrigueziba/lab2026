@@ -107,10 +107,26 @@ Genera una lista de roles o puestos que suele necesitar este tipo de proyecto (e
     return this.proyectoService.create(createProyectoDto, req.user.userId);
   }
 
-  // GET: Ver Todos (Público 🌍)
+  // GET: Ver Todos - Cartelera pública (excluye borradores y plantillas)
   @Get()
   findAll() {
     return this.proyectoService.findAll();
+  }
+
+  // GET: Mis proyectos (incluye borradores y plantillas)
+  @Get('mis-proyectos')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  findMy(@Request() req: any) {
+    return this.proyectoService.findMyProjects(req.user.userId);
+  }
+
+  // POST: Duplicar proyecto (crea copia como borrador)
+  @Post('duplicar/:id')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  duplicate(@Param('id') id: string, @Request() req: any) {
+    return this.proyectoService.duplicate(+id, req.user.userId);
   }
 
   // GET: Ver Uno (Público 🌍)

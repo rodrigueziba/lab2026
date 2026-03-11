@@ -22,8 +22,9 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   const [candidatos, setCandidatos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-  
-  const [misPostulaciones, setMisPostulaciones] = useState<number[]>([]); 
+  const [misPostulaciones, setMisPostulaciones] = useState<number[]>([]);
+  const [misPerfiles, setMisPerfiles] = useState<Array<{ id: number; nombre: string; rubro: string }>>([]);
+  const [perfilElegidoId, setPerfilElegidoId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -49,11 +50,20 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
              });
              if (resMyApps.ok) {
                 const apps = await resMyApps.json();
-                // Filtramos cuáles son mías
                 const misApps = apps
-                  .filter((a: any) => a.postulanteId === user.id) // OJO: Asegúrate que user.id existe
+                  .filter((a: any) => a.postulanteId === user.id)
                   .map((a: any) => a.puestoId);
                 setMisPostulaciones(misApps);
+             }
+             const resPerfiles = await fetch(`${apiUrl}/prestador/mis-perfiles`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+             });
+             if (resPerfiles.ok) {
+                const perfiles = await resPerfiles.json();
+                setMisPerfiles(Array.isArray(perfiles) ? perfiles : []);
+                if (Array.isArray(perfiles) && perfiles.length > 0 && !perfilElegidoId) {
+                  setPerfilElegidoId(perfiles[0].id);
+                }
              }
            }
         }
@@ -74,7 +84,14 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
       return;
     }
 
-    if (!confirm(`¿Confirmas tu postulación para: ${puestoNombre}?`)) return;
+    if (!confirm(`¿Confirmás tu postulación para: ${puestoNombre}?`)) return;
+
+    const body: { proyectoId: number; puestoId: number; mensaje: string; prestadorId?: number } = {
+      proyectoId: parseInt(id),
+      puestoId: puestoId,
+      mensaje: "¡Hola! Quiero sumarme al equipo."
+    };
+    if (perfilElegidoId) body.prestadorId = perfilElegidoId;
 
     try {
       const res = await fetch(`${apiUrl}/postulacion`, {
@@ -83,11 +100,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({
-          proyectoId: parseInt(id),
-          puestoId: puestoId,
-          mensaje: "¡Hola! Quiero sumarme al equipo."
-        })
+        body: JSON.stringify(body)
       });
 
       if (res.ok) {
@@ -200,9 +213,23 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
            )}
         </div>
 
-        {/* DERECHA: VACANTES (AQUÍ ESTÁ LA MAGIA) */}
+        {/* DERECHA: VACANTES */}
         <div className="space-y-6" id="vacantes-section">
            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sticky top-6">
+              {misPerfiles.length > 1 && (
+                <div className="mb-4 pb-4 border-b border-slate-800">
+                  <label className="block text-xs font-bold uppercase text-slate-500 mb-2">Postularme con mi perfil</label>
+                  <select
+                    value={perfilElegidoId ?? ''}
+                    onChange={(e) => setPerfilElegidoId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-orange-500"
+                  >
+                    {misPerfiles.map((p) => (
+                      <option key={p.id} value={p.id}>{p.nombre} · {p.rubro}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <h3 className="font-black text-xl mb-6 flex items-center gap-2"><Users className="text-orange-600"/> VACANTES ({proyecto.puestos.length})</h3>
               
               <div className="space-y-4">

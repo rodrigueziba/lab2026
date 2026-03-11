@@ -42,6 +42,11 @@ export class PostulacionController {
     return this.postulacionService.update(+id, updatePostulacionDto);
   }
 
+  @Patch(':id/vista')
+  marcarVista(@Param('id') id: string) {
+    return this.postulacionService.marcarVista(+id);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.postulacionService.remove(+id);

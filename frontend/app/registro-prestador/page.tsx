@@ -416,7 +416,7 @@ export default function RegistroPrestadorPage() {
         ) : (
           <button 
             type="button"
-            onClick={() => document.getElementById('form-registro-prestador')?.requestSubmit()}
+            onClick={() => (document.getElementById('form-registro-prestador') as HTMLFormElement | null)?.requestSubmit()}
             disabled={loading || uploading}
             className="w-full max-w-4xl mx-auto min-h-[48px] flex justify-center items-center gap-3 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black py-4 rounded-full transition-all shadow-lg shadow-blue-900/30 disabled:opacity-50"
           >

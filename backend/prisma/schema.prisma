@@ -65,6 +65,7 @@ model Prestador {
   userId      Int
   user        User    @relation(fields: [userId], references: [id])
   solicitudes         SolicitudContacto[]
+  postulaciones       Postulacion[]  // Postulaciones hechas con este perfil
 
   fechaNacimiento DateTime?
   formacion     String?       // Ej: "Diseño de Imagen y Sonido - UBA"
@@ -117,6 +118,8 @@ model Proyecto {
   fechaFin    DateTime? 
   esEstudiante Boolean  @default(false) // ¿Es tesis/trabajo práctico?
   esRemunerado Boolean  @default(false) // ¿Hay paga?
+  esBorrador   Boolean  @default(false) // No se muestra en cartelera hasta publicar
+  esPlantilla  Boolean  @default(false) // Guardado como plantilla para duplicar
 
   userId      Int
   user        User      @relation(fields: [userId], references: [id])
@@ -143,7 +146,7 @@ model Puesto {
 model Postulacion {
   id           Int      @id @default(autoincrement())
   mensaje      String?  @db.Text
-  estado       String   @default("Pendiente") // Pendiente, Aceptada, Rechazada
+  estado       String   @default("Pendiente") // Pendiente, Vista, En consideración, Aceptada, Rechazada
   
   proyectoId   Int
   proyecto     Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
@@ -153,6 +156,8 @@ model Postulacion {
   
   postulanteId Int
   postulante   User     @relation(fields: [postulanteId], references: [id], onDelete: Cascade)
+  prestadorId  Int?     // Perfil con el que se postuló (opcional, retrocompatible)
+  prestador    Prestador? @relation(fields: [prestadorId], references: [id], onDelete: SetNull)
 
   createdAt    DateTime @default(now())
 }

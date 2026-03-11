@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
-  Loader2, Briefcase, Calendar, CheckCircle, XCircle, Clock, ArrowRight 
+  Loader2, Briefcase, Calendar, CheckCircle, XCircle, Clock, ArrowRight, Eye, MessageCircle 
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
 
@@ -92,24 +92,40 @@ export default function MisPostulacionesPage() {
                   {post.mensaje && (
                     <p className="text-xs text-slate-500 italic line-clamp-1">"{post.mensaje}"</p>
                   )}
+                  {/* Perfil con el que te postulaste */}
+                  {post.prestador && (
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Como: <span className="text-slate-400 font-medium">{post.prestador.nombre}</span> · {post.prestador.rubro}
+                    </p>
+                  )}
                 </div>
 
-                {/* Estado y Acción */}
-                <div className="flex flex-col items-end gap-3 min-w-[140px]">
-                   {/* BADGES DE ESTADO */}
-                   {post.estado === 'Pendiente' && (
-                     <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-500 text-xs font-bold border border-yellow-500/20">
-                        <Clock size={14}/> En Revisión
+                {/* Estado y trazabilidad */}
+                <div className="flex flex-col items-end gap-3 min-w-[160px]">
+                   {/* BADGES DE ESTADO (trazabilidad tipo MercadoLibre) */}
+                   {(post.estado === 'Pendiente' || post.estado === 'Enviada') && (
+                     <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 text-blue-400 text-xs font-bold border border-blue-500/20">
+                        <Clock size={14} aria-hidden/> Enviada
+                     </span>
+                   )}
+                   {post.estado === 'Vista' && (
+                     <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-500/10 text-slate-400 text-xs font-bold border border-slate-500/20">
+                        <Eye size={14} aria-hidden/> Vista por la productora
+                     </span>
+                   )}
+                   {post.estado === 'En consideración' && (
+                     <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 text-xs font-bold border border-amber-500/20">
+                        <MessageCircle size={14} aria-hidden/> En consideración
                      </span>
                    )}
                    {post.estado === 'Aceptada' && (
-                     <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
-                        <CheckCircle size={14}/> ¡Seleccionado!
+                     <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                        <CheckCircle size={14} aria-hidden/> ¡Aceptada!
                      </span>
                    )}
                    {post.estado === 'Rechazada' && (
-                     <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 text-red-400 text-xs font-bold border border-red-500/20">
-                        <XCircle size={14}/> No seleccionado
+                     <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 text-xs font-bold border border-red-500/20">
+                        <XCircle size={14} aria-hidden/> No seleccionada
                      </span>
                    )}
 

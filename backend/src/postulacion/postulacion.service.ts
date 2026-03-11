@@ -27,10 +27,13 @@ export class PostulacionService {
 
     const nuevaPostulacion = await this.prisma.postulacion.create({
       data: {
-        ...createPostulacionDto,
+        proyectoId: createPostulacionDto.proyectoId,
+        puestoId: createPostulacionDto.puestoId,
+        mensaje: createPostulacionDto.mensaje,
+        prestadorId: createPostulacionDto.prestadorId ?? null,
         postulanteId: userId,
-        estado: 'Pendiente'
-      }
+        estado: 'Pendiente',
+      },
     });
 
     // Buscamos el proyecto para saber quién es el dueño (userId)
@@ -152,10 +155,18 @@ export class PostulacionService {
       include: {
         proyecto: true,
         puesto: true,
+        prestador: { select: { id: true, nombre: true, rubro: true } },
       },
       orderBy: {
         createdAt: 'desc',
       },
+    });
+  }
+
+  async marcarVista(id: number) {
+    return this.prisma.postulacion.update({
+      where: { id },
+      data: { estado: 'Vista' },
     });
   }
 

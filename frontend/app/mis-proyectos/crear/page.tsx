@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Plus, Trash2, Link as LinkIcon, Calendar, DollarSign, 
-  GraduationCap, Film, Briefcase, X, Image as ImageIcon, Loader2, MapPin, ArrowLeft, Sparkles 
+  GraduationCap, Film, Briefcase, X, Image as ImageIcon, Loader2, MapPin, ArrowLeft, Sparkles, Eye, Bookmark 
 } from 'lucide-react';
 
 // Inicializar Supabase
@@ -18,8 +18,9 @@ export default function CrearProyectoPage() {
   const [loading, setLoading] = useState(false);
   const [sugerirPuestosLoading, setSugerirPuestosLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
+  const [plantillas, setPlantillas] = useState<any[]>([]);
 
-  // Verificar que el usuario esté logueado antes de mostrar el formulario
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -27,7 +28,14 @@ export default function CrearProyectoPage() {
       return;
     }
     setCheckingAuth(false);
-  }, [router]);
+    fetch(`${apiUrl}/proyecto/mis-proyectos`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => res.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : [];
+        setPlantillas(list.filter((p: any) => p.esPlantilla));
+      })
+      .catch(() => {});
+  }, [router, apiUrl]);
   
   const [formData, setFormData] = useState({
     titulo: '',
@@ -177,6 +185,8 @@ export default function CrearProyectoPage() {
 
       const payload = {
         ...formData,
+        esBorrador: false,
+        esPlantilla: false,
         referencias: referencias.filter(r => r.trim() !== ''),
         puestos: puestos.filter(p => p.nombre.trim() !== ''),
         galeria: galeriaUrls,
@@ -204,10 +214,71 @@ export default function CrearProyectoPage() {
       }
     } catch (err) {
       console.error(err);
-      alert("Error de conexión.");
+      alert('Error de conexión.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGuardarBorrador = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return router.push('/login');
+      const galeriaUrls: string[] = [];
+      for (const file of imagenes) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
+        const { error } = await supabase.storage.from('proyectos').upload(fileName, file);
+        if (!error) {
+          const { data } = supabase.storage.from('proyectos').getPublicUrl(fileName);
+          galeriaUrls.push(data.publicUrl);
+        }
+      }
+      const payload = {
+        ...formData,
+        esBorrador: true,
+        esPlantilla: false,
+        referencias: referencias.filter(r => r.trim() !== ''),
+        puestos: puestos.filter(p => p.nombre.trim() !== ''),
+        galeria: galeriaUrls,
+        foto: galeriaUrls[0] ?? undefined,
+        fechaInicio: formData.fechaInicio ? new Date(formData.fechaInicio).toISOString() : null,
+        fechaFin: formData.fechaFin ? new Date(formData.fechaFin).toISOString() : null,
+      };
+      const res = await fetch(`${apiUrl}/proyecto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        alert('Borrador guardado. Podés editarlo desde Mis Proyectos.');
+        router.push('/mis-proyectos');
+      } else {
+        const error = await res.json();
+        alert(error.message || 'Error al guardar borrador');
+      }
+    } catch {
+      alert('Error de conexión.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cargarDesdePlantilla = (proyecto: any) => {
+    setFormData({
+      titulo: proyecto.titulo,
+      descripcion: proyecto.descripcion,
+      tipo: proyecto.tipo,
+      ciudad: proyecto.ciudad || 'Ushuaia',
+      fechaInicio: proyecto.fechaInicio ? new Date(proyecto.fechaInicio).toISOString().split('T')[0] : '',
+      fechaFin: proyecto.fechaFin ? new Date(proyecto.fechaFin).toISOString().split('T')[0] : '',
+      esEstudiante: proyecto.esEstudiante ?? false,
+      esRemunerado: proyecto.esRemunerado ?? false,
+    });
+    setReferencias(proyecto.referencias?.length ? [...proyecto.referencias] : ['']);
+    setPuestos(proyecto.puestos?.length ? proyecto.puestos.map((p: any) => ({ nombre: p.nombre, descripcion: p.descripcion || '' })) : [{ nombre: '', descripcion: '' }]);
   };
 
   if (checkingAuth) {
@@ -243,6 +314,21 @@ export default function CrearProyectoPage() {
           <p className="text-slate-400 text-lg font-light">
             Publicá tu producción en la Cartelera TDF.
           </p>
+          {plantillas.length > 0 && (
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              <span className="text-xs font-bold text-slate-500 uppercase">Crear desde plantilla:</span>
+              {plantillas.map((pl) => (
+                <button
+                  key={pl.id}
+                  type="button"
+                  onClick={() => cargarDesdePlantilla(pl)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-violet-600/80 text-slate-300 hover:text-white text-sm font-bold border border-slate-700 hover:border-violet-500/50 transition"
+                >
+                  <Bookmark size={14}/> {pl.titulo}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -515,8 +601,24 @@ export default function CrearProyectoPage() {
             </div>
           </div>
 
-          {/* BOTÓN FINAL */}
-          <div className="flex justify-end pt-8 pb-12">
+          {/* BOTONES FINALES */}
+          <div className="flex flex-wrap justify-end gap-3 pt-8 pb-12">
+            <button
+              type="button"
+              onClick={() => setShowPreview(true)}
+              className="px-6 py-3 rounded-full border-2 border-slate-600 text-slate-300 hover:border-orange-500 hover:text-white font-bold transition flex items-center gap-2"
+            >
+              <Eye size={20}/> Vista previa
+            </button>
+            <button
+              type="button"
+              onClick={handleGuardarBorrador}
+              disabled={loading}
+              className="px-6 py-3 rounded-full bg-slate-700 hover:bg-slate-600 text-white font-bold transition disabled:opacity-50 flex items-center gap-2"
+            >
+              {loading ? <Loader2 className="animate-spin" size={20}/> : null}
+              Guardar como borrador
+            </button>
             <button 
               type="submit" 
               disabled={loading}
@@ -528,6 +630,37 @@ export default function CrearProyectoPage() {
           </div>
 
         </form>
+
+        {/* Modal Vista Previa */}
+        {showPreview && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowPreview(false)}>
+            <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-black text-white">Vista previa del casting</h3>
+                <button type="button" onClick={() => setShowPreview(false)} className="text-slate-400 hover:text-white p-2"><X size={24}/></button>
+              </div>
+              <div className="space-y-4 text-slate-300">
+                <p className="text-3xl font-bold text-white">{formData.titulo || 'Sin título'}</p>
+                <p className="flex gap-2 flex-wrap">
+                  <span className="bg-orange-600/20 text-orange-400 px-2 py-0.5 rounded text-sm font-bold">{formData.tipo}</span>
+                  <span className="text-slate-500">{formData.ciudad}</span>
+                  {formData.esRemunerado && <span className="text-emerald-400 text-sm">Remunerado</span>}
+                  {formData.esEstudiante && <span className="text-blue-400 text-sm">Estudiantil</span>}
+                </p>
+                <p className="whitespace-pre-line text-slate-400">{formData.descripcion || 'Sin sinopsis'}</p>
+                <div>
+                  <p className="text-xs font-bold uppercase text-slate-500 mb-2">Vacantes</p>
+                  <ul className="space-y-1">
+                    {puestos.filter(p => p.nombre.trim()).map((p, i) => (
+                      <li key={i} className="flex gap-2"><span className="text-orange-500">•</span> {p.nombre} {p.descripcion && `— ${p.descripcion}`}</li>
+                    ))}
+                    {puestos.every(p => !p.nombre.trim()) && <li className="text-slate-600">Sin vacantes definidas</li>}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

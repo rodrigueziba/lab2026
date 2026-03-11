@@ -25,6 +25,20 @@ const RUBROS = [
   "VFX / Animación", "Drones"
 ];
 
+const RUBRO_SUGERENCIAS: Record<string, string[]> = {
+  "Sonido": ["Foley", "Mezcla 5.1", "Microfonista", "Grabación en locación", "Postproducción de sonido"],
+  "Fotografía / Cámara": ["Operador de cámara", "Director de fotografía", "Gaffer", "Iluminación", "Steadicam"],
+  "Dirección": ["Dirección de actores", "Puesta en escena", "Guion", "Dirección de arte"],
+  "Producción": ["Producción ejecutiva", "Locación", "Casting", "Presupuesto", "Rodaje"],
+  "Montaje / Postproducción": ["Edición", "Colorización", "VFX", "DaVinci Resolve", "Premiere"],
+  "Arte / Escenografía": ["Escenografía", "Diseño de producción", "Props", "Ambientación"],
+  "Vestuario / Maquillaje": ["Vestuario", "Maquillaje", "Caracterización", "Efectos especiales"],
+  "Música": ["Composición", "Música original", "Licencias", "Grabación"],
+  "Actuación / Casting": ["Casting", "Dirección de actores", "Improvisación"],
+  "VFX / Animación": ["After Effects", "Compositing", "3D", "Motion graphics"],
+  "Drones": ["Operador de drone", "Aéreos", "Regulación"],
+};
+
 const initialForm = {
   nombre: '',
   tipoPerfil: 'Profesional',
@@ -344,6 +358,26 @@ export default function CrearPerfilPage() {
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500" aria-hidden>▼</span>
                   </div>
                 </div>
+                {formData.rubro && RUBRO_SUGERENCIAS[formData.rubro] && (
+                  <div className="md:col-span-2">
+                    <p className="text-xs font-bold uppercase text-slate-500 mb-2">Sugerencias para tu perfil (clic para agregar a la bio)</p>
+                    <div className="flex flex-wrap gap-2">
+                      {RUBRO_SUGERENCIAS[formData.rubro].map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => setFormData(prev => ({
+                            ...prev,
+                            descripcion: prev.descripcion ? `${prev.descripcion.trim()}, ${tag}` : tag,
+                          }))}
+                          className="px-3 py-1.5 rounded-full text-xs font-bold bg-slate-800 hover:bg-orange-600/80 text-slate-300 hover:text-white border border-slate-700 hover:border-orange-500/50 transition"
+                        >
+                          + {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="group">
                   <label htmlFor="crear-ciudad" className="block text-xs font-bold uppercase text-slate-400 mb-2">Ciudad Base</label>
                   <div className="relative">
@@ -543,7 +577,7 @@ export default function CrearPerfilPage() {
             </button>
           </div>
         ) : (
-          <button type="button" onClick={() => document.getElementById('form-crear-perfil')?.requestSubmit()} disabled={loading || uploading} className="w-full max-w-4xl mx-auto min-h-[48px] flex justify-center items-center gap-3 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black py-4 rounded-full transition-all shadow-lg shadow-blue-900/30 disabled:opacity-50">
+          <button type="button" onClick={() => (document.getElementById('form-crear-perfil') as HTMLFormElement | null)?.requestSubmit()} disabled={loading || uploading} className="w-full max-w-4xl mx-auto min-h-[48px] flex justify-center items-center gap-3 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black py-4 rounded-full transition-all shadow-lg shadow-blue-900/30 disabled:opacity-50">
             {uploading || loading ? <Loader2 className="animate-spin" size={24} aria-hidden /> : <Briefcase size={24} aria-hidden />}
             {uploading ? 'SUBIENDO...' : (loading ? 'GUARDANDO...' : 'PUBLICAR MI PERFIL')}
           </button>
