@@ -4,6 +4,7 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import Navbar from "../components/Navbar";
 import FooterWrapper from '../components/FooterWrapper';
+import PageTransitionWrapper from '../components/PageTransitionWrapper';
 import { Toaster } from 'sonner';
 
 const inter = Inter({ subsets: ["latin"] });
@@ -34,9 +35,9 @@ export default function RootLayout({
        
          {/* <main className="min-h-screen pt-24 bg-slate-950"></main> */}
         <Navbar />
-        <main className="flex-1">
-        {children}
-        <Toaster position="bottom-right" richColors />
+        <main className="flex-1 flex flex-col min-h-0 bg-slate-950">
+          <PageTransitionWrapper>{children}</PageTransitionWrapper>
+          <Toaster position="bottom-right" richColors />
         </main>
         <FooterWrapper />
       </body>
