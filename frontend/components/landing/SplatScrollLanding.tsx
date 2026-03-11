@@ -109,11 +109,18 @@ const SPLAT_RESPONSE = 2.4;
 const MOBILE_BREAKPOINT = 768;
 const MAX_PIXEL_RATIO_DESKTOP = 1.5;
 const MAX_PIXEL_RATIO_MOBILE = 1.25;
-// Resolución dinámica: si FPS < umbral, bajar ratio (bajada más fuerte)
+// Inicio muy agresivo en carga para dispositivos de bajos recursos
+const INITIAL_PIXEL_RATIO_DESKTOP = 0.5;
+const INITIAL_PIXEL_RATIO_MOBILE = 0.6;
+// Resolución dinámica: si FPS < 30, bajar ratio y aplicar escala de resolución
 const FPS_LOW_THRESHOLD = 30;
 const FPS_HIGH_THRESHOLD = 55;
 const FPS_SAMPLES = 60;
-const PIXEL_RATIO_DROP_FACTOR = 0.5; // al bajar: ratio *= 0.5 (más agresivo que 0.8)
+const FPS_SAMPLES_BEFORE_DROP = 25; // reaccionar antes cuando FPS bajo
+const PIXEL_RATIO_DROP_FACTOR = 0.5;
+const MIN_PIXEL_RATIO = 0.35;
+// Cuando FPS < 30: además de bajar ratio, renderizar a % del tamaño (muy agresivo)
+const RES_SCALE_WHEN_LOW_FPS = 0.6;
 const IDLE_MS = 400;
 const IDLE_RENDER_INTERVAL = 20;
 const IDLE_RENDER_INTERVAL_MOBILE = 30; // en móvil render menos cuando idle
@@ -587,6 +594,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   const lastScrollTimeRef = useRef(0);
   const frameTimeRef = useRef<number[]>([]);
   const pixelRatioRef = useRef(MAX_PIXEL_RATIO_DESKTOP);
+  const resScaleRef = useRef(1); // 1 = tamaño completo; < 1 cuando FPS < 30 (buffer más chico)
   const lowFpsFramesRef = useRef(0);
   const highFpsFramesRef = useRef(0);
   const idleFrameCountRef = useRef(0);
@@ -665,6 +673,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
 
     const isMobile = typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT;
     const maxRatio = isMobile ? MAX_PIXEL_RATIO_MOBILE : MAX_PIXEL_RATIO_DESKTOP;
+    const initialRatio = isMobile ? INITIAL_PIXEL_RATIO_MOBILE : INITIAL_PIXEL_RATIO_DESKTOP;
 
     if (rendererRef.current) {
       log('Re-mount — reinicializando', 'warn');
@@ -704,9 +713,10 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       powerPreference: 'high-performance',
     });
 
-    const initialRatio = Math.min(window.devicePixelRatio, maxRatio);
-    pixelRatioRef.current = initialRatio;
-    renderer.setPixelRatio(initialRatio);
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+    pixelRatioRef.current = Math.min(dpr, initialRatio);
+    resScaleRef.current = 1;
+    renderer.setPixelRatio(pixelRatioRef.current);
     renderer.setSize(wrap.clientWidth, wrap.clientHeight);
     renderer.domElement.style.cssText =
       'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
@@ -726,15 +736,28 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     dl.position.set(2, 5, 3);
     scene.add(dl);
 
+    const applyRendererSize = () => {
+      const w = wrap.clientWidth;
+      const h = wrap.clientHeight;
+      const scale = resScaleRef.current;
+      const drawW = Math.max(1, Math.round(w * scale));
+      const drawH = Math.max(1, Math.round(h * scale));
+      renderer.setSize(drawW, drawH);
+      renderer.setPixelRatio(pixelRatioRef.current);
+      if (scale < 1) {
+        renderer.domElement.style.width = '100%';
+        renderer.domElement.style.height = '100%';
+      }
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    };
+
     let resizeTick: number | null = null;
     const onResize = () => {
       if (resizeTick != null) cancelAnimationFrame(resizeTick);
       resizeTick = requestAnimationFrame(() => {
         resizeTick = null;
-        renderer.setSize(wrap.clientWidth, wrap.clientHeight);
-        renderer.setPixelRatio(pixelRatioRef.current);
-        camera.aspect = wrap.clientWidth / wrap.clientHeight;
-        camera.updateProjectionMatrix();
+        applyRendererSize();
       });
     };
     window.addEventListener('resize', onResize);
@@ -752,7 +775,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       const cfg = rtConfigRef.current;
       const wps = cfg.waypoints;
 
-      // FPS para resolución dinámica (reactiva)
+      // FPS para resolución dinámica: muy agresivo cuando < 30 fps (ratio + escala de resolución)
       const ft = frameTimeRef.current;
       ft.push(now);
       if (ft.length > FPS_SAMPLES) ft.shift();
@@ -760,18 +783,32 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       if (fps < FPS_LOW_THRESHOLD) {
         lowFpsFramesRef.current++;
         highFpsFramesRef.current = 0;
-        if (lowFpsFramesRef.current >= FPS_SAMPLES && pixelRatioRef.current > 0.5) {
-          pixelRatioRef.current = Math.max(0.5, pixelRatioRef.current * PIXEL_RATIO_DROP_FACTOR);
-          renderer.setPixelRatio(pixelRatioRef.current);
-          renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+        if (lowFpsFramesRef.current >= FPS_SAMPLES_BEFORE_DROP) {
+          let changed = false;
+          if (pixelRatioRef.current > MIN_PIXEL_RATIO) {
+            pixelRatioRef.current = Math.max(MIN_PIXEL_RATIO, pixelRatioRef.current * PIXEL_RATIO_DROP_FACTOR);
+            changed = true;
+          }
+          if (resScaleRef.current > RES_SCALE_WHEN_LOW_FPS) {
+            resScaleRef.current = RES_SCALE_WHEN_LOW_FPS;
+            changed = true;
+          }
+          if (changed) applyRendererSize();
         }
       } else if (fps > FPS_HIGH_THRESHOLD) {
         highFpsFramesRef.current++;
         lowFpsFramesRef.current = 0;
-        if (highFpsFramesRef.current >= FPS_SAMPLES * 2 && pixelRatioRef.current < maxRatioCap) {
-          pixelRatioRef.current = Math.min(maxRatioCap, pixelRatioRef.current * 1.25);
-          renderer.setPixelRatio(pixelRatioRef.current);
-          renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+        if (highFpsFramesRef.current >= FPS_SAMPLES * 2) {
+          let changed = false;
+          if (resScaleRef.current < 1) {
+            resScaleRef.current = 1;
+            changed = true;
+          }
+          if (pixelRatioRef.current < maxRatioCap) {
+            pixelRatioRef.current = Math.min(maxRatioCap, pixelRatioRef.current * 1.25);
+            changed = true;
+          }
+          if (changed) applyRendererSize();
         }
       } else {
         lowFpsFramesRef.current = 0;
