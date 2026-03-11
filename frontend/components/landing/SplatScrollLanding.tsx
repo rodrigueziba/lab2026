@@ -121,6 +121,8 @@ const PIXEL_RATIO_DROP_FACTOR = 0.5;
 const MIN_PIXEL_RATIO = 0.35;
 // Cuando FPS < 30: además de bajar ratio, renderizar a % del tamaño (muy agresivo)
 const RES_SCALE_WHEN_LOW_FPS = 0.6;
+// Tras aplicar optimizaciones: mantener calidad baja al menos 30 s después del primer scroll antes de volver a subir
+const LOCK_QUALITY_AFTER_FIRST_SCROLL_MS = 30000;
 const IDLE_MS = 400;
 const IDLE_RENDER_INTERVAL = 20;
 const IDLE_RENDER_INTERVAL_MOBILE = 30; // en móvil render menos cuando idle
@@ -595,6 +597,8 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   const frameTimeRef = useRef<number[]>([]);
   const pixelRatioRef = useRef(MAX_PIXEL_RATIO_DESKTOP);
   const resScaleRef = useRef(1); // 1 = tamaño completo; < 1 cuando FPS < 30 (buffer más chico)
+  const firstScrollTimeRef = useRef(0); // 0 = aún no hubo scroll
+  const lockQualityUntilRef = useRef(0); // timestamp hasta el cual no subir calidad (tras primer scroll + optimizaciones)
   const lowFpsFramesRef = useRef(0);
   const highFpsFramesRef = useRef(0);
   const idleFrameCountRef = useRef(0);
@@ -793,12 +797,20 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
             resScaleRef.current = RES_SCALE_WHEN_LOW_FPS;
             changed = true;
           }
-          if (changed) applyRendererSize();
+          if (changed) {
+            if (firstScrollTimeRef.current > 0) {
+              lockQualityUntilRef.current = now + LOCK_QUALITY_AFTER_FIRST_SCROLL_MS;
+            }
+            applyRendererSize();
+          }
         }
       } else if (fps > FPS_HIGH_THRESHOLD) {
         highFpsFramesRef.current++;
         lowFpsFramesRef.current = 0;
-        if (highFpsFramesRef.current >= FPS_SAMPLES * 2) {
+        const lockUntil = lockQualityUntilRef.current;
+        const allowRaise = !lockUntil || now >= lockUntil;
+        if (lockUntil && now >= lockUntil) lockQualityUntilRef.current = 0;
+        if (allowRaise && highFpsFramesRef.current >= FPS_SAMPLES * 2) {
           let changed = false;
           if (resScaleRef.current < 1) {
             resScaleRef.current = 1;
@@ -950,7 +962,14 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   // ── Scroll ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const onScroll = () => {
-      lastScrollTimeRef.current = performance.now();
+      const now = performance.now();
+      lastScrollTimeRef.current = now;
+      if (firstScrollTimeRef.current === 0) {
+        firstScrollTimeRef.current = now;
+        if (resScaleRef.current < 1 || pixelRatioRef.current <= MIN_PIXEL_RATIO) {
+          lockQualityUntilRef.current = now + LOCK_QUALITY_AFTER_FIRST_SCROLL_MS;
+        }
+      }
       const maxY = document.documentElement.scrollHeight - window.innerHeight;
       const prog = maxY > 0 ? clamp01(window.scrollY / maxY) : 0;
       scrollProgressRef.current = prog;
