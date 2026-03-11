@@ -58,6 +58,7 @@ export default function GuiaPage() {
   const [headerVisible, setHeaderVisible] = useState(true);
   const lastScrollY = useRef(0);
   const filtersRef = useRef<HTMLDivElement>(null);
+  const dataLoadedRef = useRef(false);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   const [disable3D, setDisable3D] = useState(false);
 
@@ -66,8 +67,10 @@ export default function GuiaPage() {
   }, []);
 
   useEffect(() => {
+    if (dataLoadedRef.current) return;
     const cached = getSectionCache<Prestador[]>(SECTION_KEYS.guia);
     if (cached != null) {
+      dataLoadedRef.current = true;
       setPrestadores(cached);
       setPrestadoresMostrados(cached);
       setLoading(false);
@@ -76,6 +79,8 @@ export default function GuiaPage() {
     fetch(`${apiUrl}/prestador`)
       .then(res => res.json())
       .then(data => {
+          if (dataLoadedRef.current) return;
+          dataLoadedRef.current = true;
           setPrestadores(data);
           setPrestadoresMostrados(data);
           setSectionCache(SECTION_KEYS.guia, data);
@@ -85,6 +90,7 @@ export default function GuiaPage() {
   }, [apiUrl]);
 
   useEffect(() => {
+    if (!dataLoadedRef.current && prestadores.length === 0) return;
     const filtrados = prestadores.filter(p => {
         const coincideTexto = p.nombre.toLowerCase().includes(filtroTexto.toLowerCase()) || 
                               p.rubro.toLowerCase().includes(filtroTexto.toLowerCase()) ||

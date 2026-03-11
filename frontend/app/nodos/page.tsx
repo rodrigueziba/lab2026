@@ -28,17 +28,21 @@ const ORBIT_SPEED_3D  = { locacion: 0.009, proyecto: 0.006, prestador: 0.003 };
 const ORBIT_RADIUS_2D = { locacion: 48,  proyecto: 82,  prestador: 118 };
 const ORBIT_SPEED_2D  = { locacion: 0.012, proyecto: 0.007, prestador: 0.004 };
 
-// Optimización 3D: ratio limitado + resolución dinámica agresiva por FPS
-const MAX_PIXEL_RATIO_3D = 1.2;
-const FPS_LOW_3D = 30;
-const FPS_VERY_LOW_3D = 15;
-const FPS_HIGH_3D = 55;
+// Optimización 3D: más agresiva para PCs de bajos recursos
+const MAX_PIXEL_RATIO_3D = 1.0;
+const INITIAL_PIXEL_RATIO_3D = 0.65;    // Empezar bajo; subir si hay FPS de sobra
+const FPS_LOW_3D = 28;
+const FPS_VERY_LOW_3D = 14;
+const FPS_HIGH_3D = 50;
 const FPS_SAMPLES_3D = 60;
-const PIXEL_RATIO_DROP_LOW_3D = 0.45;   // FPS < 30: bajar más
-const PIXEL_RATIO_DROP_VERY_LOW_3D = 0.35; // FPS < 15: mucho más agresivo
-const SLOW_LOAD_FRAMES_3D = 90;         // primeros ~1.5s
-const SLOW_LOAD_FPS_THRESHOLD_3D = 25;  // si FPS medio en carga < esto, bajar ratio al inicio
-const MIN_PIXEL_RATIO_3D = 0.4;
+const PIXEL_RATIO_DROP_LOW_3D = 0.5;
+const PIXEL_RATIO_DROP_VERY_LOW_3D = 0.35;
+const SLOW_LOAD_FRAMES_3D = 60;         // Evaluar antes
+const SLOW_LOAD_FPS_THRESHOLD_3D = 22;
+const MIN_PIXEL_RATIO_3D = 0.35;
+// Timeout: si a los 10s no cargó fondo + esferas, pasar a versión 2D
+const FALLBACK_2D_TIMEOUT_MS = 10000;
+const SCENE_READY_MIN_FRAMES = 25;
 
 function normalizarCiudad(ciudad?: string): string {
   if (!ciudad) return 'Ushuaia';
@@ -173,10 +177,13 @@ const NODE_HEX: Record<string, string> = {
   estudiante:              '#10b981',
 };
 
+// Geometría reducida para bajo recursos (8 segmentos en lugar de 20)
+const SPHERE_SEGMENTS_LOW = 8;
+const HALO_SEGMENTS_LOW = 6;
+
 function makeNodeObject(node: any): THREE.Object3D {
   const group = new THREE.Group();
 
-  // Ciudad: completamente invisible en 3D (solo ancla de física)
   if (node.type === 'ciudad') return group;
 
   const type   = node.type === 'prestador' ? (node.subTipo?.toLowerCase() || 'profesional') : node.type;
@@ -184,25 +191,22 @@ function makeNodeObject(node: any): THREE.Object3D {
   const color  = new THREE.Color(hex);
   const radius = node.type === 'proyecto' ? 7 : node.type === 'locacion' ? 5 : 4;
 
-  // Núcleo emissive
+  // Núcleo emissive (menos polígonos)
   group.add(new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 20, 20),
-    new THREE.MeshStandardMaterial({
-      color, emissive: color, emissiveIntensity: 2.0,
-      roughness: 0.1, metalness: 0.5,
-      transparent: true, opacity: 0.95,
+    new THREE.SphereGeometry(radius, SPHERE_SEGMENTS_LOW, SPHERE_SEGMENTS_LOW),
+    new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.95,
     })
   ));
-  // Halo aditivo
+  // Halo más ligero
   group.add(new THREE.Mesh(
-    new THREE.SphereGeometry(radius * 2.4, 12, 12),
+    new THREE.SphereGeometry(radius * 2.2, HALO_SEGMENTS_LOW, HALO_SEGMENTS_LOW),
     new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.1,
+      color, transparent: true, opacity: 0.08,
       side: THREE.BackSide,
       blending: THREE.AdditiveBlending, depthWrite: false,
     })
   ));
-  group.add(new THREE.PointLight(hex, 1.0, radius * 14));
   return group;
 }
 
@@ -559,11 +563,12 @@ export default function AdminDashboardPage() {
   const boostRef        = useRef(0);
   const renderer3DRef   = useRef<THREE.WebGLRenderer | null>(null);
   const frameTime3DRef  = useRef<number[]>([]);
-  const pixelRatio3DRef = useRef(MAX_PIXEL_RATIO_3D);
+  const pixelRatio3DRef = useRef(INITIAL_PIXEL_RATIO_3D);
   const lowFps3DRef     = useRef(0);
   const highFps3DRef    = useRef(0);
   const slowLoadDoneRef = useRef(false);
   const frameCount3DRef = useRef(0);
+  const sceneReadyRef   = useRef(false);
 
   const [loading, setLoading]             = useState(true);
   const [graphData, setGraphData]         = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
@@ -577,8 +582,17 @@ export default function AdminDashboardPage() {
   const [stats, setStats]                 = useState({ locaciones: 0, proyectos: 0, prestadores: 0 });
   const [isMobile, setIsMobile]           = useState(false);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
-  // Solo renderizar iframe en cliente (mismo HTML en server y primer paint del client = sin hydration mismatch)
+  const [force2D, setForce2D]             = useState(false); // Fallback si tarda >10s en cargar 3D
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+
+  // Si en desktop la escena 3D no está lista en 10s, cambiar a versión 2D (bajo recursos)
+  useEffect(() => {
+    if (isMobile || loading || force2D) return;
+    const t = setTimeout(() => {
+      if (!sceneReadyRef.current) setForce2D(true);
+    }, FALLBACK_2D_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [isMobile, loading, force2D]);
 
   // ── Detector mobile ────────────────────────────────────────
   useEffect(() => {
@@ -596,7 +610,8 @@ export default function AdminDashboardPage() {
       const renderer = typeof g?.renderer === 'function' ? g.renderer() : null;
       if (renderer && renderer.setPixelRatio) {
         renderer3DRef.current = renderer;
-        const initial = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, MAX_PIXEL_RATIO_3D);
+        const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+        const initial = Math.min(dpr, INITIAL_PIXEL_RATIO_3D);
         pixelRatio3DRef.current = initial;
         renderer.setPixelRatio(initial);
       }
@@ -798,7 +813,8 @@ export default function AdminDashboardPage() {
       renderer = typeof g.renderer === 'function' ? g.renderer() : null;
       if (renderer) {
         renderer3DRef.current = renderer;
-        const initial = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, MAX_PIXEL_RATIO_3D);
+        const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+        const initial = Math.min(dpr, INITIAL_PIXEL_RATIO_3D);
         pixelRatio3DRef.current = initial;
         renderer.setPixelRatio(initial);
       }
@@ -808,6 +824,7 @@ export default function AdminDashboardPage() {
       ft.push(now);
       if (ft.length > FPS_SAMPLES_3D) ft.shift();
       frameCount3DRef.current++;
+      if (frameCount3DRef.current >= SCENE_READY_MIN_FRAMES) sceneReadyRef.current = true;
       const fps = ft.length >= 10 ? 1000 / ((ft[ft.length - 1] - ft[0]) / (ft.length - 1)) : 60;
       const maxRatio = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, MAX_PIXEL_RATIO_3D);
 
@@ -984,8 +1001,14 @@ export default function AdminDashboardPage() {
         />
       )}
 
-      {/* 5. HUD SHADER (solo desktop) */}
-      {!isMobile && <ShaderHUD speed={speed} distortion={distortion}/>}
+      {/* 5. HUD SHADER (solo desktop 3D) */}
+      {!isMobile && !force2D && <ShaderHUD speed={speed} distortion={distortion}/>}
+      {/* Modo rendimiento: aviso cuando se pasó a 2D por timeout */}
+      {force2D && !isMobile && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs font-bold tracking-wide">
+          Modo rendimiento (2D) — La vista 3D tardó en cargar
+        </div>
+      )}
 
       {/* 6. TOOLTIP HOVER (solo desktop) */}
       {!isMobile && hoveredNode && (
@@ -994,8 +1017,8 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* 7A. GRAFO 3D — Desktop */}
-      {!isMobile && (
+      {/* 7A. GRAFO 3D — Desktop (salvo fallback 2D) */}
+      {!isMobile && !force2D && (
         <div className="absolute inset-0 cursor-move z-20">
           {!loading && (
             <ForceGraph3D
@@ -1021,11 +1044,11 @@ export default function AdminDashboardPage() {
                 if (s?.type==='ciudad'||t?.type==='ciudad') return 0;
                 return 0.3;
               }}
-              linkDirectionalParticles={visibleLayers.proyecto && visibleLayers.prestador ? 2 : 0}
+              linkDirectionalParticles={0}
               linkDirectionalParticleColor={() => '#fdba74'}
-              linkDirectionalParticleWidth={3}
-              linkDirectionalParticleResolution={8}
-              linkDirectionalParticleSpeed={0.003}
+              linkDirectionalParticleWidth={2}
+              linkDirectionalParticleResolution={4}
+              linkDirectionalParticleSpeed={0.002}
               d3AlphaDecay={1}
               d3VelocityDecay={0.3}
               onEngineTick={handleEngineTick}
@@ -1042,8 +1065,8 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* 7B. CANVAS 2D — Mobile */}
-      {isMobile && !loading && (
+      {/* 7B. CANVAS 2D — Mobile o fallback por timeout (bajo recursos) */}
+      {(isMobile || force2D) && !loading && (
         <div className="absolute inset-0 z-20">
           <NeuralCanvas2D
             nodes={nodes2D}
@@ -1062,17 +1085,19 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* 8. MARCAS DE AGUA (solo desktop) */}
+      {/* 8. MARCAS DE AGUA (desktop: 3D y 2D) */}
       {!isMobile && <CityWatermarks/>}
 
-      {/* 9. BOTONES INFERIORES (solo desktop) */}
+      {/* 9. BOTONES INFERIORES (desktop) */}
       {!isMobile && (
         <div className="absolute bottom-8 right-8 z-50 flex gap-2">
-          <button
-            onClick={() => graphRef.current?.zoomToFit(400)}
-            className="bg-slate-900/80 backdrop-blur p-3 rounded-full text-white hover:bg-orange-600 transition shadow-lg border border-white/10"
-            title="Zoom para ver todo"
-          ><Maximize size={20}/></button>
+          {!force2D && (
+            <button
+              onClick={() => graphRef.current?.zoomToFit(400)}
+              className="bg-slate-900/80 backdrop-blur p-3 rounded-full text-white hover:bg-orange-600 transition shadow-lg border border-white/10"
+              title="Zoom para ver todo"
+            ><Maximize size={20}/></button>
+          )}
           <button
             onClick={() => window.location.reload()}
             className="bg-slate-900/80 backdrop-blur p-3 rounded-full text-white hover:bg-orange-600 transition shadow-lg border border-white/10"

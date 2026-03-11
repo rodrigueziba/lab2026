@@ -90,6 +90,7 @@ export default function CarteleraProyectosPage() {
   const filtersRef = useRef<HTMLDivElement>(null); 
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const dataLoadedRef = useRef(false);
   const [disable3D, setDisable3D] = useState(false);
 
   useEffect(() => {
@@ -97,8 +98,10 @@ export default function CarteleraProyectosPage() {
   }, []);
 
   useEffect(() => {
+    if (dataLoadedRef.current) return;
     const cached = getSectionCache<Proyecto[]>(SECTION_KEYS.proyectos);
     if (cached != null) {
+      dataLoadedRef.current = true;
       setProyectos(cached);
       setProyectosMostrados(cached);
       setLoading(false);
@@ -107,6 +110,8 @@ export default function CarteleraProyectosPage() {
     fetch(`${apiUrl}/proyecto`)
       .then(res => res.json())
       .then(data => {
+          if (dataLoadedRef.current) return;
+          dataLoadedRef.current = true;
           setProyectos(data);
           setProyectosMostrados(data);
           setSectionCache(SECTION_KEYS.proyectos, data);
@@ -116,6 +121,7 @@ export default function CarteleraProyectosPage() {
   }, [apiUrl]);
 
   useEffect(() => {
+    if (!dataLoadedRef.current && proyectos.length === 0) return;
     const filtrados = proyectos.filter(p => {
       const coincideTexto = p.titulo.toLowerCase().includes(busqueda.toLowerCase()) || 
                             p.descripcion.toLowerCase().includes(busqueda.toLowerCase());

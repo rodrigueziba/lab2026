@@ -60,7 +60,8 @@ export default function CatalogoLocacionesPage() {
 
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);      
-  const filtersRef = useRef<HTMLDivElement>(null);     
+  const filtersRef = useRef<HTMLDivElement>(null);
+  const dataLoadedRef = useRef(false);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   const [disable3D, setDisable3D] = useState(false);
 
@@ -78,8 +79,10 @@ export default function CatalogoLocacionesPage() {
   }, []);     
 
   useEffect(() => {
+    if (dataLoadedRef.current) return;
     const cached = getSectionCache<Locacion[]>(SECTION_KEYS.locaciones);
     if (cached != null) {
+      dataLoadedRef.current = true;
       setLocaciones(cached);
       setLoading(false);
       return;
@@ -87,6 +90,8 @@ export default function CatalogoLocacionesPage() {
     fetch(`${apiUrl}/locacion`)
       .then(res => res.json())
       .then(data => {
+        if (dataLoadedRef.current) return;
+        dataLoadedRef.current = true;
         const dataConCoords = data.map((loc: Locacion) => {
           const base = COORDS_BASE[loc.ciudad] || COORDS_BASE["Default"];
           let lat = typeof loc.lat === 'string' ? parseFloat(loc.lat) : Number(loc.lat);
