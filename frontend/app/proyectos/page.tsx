@@ -162,21 +162,17 @@ export default function CarteleraProyectosPage() {
   }, []);
 
   // Cabecera se disuelve al bajar y reaparece al subir (solo en escritorio, ≥768px)
+  // Cabecera se disuelve al bajar y reaparece al subir (escritorio y móvil)
   useEffect(() => {
     const SCROLL_THRESHOLD = 60;
+    const DELTA = 8;
     const handleScrollDirection = () => {
-      const w = typeof window !== 'undefined' ? window.innerWidth : 1920;
-      if (w < 768) {
-        setHeaderVisible(true);
-        lastScrollY.current = window.scrollY;
-        return;
-      }
       const y = window.scrollY;
       if (y <= SCROLL_THRESHOLD) {
         setHeaderVisible(true);
-      } else if (y > lastScrollY.current) {
+      } else if (y > lastScrollY.current + DELTA) {
         setHeaderVisible(false);
-      } else {
+      } else if (y < lastScrollY.current - DELTA) {
         setHeaderVisible(true);
       }
       lastScrollY.current = y;
@@ -212,18 +208,16 @@ export default function CarteleraProyectosPage() {
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         ::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; cursor: pointer; }
-        @media (min-width: 768px) {
-          .proyectos-page-header[data-header-hidden="true"] {
-            opacity: 0;
-            pointer-events: none;
-          }
+        .proyectos-page-header[data-header-hidden="true"] {
+          opacity: 0;
+          pointer-events: none;
         }
       `}</style>
 
-      {/* --- HEADER FLUIDO --- (en escritorio se disuelve al bajar, reaparece al subir) */}
+      {/* --- HEADER FLUIDO --- (se disuelve al bajar scroll y reaparece al subir; móvil y escritorio) */}
       <div 
         data-header-hidden={!headerVisible}
-        className={`proyectos-page-header fixed top-20 left-0 right-0 z-40 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/95 pb-3 transition-[opacity,box-shadow] duration-300 ease-out ${
+        className={`proyectos-page-header fixed top-16 md:top-20 left-0 right-0 z-40 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/95 pb-3 transition-[opacity,box-shadow] duration-300 ease-out ${
           isScrolled ? 'shadow-2xl' : ''
         }`}
       >

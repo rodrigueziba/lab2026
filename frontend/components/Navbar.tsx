@@ -32,6 +32,8 @@ export default function Navbar() {
   const mobileMenuPanelRef = useRef<HTMLDivElement>(null);
   const userHoverStartRef = useRef<number>(0);
   const userLastColorAdvanceRef = useRef<number>(0);
+  const lastScrollYRef = useRef(0);
+  const [mobileNavVisible, setMobileNavVisible] = useState(true);
 
   // Al abrir el menú móvil, resetear scroll del panel para evitar hueco cuando la página estaba scrolleada
   useEffect(() => {
@@ -45,8 +47,17 @@ export default function Navbar() {
   }, [isMobileMenuOpen]);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll);
+    const handleScroll = () => {
+      const y = window.scrollY;
+      setIsScrolled(y > 20);
+      if (window.innerWidth < 768) {
+        const delta = 8;
+        if (y > lastScrollYRef.current + delta) setMobileNavVisible(false);
+        else if (y < lastScrollYRef.current - delta || y < 30) setMobileNavVisible(true);
+        lastScrollYRef.current = y;
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
 
     const checkUser = async () => {
       const token = localStorage.getItem('token');
@@ -99,6 +110,19 @@ export default function Navbar() {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth >= 768) setMobileNavVisible(true);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Con el menú hamburguesa abierto, mantener la barra visible para poder cerrar
+  useEffect(() => {
+    if (isMobileMenuOpen) setMobileNavVisible(true);
+  }, [isMobileMenuOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -205,16 +229,20 @@ export default function Navbar() {
     );
   };
 
-  // En móvil al hacer scroll aparece fondo; en escritorio el fondo se mantiene siempre transparente
   const navPadding = 'py-4 md:py-6';
-  const navBg = isScrolled
-    ? 'bg-slate-950/95 backdrop-blur-xl border-b border-white/5 shadow-2xl md:bg-transparent md:backdrop-blur-none md:shadow-none'
-    : 'bg-transparent';
   const navHeight = 'min-h-[64px] md:min-h-0';
+  // Móvil: siempre glass cuando visible; se oculta al bajar scroll y reaparece al subir
+  const mobileGlass = 'bg-black/20 backdrop-blur-xl border-b border-white/5';
+  const mobileHiddenVisual = !mobileNavVisible ? 'opacity-0 -translate-y-full' : '';
+  const mobilePointer = mobileNavVisible ? 'pointer-events-auto' : 'pointer-events-none';
+  const mdBg = isScrolled ? 'md:bg-slate-950/95 md:backdrop-blur-xl md:border-b md:border-white/5 md:shadow-2xl' : 'md:bg-transparent md:backdrop-blur-none md:shadow-none md:border-b-0';
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-[9999] md:z-[100] ${navHeight} ${navPadding} ${navBg}`}>
-      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full min-h-[64px] md:min-h-0 relative z-[9992]">
+    <>
+    <nav
+      className={`fixed top-0 left-0 w-full z-[9999] md:z-[100] ${navHeight} ${navPadding} transition-all duration-300 ${mobileGlass} ${mobileHiddenVisual} ${mobilePointer} md:opacity-100 md:pointer-events-auto md:translate-y-0 md:bg-transparent md:backdrop-blur-none md:border-b-0 ${mdBg}`}
+    >
+      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full min-h-[64px] md:min-h-0 relative z-[9993]">
         
         <div className="flex items-center gap-2">
           <Link href="/" className="text-2xl font-black tracking-tighter text-white group">
@@ -491,5 +519,35 @@ export default function Navbar() {
         </>
       )}
     </nav>
+
+    {/* Barra inferior móvil: Locaciones, Guía, Proyectos — solo iconos, estilo glass, misma visibilidad que el nav */}
+    <div
+      className={`md:hidden fixed bottom-0 left-0 right-0 z-[9998] flex justify-center pb-6 px-4 transition-all duration-300 ${mobileNavVisible ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-8'}`}
+    >
+      <div className="flex items-center gap-2 bg-black/20 backdrop-blur-xl p-1.5 rounded-full border border-white/5 shadow-xl">
+        <Link
+          href="/locaciones"
+          className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all duration-300 touch-manipulation ${pathname === '/locaciones' ? 'text-white bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.2)] border border-white/20' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+          aria-label="Locaciones"
+        >
+          <MapPin size={22} className={pathname === '/locaciones' ? 'text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : ''} />
+        </Link>
+        <Link
+          href="/guia"
+          className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all duration-300 touch-manipulation ${pathname === '/guia' ? 'text-white bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.2)] border border-white/20' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+          aria-label="Prestadores"
+        >
+          <Users size={22} className={pathname === '/guia' ? 'text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : ''} />
+        </Link>
+        <Link
+          href="/proyectos"
+          className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all duration-300 touch-manipulation ${pathname === '/proyectos' ? 'text-white bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.2)] border border-white/20' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+          aria-label="Proyectos"
+        >
+          <Clapperboard size={22} className={pathname === '/proyectos' ? 'text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : ''} />
+        </Link>
+      </div>
+    </div>
+    </>
   );
 }

@@ -59,7 +59,9 @@ export default function CatalogoLocacionesPage() {
   const [user, setUser] = useState<{ role?: string } | null>(null);
 
   const [isScrolled, setIsScrolled] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);      
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastScrollY = useRef(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const filtersRef = useRef<HTMLDivElement>(null);
   const dataLoadedRef = useRef(false);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -112,7 +114,15 @@ export default function CatalogoLocacionesPage() {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const handleScroll = () => setIsScrolled(el.scrollTop > 20);
+    const handleScroll = () => {
+      const top = el.scrollTop;
+      setIsScrolled(top > 20);
+      const DELTA = 8;
+      if (top <= 40) setHeaderVisible(true);
+      else if (top > lastScrollY.current + DELTA) setHeaderVisible(false);
+      else if (top < lastScrollY.current - DELTA) setHeaderVisible(true);
+      lastScrollY.current = top;
+    };
     el.addEventListener('scroll', handleScroll);
     return () => el.removeEventListener('scroll', handleScroll);
   }, []);
@@ -148,7 +158,7 @@ export default function CatalogoLocacionesPage() {
   };
 
   return (
-    <div className="h-screen bg-slate-950 text-white font-sans overflow-hidden flex flex-col pt-24 selection:bg-orange-500/30">
+    <div className="h-screen bg-slate-950 text-white font-sans overflow-hidden flex flex-col pt-40 md:pt-44 selection:bg-orange-500/30">
       
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -157,10 +167,17 @@ export default function CatalogoLocacionesPage() {
         .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; } 
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #475569; }
+        .locaciones-page-header[data-header-hidden="true"] {
+          opacity: 0;
+          pointer-events: none;
+        }
       `}</style>
 
-      {/* --- HEADER: título | búsqueda | filtros (filtros se extienden a la derecha en escritorio) --- */}
-      <div className={`bg-slate-900/90 backdrop-blur-xl border-b border-slate-800 z-30 shrink-0 transition-all duration-500 w-full ${isScrolled ? 'py-4 shadow-2xl' : 'py-6 md:py-8'}`}>
+      {/* --- HEADER: título | búsqueda | filtros; se disuelve al bajar scroll y reaparece al subir (móvil y escritorio) --- */}
+      <div
+        data-header-hidden={!headerVisible}
+        className={`locaciones-page-header fixed top-16 md:top-20 left-0 right-0 z-30 bg-slate-900/90 backdrop-blur-xl border-b border-slate-800 transition-[opacity,box-shadow,padding] duration-300 ease-out ${isScrolled ? 'py-4 shadow-2xl' : 'py-6 md:py-8'}`}
+      >
         <div className="w-full px-6 max-w-[1920px] mx-auto flex flex-col md:flex-row gap-4 md:gap-6 items-stretch md:items-center">
           {/* Título */}
           <div className="shrink-0 transition-all duration-500 min-w-fit">
