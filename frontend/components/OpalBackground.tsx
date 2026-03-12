@@ -26,6 +26,7 @@ const FRAG = `
   uniform vec2  u_flow;
   uniform float u_color_speed;
   uniform vec3  u_palette_base;
+  uniform float u_brightness;
 
   vec3 palette(float t) {
     vec3 a = vec3(0.5, 0.5, 0.5);
@@ -114,7 +115,7 @@ const FRAG = `
     vec2 m = smoothstep(0.0,0.06,uv) * smoothstep(0.0,0.06,1.0-uv);
     col   *= m.x * m.y;
 
-    col *= 0.35;
+    col *= u_brightness;
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -130,6 +131,8 @@ export interface OpalBackgroundParams {
   colorSpeed?: number;
   paletteBase?: string;
   maxRipples?: number;
+  /** Brillo del fondo animado (0.1–1). Por defecto 0.35 */
+  brightness?: number;
 }
 
 const DEFAULT_PARAMS: Required<OpalBackgroundParams> = {
@@ -139,6 +142,7 @@ const DEFAULT_PARAMS: Required<OpalBackgroundParams> = {
   colorSpeed: 1,
   paletteBase: "#1a6b9e",
   maxRipples: 6,
+  brightness: 0.35,
 };
 
 function hexToVec3(hex: string): [number, number, number] {
@@ -185,6 +189,7 @@ function initGL(canvas: HTMLCanvasElement) {
     uFlow: gl.getUniformLocation(prog, "u_flow"),
     uColorSpeed: gl.getUniformLocation(prog, "u_color_speed"),
     uPaletteBase: gl.getUniformLocation(prog, "u_palette_base"),
+    uBrightness: gl.getUniformLocation(prog, "u_brightness"),
   };
 }
 
@@ -243,7 +248,7 @@ export default function OpalBackground({
     if (!ctx) return;
     const {
       gl, uTime, uRes, uRipplePos, uRippleTime, uRippleCount,
-      uSpeed, uFlow, uColorSpeed, uPaletteBase,
+      uSpeed, uFlow, uColorSpeed, uPaletteBase, uBrightness,
     } = ctx;
 
     const resize = () => {
@@ -290,6 +295,7 @@ export default function OpalBackground({
       gl.uniform2f(uFlow, p.flowX, p.flowY);
       gl.uniform1f(uColorSpeed, p.colorSpeed);
       gl.uniform3f(uPaletteBase, pr, pg, pb);
+      gl.uniform1f(uBrightness, Math.max(0.05, Math.min(1, p.brightness ?? 0.35)));
 
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 

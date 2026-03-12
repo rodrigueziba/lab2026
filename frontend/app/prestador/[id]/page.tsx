@@ -18,6 +18,7 @@ const DEFAULT_PRESTADOR_OPAL_PARAMS: Required<OpalBackgroundParams> = {
   colorSpeed: 0.1,
   paletteBase: '#1a6b9e',
   maxRipples: 2,
+  brightness: 0.35,
 };
 
 const DEFAULT_PRESTADOR_TV_OPACITY = 0.92;
@@ -31,6 +32,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
   const [solicitando, setSolicitando] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showOpalBackground, setShowOpalBackground] = useState(false);
+  const [hideCards, setHideCards] = useState(false);
   const [showDebugButton, setShowDebugButton] = useState(false);
   const [debugMenuOpen, setDebugMenuOpen] = useState(false);
   const [echoesPlaying, setEchoesPlaying] = useState(false);
@@ -252,7 +254,8 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
           }}
           aria-hidden
         />
-        <div className="relative z-10 max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch pointer-events-none">
+        <div className={`relative z-10 ${hideCards ? 'pointer-events-none invisible' : ''}`} aria-hidden={hideCards}>
+        <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch pointer-events-none">
           
           {/* COLUMNA IZQUIERDA: tarjetas con hover tipo proyectos */}
           <div className="flex flex-col gap-8 pointer-events-auto">
@@ -421,6 +424,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
 
               </div>
           </div>
+      </div>
       </div>
       </OpalBackground>
       ) : (
@@ -600,6 +604,31 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
               </div>
               <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
                 <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
+                  <span className="text-xs font-bold text-slate-400">Ocultar tarjetas</span>
+                  <button
+                    type="button"
+                    onClick={() => setHideCards((v) => !v)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 text-slate-300 hover:text-white transition-colors text-xs font-bold ${hideCards ? 'bg-orange-500/20 border-orange-500/40 text-orange-400' : 'bg-slate-800 hover:bg-slate-700'}`}
+                  >
+                    {hideCards ? 'Mostrar' : 'Ocultar'}
+                  </button>
+                </div>
+                <div>
+                  <label className="flex justify-between items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-slate-400">Brillo del fondo</span>
+                    <span className="text-xs font-mono text-orange-400 tabular-nums">{(opalParams.brightness ?? 0.35).toFixed(2)}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={5}
+                    max={100}
+                    step={5}
+                    value={((opalParams.brightness ?? 0.35) * 100)}
+                    onChange={(e) => setOpalParams((p) => ({ ...p, brightness: Number(e.target.value) / 100 }))}
+                    className="w-full h-2 rounded-full bg-slate-800 accent-orange-500 mb-4"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
                   <span className="text-xs font-bold text-slate-400">Echoes (mp3)</span>
                   <button
                     type="button"
@@ -674,7 +703,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
                 ))}
                 <button
                   type="button"
-                  onClick={() => { setOpalParams(DEFAULT_PRESTADOR_OPAL_PARAMS); setTvFilterOpacity(DEFAULT_PRESTADOR_TV_OPACITY); }}
+                  onClick={() => { setOpalParams(DEFAULT_PRESTADOR_OPAL_PARAMS); setTvFilterOpacity(DEFAULT_PRESTADOR_TV_OPACITY); setHideCards(false); }}
                   className="w-full py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:border-orange-500/30 transition-colors"
                 >
                   Restaurar valores

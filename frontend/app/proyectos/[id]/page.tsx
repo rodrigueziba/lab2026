@@ -18,6 +18,7 @@ const DEFAULT_OPAL_PARAMS: Required<OpalBackgroundParams> = {
   colorSpeed: 0.1,
   paletteBase: '#1a6b9e',
   maxRipples: 6,
+  brightness: 0.35,
 };
 
 const DEFAULT_TV_OPACITY = 0.92;
@@ -48,6 +49,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   const [opalParams, setOpalParams] = useState<Required<OpalBackgroundParams>>(DEFAULT_OPAL_PARAMS);
   const [tvFilterOpacity, setTvFilterOpacity] = useState(DEFAULT_TV_OPACITY);
   const [showOpalBackground, setShowOpalBackground] = useState(false);
+  const [hideCards, setHideCards] = useState(false);
   const [echoesPlaying, setEchoesPlaying] = useState(false);
   const echoesRef = useRef<HTMLAudioElement>(null);
 
@@ -381,7 +383,9 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
           }}
           aria-hidden
         />
-        {bodyContent}
+        <div className={hideCards ? 'pointer-events-none invisible' : ''} aria-hidden={hideCards}>
+          {bodyContent}
+        </div>
       </OpalBackground>
       ) : (
       <div className="relative min-h-[50vh] bg-slate-950">
@@ -409,6 +413,31 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
                 </button>
               </div>
               <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
+                  <span className="text-xs font-bold text-slate-400">Ocultar tarjetas</span>
+                  <button
+                    type="button"
+                    onClick={() => setHideCards((v) => !v)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 text-slate-300 hover:text-white transition-colors text-xs font-bold ${hideCards ? 'bg-orange-500/20 border-orange-500/40 text-orange-400' : 'bg-slate-800 hover:bg-slate-700'}`}
+                  >
+                    {hideCards ? 'Mostrar' : 'Ocultar'}
+                  </button>
+                </div>
+                <div>
+                  <label className="flex justify-between items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-slate-400">Brillo del fondo</span>
+                    <span className="text-xs font-mono text-orange-400 tabular-nums">{(opalParams.brightness ?? 0.35).toFixed(2)}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={5}
+                    max={100}
+                    step={5}
+                    value={((opalParams.brightness ?? 0.35) * 100)}
+                    onChange={(e) => setOpalParams((p) => ({ ...p, brightness: Number(e.target.value) / 100 }))}
+                    className="w-full h-2 rounded-full bg-slate-800 accent-orange-500 mb-4"
+                  />
+                </div>
                 <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
                   <span className="text-xs font-bold text-slate-400">Echoes (mp3)</span>
                   <button
@@ -484,7 +513,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
                 ))}
                 <button
                   type="button"
-                  onClick={() => { setOpalParams(DEFAULT_OPAL_PARAMS); setTvFilterOpacity(DEFAULT_TV_OPACITY); }}
+                  onClick={() => { setOpalParams(DEFAULT_OPAL_PARAMS); setTvFilterOpacity(DEFAULT_TV_OPACITY); setHideCards(false); }}
                   className="w-full py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:border-orange-500/30 transition-colors"
                 >
                   Restaurar valores
