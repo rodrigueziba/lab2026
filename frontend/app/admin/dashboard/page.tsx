@@ -6,6 +6,7 @@ import {
   Network, RefreshCw, Maximize, MapPin, Layers,
   Clapperboard, Focus, Zap, Wind, Mountain, X, PanelRightOpen,
 } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), { ssr: false });
 
@@ -27,6 +28,22 @@ const ORBIT_RADIUS_3D = { locacion: 80,  proyecto: 150, prestador: 230 };
 const ORBIT_SPEED_3D  = { locacion: 0.009, proyecto: 0.006, prestador: 0.003 };
 const ORBIT_RADIUS_2D = { locacion: 48,  proyecto: 82,  prestador: 118 };
 const ORBIT_SPEED_2D  = { locacion: 0.012, proyecto: 0.007, prestador: 0.004 };
+
+// Optimización 3D: más agresiva para PCs de bajos recursos
+const MAX_PIXEL_RATIO_3D = 1.0;
+const INITIAL_PIXEL_RATIO_3D = 0.65;    // Empezar bajo; subir si hay FPS de sobra
+const FPS_LOW_3D = 28;
+const FPS_VERY_LOW_3D = 14;
+const FPS_HIGH_3D = 50;
+const FPS_SAMPLES_3D = 60;
+const PIXEL_RATIO_DROP_LOW_3D = 0.5;
+const PIXEL_RATIO_DROP_VERY_LOW_3D = 0.35;
+const SLOW_LOAD_FRAMES_3D = 60;         // Evaluar antes
+const SLOW_LOAD_FPS_THRESHOLD_3D = 22;
+const MIN_PIXEL_RATIO_3D = 0.35;
+// Timeout: si a los 10s no cargó fondo + esferas, pasar a versión 2D
+const FALLBACK_2D_TIMEOUT_MS = 10000;
+const SCENE_READY_MIN_FRAMES = 25;
 
 function normalizarCiudad(ciudad?: string): string {
   if (!ciudad) return 'Ushuaia';
@@ -69,7 +86,9 @@ const aPos=gl.getAttribLocation(prog,'a_position');
 gl.useProgram(prog);gl.enableVertexAttribArray(aPos);
 gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
 const loc={res:gl.getUniformLocation(prog,'u_resolution'),time:gl.getUniformLocation(prog,'u_time'),spd:gl.getUniformLocation(prog,'u_speed'),dist:gl.getUniformLocation(prog,'u_distortion')};
-function resize(){const dpr=window.devicePixelRatio||1;canvas.width=Math.round(canvas.clientWidth*dpr);canvas.height=Math.round(canvas.clientHeight*dpr);}
+var shaderMaxDpr=0.5;
+var shaderResScale=0.6;
+function resize(){var dpr=window.devicePixelRatio||1;dpr=Math.min(dpr,shaderMaxDpr)*shaderResScale;canvas.width=Math.round(canvas.clientWidth*dpr);canvas.height=Math.round(canvas.clientHeight*dpr);}
 window.addEventListener('resize',resize);resize();
 const start=performance.now();
 (function loop(now){requestAnimationFrame(loop);curSpeed+=(targetSpeed-curSpeed)*LERP;curDist+=(targetDist-curDist)*LERP;resize();const t=(now-start)/1000;gl.viewport(0,0,canvas.width,canvas.height);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.time,t);gl.uniform1f(loc.spd,curSpeed);gl.uniform1f(loc.dist,curDist);gl.drawArrays(gl.TRIANGLES,0,6);})(performance.now());
@@ -161,10 +180,13 @@ const NODE_HEX: Record<string, string> = {
   estudiante:              '#10b981',
 };
 
+// Geometría reducida para bajo recursos (8 segmentos en lugar de 20)
+const SPHERE_SEGMENTS_LOW = 8;
+const HALO_SEGMENTS_LOW = 6;
+
 function makeNodeObject(node: any): THREE.Object3D {
   const group = new THREE.Group();
 
-  // Ciudad: completamente invisible en 3D (solo ancla de física)
   if (node.type === 'ciudad') return group;
 
   const type   = node.type === 'prestador' ? (node.subTipo?.toLowerCase() || 'profesional') : node.type;
@@ -172,25 +194,22 @@ function makeNodeObject(node: any): THREE.Object3D {
   const color  = new THREE.Color(hex);
   const radius = node.type === 'proyecto' ? 7 : node.type === 'locacion' ? 5 : 4;
 
-  // Núcleo emissive
+  // Núcleo emissive (menos polígonos)
   group.add(new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 20, 20),
-    new THREE.MeshStandardMaterial({
-      color, emissive: color, emissiveIntensity: 2.0,
-      roughness: 0.1, metalness: 0.5,
-      transparent: true, opacity: 0.95,
+    new THREE.SphereGeometry(radius, SPHERE_SEGMENTS_LOW, SPHERE_SEGMENTS_LOW),
+    new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.95,
     })
   ));
-  // Halo aditivo
+  // Halo más ligero
   group.add(new THREE.Mesh(
-    new THREE.SphereGeometry(radius * 2.4, 12, 12),
+    new THREE.SphereGeometry(radius * 2.2, HALO_SEGMENTS_LOW, HALO_SEGMENTS_LOW),
     new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.1,
+      color, transparent: true, opacity: 0.08,
       side: THREE.BackSide,
       blending: THREE.AdditiveBlending, depthWrite: false,
     })
   ));
-  group.add(new THREE.PointLight(hex, 1.0, radius * 14));
   return group;
 }
 
@@ -245,14 +264,81 @@ interface Node2D {
   _angle: number; _tilt: number;
 }
 
+const BASE_SCALE_2D = 420;
+const ZOOM_OUT_2D_FALLBACK = 1.45;
+
+/* Fondo liviano de partículas/estrellas para la vista 2D (pocos recursos) */
+const PARTICLE_COUNT_2D = 48;
+const PARTICLE_SPEED_2D = 0.4;
+
+function ParticlesBackground2D() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const particlesRef = useRef<{ x: number; y: number; r: number; opacity: number; vy: number }[]>([]);
+  const initRef = useRef(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      const W = canvas.width;
+      const H = canvas.height;
+      if (!initRef.current || particlesRef.current.length === 0) {
+        particlesRef.current = Array.from({ length: PARTICLE_COUNT_2D }, () => ({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: 0.6 + Math.random() * 1.4,
+          opacity: 0.55 + Math.random() * 0.45,
+          vy: -PARTICLE_SPEED_2D * (0.5 + Math.random()),
+        }));
+        initRef.current = true;
+      }
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    let raf = 0;
+    const loop = () => {
+      const W = canvas.width;
+      const H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+      const particles = particlesRef.current;
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.y += p.vy;
+        if (p.y < -2) p.y = H + 2;
+        if (p.y > H + 2) p.y = -2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
+        ctx.fill();
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden />;
+}
+
 function NeuralCanvas2D({
   nodes,
   visibleLayers,
   onNodeClick,
+  zoomOut = 1,
 }: {
   nodes: Node2D[];
   visibleLayers: { prestador: boolean; proyecto: boolean; locacion: boolean };
   onNodeClick?: (node: Node2D) => void;
+  zoomOut?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
@@ -267,7 +353,7 @@ function NeuralCanvas2D({
     const my = (e.clientY - rect.top)  * (canvas.height / rect.height);
     const cx = canvas.width / 2;
     const W  = canvas.width; const H = canvas.height;
-    const scale = W / 420;
+    const scale = W / (BASE_SCALE_2D * zoomOut);
 
     for (const node of nodesRef.current) {
       const ciudad = normalizarCiudad(node.ciudad);
@@ -278,7 +364,7 @@ function NeuralCanvas2D({
       const nr = (node.type === 'proyecto' ? 7 : node.type === 'locacion' ? 5 : 4) * scale;
       if (Math.hypot(mx - nx, my - ny) < nr * 2.5) { onNodeClick(node); return; }
     }
-  }, [onNodeClick]);
+  }, [onNodeClick, zoomOut]);
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
@@ -286,12 +372,13 @@ function NeuralCanvas2D({
     const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
     resize();
     window.addEventListener('resize', resize);
+    const zoom = zoomOut;
 
     const loop = () => {
       const W = canvas.width; const H = canvas.height; const cx = W / 2;
       ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = '#000010'; ctx.fillRect(0, 0, W, H);
-      const scale = W / 420;
+      ctx.fillStyle = 'rgba(0,0,16,0.62)'; ctx.fillRect(0, 0, W, H);
+      const scale = W / (BASE_SCALE_2D * zoom);
 
       const ciudades = ['Río Grande', 'Tolhuin', 'Ushuaia'];
       ciudades.forEach(ciudad => {
@@ -356,7 +443,7 @@ function NeuralCanvas2D({
 
     rafRef.current = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(rafRef.current); window.removeEventListener('resize', resize); };
-  }, [visibleLayers]);
+  }, [visibleLayers, zoomOut]);
 
   return (
     <canvas
@@ -539,12 +626,21 @@ function MobileTooltip({ node, onClose }: { node: TooltipData | null; onClose: (
    COMPONENTE PRINCIPAL
 ═══════════════════════════════════════════════════════════════ */
 export default function AdminDashboardPage() {
-  const graphRef        = useRef<any>(null); // ¡CORRECCIÓN APLICADA AQUÍ! Se añadió (null)
+  const { t } = useLanguage();
+  const graphRef        = useRef<any>(null);
   const iframeRef       = useRef<HTMLIFrameElement>(null);
   const waveCounterRef  = useRef(0);
   const speedRef        = useRef(1.0);
   const distortionRef   = useRef(0.0);
   const boostRef        = useRef(0);
+  const renderer3DRef   = useRef<THREE.WebGLRenderer | null>(null);
+  const frameTime3DRef  = useRef<number[]>([]);
+  const pixelRatio3DRef = useRef(INITIAL_PIXEL_RATIO_3D);
+  const lowFps3DRef     = useRef(0);
+  const highFps3DRef    = useRef(0);
+  const slowLoadDoneRef = useRef(false);
+  const frameCount3DRef = useRef(0);
+  const sceneReadyRef   = useRef(false);
 
   const [loading, setLoading]             = useState(true);
   const [graphData, setGraphData]         = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
@@ -558,8 +654,17 @@ export default function AdminDashboardPage() {
   const [stats, setStats]                 = useState({ locaciones: 0, proyectos: 0, prestadores: 0 });
   const [isMobile, setIsMobile]           = useState(false);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
-  // Solo renderizar iframe en cliente (mismo HTML en server y primer paint del client = sin hydration mismatch)
+  const [force2D, setForce2D]             = useState(false); // Fallback si tarda >10s en cargar 3D
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+
+  // Si en desktop la escena 3D no está lista en 10s, cambiar a versión 2D (bajo recursos)
+  useEffect(() => {
+    if (isMobile || loading || force2D) return;
+    const t = setTimeout(() => {
+      if (!sceneReadyRef.current) setForce2D(true);
+    }, FALLBACK_2D_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [isMobile, loading, force2D]);
 
   // ── Detector mobile ────────────────────────────────────────
   useEffect(() => {
@@ -568,6 +673,23 @@ export default function AdminDashboardPage() {
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  // ── 3D: limitar pixel ratio y preparar resolución dinámica (cuando el grafo está listo)
+  useEffect(() => {
+    if (loading || isMobile) return;
+    const t = setTimeout(() => {
+      const g = graphRef.current;
+      const renderer = typeof g?.renderer === 'function' ? g.renderer() : null;
+      if (renderer && renderer.setPixelRatio) {
+        renderer3DRef.current = renderer;
+        const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+        const initial = Math.min(dpr, INITIAL_PIXEL_RATIO_3D);
+        pixelRatio3DRef.current = initial;
+        renderer.setPixelRatio(initial);
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [loading, isMobile]);
 
   // ── Carga de datos ─────────────────────────────────────────
   useEffect(() => {
@@ -751,10 +873,80 @@ export default function AdminDashboardPage() {
     setHoveredNode({ name:node.name, type:node.type, subTipo:node.subTipo, ciudad:node.ciudad, categoria:node.categoria, tipo:node.tipo });
   }, []);
 
-  // ── onEngineTick: órbita real alrededor del ancla ──────────
+  // ── onEngineTick: órbita + optimización resolución dinámica por FPS ──────────
   const handleEngineTick = useCallback(() => {
     const now = performance.now();
     const boosting = now < boostRef.current;
+
+    // Obtener renderer 3D una vez (por si no estaba listo en el useEffect)
+    let renderer = renderer3DRef.current;
+    if (!renderer && graphRef.current) {
+      const g = graphRef.current;
+      renderer = typeof g.renderer === 'function' ? g.renderer() : null;
+      if (renderer) {
+        renderer3DRef.current = renderer;
+        const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+        const initial = Math.min(dpr, INITIAL_PIXEL_RATIO_3D);
+        pixelRatio3DRef.current = initial;
+        renderer.setPixelRatio(initial);
+      }
+    }
+    if (renderer) {
+      const ft = frameTime3DRef.current;
+      ft.push(now);
+      if (ft.length > FPS_SAMPLES_3D) ft.shift();
+      frameCount3DRef.current++;
+      if (frameCount3DRef.current >= SCENE_READY_MIN_FRAMES) sceneReadyRef.current = true;
+      const fps = ft.length >= 10 ? 1000 / ((ft[ft.length - 1] - ft[0]) / (ft.length - 1)) : 60;
+      const maxRatio = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, MAX_PIXEL_RATIO_3D);
+
+      // Carga lenta: si en los primeros frames el FPS es bajo, bajar ratio de golpe
+      if (!slowLoadDoneRef.current && frameCount3DRef.current >= SLOW_LOAD_FRAMES_3D) {
+        slowLoadDoneRef.current = true;
+        if (fps < SLOW_LOAD_FPS_THRESHOLD_3D && pixelRatio3DRef.current > 0.65) {
+          pixelRatio3DRef.current = Math.max(MIN_PIXEL_RATIO_3D, Math.min(0.65, pixelRatio3DRef.current * 0.6));
+          renderer.setPixelRatio(pixelRatio3DRef.current);
+          const size = new THREE.Vector2();
+          renderer.getSize(size);
+          if (size.x && size.y) renderer.setSize(size.x, size.y);
+        }
+      }
+
+      if (fps < FPS_VERY_LOW_3D) {
+        lowFps3DRef.current++;
+        highFps3DRef.current = 0;
+        if (lowFps3DRef.current >= 25 && pixelRatio3DRef.current > MIN_PIXEL_RATIO_3D) {
+          pixelRatio3DRef.current = Math.max(MIN_PIXEL_RATIO_3D, pixelRatio3DRef.current * PIXEL_RATIO_DROP_VERY_LOW_3D);
+          renderer.setPixelRatio(pixelRatio3DRef.current);
+          const size = new THREE.Vector2();
+          renderer.getSize(size);
+          if (size.x && size.y) renderer.setSize(size.x, size.y);
+        }
+      } else if (fps < FPS_LOW_3D) {
+        lowFps3DRef.current++;
+        highFps3DRef.current = 0;
+        if (lowFps3DRef.current >= 40 && pixelRatio3DRef.current > MIN_PIXEL_RATIO_3D) {
+          pixelRatio3DRef.current = Math.max(MIN_PIXEL_RATIO_3D, pixelRatio3DRef.current * PIXEL_RATIO_DROP_LOW_3D);
+          renderer.setPixelRatio(pixelRatio3DRef.current);
+          const size = new THREE.Vector2();
+          renderer.getSize(size);
+          if (size.x && size.y) renderer.setSize(size.x, size.y);
+        }
+      } else if (fps > FPS_HIGH_3D) {
+        highFps3DRef.current++;
+        lowFps3DRef.current = 0;
+        if (highFps3DRef.current >= FPS_SAMPLES_3D * 2 && pixelRatio3DRef.current < maxRatio) {
+          pixelRatio3DRef.current = Math.min(maxRatio, pixelRatio3DRef.current * 1.2);
+          renderer.setPixelRatio(pixelRatio3DRef.current);
+          const size = new THREE.Vector2();
+          renderer.getSize(size);
+          if (size.x && size.y) renderer.setSize(size.x, size.y);
+        }
+      } else {
+        lowFps3DRef.current = 0;
+        highFps3DRef.current = 0;
+      }
+    }
 
     // Mapa de posiciones de anclas
     const anclas: Record<string, { x:number; y:number; z:number }> = {};
@@ -835,8 +1027,8 @@ export default function AdminDashboardPage() {
       {/* 3. FILTRO TV */}
       <TVOverlay/>
 
-      {/* 4. PANEL IZQUIERDO — en móvil: minimizado con botón para abrir; al abrir, centrado y con cerrar */}
-      {isMobile ? (
+      {/* 4. PANEL — móvil o fallback 2D: menú con botón; escritorio 3D: panel fijo */}
+      {(isMobile || force2D) ? (
         <>
           {mobilePanelOpen && (
             <>
@@ -852,7 +1044,7 @@ export default function AdminDashboardPage() {
                 visibleLayers={visibleLayers}
                 toggleLayer={toggleLayer}
                 resetCamera={resetCamera}
-                isMobile={isMobile}
+                isMobile={true}
                 mobileExpanded
                 onMobileClose={() => setMobilePanelOpen(false)}
               />
@@ -877,12 +1069,18 @@ export default function AdminDashboardPage() {
           visibleLayers={visibleLayers}
           toggleLayer={toggleLayer}
           resetCamera={resetCamera}
-          isMobile={isMobile}
+          isMobile={false}
         />
       )}
 
-      {/* 5. HUD SHADER (solo desktop) */}
-      {!isMobile && <ShaderHUD speed={speed} distortion={distortion}/>}
+      {/* 5. HUD SHADER (solo desktop 3D) */}
+      {!isMobile && !force2D && <ShaderHUD speed={speed} distortion={distortion}/>}
+      {/* Modo rendimiento: aviso cuando se pasó a 2D por timeout */}
+      {force2D && !isMobile && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs font-bold tracking-wide">
+          {t('nodos.modo_rendimiento')}
+        </div>
+      )}
 
       {/* 6. TOOLTIP HOVER (solo desktop) */}
       {!isMobile && hoveredNode && (
@@ -891,8 +1089,8 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* 7A. GRAFO 3D — Desktop */}
-      {!isMobile && (
+      {/* 7A. GRAFO 3D — Desktop (salvo fallback 2D) */}
+      {!isMobile && !force2D && (
         <div className="absolute inset-0 cursor-move z-20">
           {!loading && (
             <ForceGraph3D
@@ -918,11 +1116,11 @@ export default function AdminDashboardPage() {
                 if (s?.type==='ciudad'||t?.type==='ciudad') return 0;
                 return 0.3;
               }}
-              linkDirectionalParticles={visibleLayers.proyecto && visibleLayers.prestador ? 2 : 0}
+              linkDirectionalParticles={0}
               linkDirectionalParticleColor={() => '#fdba74'}
-              linkDirectionalParticleWidth={3}
-              linkDirectionalParticleResolution={8}
-              linkDirectionalParticleSpeed={0.003}
+              linkDirectionalParticleWidth={2}
+              linkDirectionalParticleResolution={4}
+              linkDirectionalParticleSpeed={0.002}
               d3AlphaDecay={1}
               d3VelocityDecay={0.3}
               onEngineTick={handleEngineTick}
@@ -932,21 +1130,26 @@ export default function AdminDashboardPage() {
             <div className="absolute inset-0 flex items-center justify-center z-30">
               <div className="flex flex-col items-center gap-4">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"/>
-                <p className="text-slate-500 text-sm animate-pulse tracking-widest uppercase">Conectando con la base de datos</p>
+                <p className="text-slate-500 text-sm animate-pulse tracking-widest uppercase">{t('nodos.conectando')}</p>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* 7B. CANVAS 2D — Mobile */}
-      {isMobile && !loading && (
+      {/* 7B. CANVAS 2D — Mobile o fallback por timeout (bajo recursos); en fallback cámara más lejos */}
+      {(isMobile || force2D) && !loading && (
         <div className="absolute inset-0 z-20">
-          <NeuralCanvas2D
-            nodes={nodes2D}
-            visibleLayers={visibleLayers}
-            onNodeClick={n => setMobileTooltip({ name:n.name??'', type:n.type, subTipo:n.subTipo, ciudad:n.ciudad })}
-          />
+          <div className="absolute inset-0 bg-[#000010]" aria-hidden />
+          <ParticlesBackground2D />
+          <div className="absolute inset-0">
+            <NeuralCanvas2D
+              nodes={nodes2D}
+              visibleLayers={visibleLayers}
+              onNodeClick={n => setMobileTooltip({ name:n.name??'', type:n.type, subTipo:n.subTipo, ciudad:n.ciudad })}
+              zoomOut={force2D ? ZOOM_OUT_2D_FALLBACK : 1}
+            />
+          </div>
           <MobileTooltip node={mobileTooltip} onClose={() => setMobileTooltip(null)}/>
         </div>
       )}
@@ -954,16 +1157,16 @@ export default function AdminDashboardPage() {
         <div className="absolute inset-0 z-20 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500"/>
-            <p className="text-slate-500 text-sm animate-pulse tracking-widest uppercase">Conectando red...</p>
+            <p className="text-slate-500 text-sm animate-pulse tracking-widest uppercase">{t('nodos.conectando_red')}</p>
           </div>
         </div>
       )}
 
-      {/* 8. MARCAS DE AGUA (solo desktop) */}
-      {!isMobile && <CityWatermarks/>}
+      {/* 8. MARCAS DE AGUA (solo desktop 3D) */}
+      {!isMobile && !force2D && <CityWatermarks/>}
 
-      {/* 9. BOTONES INFERIORES (solo desktop) */}
-      {!isMobile && (
+      {/* 9. BOTONES INFERIORES (solo desktop 3D) */}
+      {!isMobile && !force2D && (
         <div className="absolute bottom-8 right-8 z-50 flex gap-2">
           <button
             onClick={() => graphRef.current?.zoomToFit(400)}
