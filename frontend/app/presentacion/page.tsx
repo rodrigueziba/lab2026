@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * FILM COMMISSION TDF — Presentación Interactiva (Versión Completa)
+ * FILM COMMISSION TDF — Presentación Interactiva (Versión Actualizada)
  * ─────────────────────────────────────────────────
  * Frontend: app/presentacion/page.tsx
  */
@@ -62,17 +62,16 @@ function gradientColorsFromBase(baseHex: string): string[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SLIDE DATA (24 Slides Totales)
+// SLIDE DATA (25 Slides Totales - Reordenado)
 // ─────────────────────────────────────────────────────────────────────────────
 type SlideId =
-  | "portada" | "que-es" | "contexto" | "problema" | "internacionalizacion"
-  | "solucion" | "usuarios" | "perfiles"
+  | "portada" | "que-es" | "contexto" | "problema" | "enfoque" | "stack" | "impacto" 
+  | "solucion" | "internacionalizacion" | "usuarios" | "perfiles"
   | "journey-prestador" | "journey-contratante" 
   | "onboarding" | "gamificacion" | "descubrimiento-ia"
   | "modulos" | "mapa-nodal" | "seguridad"
-  | "locaciones" | "dashboard" | "stack"
-  | "notificaciones" | "impacto" | "resumen"
-  | "demo" | "cierre";
+  | "locaciones" | "dashboard" 
+  | "notificaciones" | "resumen" | "demo" | "cierre";
 
 interface Slide { id: SlideId; label: string; }
 
@@ -81,8 +80,11 @@ const SLIDES: Slide[] = [
   { id: "que-es",               label: "¿Qué es?"            },
   { id: "contexto",             label: "Contexto"            },
   { id: "problema",             label: "Problema"            },
-  { id: "internacionalizacion", label: "Visión Global"       },
+  { id: "enfoque",              label: "El Enfoque"          },
+  { id: "stack",                label: "Stack Técnico"       },
+  { id: "impacto",              label: "Impacto"             },
   { id: "solucion",             label: "Solución"            },
+  { id: "internacionalizacion", label: "Visión Global"       },
   { id: "usuarios",             label: "Usuarios"            },
   { id: "perfiles",             label: "Perfiles"            },
   { id: "journey-prestador",    label: "Journey Prestador"   },
@@ -95,9 +97,7 @@ const SLIDES: Slide[] = [
   { id: "seguridad",            label: "Seguridad"           },
   { id: "locaciones",           label: "Locaciones"          },
   { id: "dashboard",            label: "Dashboard Admin"     },
-  { id: "stack",                label: "Stack Técnico"       },
   { id: "notificaciones",       label: "Matchmaking & Alertas"},
-  { id: "impacto",              label: "Impacto"             },
   { id: "resumen",              label: "Resumen"             },
   { id: "demo",                 label: "Demo"                },
   { id: "cierre",               label: "Cierre"              },
@@ -165,7 +165,7 @@ function JourneyCard({ num, icon, title, desc, tags, color, last }: { num: numbe
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SLIDES CONTENT (Originales + Nuevas)
+// SLIDES CONTENT 
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SlidePortada() {
@@ -179,7 +179,7 @@ function SlidePortada() {
         ))}
       </div>
       <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-500 text-xs font-semibold tracking-widest uppercase animate-fade-up">
-        📽 Laboratorio de Desarrollo de Software · 2026
+        📽 Laboratorio de Software (IF055) · 2026
       </span>
       <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight animate-fade-up [animation-delay:100ms]">
         Film Commission<br /><span className="text-orange-500">TDF</span>
@@ -189,7 +189,7 @@ function SlidePortada() {
       </p>
       <div className="w-12 h-0.5 bg-orange-500/60 rounded animate-fade-up [animation-delay:300ms]" />
       <div className="flex gap-8 text-center animate-fade-up [animation-delay:400ms]">
-        {[{ label: "Desarrollador", val: "Ezequiel Rodríguez Ibarra" }, { label: "Cátedra", val: "Lab. de Desarrollo de Software" }, { label: "Año", val: "2026" }].map((m) => (
+        {[{ label: "Desarrollador", val: "Ezequiel Ibarra" }, { label: "Cátedra", val: "Laboratorio de Software (IF055)" }, { label: "Año", val: "2026" }].map((m) => (
           <div key={m.label} className="flex flex-col gap-1">
             <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-orange-500">{m.label}</span>
             <span className="text-sm text-slate-300 font-medium">{m.val}</span>
@@ -253,14 +253,103 @@ function SlideProblema() {
           <div className="flex items-start gap-3"><span className="text-4xl">🧩</span><div><div className="font-bold text-white mb-1">Fragmentación de la Información</div><p className="text-slate-400 text-xs leading-relaxed">La falta de una base de datos unificada de servicios y prestadores dificulta enormemente el desarrollo del sector local.</p></div></div>
         </Card>
         <Card className="flex flex-col gap-4 border-l-2 border-l-[#f59e0b]">
-          <div className="flex items-start gap-3"><span className="text-4xl">👻</span><div><div className="font-bold text-white mb-1">Invisibilidad del Talento</div><p className="text-slate-400 text-xs leading-relaxed">Las incipientes PYMES audiovisuales fueguinas son invisibles ante grandes oportunidades. Los externos traen sus propios equipos.</p></div></div>
+          <div className="flex items-start gap-3"><span className="text-4xl">👻</span><div><div className="font-bold text-white mb-1">Invisibilidad del Talento</div><p className="text-slate-400 text-xs leading-relaxed">Los productores y profesionales audiovisuales fueguinos son invisibles ante grandes oportunidades. Los externos traen sus propios equipos.</p></div></div>
         </Card>
       </div>
     </div>
   );
 }
 
-// NUEVA DIAPOSITIVA: Internacionalización
+function SlideEnfoque() {
+  return (
+    <div className="w-full max-w-5xl mx-auto px-4 flex flex-col gap-6">
+      <div>
+        <Eyebrow>Estrategia y Desarrollo</Eyebrow>
+        <SectionTitle>Comunidad & <span className="text-[#7c3aed]">Retención</span></SectionTitle>
+        <Sub>
+          Frente a alternativas centradas solo en logística, el objetivo de esta plataforma es consolidar a la comunidad audiovisual: lograr que se registren, interactúen y exhiban su portfolio con el respeto que merece.
+        </Sub>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
+        <Card className="flex flex-col gap-4 border-l-2 border-l-[#4f9cf9]">
+          <div className="font-bold text-white text-lg">Un desarrollador, un lenguaje</div>
+          <p className="text-slate-400 text-sm leading-relaxed text-justify">
+            Afrontando las limitaciones de ser un único programador sin experiencia previa, se optó por utilizar <strong>JavaScript en todo el ecosistema</strong>. <br/><br/>
+            El foco absoluto se puso en retener la atención del usuario y reducir la fricción al completar formularios. Para lograrlo, se priorizó un diseño hiperatractivo apoyado en librerías experimentales para generar curiosidad estética.
+          </p>
+        </Card>
+        <Card accent="purple" className="flex flex-col gap-4 justify-center">
+          <div className="font-bold text-white text-sm mb-1 text-center">Características y Herramientas Integradas</div>
+          <div className="flex flex-wrap gap-2 justify-center">
+            <Tag color="purple">Efectos 3D y 2D</Tag>
+            <Tag color="orange">Mapa Galaxia (Nodos)</Tag>
+            <Tag color="green">Gamificación de Perfil</Tag>
+            <Tag color="blue">IA (Perfiles y Roles)</Tag>
+            <Tag color="default">Fotos con Profundidad 3D</Tag>
+            <Tag color="purple">Shake to Shuffle (Móvil)</Tag>
+            <Tag color="orange">Formularios por Pasos</Tag>
+            <Tag color="green">Borradores Automáticos</Tag>
+            <Tag color="blue">Fondos Interactivos</Tag>
+            <Tag color="default">Tour de Bienvenida</Tag>
+            <Tag color="purple">Traducción (EN/ES)</Tag>
+            <Tag color="orange">Easter Eggs</Tag>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function SlideStack() {
+  return (
+    <div className="w-full max-w-4xl mx-auto px-4 flex flex-col gap-6">
+      <div><Eyebrow>Arquitectura</Eyebrow><SectionTitle>El Ecosistema <span className="text-[#f59e0b]">JS Everywhere</span></SectionTitle><Sub>Unificar el código bajo JavaScript/TypeScript eliminó fricciones en un equipo de un solo programador.</Sub></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="flex flex-col gap-3">
+          {[{ icon: "⚛️", label: "Frontend", tech: "Next.js 14 · Tailwind · JavaScript/TS", color: "border-l-[#4f9cf9]", textColor: "text-[#4f9cf9]" }, { icon: "⚙️", label: "Backend API", tech: "NestJS · JWT · RBAC", color: "border-l-orange-500", textColor: "text-orange-500" }, { icon: "🗄️", label: "Base de Datos", tech: "PostgreSQL (Supabase) · Prisma", color: "border-l-[#f59e0b]", textColor: "text-[#f59e0b]" }, { icon: "🐳", label: "Deploy", tech: "Docker · Vercel · Render", color: "border-l-[#7c3aed]", textColor: "text-[#7c3aed]" }].map((l) => (
+            <div key={l.label} className={`${C.card} px-4 py-3 flex gap-3 items-center border-l-2 ${l.color}`}><span className="text-xl w-6 text-center">{l.icon}</span><div><div className={`text-xs font-bold tracking-widest uppercase ${l.textColor}`}>{l.label}</div><div className="text-slate-300 text-xs">{l.tech}</div></div></div>
+          ))}
+        </div>
+        <div className="flex flex-col gap-4 justify-center">
+          <Card accent="blue" className="flex flex-col gap-2"><div className="text-xs font-bold text-[#4f9cf9] tracking-widest uppercase">Producto Final</div><p className="text-slate-300 text-xs leading-relaxed">NestJS modular · Next.js SSR · Contenedores Docker · Integración de WebGL y Three.js para inmersión 3D.</p></Card>
+          <Card className="flex items-center gap-4 bg-slate-900/50 border-dashed"><div className="text-4xl">🐳</div><div><div className="font-bold text-white text-sm">Dockerizado</div><p className="text-slate-400 text-xs">Entorno aislado para despliegues seguros.</p></div></Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SlideImpacto() {
+  return (
+    <div className="w-full max-w-3xl mx-auto px-4 flex flex-col gap-6">
+      <div><Eyebrow>Propuesta de Valor</Eyebrow><SectionTitle>El Código al Servicio del Arte y<br />de la <span className="text-orange-500">Industria</span></SectionTitle></div>
+      <Card className="border-l-2 border-l-orange-500 relative overflow-hidden">
+        <div className="pointer-events-none absolute top-0 right-0 text-[120px] opacity-[.03] leading-none select-none">🎬</div>
+        <p className="text-slate-200 text-lg font-light italic leading-relaxed mb-4">Identifiqué que la plataforma podría ser útil para reunir a los prestadores entre sí y generar una comunidad cohesionada para la industria audiovisual fueguina.</p>
+        <div className="flex flex-wrap gap-2 mt-4"><Tag color="orange">Industria Cultural</Tag><Tag color="blue">Políticas Públicas</Tag><Tag color="purple">Consolidación</Tag></div>
+      </Card>
+    </div>
+  );
+}
+
+function SlideSolucion() {
+  return (
+    <div className="w-full max-w-4xl mx-auto px-4 flex flex-col gap-6 items-center text-center">
+      <div><Eyebrow>La Plataforma</Eyebrow><SectionTitle>Film Commission <span className="text-orange-500">TDF</span></SectionTitle><Sub center>Una plataforma web integral para centralizar, gestionar y promover la industria audiovisual fueguina.</Sub></div>
+      <div className="grid grid-cols-3 gap-4 w-full">
+        {[{ num: "6", label: "Módulos", color: "text-orange-500" }, { num: "3", label: "Tipos de usuario", color: "text-[#4f9cf9]" }, { num: "3", label: "Bases de datos principales", color: "text-[#10b981]" }].map((s) => (
+          <div key={s.num} className={`${C.card} p-5 flex flex-col items-center gap-1.5`}><div className={`text-4xl font-extrabold ${s.color}`}>{s.num}</div><div className="text-xs text-slate-400">{s.label}</div></div>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-4 w-full">
+        {[{ icon: "📋", color: "gold" as const, title: "Directorio Público", desc: "Perfiles filtrados por ciudad y rubro" }, { icon: "📍", color: "blue" as const, title: "Catálogo de Locaciones", desc: "Escenarios georreferenciados con fotos" }, { icon: "🎞️", color: "purple" as const, title: "Cartelera de Proyectos", desc: "Producciones activas con roles vacantes" }].map((c) => (
+          <Card key={c.title} className="flex flex-col gap-3 text-left"><IconBox icon={c.icon} color={c.color} /><div className="font-bold text-white text-sm">{c.title}</div><p className="text-slate-400 text-xs">{c.desc}</p></Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SlideInternacionalizacion() {
   return (
     <div className="w-full max-w-4xl mx-auto px-4 flex flex-col gap-6">
@@ -278,24 +367,6 @@ function SlideInternacionalizacion() {
           <Tag color="orange">Atracción de Capital</Tag>
         </div>
       </Card>
-    </div>
-  );
-}
-
-function SlideSolucion() {
-  return (
-    <div className="w-full max-w-4xl mx-auto px-4 flex flex-col gap-6 items-center text-center">
-      <div><Eyebrow>La Plataforma</Eyebrow><SectionTitle>Film Commission <span className="text-orange-500">TDF</span></SectionTitle><Sub center>Una plataforma web integral para centralizar, gestionar y promover la industria audiovisual fueguina.</Sub></div>
-      <div className="grid grid-cols-3 gap-4 w-full">
-        {[{ num: "6", label: "Módulos", color: "text-orange-500" }, { num: "3", label: "Tipos de usuario", color: "text-[#4f9cf9]" }, { num: "3D", label: "Mapa nodal", color: "text-[#10b981]" }].map((s) => (
-          <div key={s.num} className={`${C.card} p-5 flex flex-col items-center gap-1.5`}><div className={`text-4xl font-extrabold ${s.color}`}>{s.num}</div><div className="text-xs text-slate-400">{s.label}</div></div>
-        ))}
-      </div>
-      <div className="grid grid-cols-3 gap-4 w-full">
-        {[{ icon: "📋", color: "gold" as const, title: "Directorio Público", desc: "Perfiles filtrados por ciudad y rubro" }, { icon: "📍", color: "blue" as const, title: "Catálogo de Locaciones", desc: "Escenarios georreferenciados con fotos" }, { icon: "🎞️", color: "purple" as const, title: "Cartelera de Proyectos", desc: "Producciones activas con roles vacantes" }].map((c) => (
-          <Card key={c.title} className="flex flex-col gap-3 text-left"><IconBox icon={c.icon} color={c.color} /><div className="font-bold text-white text-sm">{c.title}</div><p className="text-slate-400 text-xs">{c.desc}</p></Card>
-        ))}
-      </div>
     </div>
   );
 }
@@ -333,8 +404,8 @@ function SlidePerfiles() {
 
 function SlideJourneyPrestador() {
   const steps = [
-    { num: 1, icon: "🔑", title: "Registrarse", desc: "Email + contraseña o Google OAuth.", tags: ["Sin costo"], color: "gold" as const },
-    { num: 2, icon: "✏️", title: "Completá tu perfil", desc: "Cargá especialidad, descripción, zona de trabajo y contacto.", tags: ["Zona geográfica", "Portfolio"], color: "blue" as const },
+    { num: 1, icon: "🔑", title: "Registrarse", desc: "Email + contraseña o Google OAuth.", tags: ["Sin costo", "Formulario en Pasos"], color: "gold" as const },
+    { num: 2, icon: "✏️", title: "Completá tu perfil", desc: "Cargá especialidad, descripción, zona de trabajo y contacto.", tags: ["IA para biografía", "Autoguardado"], color: "blue" as const },
     { num: 3, icon: "👁", title: "Aparecés en el directorio", desc: "Visible en la Guía pública para contratantes.", tags: ["Directorio público"], color: "purple" as const },
     { num: 4, icon: "📢", title: "Conectate con proyectos", desc: "Explorá y postulate a producciones activas.", tags: ["Roles disponibles"], color: "gold" as const },
   ];
@@ -349,9 +420,9 @@ function SlideJourneyPrestador() {
 function SlideJourneyContratante() {
   const steps = [
     { num: 1, icon: "🌐", title: "Registrarse", desc: "Acceso al directorio y locaciones.", tags: ["OAuth Google"], color: "gold" as const },
-    { num: 2, icon: "🔍", title: "Buscar talento", desc: "Filtra el directorio por rubro y ciudad.", tags: ["Búsqueda en tiempo real"], color: "blue" as const },
+    { num: 2, icon: "🔍", title: "Buscar talento", desc: "Filtra el directorio por rubro y ciudad.", tags: ["Shake to Shuffle"], color: "blue" as const },
     { num: 3, icon: "📍", title: "Explorar locaciones", desc: "Navega locaciones georreferenciadas con fotos.", tags: ["Mapa interactivo"], color: "purple" as const },
-    { num: 4, icon: "📋", title: "Publicar proyectos", desc: "Creá proyecto, definí roles y recibí postulaciones.", tags: ["Gestión candidatos"], color: "gold" as const },
+    { num: 4, icon: "📋", title: "Publicar proyectos", desc: "Creá proyecto, definí roles y recibí postulaciones.", tags: ["IA para sugerir roles"], color: "gold" as const },
   ];
   return (
     <div className="w-full max-w-3xl mx-auto px-4 flex flex-col gap-6">
@@ -361,7 +432,6 @@ function SlideJourneyContratante() {
   );
 }
 
-// NUEVA DIAPOSITIVA: Onboarding / Retención
 function SlideOnboarding() {
   return (
     <div className="w-full max-w-4xl mx-auto px-4 flex flex-col gap-6">
@@ -370,13 +440,13 @@ function SlideOnboarding() {
         <Card className="flex flex-col justify-center border-l-2 border-l-orange-500 py-8">
           <div className="flex items-center gap-3 mb-4"><Rocket className="text-orange-500" size={32} /><span className="font-bold text-white text-xl">Tour de Bienvenida</span></div>
           <p className="text-slate-400 text-sm mb-4 leading-relaxed">
-            Un sistema de onboarding inteligente que detecta si sos un invitado o un usuario registrado, guiándote interactivamente por las secciones clave (Directorio, Locaciones, Proyectos) reduciendo drásticamente la tasa de rebote.
+            Un sistema de onboarding inteligente que detecta si sos un invitado o un usuario registrado, guiándote interactivamente por las secciones clave (Directorio, Locaciones, Proyectos) reduciendo drásticamente la sensación de sentirse abrumado.
           </p>
         </Card>
         <Card accent="blue" className="flex flex-col justify-center py-8">
           <div className="flex items-center gap-3 mb-4"><Target className="text-[#4f9cf9]" size={32} /><span className="font-bold text-white text-xl">Experiencia sin Fricción</span></div>
           <p className="text-slate-400 text-sm mb-4 leading-relaxed">
-            Navegación fluida, transiciones de estado limpias y una jerarquía visual que prioriza el descubrimiento de talento local de manera intuitiva y profesional.
+            Navegación fluida, transiciones de estado limpias y una jerarquía visual que respeta y expone el portfolio de los profesionales. Se habilitó el guardado de borradores automático para que nadie pierda su progreso.
           </p>
         </Card>
       </div>
@@ -384,7 +454,6 @@ function SlideOnboarding() {
   );
 }
 
-// NUEVA DIAPOSITIVA: Gamificación
 function SlideGamificacion() {
   return (
     <div className="w-full max-w-4xl mx-auto px-4 flex flex-col gap-6">
@@ -405,27 +474,26 @@ function SlideGamificacion() {
         <div className="text-3xl">🎁</div>
         <div>
           <div className="font-bold text-white mb-1">Recompensas y Easter Eggs</div>
-          <p className="text-slate-400 text-sm leading-relaxed">Al llegar al 100%, los usuarios desbloquean fondos animados y un menú interactivo oculto presionando <strong className="text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded">Shift</strong>, incentivándolos a participar de forma lúdica.</p>
+          <p className="text-slate-400 text-sm leading-relaxed">Al llegar al 100%, los usuarios desbloquean fondos animados interactivos y un menú oculto presionando <strong className="text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded">Shift</strong>, incentivándolos a participar de forma lúdica.</p>
         </div>
       </div>
     </div>
   );
 }
 
-// NUEVA DIAPOSITIVA: Descubrimiento e IA
 function SlideDescubrimientoIA() {
   return (
     <div className="w-full max-w-4xl mx-auto px-4 flex flex-col gap-6">
       <div><Eyebrow>IA & Algoritmos</Eyebrow><SectionTitle>Cero Fricción &amp; <span className="text-[#7c3aed]">Descubrimiento</span></SectionTitle><Sub>Democratizando la visibilidad del talento fueguino.</Sub></div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card accent="purple" className="flex flex-col gap-4">
-          <div className="flex items-center gap-3"><Dices className="text-[#7c3aed]" size={32} /><div className="font-bold text-white text-lg">Descubrimiento Aleatorio (El Dado)</div></div>
-          <p className="text-slate-400 text-sm leading-relaxed">Los directorios clásicos esconden a los más antiguos. Un botón en forma de 'Dado' reorganiza aleatoriamente prestadores y proyectos, garantizando igualdad de oportunidades de visibilidad para toda la comunidad.</p>
+          <div className="flex items-center gap-3"><Dices className="text-[#7c3aed]" size={32} /><div className="font-bold text-white text-lg">Descubrimiento Interactivo</div></div>
+          <p className="text-slate-400 text-sm leading-relaxed">Los directorios clásicos esconden a los perfiles más antiguos. Se implementó un botón en forma de 'Dado' (y el uso del movimiento del celular) para reorganizar aleatoriamente los listados, garantizando rotación y visibilidad equitativa.</p>
         </Card>
         <Card className="flex flex-col gap-4 relative overflow-hidden">
           <div className="absolute top-4 right-4 opacity-10"><Sparkles size={80}/></div>
           <div className="flex items-center gap-3"><Sparkles className="text-orange-400" size={32} /><div className="font-bold text-white text-lg">Asistencia de IA (Cero Fricción)</div></div>
-          <p className="text-slate-400 text-sm leading-relaxed z-10">La gente abandona los formularios largos. El sistema asiste con Inteligencia Artificial para redactar biografías profesionales y sugerir automáticamente qué roles técnicos faltan al crear un proyecto.</p>
+          <p className="text-slate-400 text-sm leading-relaxed z-10">La gente abandona los formularios largos. El sistema asiste con Inteligencia Artificial para ayudar a crear descripciones atractivas para el perfil y sugerir automáticamente los puestos a cubrir al crear una nueva producción.</p>
         </Card>
       </div>
     </div>
@@ -437,7 +505,7 @@ function SlideModulos() {
     { icon: "🔐", color: "gold" as const, title: "Autenticación", desc: "Login, OAuth Google, JWT · Control RBAC" },
     { icon: "👥", color: "blue" as const, title: "Directorio", desc: "CRUD de perfiles, búsqueda en tiempo real" },
     { icon: "📋", color: "purple" as const, title: "Cartelera", desc: "Publicar proyectos y gestionar postulaciones" },
-    { icon: "📍", color: "green" as const, title: "Catálogo", desc: "Fichas con fotos, coordenadas y Leaflet" },
+    { icon: "📍", color: "green" as const, title: "Catálogo", desc: "Fichas con fotos con profundidad 3D" },
     { icon: "📊", color: "blue" as const, title: "Dashboard", desc: "Métricas Recharts y ABM de usuarios" },
     { icon: "🔔", color: "gold" as const, title: "Notificaciones", desc: "Alertas en tiempo real y Matchmaking" },
   ];
@@ -459,7 +527,7 @@ function SlideModulos() {
 function SlideMapaNodal() {
   return (
     <div className="w-full max-w-4xl mx-auto px-4 flex flex-col gap-6">
-      <div><Eyebrow>Innovación Técnica</Eyebrow><SectionTitle>Mapa Nodal <span className="text-[#4f9cf9]">3D</span></SectionTitle><Sub>El motor psicológico: los usuarios quieren completar su perfil para verse brillando en la red de la provincia.</Sub></div>
+      <div><Eyebrow>Innovación Técnica</Eyebrow><SectionTitle>Mapa Galaxia <span className="text-[#4f9cf9]">Nodal 3D</span></SectionTitle><Sub>El motor psicológico: los usuarios quieren completar su perfil para verse brillando como un planeta en la red de la provincia.</Sub></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="flex flex-col gap-3">
           {[{ icon: "⬡", color: "gold" as const, title: "Shaders WebGL", desc: "Renderizado 3D sin plugins." }, { icon: "🌀", color: "blue" as const, title: "Físicas de grafos", desc: "Conexiones con peso real del ecosistema." }, { icon: "🔗", color: "purple" as const, title: "Nodos Interactivos", desc: "Prestadores, Proyectos y Locaciones." }].map((f) => (
@@ -507,7 +575,7 @@ function SlideLocaciones() {
       <div><Eyebrow>Módulo 3 — Locaciones</Eyebrow><SectionTitle>Scouting <span className="text-[#4f9cf9]">Digital</span></SectionTitle></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="flex flex-col gap-4">
-          {[{ icon: "📷", color: "gold" as const, title: "Fichas Técnicas", desc: "Galerías fotográficas en Supabase Storage." }, { icon: "🗺️", color: "blue" as const, title: "Geolocalización", desc: "Coordenadas con mapa interactivo Leaflet." }, { icon: "🏙️", color: "purple" as const, title: "Tres ciudades", desc: "Ushuaia · Tolhuin · Río Grande" }].map((f) => (
+          {[{ icon: "📷", color: "gold" as const, title: "Fichas Técnicas", desc: "Galerías fotográficas con profundidad 3D." }, { icon: "🗺️", color: "blue" as const, title: "Geolocalización", desc: "Coordenadas con mapa interactivo Leaflet." }, { icon: "🏙️", color: "purple" as const, title: "Tres ciudades", desc: "Ushuaia · Tolhuin · Río Grande" }].map((f) => (
             <Card key={f.title} className="flex gap-3 items-center py-4"><IconBox icon={f.icon} color={f.color} /><div><div className="font-bold text-white text-sm">{f.title}</div><p className="text-slate-400 text-xs">{f.desc}</p></div></Card>
           ))}
         </div>
@@ -543,27 +611,6 @@ function SlideDashboard() {
   );
 }
 
-// MODIFICADA: Enfatizar "JavaScript Everywhere"
-function SlideStack() {
-  return (
-    <div className="w-full max-w-4xl mx-auto px-4 flex flex-col gap-6">
-      <div><Eyebrow>Arquitectura</Eyebrow><SectionTitle>El Ecosistema <span className="text-[#f59e0b]">JS Everywhere</span></SectionTitle><Sub>Unificar el código bajo TypeScript de extremo a extremo elimina fricciones y errores.</Sub></div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <div className="flex flex-col gap-3">
-          {[{ icon: "⚛️", label: "Frontend", tech: "Next.js 14 · Tailwind · TypeScript", color: "border-l-[#4f9cf9]", textColor: "text-[#4f9cf9]" }, { icon: "⚙️", label: "Backend API", tech: "NestJS · JWT · RBAC", color: "border-l-orange-500", textColor: "text-orange-500" }, { icon: "🗄️", label: "Base de Datos", tech: "PostgreSQL (Supabase) · Prisma ORM", color: "border-l-[#f59e0b]", textColor: "text-[#f59e0b]" }, { icon: "🐳", label: "Deploy", tech: "Docker · Vercel · Render", color: "border-l-[#7c3aed]", textColor: "text-[#7c3aed]" }].map((l) => (
-            <div key={l.label} className={`${C.card} px-4 py-3 flex gap-3 items-center border-l-2 ${l.color}`}><span className="text-xl w-6 text-center">{l.icon}</span><div><div className={`text-xs font-bold tracking-widest uppercase ${l.textColor}`}>{l.label}</div><div className="text-slate-300 text-xs">{l.tech}</div></div></div>
-          ))}
-        </div>
-        <div className="flex flex-col gap-4 justify-center">
-          <Card accent="blue" className="flex flex-col gap-2"><div className="text-xs font-bold text-[#4f9cf9] tracking-widest uppercase">Producto Enterprise</div><p className="text-slate-300 text-xs leading-relaxed">TypeScript estricto · NestJS modular · Next.js SSR · Contenedores Docker · WebGL 3D.</p></Card>
-          <Card className="flex items-center gap-4 bg-slate-900/50 border-dashed"><div className="text-4xl">🐳</div><div><div className="font-bold text-white text-sm">Dockerizado</div><p className="text-slate-400 text-xs">Entorno aislado para despliegues seguros.</p></div></Card>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// MODIFICADA: Enfatizar Matchmaking
 function SlideNotificaciones() {
   return (
     <div className="w-full max-w-4xl mx-auto px-4 flex flex-col gap-6">
@@ -582,21 +629,6 @@ function SlideNotificaciones() {
           ))}
         </div>
       </div>
-    </div>
-  );
-}
-
-function SlideImpacto() {
-  return (
-    <div className="w-full max-w-3xl mx-auto px-4 flex flex-col gap-6">
-      <div><Eyebrow>Propuesta de Valor</Eyebrow><SectionTitle>El Código al Servicio<br />del <span className="text-orange-500">Arte</span></SectionTitle></div>
-      <Card className="border-l-2 border-l-orange-500 relative overflow-hidden">
-        <div className="pointer-events-none absolute top-0 right-0 text-[120px] opacity-[.03] leading-none select-none">🎬</div>
-        <p className="text-slate-200 text-lg font-light italic leading-relaxed mb-4">"Identifiqué que la plataforma podría ser útil para reunir a los prestadores entre sí y generar una comunidad cohesionada para la industria audiovisual fueguina."</p>
-        <Divider />
-        <p className="text-slate-400 text-sm leading-relaxed mb-4">La migración a TypeScript, Docker y arquitecturas enterprise no fue un fin en sí mismo — fue el medio necesario para construir un producto real y escalable que la industria necesita.</p>
-        <div className="flex flex-wrap gap-2"><Tag color="orange">Industria Cultural</Tag><Tag color="blue">Políticas Públicas</Tag></div>
-      </Card>
     </div>
   );
 }
@@ -654,8 +686,11 @@ const SLIDE_COMPONENTS: Record<SlideId, React.FC> = {
   "que-es":             SlideQueEs,
   contexto:             SlideContexto,
   problema:             SlideProblema,
-  internacionalizacion: SlideInternacionalizacion,
+  enfoque:              SlideEnfoque,
+  stack:                SlideStack,
+  impacto:              SlideImpacto,
   solucion:             SlideSolucion,
+  internacionalizacion: SlideInternacionalizacion,
   usuarios:             SlideUsuarios,
   perfiles:             SlidePerfiles,
   "journey-prestador":  SlideJourneyPrestador,
@@ -668,9 +703,7 @@ const SLIDE_COMPONENTS: Record<SlideId, React.FC> = {
   seguridad:            SlideSeguridad,
   locaciones:           SlideLocaciones,
   dashboard:            SlideDashboard,
-  stack:                SlideStack,
   notificaciones:       SlideNotificaciones,
-  impacto:              SlideImpacto,
   resumen:              SlideResumen,
   demo:                 SlideDemo,
   cierre:               SlideCierre,
@@ -778,11 +811,7 @@ export default function PresentationPage() {
       <TopologyBackground {...(topoProps as Record<string, unknown>)} />
       
       <div className="fixed top-0 left-0 h-0.5 bg-gradient-to-r from-orange-500 to-[#f59e0b] z-50 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
-      
-      <div className="fixed top-5 left-6 z-40 flex items-center gap-2 opacity-60 pointer-events-none">
-        <span className="text-orange-500 text-base">▶</span><span className="text-sm font-bold text-slate-300 tracking-wide">TDFFILM</span>
-      </div>
-      
+            
       <div className="fixed top-5 right-6 z-40 text-xs font-bold text-slate-500 tracking-widest opacity-70 pointer-events-none">
         {String(current + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
       </div>
