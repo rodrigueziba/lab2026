@@ -114,7 +114,7 @@ const FRAG = `
     vec2 m = smoothstep(0.0,0.06,uv) * smoothstep(0.0,0.06,1.0-uv);
     col   *= m.x * m.y;
 
-    col *= 0.64;
+    col *= 0.35;
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -193,6 +193,8 @@ interface OpalBackgroundProps {
   standalone?: boolean;
   className?: string;
   params?: OpalBackgroundParams;
+  /** Llamado cada vez que el usuario hace click en el fondo y se añade un ripple */
+  onRipple?: () => void;
 }
 
 const TARGET_FPS = 30;
@@ -204,6 +206,7 @@ export default function OpalBackground({
   standalone = false,
   className = "",
   params: paramsProp,
+  onRipple,
 }: OpalBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
@@ -342,8 +345,9 @@ export default function OpalBackground({
   const handleOverlayClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       addRippleAt(e.clientX, e.clientY);
+      onRipple?.();
     },
-    [addRippleAt]
+    [addRippleAt, onRipple]
   );
 
   if (disabled) {

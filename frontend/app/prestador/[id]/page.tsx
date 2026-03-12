@@ -1,13 +1,27 @@
 'use client';
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2'; // 👈 Importamos SweetAlert
 import { 
   MapPin, Mail, Phone, Globe, User, Briefcase, 
   Image as ImageIcon, CheckCircle, Loader2, Lock, Clock, XCircle,
-  GraduationCap, Film, ExternalLink
+  GraduationCap, Film, ExternalLink, Settings2, X, Play, Pause
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
+import OpalBackground, { type OpalBackgroundParams } from '@/components/OpalBackground';
+import { isProfileHealth100 } from '@/lib/profileHealth';
+
+const DEFAULT_PRESTADOR_OPAL_PARAMS: Required<OpalBackgroundParams> = {
+  speed: 0.1,
+  flowX: -1.35,
+  flowY: -1.35,
+  colorSpeed: 0.1,
+  paletteBase: '#1a6b9e',
+  maxRipples: 2,
+};
+
+const DEFAULT_PRESTADOR_TV_OPACITY = 0.92;
+const ECHOES_FIRST_RIPPLE_KEY = 'tdffilm_echoes_first_ripple_played';
 
 export default function DetallePrestadorPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -16,6 +30,32 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
   const [loading, setLoading] = useState(true);
   const [solicitando, setSolicitando] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [showOpalBackground, setShowOpalBackground] = useState(false);
+  const [showDebugButton, setShowDebugButton] = useState(false);
+  const [debugMenuOpen, setDebugMenuOpen] = useState(false);
+  const [echoesPlaying, setEchoesPlaying] = useState(false);
+  const [opalParams, setOpalParams] = useState<Required<OpalBackgroundParams>>(DEFAULT_PRESTADOR_OPAL_PARAMS);
+  const [tvFilterOpacity, setTvFilterOpacity] = useState(DEFAULT_PRESTADOR_TV_OPACITY);
+  const echoesRef = useRef<HTMLAudioElement>(null);
+
+  const handleOpalRipple = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (localStorage.getItem(ECHOES_FIRST_RIPPLE_KEY) === '1') return;
+    try {
+      echoesRef.current?.play();
+      localStorage.setItem(ECHOES_FIRST_RIPPLE_KEY, '1');
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'ShiftLeft' && e.code !== 'ShiftRight') return;
+      if (typeof window !== 'undefined' && window.innerWidth < 768) return;
+      setShowDebugButton((v) => !v);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const tvScanline = { 
     backgroundImage: "linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06))", 
@@ -52,6 +92,13 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
                     telefono: accessData.datos.telefono
                 }));
             }
+        }
+        const resPerfiles = await fetch(`${apiUrl}/prestador/mis-perfiles`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (resPerfiles.ok) {
+          const perfiles = await resPerfiles.json();
+          setShowOpalBackground(isProfileHealth100(Array.isArray(perfiles) ? perfiles : []));
         }
       }
     } catch (err) {
@@ -160,6 +207,13 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-sans overflow-x-hidden">
+      <audio
+        ref={echoesRef}
+        src="/echoes.mp3"
+        className="hidden"
+        onPlay={() => setEchoesPlaying(true)}
+        onPause={() => setEchoesPlaying(false)}
+      />
       
       {/* CABECERA */}
       <div className="relative h-[60vh] w-full bg-black overflow-hidden group">
@@ -187,10 +241,21 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+      {/* BODY: fondo Opal + filtro TV solo si usuario logueado tiene 100% salud de perfil */}
+      {showOpalBackground ? (
+      <OpalBackground className="relative min-h-[50vh]" params={opalParams} onRipple={handleOpalRipple}>
+        <div
+          className="absolute inset-0 pointer-events-none z-[1]"
+          style={{
+            opacity: tvFilterOpacity,
+            background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.94) 2px, rgba(0,0,0,0.94) 4px)',
+          }}
+          aria-hidden
+        />
+        <div className="relative z-10 max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch pointer-events-none">
           
           {/* COLUMNA IZQUIERDA: tarjetas con hover tipo proyectos */}
-          <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-8 pointer-events-auto">
               <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl flex-1 transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
                   <h3 className="text-orange-500 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2">{esEmpresa ? 'Sobre la Empresa' : 'Sobre el Profesional'}</h3>
                   <p className="text-slate-300 text-lg leading-relaxed whitespace-pre-line text-justify">{prestador.descripcion || "Sin descripción."}</p>
@@ -235,7 +300,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
           </div>
 
           {/* COLUMNA DERECHA (Contacto) — misma altura y estilo */}
-          <div className="flex flex-col">
+          <div className="flex flex-col pointer-events-auto">
               <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl sticky top-24 flex-1 min-h-0 transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
                   <h3 className="text-white font-bold text-xl mb-6">Información de Contacto</h3>
 
@@ -357,6 +422,268 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
               </div>
           </div>
       </div>
+      </OpalBackground>
+      ) : (
+      <div className="relative min-h-[50vh] bg-slate-950">
+        <div className="relative z-10 max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+          {/* COLUMNA IZQUIERDA */}
+          <div className="flex flex-col gap-8">
+              <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl flex-1 transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
+                  <h3 className="text-orange-500 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2">{esEmpresa ? 'Sobre la Empresa' : 'Sobre el Profesional'}</h3>
+                  <p className="text-slate-300 text-lg leading-relaxed whitespace-pre-line text-justify">{prestador.descripcion || "Sin descripción."}</p>
+                  {prestador.formacion && (
+                    <div className="mt-6 pt-6 border-t border-slate-800">
+                      <h4 className="text-cyan-400 font-bold uppercase tracking-wider text-sm mb-2 flex items-center gap-2"><GraduationCap size={18}/> Formación</h4>
+                      <p className="text-slate-300 leading-relaxed">{prestador.formacion}</p>
+                    </div>
+                  )}
+                  {prestador.experiencias && prestador.experiencias.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-slate-800">
+                      <h4 className="text-amber-400 font-bold uppercase tracking-wider text-sm mb-3 flex items-center gap-2"><Film size={18}/> Filmografía / Experiencia</h4>
+                      <ul className="space-y-2">
+                        {prestador.experiencias.map((exp: { proyecto?: string; anio?: string; rol?: string }, idx: number) => (
+                          <li key={idx} className="flex flex-wrap items-baseline gap-2 text-slate-300">
+                            <span className="font-medium text-white">{exp.proyecto}</span>
+                            {exp.anio && <span className="text-slate-500 text-sm">({exp.anio})</span>}
+                            {exp.rol && <span className="text-slate-400 text-sm">— {exp.rol}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+              </div>
+              {prestador.galeria && prestador.galeria.length > 0 && (
+                  <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
+                      <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-6 flex items-center gap-2 border-b border-slate-800 pb-2">
+                          <ImageIcon size={20}/> Portfolio
+                      </h3>
+                      <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-slate-800 bg-black group">
+                          {prestador.galeria.map((img: string, idx: number) => (
+                              <div key={idx} className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${idx === currentSlide ? 'opacity-100' : 'opacity-0'}`}>
+                                  <img src={img} className="w-full h-full object-contain bg-black/90"/>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              )}
+          </div>
+          <div className="flex flex-col">
+              <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl sticky top-24 flex-1 min-h-0 transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
+                  <h3 className="text-white font-bold text-xl mb-6">Información de Contacto</h3>
+                  {redes.length > 0 && (
+                      <div className="mb-6 pb-6 border-b border-slate-800">
+                          <div className="flex items-center gap-3 text-slate-400 mb-3"><span className="text-xs font-bold uppercase">Redes sociales</span></div>
+                          <div className="flex flex-wrap gap-3">
+                              {redes.map((r) => {
+                                const href = normalizeSocialUrl(r.key, r.url!);
+                                const handle = String(r.url).replace(/^@/, '').replace(/^https?:\/\/[^/]+\//i, '').replace(/\/$/, '') || r.url;
+                                return (
+                                  <div key={r.key} className="relative group/red">
+                                      <a href={href} target="_blank" rel="noreferrer" className={`inline-flex items-center justify-center w-11 h-11 rounded-xl border border-slate-700 ${r.bg} ${r.color} transition-all hover:scale-110 hover:border-current`} title={r.label}>
+                                          <SocialIconSvg type={r.key} className="w-5 h-5" />
+                                      </a>
+                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover/red:opacity-100 group-hover/red:visible transition-all z-20 min-w-[180px]">
+                                          <p className="text-white font-bold text-sm whitespace-nowrap">{r.label}</p>
+                                          <p className="text-slate-400 text-xs truncate max-w-[200px]" title={handle}>{handle}</p>
+                                          <a href={href} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-orange-400 text-xs font-bold hover:text-orange-300">
+                                              <ExternalLink size={12}/> Abrir perfil
+                                          </a>
+                                      </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                      </div>
+                  )}
+                  {videoId && (
+                      <div className="mb-6 pb-6 border-b border-slate-800">
+                          <div className="flex items-center gap-3 text-slate-400 mb-3"><span className="text-xs font-bold uppercase">Reel / Video</span></div>
+                          <a
+                              href={prestador.videoReel || `https://www.youtube.com/watch?v=${videoId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block rounded-xl overflow-hidden border border-slate-700 hover:border-orange-500/50 transition-all group/reel"
+                          >
+                              <img
+                                  src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
+                                  alt="Preview del reel"
+                                  className="w-full aspect-video object-cover group-hover/reel:opacity-90 transition-opacity"
+                                  onError={(e) => {
+                                      const target = e.currentTarget;
+                                      target.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                                  }}
+                              />
+                              <div className="bg-slate-800/80 py-2 px-3 flex items-center justify-center gap-2 text-orange-400 text-sm font-bold group-hover/reel:text-orange-300">
+                                  Ver en YouTube
+                              </div>
+                          </a>
+                      </div>
+                  )}
+                  <div className="space-y-6">
+                      <div className="group">
+                          <div className="flex items-center gap-3 text-slate-400 mb-1 group-hover:text-orange-500 transition"><Mail size={18}/> <span className="text-xs font-bold uppercase">Email</span></div>
+                          <p className="text-white font-medium break-all">
+                              {accessStatus === 'Aprobada' ? (
+                                <span className="text-emerald-400 font-bold">{prestador.email}</span>
+                              ) : (
+                                <span className="text-slate-500 italic flex items-center gap-2"><Lock size={14}/> 🔒 Solicitar contacto</span>
+                              )}
+                          </p>
+                      </div>
+                      <div className="group">
+                          <div className="flex items-center gap-3 text-slate-400 mb-1 group-hover:text-orange-500 transition"><Phone size={18}/> <span className="text-xs font-bold uppercase">Teléfono</span></div>
+                          <p className="text-white font-medium">
+                              {accessStatus === 'Aprobada' ? (
+                                <span className="text-emerald-400 font-bold">{prestador.telefono || "No especificado"}</span>
+                              ) : (
+                                <span className="text-slate-500 italic flex items-center gap-2"><Lock size={14}/> 🔒 Solicitar contacto</span>
+                              )}
+                          </p>
+                      </div>
+                      {prestador.web && (
+                          <div className="group">
+                              <div className="flex items-center gap-3 text-slate-400 mb-1 group-hover:text-orange-500 transition"><Globe size={18}/> <span className="text-xs font-bold uppercase">Web</span></div>
+                              <a href={prestador.web} target="_blank" rel="noreferrer" className="text-blue-400 underline">Visitar Sitio</a>
+                          </div>
+                      )}
+                  </div>
+                  <div className="mt-8 pt-6 border-t border-slate-800">
+                      {accessStatus === 'Ninguna' && (
+                          <button 
+                            onClick={handleSolicitarContacto}
+                            disabled={solicitando}
+                            className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-orange-900/20 disabled:opacity-50 flex justify-center items-center gap-2"
+                          >
+                              {solicitando ? <Loader2 className="animate-spin" /> : 'Solicitar Datos de Contacto'}
+                          </button>
+                      )}
+                      {accessStatus === 'Pendiente' && (
+                          <div className="w-full bg-yellow-500/10 text-yellow-500 font-bold py-3 rounded-xl border border-yellow-500/30 flex justify-center items-center gap-2">
+                              <Clock size={18}/> Solicitud Enviada
+                          </div>
+                      )}
+                      {accessStatus === 'Aprobada' && (
+                          <div className="w-full bg-emerald-500/10 text-emerald-400 font-bold py-3 rounded-xl border border-emerald-500/30 flex justify-center items-center gap-2">
+                              <CheckCircle size={18}/> Acceso Concedido
+                          </div>
+                      )}
+                       {accessStatus === 'Rechazada' && (
+                          <div className="w-full bg-red-500/10 text-red-500 font-bold py-3 rounded-xl border border-red-500/30 flex justify-center items-center gap-2">
+                              <XCircle size={18}/> Solicitud Rechazada
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* Debug: activado con Shift en escritorio, solo si hay fondo Opal */}
+      {showOpalBackground && showDebugButton && (
+        <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDebugMenuOpen((v) => !v)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950/90 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-white hover:border-orange-500/40 hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] transition-all font-bold text-sm"
+          >
+            <Settings2 size={18} />
+            Debug
+          </button>
+          {debugMenuOpen && (
+            <div className="fixed left-24 top-1/2 -translate-y-1/2 w-72 rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[61]">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">OpalBackground</span>
+                <button type="button" onClick={() => setDebugMenuOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors" aria-label="Cerrar">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
+                  <span className="text-xs font-bold text-slate-400">Echoes (mp3)</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = echoesRef.current;
+                      if (!el) return;
+                      if (el.paused) el.play();
+                      else el.pause();
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-300 hover:text-white transition-colors text-xs font-bold"
+                  >
+                    {echoesPlaying ? <Pause size={16} /> : <Play size={16} />}
+                    {echoesPlaying ? 'Pausar' : 'Reproducir'}
+                  </button>
+                </div>
+                <div>
+                  <label className="flex justify-between items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-slate-400">Opacidad filtro TV</span>
+                    <span className="text-xs font-mono text-orange-400 tabular-nums">{(tvFilterOpacity * 100).toFixed(0)}%</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={tvFilterOpacity * 100}
+                    onChange={(e) => setTvFilterOpacity(Number(e.target.value) / 100)}
+                    className="w-full h-2 rounded-full bg-slate-800 accent-orange-500 mb-4"
+                  />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-400 block mb-2">Color base paleta (4 complementarios)</span>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={opalParams.paletteBase}
+                      onChange={(e) => setOpalParams((p) => ({ ...p, paletteBase: e.target.value }))}
+                      className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent"
+                    />
+                    <span className="text-xs font-mono text-slate-500">{opalParams.paletteBase}</span>
+                  </div>
+                </div>
+                {[
+                  { key: 'speed', label: 'Velocidad', min: 0.2, max: 3, step: 0.1 },
+                  { key: 'flowX', label: 'Dirección X', min: -1.5, max: 1.5, step: 0.05 },
+                  { key: 'flowY', label: 'Dirección Y', min: -1.5, max: 1.5, step: 0.05 },
+                  { key: 'colorSpeed', label: 'Velocidad cambio color', min: 0.1, max: 3, step: 0.1 },
+                  { key: 'maxRipples', label: 'Cantidad ripples (click)', min: 1, max: 6, step: 1 },
+                ].map(({ key, label, min, max, step }) => (
+                  <div key={key}>
+                    <label className="flex justify-between items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-slate-400">{label}</span>
+                      <span className="text-xs font-mono text-orange-400 tabular-nums">
+                        {key === 'maxRipples' ? opalParams[key] : (opalParams[key as keyof typeof opalParams] as number).toFixed(2)}
+                      </span>
+                    </label>
+                    <input
+                      type="range"
+                      min={min}
+                      max={max}
+                      step={step}
+                      value={opalParams[key as keyof typeof opalParams] as number}
+                      onChange={(e) =>
+                        setOpalParams((p) => ({
+                          ...p,
+                          [key]: key === 'maxRipples' ? parseInt(e.target.value, 10) : parseFloat(e.target.value),
+                        }))
+                      }
+                      className="w-full h-2 rounded-full bg-slate-800 accent-orange-500"
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => { setOpalParams(DEFAULT_PRESTADOR_OPAL_PARAMS); setTvFilterOpacity(DEFAULT_PRESTADOR_TV_OPACITY); }}
+                  className="w-full py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:border-orange-500/30 transition-colors"
+                >
+                  Restaurar valores
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

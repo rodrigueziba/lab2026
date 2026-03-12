@@ -1,14 +1,15 @@
 'use client';
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   Calendar, MapPin, Clock, DollarSign, GraduationCap, 
   Users, ChevronLeft, Mail, Star, CheckCircle, Film, 
-  Image as ImageIcon, ExternalLink, BookOpen, X, Settings2
+  Image as ImageIcon, ExternalLink, BookOpen, X, Settings2, Play, Pause
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OpalBackground, { type OpalBackgroundParams } from '@/components/OpalBackground';
+import { isProfileHealth100 } from '@/lib/profileHealth';
 
 const DEFAULT_OPAL_PARAMS: Required<OpalBackgroundParams> = {
   speed: 0.1,
@@ -20,6 +21,8 @@ const DEFAULT_OPAL_PARAMS: Required<OpalBackgroundParams> = {
 };
 
 const DEFAULT_TV_OPACITY = 0.92;
+
+const ECHOES_FIRST_RIPPLE_KEY = 'tdffilm_echoes_first_ripple_played';
 
 const getYoutubeId = (url: string) => {
   if (!url) return null;
@@ -44,6 +47,18 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   const [debugMenuOpen, setDebugMenuOpen] = useState(false);
   const [opalParams, setOpalParams] = useState<Required<OpalBackgroundParams>>(DEFAULT_OPAL_PARAMS);
   const [tvFilterOpacity, setTvFilterOpacity] = useState(DEFAULT_TV_OPACITY);
+  const [showOpalBackground, setShowOpalBackground] = useState(false);
+  const [echoesPlaying, setEchoesPlaying] = useState(false);
+  const echoesRef = useRef<HTMLAudioElement>(null);
+
+  const handleOpalRipple = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (localStorage.getItem(ECHOES_FIRST_RIPPLE_KEY) === '1') return;
+    try {
+      echoesRef.current?.play();
+      localStorage.setItem(ECHOES_FIRST_RIPPLE_KEY, '1');
+    } catch (_) {}
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -89,9 +104,11 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
              });
              if (resPerfiles.ok) {
                 const perfiles = await resPerfiles.json();
-                setMisPerfiles(Array.isArray(perfiles) ? perfiles : []);
-                if (Array.isArray(perfiles) && perfiles.length > 0 && !perfilElegidoId) {
-                  setPerfilElegidoId(perfiles[0].id);
+                const list = Array.isArray(perfiles) ? perfiles : [];
+                setMisPerfiles(list);
+                setShowOpalBackground(isProfileHealth100(list));
+                if (list.length > 0 && !perfilElegidoId) {
+                  setPerfilElegidoId(list[0].id);
                 }
              }
            }
@@ -154,62 +171,8 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   const galeria = Array.isArray(proyecto.galeria) ? proyecto.galeria : [];
   const referencias = Array.isArray(proyecto.referencias) ? proyecto.referencias : [];
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans pb-20">
-      
-      {/* HERO */}
-      <div className="relative h-[60vh] md:h-[70vh] w-full overflow-hidden bg-black">
-        <div className="absolute inset-0 z-0">
-          {youtubeId ? (
-             <iframe 
-               src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${youtubeId}`}
-               className="w-full h-full object-cover opacity-60 pointer-events-none scale-125"
-               allow="autoplay"
-             />
-          ) : (
-             <DepthAwareImage imageUrl={proyecto.foto || galeria[0] || '/placeholder-dark.jpg'} depthUrl={proyecto.fotoProfundidad} alt={proyecto.titulo} className="w-full h-full object-cover opacity-50" containerClassName="w-full h-full overflow-hidden" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent"></div>
-        </div>
-
-        <div className="absolute bottom-0 left-0 w-full z-10 px-6 pb-8 md:pb-12">
-          <div className="max-w-6xl mx-auto">
-             <Link href="/proyectos" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition font-bold text-sm uppercase tracking-widest">
-                <ChevronLeft size={16}/> {t('proyectos.volver')}
-             </Link>
-             <div className="flex flex-wrap gap-3 mb-4">
-                {proyecto.esRemunerado && <span className="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-lg"><DollarSign size={12}/> {t('proyectos.remunerado')}</span>}
-                {proyecto.esEstudiante && <span className="bg-cyan-500/90 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1"><GraduationCap size={12}/> {t('proyectos.estudiante')}</span>}
-                <span className="bg-orange-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase">{proyecto.tipo}</span>
-                <span className="bg-slate-700 text-slate-200 text-xs font-bold px-3 py-1 rounded-full">{proyecto.estado}</span>
-             </div>
-             <h1 className="text-3xl md:text-6xl font-black mb-3 leading-tight tracking-tighter">{proyecto.titulo}</h1>
-             <div className="flex flex-wrap gap-4 text-sm font-bold text-slate-300">
-                <span className="flex items-center gap-2"><MapPin size={16} className="text-orange-500"/> {proyecto.ciudad}</span>
-                {formatDate(proyecto.fechaInicio) && <span className="flex items-center gap-2"><Calendar size={16} className="text-orange-500"/> {formatDate(proyecto.fechaInicio)}{proyecto.fechaFin ? ` – ${formatDate(proyecto.fechaFin)}` : ''}</span>}
-             </div>
-             <button 
-               onClick={() => document.getElementById('vacantes-section')?.scrollIntoView({ behavior: 'smooth' })}
-               className="mt-6 bg-white text-black hover:bg-slate-200 px-6 py-3 rounded-full font-black flex items-center gap-2 shadow-xl transition transform hover:scale-105 text-sm"
-             >
-               <Mail size={18}/> {t('proyectos.ver_vacantes')}
-             </button>
-          </div>
-        </div>
-      </div>
-
-      {/* BODY: fondo Opal + filtro TV tipo televisión + tarjetas */}
-      <OpalBackground className="relative min-h-[50vh]" params={opalParams}>
-        <div
-          className="absolute inset-0 pointer-events-none z-[1]"
-          style={{
-            opacity: tvFilterOpacity,
-            background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.94) 2px, rgba(0,0,0,0.94) 4px)',
-          }}
-          aria-hidden
-        />
-        <div className="relative z-10 max-w-6xl mx-auto px-6 py-12 flex flex-col gap-8 pointer-events-none">
-        {/* GALERÍA: arriba de todo, ancho completo en PC */}
+  const bodyContent = (
+    <div className="relative z-10 max-w-6xl mx-auto px-6 py-12 flex flex-col gap-8 pointer-events-none">
         {galeria.length > 0 && (
           <div className="w-full bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 duration-300 pointer-events-auto">
             <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
@@ -224,9 +187,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
             </div>
           </div>
         )}
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start pointer-events-auto">
-        {/* COLUMNA IZQUIERDA: La historia, Ficha, Video/Reel */}
         <div className="flex flex-col gap-8">
           <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300 pointer-events-auto">
             <h3 className="text-orange-500 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
@@ -234,7 +195,6 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
             </h3>
             <p className="text-slate-300 text-lg leading-relaxed whitespace-pre-line text-justify">{proyecto.descripcion}</p>
           </div>
-
           <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300 pointer-events-auto">
             <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-6 border-b border-slate-800 pb-2 flex items-center gap-2">
               <Film size={20}/> {t('proyectos.ficha')}
@@ -249,7 +209,6 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
               <div><dt className="text-slate-500 font-bold uppercase tracking-wider mb-1">Estudiante / Tesis</dt><dd className="text-white font-medium">{proyecto.esEstudiante ? 'Sí' : 'No'}</dd></div>
             </dl>
           </div>
-
           {youtubeId && (
             <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300 pointer-events-auto">
               <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
@@ -274,8 +233,6 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
             </div>
           )}
         </div>
-
-        {/* COLUMNA DERECHA: Vacantes arriba, luego Otras refs y Smart Match */}
         <div className="flex flex-col gap-8 lg:sticky lg:top-24">
           <div id="vacantes-section" className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300 pointer-events-auto">
             <h3 className="text-orange-500 font-black uppercase tracking-widest text-lg mb-6 border-b border-slate-800 pb-2 flex items-center gap-2">
@@ -324,7 +281,6 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
               })}
             </div>
           </div>
-
           {referencias.length > 1 && (
             <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 duration-300 pointer-events-auto">
               <h3 className="text-slate-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2">{t('proyectos.otras_refs')}</h3>
@@ -341,7 +297,6 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
           )}
         </div>
         </div>
-
         {candidatos.length > 0 && (
           <div className="w-full bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 duration-300 pointer-events-auto">
             <div className="flex items-center gap-3 mb-6">
@@ -361,11 +316,81 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
             </div>
           </div>
         )}
-        </div>
-      </OpalBackground>
+    </div>
+  );
 
-      {/* Debug: activado con Shift en escritorio */}
-      {showDebugButton && (
+  return (
+    <div className="min-h-screen bg-slate-950 text-white font-sans pb-20">
+      <audio
+        ref={echoesRef}
+        src="/echoes.mp3"
+        className="hidden"
+        onPlay={() => setEchoesPlaying(true)}
+        onPause={() => setEchoesPlaying(false)}
+      />
+      
+      {/* HERO */}
+      <div className="relative h-[60vh] md:h-[70vh] w-full overflow-hidden bg-black">
+        <div className="absolute inset-0 z-0">
+          {youtubeId ? (
+             <iframe 
+               src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${youtubeId}`}
+               className="w-full h-full object-cover opacity-60 pointer-events-none scale-125"
+               allow="autoplay"
+             />
+          ) : (
+             <DepthAwareImage imageUrl={proyecto.foto || galeria[0] || '/placeholder-dark.jpg'} depthUrl={proyecto.fotoProfundidad} alt={proyecto.titulo} className="w-full h-full object-cover opacity-50" containerClassName="w-full h-full overflow-hidden" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent"></div>
+        </div>
+
+        <div className="absolute bottom-0 left-0 w-full z-10 px-6 pb-8 md:pb-12">
+          <div className="max-w-6xl mx-auto">
+             <Link href="/proyectos" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition font-bold text-sm uppercase tracking-widest">
+                <ChevronLeft size={16}/> {t('proyectos.volver')}
+             </Link>
+             <div className="flex flex-wrap gap-3 mb-4">
+                {proyecto.esRemunerado && <span className="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-lg"><DollarSign size={12}/> {t('proyectos.remunerado')}</span>}
+                {proyecto.esEstudiante && <span className="bg-cyan-500/90 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1"><GraduationCap size={12}/> {t('proyectos.estudiante')}</span>}
+                <span className="bg-orange-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase">{proyecto.tipo}</span>
+                <span className="bg-slate-700 text-slate-200 text-xs font-bold px-3 py-1 rounded-full">{proyecto.estado}</span>
+             </div>
+             <h1 className="text-3xl md:text-6xl font-black mb-3 leading-tight tracking-tighter">{proyecto.titulo}</h1>
+             <div className="flex flex-wrap gap-4 text-sm font-bold text-slate-300">
+                <span className="flex items-center gap-2"><MapPin size={16} className="text-orange-500"/> {proyecto.ciudad}</span>
+                {formatDate(proyecto.fechaInicio) && <span className="flex items-center gap-2"><Calendar size={16} className="text-orange-500"/> {formatDate(proyecto.fechaInicio)}{proyecto.fechaFin ? ` – ${formatDate(proyecto.fechaFin)}` : ''}</span>}
+             </div>
+             <button 
+               onClick={() => document.getElementById('vacantes-section')?.scrollIntoView({ behavior: 'smooth' })}
+               className="mt-6 bg-white text-black hover:bg-slate-200 px-6 py-3 rounded-full font-black flex items-center gap-2 shadow-xl transition transform hover:scale-105 text-sm"
+             >
+               <Mail size={18}/> {t('proyectos.ver_vacantes')}
+             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* BODY: fondo Opal + filtro TV solo si usuario logueado tiene 100% salud de perfil */}
+      {showOpalBackground ? (
+      <OpalBackground className="relative min-h-[50vh]" params={opalParams} onRipple={handleOpalRipple}>
+        <div
+          className="absolute inset-0 pointer-events-none z-[1]"
+          style={{
+            opacity: tvFilterOpacity,
+            background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.94) 2px, rgba(0,0,0,0.94) 4px)',
+          }}
+          aria-hidden
+        />
+        {bodyContent}
+      </OpalBackground>
+      ) : (
+      <div className="relative min-h-[50vh] bg-slate-950">
+        {bodyContent}
+      </div>
+      )}
+
+      {/* Debug: activado con Shift en escritorio, solo si hay fondo Opal */}
+      {showOpalBackground && showDebugButton && (
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-2">
           <button
             type="button"
@@ -384,6 +409,22 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
                 </button>
               </div>
               <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
+                  <span className="text-xs font-bold text-slate-400">Echoes (mp3)</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = echoesRef.current;
+                      if (!el) return;
+                      if (el.paused) el.play();
+                      else el.pause();
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-300 hover:text-white transition-colors text-xs font-bold"
+                  >
+                    {echoesPlaying ? <Pause size={16} /> : <Play size={16} />}
+                    {echoesPlaying ? 'Pausar' : 'Reproducir'}
+                  </button>
+                </div>
                 <div>
                   <label className="flex justify-between items-center gap-2 mb-1">
                     <span className="text-xs font-bold text-slate-400">Opacidad filtro TV</span>
