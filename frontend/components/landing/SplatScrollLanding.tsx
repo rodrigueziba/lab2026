@@ -100,6 +100,10 @@ const CAM_CONFIG: {
 
 const SPLAT_URL = '/splats/10.spz';
 
+// Cache del splat en memoria (blob URL) para no recargar en 10 minutos
+const SPLAT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
+let splatCache: { url: string; timestamp: number } | null = null;
+
 // Más bajo = más suave / más lento
 const SCROLL_RESPONSE = 1.6;
 const CAMERA_RESPONSE = 1.4;
@@ -109,9 +113,12 @@ const SPLAT_RESPONSE = 1.2;
 const MOBILE_BREAKPOINT = 768;
 const MAX_PIXEL_RATIO_DESKTOP = 1.5;
 const MAX_PIXEL_RATIO_MOBILE = 1.25;
-// Inicio muy agresivo en carga para dispositivos de bajos recursos
-const INITIAL_PIXEL_RATIO_DESKTOP = 0.5;
-const INITIAL_PIXEL_RATIO_MOBILE = 0.6;
+// Inicio muy agresivo: arrancar con resolución y pixel ratio bajos para asegurar ~30 fps
+const INITIAL_PIXEL_RATIO_DESKTOP = 0.35;
+const INITIAL_PIXEL_RATIO_MOBILE = 0.4;
+// Escala de resolución inicial (renderizar a % del tamaño; 1 = 100%)
+const INITIAL_RES_SCALE_DESKTOP = 0.7;
+const INITIAL_RES_SCALE_MOBILE = 0.55;
 // Resolución dinámica: si FPS < 30, bajar ratio y aplicar escala de resolución
 const FPS_LOW_THRESHOLD = 30;
 const FPS_HIGH_THRESHOLD = 55;
@@ -721,6 +728,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     const isMobile = typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT;
     const maxRatio = isMobile ? MAX_PIXEL_RATIO_MOBILE : MAX_PIXEL_RATIO_DESKTOP;
     const initialRatio = isMobile ? INITIAL_PIXEL_RATIO_MOBILE : INITIAL_PIXEL_RATIO_DESKTOP;
+    const initialResScale = isMobile ? INITIAL_RES_SCALE_MOBILE : INITIAL_RES_SCALE_DESKTOP;
 
     if (rendererRef.current) {
       log('Re-mount — reinicializando', 'warn');
@@ -762,9 +770,13 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
 
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
     pixelRatioRef.current = Math.min(dpr, initialRatio);
-    resScaleRef.current = 1;
+    resScaleRef.current = initialResScale;
     renderer.setPixelRatio(pixelRatioRef.current);
-    renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+    const drawW = Math.max(1, Math.round(wrap.clientWidth * initialResScale));
+    const drawH = Math.max(1, Math.round(wrap.clientHeight * initialResScale));
+    renderer.setSize(drawW, drawH);
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
     renderer.domElement.style.cssText =
       'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
     wrap.appendChild(renderer.domElement);
@@ -956,27 +968,59 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     });
 
     log('Loop iniciado', 'ok');
-    log(`Cargando: ${SPLAT_URL}`);
 
-    try {
+    const loadSplat = (splatUrl: string) => {
+      if (mountIdRef.current !== thisMountId) return;
       const splat = new SplatMesh({
-        url: SPLAT_URL,
+        url: splatUrl,
         onLoad: () => {
           if (mountIdRef.current !== thisMountId) return;
           log('Splat cargado ✓', 'ok');
         },
       });
-
+      if (mountIdRef.current !== thisMountId) return;
       splat.rotation.copy(new THREE.Euler(...rtConfigRef.current.splatRotation));
       splat.position.copy(v3(rtConfigRef.current.waypoints[0].splatPos));
       scene.add(splat);
       splatRef.current = splat;
       log('SplatMesh en scene');
-    } catch (e) {
-      log(`SplatMesh ERROR: ${e}`, 'error');
-    }
+    };
+
+    let splatLoadCancelled = false;
+    (async () => {
+      try {
+        const now = Date.now();
+        if (splatCache && now - splatCache.timestamp < SPLAT_CACHE_TTL_MS) {
+          log(`Splat desde cache (${Math.round((SPLAT_CACHE_TTL_MS - (now - splatCache.timestamp)) / 1000)}s restantes)`);
+          if (!splatLoadCancelled) loadSplat(splatCache.url);
+          return;
+        }
+        if (splatCache) {
+          try { URL.revokeObjectURL(splatCache.url); } catch (_) {}
+          splatCache = null;
+        }
+        log(`Cargando: ${SPLAT_URL}`);
+        const res = await fetch(SPLAT_URL);
+        if (splatLoadCancelled) return;
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        if (splatLoadCancelled) return;
+        const blobUrl = URL.createObjectURL(blob);
+        splatCache = { url: blobUrl, timestamp: Date.now() };
+        if (!splatLoadCancelled) loadSplat(blobUrl);
+      } catch (e) {
+        if (splatLoadCancelled) return;
+        log(`SplatMesh ERROR: ${e}`, 'error');
+        try {
+          if (!splatLoadCancelled) loadSplat(SPLAT_URL);
+        } catch (e2) {
+          log(`Splat fallback URL también falló: ${e2}`, 'error');
+        }
+      }
+    })();
 
     return () => {
+      splatLoadCancelled = true;
       log(`Desmontando mount #${thisMountId}`, 'warn');
       renderer.setAnimationLoop(null);
       if (resizeTick != null) cancelAnimationFrame(resizeTick);
