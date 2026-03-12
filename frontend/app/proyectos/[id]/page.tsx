@@ -4,10 +4,22 @@ import Link from 'next/link';
 import { 
   Calendar, MapPin, Clock, DollarSign, GraduationCap, 
   Users, ChevronLeft, Mail, Star, CheckCircle, Film, 
-  Image as ImageIcon, ExternalLink, BookOpen
+  Image as ImageIcon, ExternalLink, BookOpen, X, Settings2
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
 import { useLanguage } from '@/contexts/LanguageContext';
+import OpalBackground, { type OpalBackgroundParams } from '@/components/OpalBackground';
+
+const DEFAULT_OPAL_PARAMS: Required<OpalBackgroundParams> = {
+  speed: 0.1,
+  flowX: 0.75,
+  flowY: 0.95,
+  colorSpeed: 0.1,
+  paletteBase: '#1a6b9e',
+  maxRipples: 6,
+};
+
+const DEFAULT_TV_OPACITY = 0.92;
 
 const getYoutubeId = (url: string) => {
   if (!url) return null;
@@ -27,6 +39,21 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   const [misPostulaciones, setMisPostulaciones] = useState<number[]>([]);
   const [misPerfiles, setMisPerfiles] = useState<Array<{ id: number; nombre: string; rubro: string }>>([]);
   const [perfilElegidoId, setPerfilElegidoId] = useState<number | null>(null);
+
+  const [showDebugButton, setShowDebugButton] = useState(false);
+  const [debugMenuOpen, setDebugMenuOpen] = useState(false);
+  const [opalParams, setOpalParams] = useState<Required<OpalBackgroundParams>>(DEFAULT_OPAL_PARAMS);
+  const [tvFilterOpacity, setTvFilterOpacity] = useState(DEFAULT_TV_OPACITY);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'ShiftLeft' && e.code !== 'ShiftRight') return;
+      if (typeof window !== 'undefined' && window.innerWidth < 768) return;
+      setShowDebugButton((v) => !v);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -171,11 +198,20 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
         </div>
       </div>
 
-      {/* BODY: galería arriba de todo (ancho completo); luego 2 columnas */}
-      <div className="max-w-6xl mx-auto px-6 py-12 flex flex-col gap-8">
+      {/* BODY: fondo Opal + filtro TV tipo televisión + tarjetas */}
+      <OpalBackground className="relative min-h-[50vh]" params={opalParams}>
+        <div
+          className="absolute inset-0 pointer-events-none z-[1]"
+          style={{
+            opacity: tvFilterOpacity,
+            background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.94) 2px, rgba(0,0,0,0.94) 4px)',
+          }}
+          aria-hidden
+        />
+        <div className="relative z-10 max-w-6xl mx-auto px-6 py-12 flex flex-col gap-8 pointer-events-none">
         {/* GALERÍA: arriba de todo, ancho completo en PC */}
         {galeria.length > 0 && (
-          <div className="w-full bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 duration-300">
+          <div className="w-full bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 duration-300 pointer-events-auto">
             <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
               <ImageIcon size={20}/> {t('proyectos.galeria')}
             </h3>
@@ -189,17 +225,17 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start pointer-events-auto">
         {/* COLUMNA IZQUIERDA: La historia, Ficha, Video/Reel */}
         <div className="flex flex-col gap-8">
-          <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
+          <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300 pointer-events-auto">
             <h3 className="text-orange-500 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
               <BookOpen size={20}/> {t('proyectos.la_historia')}
             </h3>
             <p className="text-slate-300 text-lg leading-relaxed whitespace-pre-line text-justify">{proyecto.descripcion}</p>
           </div>
 
-          <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
+          <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300 pointer-events-auto">
             <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-6 border-b border-slate-800 pb-2 flex items-center gap-2">
               <Film size={20}/> {t('proyectos.ficha')}
             </h3>
@@ -215,7 +251,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
           </div>
 
           {youtubeId && (
-            <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
+            <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300 pointer-events-auto">
               <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
                 <ImageIcon size={20}/> {t('proyectos.video_reel')}
               </h3>
@@ -241,7 +277,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
 
         {/* COLUMNA DERECHA: Vacantes arriba, luego Otras refs y Smart Match */}
         <div className="flex flex-col gap-8 lg:sticky lg:top-24">
-          <div id="vacantes-section" className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
+          <div id="vacantes-section" className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300 pointer-events-auto">
             <h3 className="text-orange-500 font-black uppercase tracking-widest text-lg mb-6 border-b border-slate-800 pb-2 flex items-center gap-2">
               <Users className="text-orange-600"/> {t('proyectos.vacantes')} ({proyecto.puestos?.length || 0})
             </h3>
@@ -290,7 +326,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
           </div>
 
           {referencias.length > 1 && (
-            <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 duration-300">
+            <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 duration-300 pointer-events-auto">
               <h3 className="text-slate-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2">{t('proyectos.otras_refs')}</h3>
               <ul className="space-y-2">
                 {referencias.filter((r: string) => r !== videoRef).map((url: string, i: number) => (
@@ -303,29 +339,120 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
               </ul>
             </div>
           )}
+        </div>
+        </div>
 
-          {candidatos.length > 0 && (
-            <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 duration-300">
-              <div className="flex items-center gap-3 mb-6">
-                <Star size={24} className="text-orange-500"/>
-                <h3 className="text-xl font-bold text-white">Smart Match ({candidatos.length})</h3>
+        {candidatos.length > 0 && (
+          <div className="w-full bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 duration-300 pointer-events-auto">
+            <div className="flex items-center gap-3 mb-6">
+              <Star size={24} className="text-orange-500"/>
+              <h3 className="text-xl font-bold text-white">Smart Match ({candidatos.length})</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {candidatos.map((cand: any) => (
+                <div key={cand.id} className="flex items-center gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-500">{cand.nombre?.[0] || '?'}</div>
+                  <div>
+                    <h4 className="font-bold text-white">{cand.nombre}</h4>
+                    <p className="text-xs text-slate-400">{cand.rubro}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        </div>
+      </OpalBackground>
+
+      {/* Debug: activado con Shift en escritorio */}
+      {showDebugButton && (
+        <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDebugMenuOpen((v) => !v)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950/90 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-white hover:border-orange-500/40 hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] transition-all font-bold text-sm"
+          >
+            <Settings2 size={18} />
+            Debug
+          </button>
+          {debugMenuOpen && (
+            <div className="fixed left-24 top-1/2 -translate-y-1/2 w-72 rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[61]">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">OpalBackground</span>
+                <button type="button" onClick={() => setDebugMenuOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors" aria-label="Cerrar">
+                  <X size={18} />
+                </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {candidatos.map((cand: any) => (
-                  <div key={cand.id} className="flex items-center gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-500">{cand.nombre?.[0] || '?'}</div>
-                    <div>
-                      <h4 className="font-bold text-white">{cand.nombre}</h4>
-                      <p className="text-xs text-slate-400">{cand.rubro}</p>
-                    </div>
+              <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div>
+                  <label className="flex justify-between items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-slate-400">Opacidad filtro TV</span>
+                    <span className="text-xs font-mono text-orange-400 tabular-nums">{(tvFilterOpacity * 100).toFixed(0)}%</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={tvFilterOpacity * 100}
+                    onChange={(e) => setTvFilterOpacity(Number(e.target.value) / 100)}
+                    className="w-full h-2 rounded-full bg-slate-800 accent-orange-500 mb-4"
+                  />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-400 block mb-2">Color base paleta (4 complementarios)</span>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={opalParams.paletteBase}
+                      onChange={(e) => setOpalParams((p) => ({ ...p, paletteBase: e.target.value }))}
+                      className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent"
+                    />
+                    <span className="text-xs font-mono text-slate-500">{opalParams.paletteBase}</span>
+                  </div>
+                </div>
+                {[
+                  { key: 'speed', label: 'Velocidad', min: 0.2, max: 3, step: 0.1 },
+                  { key: 'flowX', label: 'Dirección X', min: -1.5, max: 1.5, step: 0.05 },
+                  { key: 'flowY', label: 'Dirección Y', min: -1.5, max: 1.5, step: 0.05 },
+                  { key: 'colorSpeed', label: 'Velocidad cambio color', min: 0.1, max: 3, step: 0.1 },
+                  { key: 'maxRipples', label: 'Cantidad ripples (click)', min: 1, max: 6, step: 1 },
+                ].map(({ key, label, min, max, step }) => (
+                  <div key={key}>
+                    <label className="flex justify-between items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-slate-400">{label}</span>
+                      <span className="text-xs font-mono text-orange-400 tabular-nums">
+                        {key === 'maxRipples' ? opalParams[key] : (opalParams[key as keyof typeof opalParams] as number).toFixed(2)}
+                      </span>
+                    </label>
+                    <input
+                      type="range"
+                      min={min}
+                      max={max}
+                      step={step}
+                      value={opalParams[key as keyof typeof opalParams] as number}
+                      onChange={(e) =>
+                        setOpalParams((p) => ({
+                          ...p,
+                          [key]: key === 'maxRipples' ? parseInt(e.target.value, 10) : parseFloat(e.target.value),
+                        }))
+                      }
+                      className="w-full h-2 rounded-full bg-slate-800 accent-orange-500"
+                    />
                   </div>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => { setOpalParams(DEFAULT_OPAL_PARAMS); setTvFilterOpacity(DEFAULT_TV_OPACITY); }}
+                  className="w-full py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:border-orange-500/30 transition-colors"
+                >
+                  Restaurar valores
+                </button>
               </div>
             </div>
           )}
         </div>
-      </div>
-      </div>
+      )}
     </div>
   );
 }
