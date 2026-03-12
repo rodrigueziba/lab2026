@@ -16,7 +16,7 @@ export default function MisPostulacionesPage() {
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem('token');
-      if (!token) return router.push('/login');
+      if (!token) return router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'));
 
       try {
         const res = await fetch(`${apiUrl}/postulacion/mis-postulaciones`, {

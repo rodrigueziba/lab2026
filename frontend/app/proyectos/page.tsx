@@ -157,6 +157,32 @@ export default function CarteleraProyectosPage() {
       setProyectosMostrados(shuffled);
   };
 
+  // Móvil no-iPhone: agitar el dispositivo reordena las tarjetas (mismo efecto que el botón)
+  const lastShakeRef = useRef(0);
+  useEffect(() => {
+    if (typeof window === 'undefined' || disable3D || window.innerWidth >= 768) return;
+    const SHAKE_THRESHOLD = 18;
+    const COOLDOWN_MS = 1200;
+    const onMotion = (e: DeviceMotionEvent) => {
+      const a = e.accelerationIncludingGravity;
+      if (!a) return;
+      const total = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
+      if (total > SHAKE_THRESHOLD && Date.now() - lastShakeRef.current > COOLDOWN_MS) {
+        lastShakeRef.current = Date.now();
+        setProyectosMostrados(prev => {
+          const arr = [...prev];
+          for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+          }
+          return arr;
+        });
+      }
+    };
+    window.addEventListener('devicemotion', onMotion);
+    return () => window.removeEventListener('devicemotion', onMotion);
+  }, [disable3D]);
+
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll);

@@ -291,7 +291,7 @@ export default function NotFoundClient() {
             onMouseLeave={() => setHeroMouse({ nx: 0.5, ny: 0.5, hover: false })}
             onMouseMove={onHeroMove}
           >
-            <h1 className="select-none text-center text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-none">
+            <h1 className="select-none text-center text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-none text-slate-100">
               {titleLetters.map((ch, i) => (
                 <span
                   key={`${ch}-${i}`}
@@ -308,11 +308,11 @@ export default function NotFoundClient() {
               ))}
             </h1>
 
-            <p className="mt-4 text-base sm:text-lg md:text-xl text-white/72">
+            <p className="mt-4 text-base sm:text-lg md:text-xl text-slate-200">
               Página no encontrada
             </p>
 
-            <p className="mt-3 text-sm sm:text-base text-white/45 max-w-xl mx-auto leading-relaxed">
+            <p className="mt-3 text-sm sm:text-base text-slate-400 max-w-xl mx-auto leading-relaxed">
               La ruta que intentaste abrir no existe o fue movida. Podés volver al inicio y seguir explorando.
             </p>
 

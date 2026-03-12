@@ -19,7 +19,7 @@ export default function MisPerfilesPage() {
     const userStr = localStorage.getItem('user');
     const token = localStorage.getItem('token');
     
-    if (!userStr || !token) return router.push('/login');
+    if (!userStr || !token) return router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'));
     setUser(JSON.parse(userStr));
 
     fetchPerfiles(token);

@@ -17,7 +17,7 @@ export default function MisProyectosPage() {
     const token = localStorage.getItem('token');
 
     if (!token || !userStr) {
-      router.push('/login');
+      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'));
       return;
     }
     

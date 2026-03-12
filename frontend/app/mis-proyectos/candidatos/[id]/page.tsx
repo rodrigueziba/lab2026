@@ -18,7 +18,7 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem('token');
-      if (!token) return router.push('/login');
+      if (!token) return router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'));
 
       try {
         const resProj = await fetch(`${apiUrl}/proyecto/${id}`);

@@ -261,6 +261,14 @@ function DebugPanel({
   onSaveLook,
   onSaveSplatPos,
   onJump,
+  debugHideTvFilter,
+  setDebugHideTvFilter,
+  debugHideVignette,
+  setDebugHideVignette,
+  debugHideCards,
+  setDebugHideCards,
+  debugHideHero,
+  setDebugHideHero,
 }: {
   config: RuntimeConfig;
   onApply: (c: RuntimeConfig) => void;
@@ -276,10 +284,18 @@ function DebugPanel({
   onSaveLook: (i: number) => void;
   onSaveSplatPos: (i: number) => void;
   onJump: (i: number) => void;
+  debugHideTvFilter: boolean;
+  setDebugHideTvFilter: (v: boolean) => void;
+  debugHideVignette: boolean;
+  setDebugHideVignette: (v: boolean) => void;
+  debugHideCards: boolean;
+  setDebugHideCards: (v: boolean) => void;
+  debugHideHero: boolean;
+  setDebugHideHero: (v: boolean) => void;
 }) {
   const [local, setLocal] = useState<RuntimeConfig>(structuredClone(config));
   const [open, setOpen] = useState(true);
-  const [tab, setTab] = useState<'logs' | 'cam' | 'splat' | 'export'>('logs');
+  const [tab, setTab] = useState<'logs' | 'cam' | 'splat' | 'export' | 'ui'>('logs');
   const [copied, setCopied] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -374,7 +390,7 @@ function DebugPanel({
       {open && (
         <div className="rounded-b-2xl bg-[#0a0a18]/97 border-x border-b border-white/10 backdrop-blur-2xl divide-y divide-white/5 overflow-hidden">
           <div className="flex">
-            {(['logs', 'cam', 'splat', 'export'] as const).map(t => (
+            {(['logs', 'cam', 'splat', 'export', 'ui'] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -571,6 +587,29 @@ function DebugPanel({
               </button>
             </div>
           )}
+
+          {tab === 'ui' && (
+            <div className="p-3 space-y-2">
+              <p className="text-[10px] text-white/30 uppercase tracking-widest mb-2">Visibilidad</p>
+              {[
+                { key: 'tv', label: 'Sacar filtro TV', value: debugHideTvFilter, set: setDebugHideTvFilter },
+                { key: 'vignette', label: 'Sacar viñeta', value: debugHideVignette, set: setDebugHideVignette },
+                { key: 'cards', label: 'Sacar tarjetas', value: debugHideCards, set: setDebugHideCards },
+                { key: 'hero', label: 'Ocultar hero (título)', value: debugHideHero, set: setDebugHideHero },
+              ].map(({ key, label, value, set }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => set(!value)}
+                  className={`w-full rounded-xl py-2 text-[10px] font-semibold tracking-wide transition-all border ${
+                    value ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/40' : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {label}: {value ? 'Sí' : 'No'}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -615,6 +654,10 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
 
   const [rtConfig, setRtConfig] = useState<RuntimeConfig>(() => structuredClone(CAM_CONFIG));
   const rtConfigRef = useRef(rtConfig);
+  const [debugHideTvFilter, setDebugHideTvFilter] = useState(false);
+  const [debugHideVignette, setDebugHideVignette] = useState(false);
+  const [debugHideCards, setDebugHideCards] = useState(false);
+  const [debugHideHero, setDebugHideHero] = useState(false);
   const freeRoamRef = useRef(false);
   const flySpeedRef = useRef(0.3);
   const isDragging = useRef(false);
@@ -1172,6 +1215,10 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="relative text-white bg-slate-950 min-h-[100dvh] md:min-h-0" style={{ height: `${N_SECTIONS * 100}svh` }}>
+      {/* Mensaje al inspeccionar o ver código fuente */}
+      <div className="absolute opacity-0 w-0 h-0 overflow-hidden pointer-events-none select-none" aria-hidden>
+        Lo sutil domina lo denso
+      </div>
       <div
         ref={canvasWrapRef}
         className={`fixed inset-0 h-[100dvh] w-full min-h-[100dvh] ${isFreeRoam ? 'cursor-crosshair' : 'cursor-default'}`}
@@ -1190,6 +1237,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
             animation: card-icon-glow 2s ease-in-out infinite;
           }
         `}</style>
+        {!debugHideVignette && (
         <div
           className="pointer-events-none absolute inset-0 z-10 hero-vignette"
           style={{
@@ -1197,14 +1245,17 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
               'radial-gradient(ellipse 68% 68% at 50% 50%, transparent 0%, transparent 26%, rgba(6,6,15,0.58) 48%, rgba(6,6,15,0.92) 64%, rgba(6,6,15,0.99) 78%, #06060f 100%)',
           }}
         />
+        )}
 
         {/* Filtro estilo TV (solo escritorio): oscurece un poco el fondo como en /login */}
+        {!debugHideTvFilter && (
         <div
           className="hidden md:block pointer-events-none absolute inset-0 z-[11] bg-black/50 shadow-[inset_0_0_150px_rgba(0,0,0,0.6)]"
           style={{
             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 4px)',
           }}
         />
+        )}
 
         {(isAdmin || (isDesktop && showDebugByShift)) && (
           <button
@@ -1237,9 +1288,18 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
             onSaveLook={saveLook}
             onSaveSplatPos={saveSplatPos}
             onJump={jumpToWP}
+            debugHideTvFilter={debugHideTvFilter}
+            setDebugHideTvFilter={setDebugHideTvFilter}
+            debugHideVignette={debugHideVignette}
+            setDebugHideVignette={setDebugHideVignette}
+            debugHideCards={debugHideCards}
+            setDebugHideCards={setDebugHideCards}
+            debugHideHero={debugHideHero}
+            setDebugHideHero={setDebugHideHero}
           />
         )}
 
+        {!debugHideHero && (
         <div
           className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-opacity duration-700 ${
             isHeroVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -1318,8 +1378,9 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
             </div>
           </div>
         </div>
+        )}
 
-        {CARDS.map((card, i) => {
+        {!debugHideCards && CARDS.map((card, i) => {
           const slotStart = (i + 1) * cardSlot;
           const slotEnd = (i + 2) * cardSlot;
           const inSlot = scrollProgress >= slotStart && scrollProgress < slotEnd;

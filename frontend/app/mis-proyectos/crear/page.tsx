@@ -24,7 +24,7 @@ export default function CrearProyectoPage() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      router.replace('/login');
+      router.replace('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/mis-proyectos/crear'));
       return;
     }
     setCheckingAuth(false);
@@ -152,7 +152,7 @@ export default function CrearProyectoPage() {
 
     try {
       const token = localStorage.getItem('token');
-      if (!token) return router.push('/login');
+      if (!token) return router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/mis-proyectos/crear'));
 
       const galeriaUrls: string[] = [];
       for (const file of imagenes) {
@@ -225,7 +225,7 @@ export default function CrearProyectoPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      if (!token) return router.push('/login');
+      if (!token) return router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/mis-proyectos/crear'));
       const galeriaUrls: string[] = [];
       for (const file of imagenes) {
         const fileExt = file.name.split('.').pop();
@@ -441,11 +441,11 @@ export default function CrearProyectoPage() {
 
           {/* 2. CARACTERÍSTICAS (Cards Selección) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <label className={`relative p-6 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-5 group hover:shadow-xl ${formData.esEstudiante ? 'bg-blue-950/30 border-blue-500 shadow-blue-900/20' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}>
-              <div className={`p-4 rounded-xl transition-colors ${formData.esEstudiante ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500 group-hover:text-slate-300'}`}>
+            <label className={`relative p-6 rounded-2xl border-2 transition-all cursor-pointer flex flex-col md:flex-row md:items-center gap-5 group hover:shadow-xl ${formData.esEstudiante ? 'bg-blue-950/30 border-blue-500 shadow-blue-900/20' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}>
+              <div className={`p-4 rounded-xl transition-colors self-start md:self-auto shrink-0 ${formData.esEstudiante ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500 group-hover:text-slate-300'}`}>
                 <GraduationCap size={28} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className={`font-bold text-lg ${formData.esEstudiante ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>Proyecto Estudiantil</h3>
                 <p className="text-xs text-slate-500">Práctica académica o tesis.</p>
               </div>
@@ -455,11 +455,11 @@ export default function CrearProyectoPage() {
               </div>
             </label>
 
-            <label className={`relative p-6 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-5 group hover:shadow-xl ${formData.esRemunerado ? 'bg-emerald-950/30 border-emerald-500 shadow-emerald-900/20' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}>
-              <div className={`p-4 rounded-xl transition-colors ${formData.esRemunerado ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500 group-hover:text-slate-300'}`}>
+            <label className={`relative p-6 rounded-2xl border-2 transition-all cursor-pointer flex flex-col md:flex-row md:items-center gap-5 group hover:shadow-xl ${formData.esRemunerado ? 'bg-emerald-950/30 border-emerald-500 shadow-emerald-900/20' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}>
+              <div className={`p-4 rounded-xl transition-colors self-start md:self-auto shrink-0 ${formData.esRemunerado ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500 group-hover:text-slate-300'}`}>
                 <DollarSign size={28} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className={`font-bold text-lg ${formData.esRemunerado ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>Proyecto Remunerado</h3>
                 <p className="text-xs text-slate-500">Roles con compensación económica.</p>
               </div>

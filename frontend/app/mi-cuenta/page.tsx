@@ -22,7 +22,7 @@ export default function MiCuentaPage() {
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
-    if (!userStr) return router.push('/login');
+    if (!userStr) return router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'));
     const userData = JSON.parse(userStr);
     setUser(userData);
     setEmail(userData.email);
@@ -97,7 +97,7 @@ export default function MiCuentaPage() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    router.push('/login');
+    router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'));
   };
 
   if (!user) return null;

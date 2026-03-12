@@ -473,7 +473,7 @@ export default function Navbar() {
             </div>
           ) : (
             <div className="flex items-center gap-4">
-               <Link href="/login" className="text-sm font-bold text-slate-300 hover:text-white transition hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">Ingresar</Link>
+               <Link href={pathname ? `/login?redirect=${encodeURIComponent(pathname)}` : '/login'} className="text-sm font-bold text-slate-300 hover:text-white transition hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">Ingresar</Link>
                <Link href="/registro" className="bg-white text-black hover:bg-slate-200 px-6 py-2.5 rounded-full text-sm font-black transition transform hover:scale-105 shadow-[0_0_15px_rgba(255,255,255,0.2)]">Registrarse</Link>
             </div>
           )}
@@ -537,6 +537,7 @@ export default function Navbar() {
                     </span>
                   </div>
                   <div className="h-px bg-slate-700 my-1" />
+                  <MobileNavLink href="/info" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Info} label={t('nav.info')} />
                   <MobileNavLink href="/nodos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Atom} label={t('nav.nodos')} />
                   <button onClick={handleLogout} className="text-left text-red-400 font-bold py-3 px-4 flex items-center gap-2 text-sm mt-1"><LogOut size={18}/> {t('nav.cerrar_sesion')}</button>
                 </>
@@ -551,9 +552,10 @@ export default function Navbar() {
                     </span>
                   </div>
                   <div className="h-px bg-slate-700 my-1" />
+                  <MobileNavLink href="/info" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Info} label={t('nav.info')} />
                   <MobileNavLink href="/nodos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Atom} label={t('nav.nodos')} />
                   <div className="flex flex-col gap-2 pt-2">
-                    <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-3 rounded-xl border border-slate-600 text-white font-bold text-sm">{t('nav.ingresar')}</Link>
+                    <Link href={pathname ? `/login?redirect=${encodeURIComponent(pathname)}` : '/login'} onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-3 rounded-xl border border-slate-600 text-white font-bold text-sm">{t('nav.ingresar')}</Link>
                     <Link href="/registro" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-3 rounded-xl bg-orange-600 text-white font-bold text-sm">{t('nav.registrarse')}</Link>
                   </div>
                 </>

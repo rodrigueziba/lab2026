@@ -48,7 +48,7 @@ export default function EditarPrestadorPage() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) router.push('/login');
+    if (!token) router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'));
 
     if (id) {
       fetch(`${apiUrl}/prestador/${id}`)

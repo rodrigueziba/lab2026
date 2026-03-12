@@ -119,7 +119,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
   // Lógica de Solicitar Contacto (MEJORADA CON ERRORES)
   const handleSolicitarContacto = async () => {
     const token = localStorage.getItem('token');
-    if (!token) return router.push('/login');
+    if (!token) return router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
 
     setSolicitando(true);
     try {

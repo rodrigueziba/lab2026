@@ -83,7 +83,7 @@ export default function CrearPerfilPage() {
     const token = localStorage.getItem('token');
     if (!token) {
       toast.error('Debés iniciar sesión para crear un perfil.');
-      router.push('/login');
+      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/mi-perfil/crear'));
     }
   }, [router]);
 

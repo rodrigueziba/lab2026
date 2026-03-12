@@ -33,7 +33,9 @@ function LoginForm() {
       localStorage.setItem('token', token);
       localStorage.setItem('user', decodeURIComponent(userStr));
       window.dispatchEvent(new Event('storage'));
-      router.push('/'); 
+      const redirect = searchParams.get('redirect') || sessionStorage.getItem('loginRedirect') || '/';
+      try { sessionStorage.removeItem('loginRedirect'); } catch (_) {}
+      router.push(redirect);
     }
   }, [searchParams, router]);
 
@@ -55,7 +57,8 @@ function LoginForm() {
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('user', JSON.stringify(data.user));
         window.dispatchEvent(new Event('storage'));
-        router.push('/');
+        const redirect = searchParams.get('redirect') || '/';
+        router.push(redirect);
       } else {
         setError(t('login.credenciales_invalidas'));
       }
@@ -66,8 +69,10 @@ function LoginForm() {
     }
   };
 
-  // Función para iniciar el viaje a Google
+  // Función para iniciar el viaje a Google (guardamos redirect para después del callback)
   const handleGoogleLogin = () => {
+    const redirect = searchParams.get('redirect');
+    if (redirect) try { sessionStorage.setItem('loginRedirect', redirect); } catch (_) {}
     window.location.href = `${apiUrl}/auth/google`;
   };
 

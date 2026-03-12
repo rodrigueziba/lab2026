@@ -128,7 +128,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   const handlePostular = async (puestoId: number, puestoNombre: string) => {
     const token = localStorage.getItem('token');
     if (!token) {
-      if(confirm("Debes iniciar sesión. ¿Ir al login?")) window.location.href = '/login';
+      if(confirm("Debes iniciar sesión. ¿Ir al login?")) window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
       return;
     }
 
