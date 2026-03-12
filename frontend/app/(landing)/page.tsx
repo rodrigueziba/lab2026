@@ -254,12 +254,14 @@ export default function Page() {
       {/* 1. Componente 3D principal */}
       <SplatScrollLanding isAdmin={isAdmin} />
 
-      {/* 2. Sección "Cómo Funciona" con z-index para deslizarse por encima */}
+      {/* 2. Sección "Cómo Funciona" posicionada entre Guía de Prestadores y Proyectos */}
       <section className="relative z-30 pointer-events-none">
         
-        {/* Espaciador crucial: Da tiempo para que en móvil (y desktop) se termine de leer 
-            el último bloque del 3D antes de que el fondo sólido empiece a subir. */}
-        <div className="h-[300vh] md:h-[280vh] w-full" />
+        {/* Espaciador: Da tiempo para que aparezca la tarjeta de Guía de Prestadores
+            antes de que el bloque de características empiece a subir.
+            Con N_SECTIONS=4 y 400svh totales del 3D, la tarjeta Guía ocupa el slot 50%-75%.
+            Reducimos el spacer para que el bloque aparezca en ese rango. */}
+        <div className="h-[50vh] md:h-[40vh] w-full" />
 
         {/* CONTENEDOR INTERACTIVO */}
         <div className="pointer-events-auto">

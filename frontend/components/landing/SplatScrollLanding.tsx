@@ -101,9 +101,9 @@ const CAM_CONFIG: {
 const SPLAT_URL = '/splats/10.spz';
 
 // Más bajo = más suave / más lento
-const SCROLL_RESPONSE = 3.2;
-const CAMERA_RESPONSE = 2.8;
-const SPLAT_RESPONSE = 2.4;
+const SCROLL_RESPONSE = 1.6;
+const CAMERA_RESPONSE = 1.4;
+const SPLAT_RESPONSE = 1.2;
 
 // Límite de pixel ratio (móvil más bajo para mejor rendimiento)
 const MOBILE_BREAKPOINT = 768;
@@ -1358,6 +1358,18 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
               <span className="transition-all duration-300 hover:text-blue-400 hover:drop-shadow-[0_0_10px_rgba(30,64,175,0.9)] cursor-default">Argentina</span>
             </p>
 
+            <p
+              className="mt-5 sm:mt-6 text-center text-sm sm:text-base text-white/70 max-w-xs sm:max-w-md mx-auto leading-relaxed px-2"
+              style={{
+                textShadow: '0 2px 12px rgba(0,0,0,0.7), 0 1px 4px rgba(0,0,0,0.5)',
+              }}
+            >
+              Plataforma para impulsar la industria audiovisual en el Fin del Mundo.{' '}
+              <span className="text-white/50">
+                Conectamos talento, locaciones y producciones en Tierra del Fuego.
+              </span>
+            </p>
+
             <div
               className="mt-8 sm:mt-12 flex flex-col items-center gap-2"
               style={{ animation: 'scrollBounce 3s ease-in-out infinite' }}
@@ -1389,7 +1401,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
           return (
             <div
               key={card.key}
-              className={`absolute inset-0 z-20 flex items-end sm:items-center justify-center sm:justify-start px-5 sm:px-12 md:px-20 pb-20 sm:pb-0 ${inSlot ? 'pointer-events-auto' : 'pointer-events-none'} group`}
+              className={`absolute inset-0 z-20 flex items-end sm:items-center justify-center sm:justify-start px-5 sm:px-12 md:px-16 pb-20 sm:pb-0 ${inSlot ? 'pointer-events-auto' : 'pointer-events-none'} group`}
               style={{
                 opacity: inSlot ? 1 : 0,
                 transform: inSlot ? 'translateY(0)' : 'translateY(28px)',
@@ -1398,10 +1410,10 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
             >
               <Link
                 href={card.href}
-                className="w-full max-w-xs sm:max-w-sm mx-auto sm:mx-0 md:absolute md:inset-0 md:max-w-none md:mx-0 flex items-end sm:items-center justify-center sm:justify-start px-5 sm:px-12 md:px-20 pb-20 sm:pb-0 focus:outline-none"
+                className="w-full max-w-xs sm:max-w-sm mx-auto sm:mx-0 md:absolute md:inset-0 md:max-w-none md:mx-0 flex items-end sm:items-center justify-center sm:justify-start px-5 sm:px-12 md:px-16 pb-20 sm:pb-0 focus:outline-none"
               >
                 <span className="sr-only">{card.title}</span>
-                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_10px_30px_rgba(0,0,0,0.3)] transition-all duration-500 group-hover:border-orange-500/40 group-hover:bg-slate-900/80 group-hover:scale-[1.02] group-hover:-translate-y-1 group-hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.15),_0_0_40px_rgba(249,115,22,0.2),_0_20px_40px_rgba(0,0,0,0.4)] group-focus-visible:ring-2 group-focus-visible:ring-orange-500 w-full max-w-xs sm:max-w-sm mx-auto sm:mx-0">
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_10px_30px_rgba(0,0,0,0.3)] transition-all duration-500 group-hover:border-orange-500/40 group-hover:bg-slate-900/80 group-hover:scale-[1.02] group-hover:-translate-y-1 group-hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.15),_0_0_40px_rgba(249,115,22,0.2),_0_20px_40px_rgba(0,0,0,0.4)] group-focus-visible:ring-2 group-focus-visible:ring-orange-500 w-full max-w-xs sm:max-w-sm md:max-w-lg mx-auto sm:mx-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                   <div className="h-px w-full bg-gradient-to-r from-transparent via-orange-500/30 to-transparent transition-all duration-300 group-hover:via-orange-400/70" />
                   <div className="relative z-10 p-6 sm:p-8">
