@@ -1,7 +1,40 @@
 'use client';
 
-import { CheckCircle, Circle, Link2, Image as ImageIcon, User, Briefcase } from 'lucide-react';
+import React from 'react';
+import { CheckCircle, Circle, Link2, Image as ImageIcon, User, Briefcase, Sparkles, Settings, MousePointerClick } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-flex items-center px-1.5 py-0.5 rounded border border-slate-600 bg-slate-800/80 text-slate-300 font-mono text-xs font-semibold shadow-sm">
+      {children}
+    </kbd>
+  );
+}
+
+function renderTipWithKeys(text: string, shiftLabel: string, spaceLabel: string) {
+  const parts = text.split('__SHIFT__');
+  if (parts.length === 2) {
+    return (
+      <>
+        {parts[0]}
+        <Kbd>{shiftLabel}</Kbd>
+        {parts[1]}
+      </>
+    );
+  }
+  const partsSpace = text.split('__SPACE__');
+  if (partsSpace.length === 2) {
+    return (
+      <>
+        {partsSpace[0]}
+        <Kbd>{spaceLabel}</Kbd>
+        {partsSpace[1]}
+      </>
+    );
+  }
+  return text;
+}
 
 interface ProfileHealthProps {
   perfiles: Array<{
@@ -32,6 +65,12 @@ export default function ProfileHealth({ perfiles, className = '' }: ProfileHealt
   ];
   const completados = pasos.filter((s) => s.listo).length;
   const porcentaje = Math.round((completados / pasos.length) * 100);
+
+  const tips100 = [
+    { labelKey: 'profile_health.tip_fondos', icon: Sparkles, useKeys: false },
+    { labelKey: 'profile_health.tip_shift', icon: Settings, useKeys: true },
+    { labelKey: 'profile_health.tip_espaciadora', icon: MousePointerClick, useKeys: true },
+  ];
 
   return (
     <div className={`bg-slate-900/60 border border-slate-800 rounded-2xl p-6 ${className}`}>
@@ -70,6 +109,29 @@ export default function ProfileHealth({ perfiles, className = '' }: ProfileHealt
           );
         })}
       </ul>
+
+      {porcentaje === 100 && (
+        <div className="mt-6 pt-6 border-t border-slate-800">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+            {t('profile_health.beneficios_titulo')}
+          </p>
+          <ul className="space-y-3">
+            {tips100.map((tip) => {
+              const Icon = tip.icon;
+              const text = t(tip.labelKey);
+              const content = tip.useKeys
+                ? renderTipWithKeys(text, t('profile_health.kbd_shift'), t('profile_health.kbd_space'))
+                : text;
+              return (
+                <li key={tip.labelKey} className="flex items-start gap-3 text-sm text-slate-300">
+                  <Icon size={18} className="text-orange-500 shrink-0 mt-0.5" aria-hidden />
+                  <span>{content}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
