@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdatePostulacionDto } from './dto/update-postulacion.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -75,7 +75,16 @@ export class PostulacionService {
     return nuevaPostulacion;
   }
 
-  async update(id: number, updatePostulacionDto: UpdatePostulacionDto) {
+  async update(id: number, updatePostulacionDto: UpdatePostulacionDto, userId?: number) {
+    if (userId != null) {
+      const postulacion = await this.prisma.postulacion.findUnique({
+        where: { id },
+        include: { proyecto: { select: { userId: true } } },
+      });
+      if (!postulacion?.proyecto || postulacion.proyecto.userId !== userId) {
+        throw new ForbiddenException('No tenés permiso para gestionar esta postulación.');
+      }
+    }
     const postulacionActualizada = await this.prisma.postulacion.update({
       where: { id },
       data: {

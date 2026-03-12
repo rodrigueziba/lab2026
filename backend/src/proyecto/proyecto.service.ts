@@ -103,8 +103,11 @@ export class ProyectoService {
     if (existing.userId !== userId && role !== 'admin') {
       throw new ForbiddenException('No tienes permiso para modificar este proyecto');
     }
-    const { puestos, ...proyectoData } = updateProyectoDto;
-    const dataToUpdate: any = { ...proyectoData };
+    const { puestos, esBorrador, esPlantilla, ...rest } = updateProyectoDto;
+    const dataToUpdate: any = { ...rest };
+    // Solo actualizar esBorrador/esPlantilla si vienen explícitamente (evita que se oculten proyectos del listado)
+    if (esBorrador !== undefined) dataToUpdate.esBorrador = esBorrador;
+    if (esPlantilla !== undefined) dataToUpdate.esPlantilla = esPlantilla;
 
     if (puestos) {
       dataToUpdate.puestos = {

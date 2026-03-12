@@ -38,8 +38,9 @@ export class PostulacionController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePostulacionDto: UpdatePostulacionDto) {
-    return this.postulacionService.update(+id, updatePostulacionDto);
+  @UseGuards(JwtAuthGuard)
+  update(@Param('id') id: string, @Body() updatePostulacionDto: UpdatePostulacionDto, @Req() req: any) {
+    return this.postulacionService.update(+id, updatePostulacionDto, req.user?.userId);
   }
 
   @Patch(':id/vista')

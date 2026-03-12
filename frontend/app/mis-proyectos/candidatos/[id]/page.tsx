@@ -13,6 +13,7 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
   const [candidatos, setCandidatos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [proyectoTitulo, setProyectoTitulo] = useState('');
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,6 +53,7 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
   const handleUpdateEstado = async (postulacionId: number, nuevoEstado: 'Aceptada' | 'Rechazada' | 'En consideración') => {
     const token = localStorage.getItem('token');
     if (!token) return;
+    setUpdatingId(postulacionId);
 
     try {
       const res = await fetch(`${apiUrl}/postulacion/${postulacionId}`, {
@@ -63,17 +65,21 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
         body: JSON.stringify({ estado: nuevoEstado })
       });
 
+      const data = await res.json();
+
       if (res.ok) {
         setCandidatos(prev => prev.map(c => 
-          c.id === postulacionId ? { ...c, estado: nuevoEstado } : c
+          c.id === postulacionId ? { ...c, estado: data.estado ?? nuevoEstado } : c
         ));
         if (nuevoEstado === 'Aceptada') alert('¡Postulación aceptada! 🎉');
       } else {
-        alert("Error al actualizar el estado.");
+        alert(data?.message || "Error al actualizar el estado.");
       }
     } catch (error) {
       console.error(error);
       alert("Error de conexión.");
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -128,42 +134,45 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
 
                 {/* Acciones */}
                 <div className="flex gap-3 shrink-0 items-center">
-                  
-                  {/* Botón Contactar (Siempre visible o condicional, según prefieras) */}
-                  <button title="Contactar por Email" className="p-3 bg-slate-800 hover:bg-blue-600 rounded-full transition text-slate-400 hover:text-white" onClick={() => window.open(`mailto:${c.postulante.email}`)}>
-                    <Mail size={18}/>
-                  </button>
-                  
-                  <div className="w-px h-8 bg-slate-800 mx-2"></div>
-
-                  {/* Botón Aceptar (Solo si NO está aceptada ya) */}
-                  {c.estado !== 'Aceptada' && (
-                      <button 
-                        onClick={() => handleUpdateEstado(c.id, 'Aceptada')}
-                        title="Aceptar Postulación" 
-                        className="p-3 bg-slate-800 hover:bg-emerald-600 text-emerald-500 hover:text-white rounded-full transition border border-slate-700"
-                      >
-                        <CheckCircle size={18}/>
+                  {updatingId === c.id ? (
+                    <div className="flex items-center gap-2 text-slate-400 text-sm">
+                      <Loader2 size={20} className="animate-spin" />
+                      <span>Actualizando...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <button title="Contactar por Email" className="p-3 bg-slate-800 hover:bg-blue-600 rounded-full transition text-slate-400 hover:text-white" onClick={() => window.open(`mailto:${c.postulante.email}`)}>
+                        <Mail size={18}/>
                       </button>
-                  )}
-
-                  {c.estado !== 'Rechazada' && c.estado !== 'Aceptada' && (
-                    <button
-                      onClick={() => handleUpdateEstado(c.id, 'En consideración')}
-                      title="En consideración / Entrevista"
-                      className="p-3 bg-slate-800 hover:bg-amber-600 text-amber-400 hover:text-white rounded-full transition border border-slate-700"
-                    >
-                      <MessageCircle size={18}/>
-                    </button>
-                  )}
-                  {c.estado !== 'Rechazada' && (
-                    <button 
-                      onClick={() => handleUpdateEstado(c.id, 'Rechazada')}
-                      title="Rechazar" 
-                      className="p-3 bg-slate-800 hover:bg-red-600 text-red-500 hover:text-white rounded-full transition border border-slate-700"
-                    >
-                      <XCircle size={18}/>
-                    </button>
+                      <div className="w-px h-8 bg-slate-800 mx-2"></div>
+                      {c.estado !== 'Aceptada' && (
+                          <button 
+                            onClick={() => handleUpdateEstado(c.id, 'Aceptada')}
+                            title="Aceptar Postulación" 
+                            className="p-3 bg-slate-800 hover:bg-emerald-600 text-emerald-500 hover:text-white rounded-full transition border border-slate-700"
+                          >
+                            <CheckCircle size={18}/>
+                          </button>
+                      )}
+                      {c.estado !== 'Rechazada' && c.estado !== 'Aceptada' && (
+                        <button
+                          onClick={() => handleUpdateEstado(c.id, 'En consideración')}
+                          title="En consideración / Entrevista"
+                          className="p-3 bg-slate-800 hover:bg-amber-600 text-amber-400 hover:text-white rounded-full transition border border-slate-700"
+                        >
+                          <MessageCircle size={18}/>
+                        </button>
+                      )}
+                      {c.estado !== 'Rechazada' && (
+                        <button 
+                          onClick={() => handleUpdateEstado(c.id, 'Rechazada')}
+                          title="Rechazar" 
+                          className="p-3 bg-slate-800 hover:bg-red-600 text-red-500 hover:text-white rounded-full transition border border-slate-700"
+                        >
+                          <XCircle size={18}/>
+                        </button>
+                      )}
+                    </>
                   )}
 
                   {/* Badges de Estado */}

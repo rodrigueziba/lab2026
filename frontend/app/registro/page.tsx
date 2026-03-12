@@ -42,7 +42,7 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (res.ok) {
-        // Auto-login: iniciar sesión con las mismas credenciales y redirigir a registro-prestador
+        // Auto-login: iniciar sesión con las mismas credenciales y redirigir a crear perfil
         try {
           const loginRes = await fetch(`${apiUrl}/auth/login`, {
             method: 'POST',
@@ -61,7 +61,7 @@ export default function RegisterPage() {
               confirmButtonColor: '#ea580c',
               confirmButtonText: 'Continuar',
             });
-            router.push('/registro-prestador');
+            router.push('/mi-perfil/crear');
             return;
           }
         } catch (_) {
