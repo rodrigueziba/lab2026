@@ -7,6 +7,7 @@ import {
   Image as ImageIcon, ExternalLink, BookOpen
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const getYoutubeId = (url: string) => {
   if (!url) return null;
@@ -18,7 +19,7 @@ const getYoutubeId = (url: string) => {
 export default function DetalleProyectoPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params); 
   const id = resolvedParams.id;
-
+  const { t } = useLanguage();
   const [proyecto, setProyecto] = useState<any>(null);
   const [candidatos, setCandidatos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,7 +119,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   };
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Cargando...</div>;
-  if (!proyecto) return <div className="text-white text-center py-20">Proyecto no encontrado</div>;
+  if (!proyecto) return <div className="text-white text-center py-20">{t('proyectos.proyecto_no_encontrado')}</div>;
 
   const videoRef = proyecto.referencias?.find((r: string) => r && (r.includes('youtu') || r.includes('vimeo')));
   const youtubeId = videoRef ? getYoutubeId(videoRef) : null;
@@ -147,11 +148,11 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
         <div className="absolute bottom-0 left-0 w-full z-10 px-6 pb-8 md:pb-12">
           <div className="max-w-6xl mx-auto">
              <Link href="/proyectos" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition font-bold text-sm uppercase tracking-widest">
-                <ChevronLeft size={16}/> Volver a Cartelera
+                <ChevronLeft size={16}/> {t('proyectos.volver')}
              </Link>
              <div className="flex flex-wrap gap-3 mb-4">
-                {proyecto.esRemunerado && <span className="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-lg"><DollarSign size={12}/> Remunerado</span>}
-                {proyecto.esEstudiante && <span className="bg-cyan-500/90 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1"><GraduationCap size={12}/> Estudiante / Tesis</span>}
+                {proyecto.esRemunerado && <span className="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-lg"><DollarSign size={12}/> {t('proyectos.remunerado')}</span>}
+                {proyecto.esEstudiante && <span className="bg-cyan-500/90 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1"><GraduationCap size={12}/> {t('proyectos.estudiante')}</span>}
                 <span className="bg-orange-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase">{proyecto.tipo}</span>
                 <span className="bg-slate-700 text-slate-200 text-xs font-bold px-3 py-1 rounded-full">{proyecto.estado}</span>
              </div>
@@ -164,7 +165,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
                onClick={() => document.getElementById('vacantes-section')?.scrollIntoView({ behavior: 'smooth' })}
                className="mt-6 bg-white text-black hover:bg-slate-200 px-6 py-3 rounded-full font-black flex items-center gap-2 shadow-xl transition transform hover:scale-105 text-sm"
              >
-               <Mail size={18}/> Ver vacantes
+               <Mail size={18}/> {t('proyectos.ver_vacantes')}
              </button>
           </div>
         </div>
@@ -177,14 +178,14 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
         <div className="flex flex-col gap-8">
           <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
             <h3 className="text-orange-500 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
-              <BookOpen size={20}/> La historia
+              <BookOpen size={20}/> {t('proyectos.la_historia')}
             </h3>
             <p className="text-slate-300 text-lg leading-relaxed whitespace-pre-line">{proyecto.descripcion}</p>
           </div>
 
           <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
             <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-6 border-b border-slate-800 pb-2 flex items-center gap-2">
-              <Film size={20}/> Ficha del proyecto
+              <Film size={20}/> {t('proyectos.ficha')}
             </h3>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><dt className="text-slate-500 font-bold uppercase tracking-wider mb-1">Tipo</dt><dd className="text-white font-medium">{proyecto.tipo}</dd></div>
@@ -200,7 +201,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
           {youtubeId && (
             <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
               <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
-                <ImageIcon size={20}/> Video / Reel
+                <ImageIcon size={20}/> {t('proyectos.video_reel')}
               </h3>
               <a
                 href={videoRef || `https://www.youtube.com/watch?v=${youtubeId}`}
@@ -215,7 +216,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
                   onError={(e) => { const t = e.currentTarget; t.src = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`; }}
                 />
                 <div className="bg-slate-800/80 py-2 px-3 flex items-center justify-center gap-2 text-orange-400 text-sm font-bold group-hover/reel:text-orange-300">
-                  <ExternalLink size={16}/> Ver en YouTube
+                  <ExternalLink size={16}/> {t('proyectos.ver_youtube')}
                 </div>
               </a>
             </div>
@@ -226,7 +227,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
         <div className="flex flex-col gap-8 lg:sticky lg:top-24">
           <div id="vacantes-section" className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
             <h3 className="text-orange-500 font-black uppercase tracking-widest text-lg mb-6 border-b border-slate-800 pb-2 flex items-center gap-2">
-              <Users className="text-orange-600"/> Vacantes ({proyecto.puestos?.length || 0})
+              <Users className="text-orange-600"/> {t('proyectos.vacantes')} ({proyecto.puestos?.length || 0})
             </h3>
             {misPerfiles.length > 1 && (
               <div className="mb-4 pb-4 border-b border-slate-800">
@@ -249,20 +250,20 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
                   <div key={puesto.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 hover:border-slate-600 transition">
                     <div className="flex justify-between mb-2">
                       <h4 className="font-bold text-white">{puesto.nombre}</h4>
-                      {yaPostulado && <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded font-bold border border-emerald-500/30">Aplicado</span>}
+                      {yaPostulado && <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded font-bold border border-emerald-500/30">{t('proyectos.aplicado')}</span>}
                     </div>
                     <p className="text-xs text-slate-500 line-clamp-2 mb-4">{puesto.descripcion || 'Sin descripción'}</p>
                     <div className="pt-3 border-t border-slate-900 flex justify-end">
                       {yaPostulado ? (
                         <button disabled className="text-xs font-bold text-emerald-500 flex items-center gap-1 cursor-default">
-                          <CheckCircle size={14}/> Ya te postulaste
+                          <CheckCircle size={14}/> {t('proyectos.ya_postulaste')}
                         </button>
                       ) : (
                         <button
                           onClick={() => handlePostular(puesto.id, puesto.nombre)}
                           className="text-xs font-bold text-orange-400 hover:text-orange-300 transition flex items-center gap-1"
                         >
-                          Aplicar a este rol →
+                          {t('proyectos.aplicar_rol')}
                         </button>
                       )}
                     </div>
@@ -274,7 +275,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
 
           {referencias.length > 1 && (
             <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 duration-300">
-              <h3 className="text-slate-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2">Otras referencias</h3>
+              <h3 className="text-slate-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2">{t('proyectos.otras_refs')}</h3>
               <ul className="space-y-2">
                 {referencias.filter((r: string) => r !== videoRef).map((url: string, i: number) => (
                   <li key={i}>
@@ -312,7 +313,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
         {galeria.length > 0 && (
           <div className="lg:col-span-2 w-full bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 duration-300">
             <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
-              <ImageIcon size={20}/> Galería
+              <ImageIcon size={20}/> {t('proyectos.galeria')}
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {galeria.map((img: string, idx: number) => (

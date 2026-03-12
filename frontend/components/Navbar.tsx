@@ -4,18 +4,22 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
   Menu, X, ChevronDown, LogOut, Film, User, 
-  Briefcase, MapPin, Users, Clapperboard, Bell, Shield, Inbox, Atom, Info
+  Briefcase, MapPin, Users, Clapperboard, Bell, Shield, Inbox, Atom, Info, Globe
 } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const RAINBOW_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
+  const { locale, setLocale, t } = useLanguage();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isLangOpen, setIsLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
   
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notificaciones, setNotificaciones] = useState<any[]>([]);
@@ -142,6 +146,7 @@ export default function Navbar() {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsUserMenuOpen(false);
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) setIsNotifOpen(false);
+      if (langRef.current && !langRef.current.contains(event.target as Node)) setIsLangOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -275,18 +280,37 @@ export default function Navbar() {
 
         {/* Centro: Locaciones, Prestadores, Proyectos — siempre centrados (solo escritorio); IDs para Tour de Bienvenida */}
         <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-2 bg-black/20 backdrop-blur-sm p-1.5 rounded-full border border-white/5">
-          <div id="tour-locaciones"><NavLink href="/locaciones" icon={MapPin} label="Locaciones" /></div>
-          <div id="tour-guia"><NavLink href="/guia" icon={Users} label="Prestadores" /></div>
-          <div id="tour-proyectos"><NavLink href="/proyectos" icon={Clapperboard} label="Proyectos" /></div>
+          <div id="tour-locaciones"><NavLink href="/locaciones" icon={MapPin} label={t('nav.locaciones')} /></div>
+          <div id="tour-guia"><NavLink href="/guia" icon={Users} label={t('nav.prestadores')} /></div>
+          <div id="tour-proyectos"><NavLink href="/proyectos" icon={Clapperboard} label={t('nav.proyectos')} /></div>
         </div>
 
         <div className="hidden md:flex items-center gap-4">
-          {/* Icono info: mismo estilo/opacidad que átomo, al hover ilumina azul brillante, enlace a /info */}
+          {/* Selector de idioma */}
+          <div className="relative" ref={langRef}>
+            <button
+              type="button"
+              onClick={() => setIsLangOpen(!isLangOpen)}
+              className="flex items-center justify-center opacity-[0.12] hover:opacity-100 transition-opacity duration-300 text-white hover:text-cyan-400 rounded-full p-1.5 hover:ring-1 hover:ring-cyan-400/50"
+              title={t('nav.idioma')}
+              aria-label={t('nav.idioma')}
+              aria-expanded={isLangOpen}
+            >
+              <Globe size={20} strokeWidth={2} />
+            </button>
+            {isLangOpen && (
+              <div className="absolute right-0 mt-2 w-40 py-1 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-[100] animate-in fade-in zoom-in-95 duration-200">
+                <button onClick={() => { setLocale('es'); setIsLangOpen(false); }} className={`w-full text-left px-4 py-2 text-sm font-medium transition ${locale === 'es' ? 'text-orange-400 bg-orange-500/10' : 'text-slate-300 hover:bg-slate-800'}`}>{t('nav.espanol')}</button>
+                <button onClick={() => { setLocale('en'); setIsLangOpen(false); }} className={`w-full text-left px-4 py-2 text-sm font-medium transition ${locale === 'en' ? 'text-orange-400 bg-orange-500/10' : 'text-slate-300 hover:bg-slate-800'}`}>{t('nav.ingles')}</button>
+              </div>
+            )}
+          </div>
+          {/* Icono info */}
           <Link
             href="/info"
             className="hidden md:flex items-center justify-center opacity-[0.12] hover:opacity-100 transition-opacity duration-300 text-white hover:text-blue-400 rounded-full p-1 hover:ring-1 hover:ring-blue-400/50 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.8)]"
-            title="Información"
-            aria-label="Información"
+            title={t('nav.info')}
+            aria-label={t('nav.info')}
           >
             <Info size={20} strokeWidth={2} />
           </Link>
@@ -298,7 +322,7 @@ export default function Navbar() {
                     <button 
                         onClick={() => setIsNotifOpen(!isNotifOpen)}
                         className="relative min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-slate-400 hover:text-yellow-400 transition rounded-full hover:bg-white/10 hover:drop-shadow-[0_0_12px_rgba(250,204,21,0.95)]"
-                        aria-label={unreadCount > 0 ? `Notificaciones (${unreadCount} sin leer)` : 'Notificaciones'}
+                        aria-label={unreadCount > 0 ? t('nav.notifications_unread', { count: unreadCount }) : t('nav.notifications')}
                     >
                         <Bell size={20}/>
                         {unreadCount > 0 && (
@@ -309,12 +333,12 @@ export default function Navbar() {
                     {isNotifOpen && (
                         <div className="absolute right-0 mt-4 w-80 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                             <div className="px-4 py-3 border-b border-slate-800 bg-slate-950/50 flex justify-between items-center">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Notificaciones</span>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t('nav.notifications')}</span>
                                 {unreadCount > 0 && <span className="text-xs bg-red-500 text-white px-1.5 rounded font-bold">{unreadCount}</span>}
                             </div>
                             <div className="max-h-64 overflow-y-auto">
                                 {notificaciones.length === 0 ? (
-                                    <div className="p-6 text-center text-slate-500 text-sm">No tienes notificaciones.</div>
+                                    <div className="p-6 text-center text-slate-500 text-sm">{t('nav.no_notifications')}</div>
                                 ) : (
                                     notificaciones.map((n) => (
                                         <div 
@@ -460,7 +484,7 @@ export default function Navbar() {
           className="md:hidden relative z-[110] text-white min-w-[44px] min-h-[44px] flex items-center justify-center p-2 -m-2 touch-manipulation"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           aria-expanded={isMobileMenuOpen}
-          aria-label={isMobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-label={isMobileMenuOpen ? t('nav.cerrar_menu') : t('nav.abrir_menu')}
         >
           {isMobileMenuOpen ? <X size={28}/> : <Menu size={28}/>}
         </button>
@@ -484,7 +508,7 @@ export default function Navbar() {
               {user?.role === 'admin' && (
                 <>
                   <p className="px-2 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Admin</p>
-                  <MobileNavLink href="/admin/panel" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label="Panel Admin" />
+                  <MobileNavLink href="/admin/panel" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label={t('nav.panel_admin')} />
                   <div className="h-px bg-slate-700 my-1" />
                 </>
               )}
@@ -492,29 +516,45 @@ export default function Navbar() {
                 <>
                   {tienePerfilPrestador === false && (
                     <Link href="/registro-prestador" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-400 font-bold text-sm min-h-[44px]">
-                      Crear perfil de prestador →
+                      {t('nav.crear_perfil_prestador')}
                     </Link>
                   )}
                   <div className="flex items-center gap-3 py-2 px-2 rounded-xl bg-slate-800/50">
                     <div className="w-9 h-9 rounded-full bg-orange-600 flex items-center justify-center text-white font-bold text-sm">{user.nombre?.[0] ?? 'U'}</div>
                     <div className="min-w-0"><p className="font-bold text-white truncate text-sm">{user.nombre}</p><p className="text-xs text-slate-500 truncate">{user.email}</p></div>
                   </div>
-                  <MobileNavLink href="/mis-proyectos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Film} label="Mis Proyectos" />
-                  <MobileNavLink href="/mis-postulaciones" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Briefcase} label="Mis Postulaciones" />
-                  <MobileNavLink href="/mis-perfiles/solicitudes" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Inbox} label="Solicitudes Recibidas" />
-                  <MobileNavLink href="/mi-perfil" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={User} label="Mi Perfil" />
-                  <MobileNavLink href="/mi-cuenta" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label="Mi Cuenta" />
+                  <MobileNavLink href="/mis-proyectos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Film} label={t('nav.mis_proyectos')} />
+                  <MobileNavLink href="/mis-postulaciones" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Briefcase} label={t('nav.mis_postulaciones')} />
+                  <MobileNavLink href="/mis-perfiles/solicitudes" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Inbox} label={t('nav.solicitudes_recibidas')} />
+                  <MobileNavLink href="/mi-perfil" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={User} label={t('nav.mi_perfil')} />
+                  <MobileNavLink href="/mi-cuenta" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label={t('nav.mi_cuenta')} />
                   <div className="h-px bg-slate-700 my-1" />
-                  <MobileNavLink href="/nodos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Atom} label="Nodos" />
-                  <button onClick={handleLogout} className="text-left text-red-400 font-bold py-3 px-4 flex items-center gap-2 text-sm mt-1"><LogOut size={18}/> Cerrar sesión</button>
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{t('nav.idioma')}</span>
+                    <span className="flex gap-1">
+                      <button onClick={() => { setLocale('es'); }} className={`px-2 py-1 rounded text-xs font-bold ${locale === 'es' ? 'bg-orange-500/30 text-orange-400 border border-orange-500/50' : 'text-slate-500 hover:text-white border border-slate-700'}`}>ES</button>
+                      <button onClick={() => { setLocale('en'); }} className={`px-2 py-1 rounded text-xs font-bold ${locale === 'en' ? 'bg-orange-500/30 text-orange-400 border border-orange-500/50' : 'text-slate-500 hover:text-white border border-slate-700'}`}>EN</button>
+                    </span>
+                  </div>
+                  <div className="h-px bg-slate-700 my-1" />
+                  <MobileNavLink href="/nodos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Atom} label={t('nav.nodos')} />
+                  <button onClick={handleLogout} className="text-left text-red-400 font-bold py-3 px-4 flex items-center gap-2 text-sm mt-1"><LogOut size={18}/> {t('nav.cerrar_sesion')}</button>
                 </>
               ) : (
                 <>
                   <div className="h-px bg-slate-700 my-1" />
-                  <MobileNavLink href="/nodos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Atom} label="Nodos" />
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{t('nav.idioma')}</span>
+                    <span className="flex gap-1">
+                      <button onClick={() => setLocale('es')} className={`px-2 py-1 rounded text-xs font-bold ${locale === 'es' ? 'bg-orange-500/30 text-orange-400 border border-orange-500/50' : 'text-slate-500 hover:text-white border border-slate-700'}`}>ES</button>
+                      <button onClick={() => setLocale('en')} className={`px-2 py-1 rounded text-xs font-bold ${locale === 'en' ? 'bg-orange-500/30 text-orange-400 border border-orange-500/50' : 'text-slate-500 hover:text-white border border-slate-700'}`}>EN</button>
+                    </span>
+                  </div>
+                  <div className="h-px bg-slate-700 my-1" />
+                  <MobileNavLink href="/nodos" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Atom} label={t('nav.nodos')} />
                   <div className="flex flex-col gap-2 pt-2">
-                    <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-3 rounded-xl border border-slate-600 text-white font-bold text-sm">Ingresar</Link>
-                    <Link href="/registro" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-3 rounded-xl bg-orange-600 text-white font-bold text-sm">Registrarse</Link>
+                    <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-3 rounded-xl border border-slate-600 text-white font-bold text-sm">{t('nav.ingresar')}</Link>
+                    <Link href="/registro" onClick={() => setIsMobileMenuOpen(false)} className="text-center w-full py-3 rounded-xl bg-orange-600 text-white font-bold text-sm">{t('nav.registrarse')}</Link>
                   </div>
                 </>
               )}
@@ -530,21 +570,21 @@ export default function Navbar() {
         <Link
           href="/locaciones"
           className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all duration-300 touch-manipulation ${pathname === '/locaciones' ? 'text-white bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.2)] border border-white/20' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
-          aria-label="Locaciones"
+          aria-label={t('nav.locaciones')}
         >
           <MapPin size={22} className={pathname === '/locaciones' ? 'text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : ''} />
         </Link>
         <Link
           href="/guia"
           className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all duration-300 touch-manipulation ${pathname === '/guia' ? 'text-white bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.2)] border border-white/20' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
-          aria-label="Prestadores"
+          aria-label={t('nav.prestadores')}
         >
           <Users size={22} className={pathname === '/guia' ? 'text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : ''} />
         </Link>
         <Link
           href="/proyectos"
           className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all duration-300 touch-manipulation ${pathname === '/proyectos' ? 'text-white bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.2)] border border-white/20' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
-          aria-label="Proyectos"
+          aria-label={t('nav.proyectos')}
         >
           <Clapperboard size={22} className={pathname === '/proyectos' ? 'text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : ''} />
         </Link>

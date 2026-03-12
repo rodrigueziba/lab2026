@@ -366,7 +366,7 @@ export default function GuiaPrestadorPage() {
             <span className="text-orange-500 text-xs font-bold tracking-[.15em] uppercase">El mapa nodal</span>
             <h2 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Tu nodo en la red audiovisual</h2>
             <p className="mt-3 text-slate-400 max-w-lg mx-auto">Cada prestador, proyecto y locación es un nodo. El grafo 3D muestra cómo se conectan todos en tiempo real.</p>
-            <div className="mt-10 mx-auto max-w-xl bg-[#111827]/80 backdrop-blur-sm border border-white/7 rounded-2xl p-10 relative overflow-hidden">
+            <Link href="/nodos" className="mt-10 mx-auto max-w-xl block bg-[#111827]/80 backdrop-blur-sm border border-white/7 rounded-2xl p-10 relative overflow-hidden cursor-pointer transition-all hover:border-[#4f9cf9]/30 hover:shadow-[0_12px_48px_rgba(0,0,0,.5)]">
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_50%,rgba(79,156,249,.06),transparent_70%)]" />
               <div className="relative h-52">
                 <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="none">
@@ -388,7 +388,7 @@ export default function GuiaPrestadorPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </Link>
           </div>
         </section>
 

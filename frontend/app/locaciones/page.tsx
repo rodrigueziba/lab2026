@@ -1,12 +1,12 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-// Importamos 'Variants' de framer-motion para tipar correctamente las animaciones
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { ChevronLeft, ChevronRight, Search, MapPin, Mountain, ArrowRight, Filter } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
 import { getSectionCache, setSectionCache, SECTION_KEYS } from '@/lib/sectionCache';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // Cargamos el mapa solo en el cliente
 const MapaTDF = dynamic(() => import('../../components/MapaTDF'), { 
@@ -52,6 +52,7 @@ interface Locacion {
 }
 
 export default function CatalogoLocacionesPage() {
+  const { t } = useLanguage();
   const [locaciones, setLocaciones] = useState<Locacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroCategoria, setFiltroCategoria] = useState("Todas");
@@ -209,7 +210,7 @@ export default function CatalogoLocacionesPage() {
               <div className="bg-orange-600/20 p-2 rounded-lg border border-orange-500/30">
                 <Mountain className="text-orange-500" size={isScrolled ? 20 : 28} />
               </div>
-              <span>CATÁLOGO <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">TDF</span></span>
+              <span>{t('locaciones.titulo')} <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">{t('locaciones.tdf')}</span></span>
             </h1>
           </div>
 
@@ -252,7 +253,7 @@ export default function CatalogoLocacionesPage() {
           >
              <div className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
                <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
-               {locacionesFiltradas.length} resultados
+               {locacionesFiltradas.length} {t('locaciones.resultados')}
              </div>
 
              {user?.role === 'admin' && (
@@ -296,7 +297,7 @@ export default function CatalogoLocacionesPage() {
                              </div>
                              <div className="mt-auto pt-3 border-t border-slate-800/50 flex justify-between items-center gap-3">
                                <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium bg-black/30 px-2 py-1 rounded-full shrink-0"><MapPin size={10} className="text-orange-500"/> {loc.ciudad}</span>
-                               <span className="text-[10px] font-bold text-slate-500 group-hover:text-white flex items-center gap-1 transition-colors uppercase tracking-wider shrink-0">Ver Ficha <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform text-orange-500"/></span>
+                               <span className="text-[10px] font-bold text-slate-500 group-hover:text-white flex items-center gap-1 transition-colors uppercase tracking-wider shrink-0">{t('common.ver_ficha')} <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform text-orange-500"/></span>
                              </div>
                           </div>
                         </div>
@@ -308,8 +309,8 @@ export default function CatalogoLocacionesPage() {
               {!loading && locacionesFiltradas.length === 0 && (
                  <div className="text-center py-20 text-slate-500 bg-slate-900/30 rounded-2xl border border-dashed border-slate-800 mx-4">
                    <Mountain className="mx-auto mb-2 opacity-20" size={32}/>
-                   <p className="text-sm">No hay locaciones con esos filtros.</p>
-                   <button onClick={() => {setBusqueda(''); setFiltroCategoria('Todas');}} className="text-orange-500 text-xs mt-2 hover:underline">Resetear</button>
+                   <p className="text-sm">{t('locaciones.sin_resultados')}</p>
+                   <button onClick={() => {setBusqueda(''); setFiltroCategoria('Todas');}} className="text-orange-500 text-xs mt-2 hover:underline">{t('locaciones.resetear')}</button>
                  </div>
               )}
             </div>

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
 import { getSectionCache, setSectionCache, SECTION_KEYS } from '@/lib/sectionCache';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const getYoutubeId = (url: string) => {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -70,6 +71,7 @@ interface Proyecto {
 }
 
 export default function CarteleraProyectosPage() {
+  const { t } = useLanguage();
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [proyectosMostrados, setProyectosMostrados] = useState<Proyecto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -372,14 +374,14 @@ export default function CarteleraProyectosPage() {
         <div className="flex justify-between items-center mb-8 pb-4 border-b border-slate-800">
           <div className="flex items-center gap-2 text-slate-400">
             <Filter size={16}/>
-            <span className="text-sm font-medium">{proyectosMostrados.length} resultados</span>
+            <span className="text-sm font-medium">{proyectosMostrados.length} {t('common.results')}</span>
           </div>
         </div>
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
-            <p className="text-slate-500 text-sm animate-pulse">Cargando cartelera...</p>
+            <p className="text-slate-500 text-sm animate-pulse">{t('proyectos.cargando')}</p>
           </div>
         ) : (
           <motion.div 

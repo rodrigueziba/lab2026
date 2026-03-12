@@ -12,11 +12,13 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { RGBShiftShader } from 'three/examples/jsm/shaders/RGBShiftShader.js';
 
+import { useLanguage } from '@/contexts/LanguageContext';
+
 // --- Componente del Formulario ---
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -55,10 +57,10 @@ function LoginForm() {
         window.dispatchEvent(new Event('storage'));
         router.push('/');
       } else {
-        setError('Credenciales inválidas');
+        setError(t('login.credenciales_invalidas'));
       }
     } catch (err) {
-      setError('Error de conexión con el servidor');
+      setError(t('login.error_conexion'));
     } finally {
       setLoading(false);
     }
@@ -72,8 +74,8 @@ function LoginForm() {
   return (
     <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-md relative z-10">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-black text-white mb-2">Bienvenido</h1>
-        <p className="text-slate-400">Ingresa a tu cuenta para continuar</p>
+        <h1 className="text-3xl font-black text-white mb-2">{t('login.bienvenido')}</h1>
+        <p className="text-slate-400">{t('login.ingresa_cuenta')}</p>
       </div>
 
       {error && (
@@ -93,12 +95,12 @@ function LoginForm() {
             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
         </svg>
-        <span>Continuar con Google</span>
+        <span>{t('login.continuar_google')}</span>
       </button>
 
       <div className="relative flex py-2 items-center mb-6">
         <div className="flex-grow border-t border-slate-700"></div>
-        <span className="flex-shrink mx-4 text-slate-500 text-xs font-bold uppercase">O ingresa con email</span>
+        <span className="flex-shrink mx-4 text-slate-500 text-xs font-bold uppercase">{t('login.o_email')}</span>
         <div className="flex-grow border-t border-slate-700"></div>
       </div>
 
@@ -107,7 +109,7 @@ function LoginForm() {
           <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
           <input
             type="email"
-            placeholder="Correo electrónico"
+            placeholder={t('login.correo')}
             className="w-full bg-slate-950/80 border border-slate-800 p-4 pl-12 rounded-xl text-white focus:border-orange-500 focus:bg-slate-950 focus:outline-none placeholder:text-slate-600 transition-all"
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -118,7 +120,7 @@ function LoginForm() {
           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
           <input
             type="password"
-            placeholder="Contraseña"
+            placeholder={t('login.password')}
             className="w-full bg-slate-950/80 border border-slate-800 p-4 pl-12 rounded-xl text-white focus:border-orange-500 focus:bg-slate-950 focus:outline-none placeholder:text-slate-600 transition-all"
             value={formData.password}
             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -128,7 +130,7 @@ function LoginForm() {
 
         <div className="flex justify-end">
           <Link href="/login/olvide-password" className="text-sm text-orange-500 hover:text-orange-400 font-bold">
-            ¿Olvidaste tu contraseña?
+            {t('login.olvidaste')}
           </Link>
         </div>
 
@@ -136,15 +138,15 @@ function LoginForm() {
           disabled={loading}
           className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 py-4 rounded-xl text-white font-bold flex justify-center items-center gap-2 transition-all shadow-lg shadow-orange-900/30 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? <Loader2 className="animate-spin" /> : 'Ingresar'}
+          {loading ? <Loader2 className="animate-spin" /> : t('login.iniciar')}
         </button>
       </form>
 
       <div className="mt-8 text-center">
         <p className="text-slate-400 text-sm">
-          ¿No tienes cuenta?{' '}
+          {t('login.no_cuenta')}{' '}
           <Link href="/registro" className="text-orange-500 font-bold hover:text-orange-400">
-            Regístrate aquí
+            {t('login.registrate_aqui')}
           </Link>
         </p>
       </div>

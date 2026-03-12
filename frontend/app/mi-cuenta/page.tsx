@@ -5,9 +5,11 @@ import {
   Shield, Mail, Lock, Save, AlertTriangle, 
   CheckCircle, Loader2, LogOut, BookOpen 
 } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function MiCuentaPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -106,7 +108,7 @@ export default function MiCuentaPage() {
         
         <div className="mb-10">
             <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
-                <Shield className="text-orange-500" size={32}/> Configuración de Cuenta
+                <Shield className="text-orange-500" size={32}/> {t('mi_cuenta.titulo')}
             </h1>
             <p className="text-slate-400 text-lg">Administra tus credenciales de acceso y seguridad.</p>
         </div>
@@ -196,7 +198,7 @@ export default function MiCuentaPage() {
             }}
             className="text-slate-500 hover:text-orange-500 text-sm font-medium flex items-center gap-2 transition-colors"
           >
-            <BookOpen size={16} /> Volver a ver el tutorial
+            <BookOpen size={16} /> {t('mi_cuenta.ver_tutorial')}
           </button>
         </div>
 

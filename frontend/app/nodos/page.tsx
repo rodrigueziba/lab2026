@@ -6,6 +6,7 @@ import {
   Network, RefreshCw, Maximize, MapPin, Layers,
   Clapperboard, Focus, Zap, Wind, Mountain, X, PanelRightOpen,
 } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), { ssr: false });
 
@@ -266,6 +267,68 @@ interface Node2D {
 const BASE_SCALE_2D = 420;
 const ZOOM_OUT_2D_FALLBACK = 1.45;
 
+/* Fondo liviano de partículas/estrellas para la vista 2D (pocos recursos) */
+const PARTICLE_COUNT_2D = 48;
+const PARTICLE_SPEED_2D = 0.4;
+
+function ParticlesBackground2D() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const particlesRef = useRef<{ x: number; y: number; r: number; opacity: number; vy: number }[]>([]);
+  const initRef = useRef(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      const W = canvas.width;
+      const H = canvas.height;
+      if (!initRef.current || particlesRef.current.length === 0) {
+        particlesRef.current = Array.from({ length: PARTICLE_COUNT_2D }, () => ({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: 0.6 + Math.random() * 1.4,
+          opacity: 0.55 + Math.random() * 0.45,
+          vy: -PARTICLE_SPEED_2D * (0.5 + Math.random()),
+        }));
+        initRef.current = true;
+      }
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    let raf = 0;
+    const loop = () => {
+      const W = canvas.width;
+      const H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+      const particles = particlesRef.current;
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.y += p.vy;
+        if (p.y < -2) p.y = H + 2;
+        if (p.y > H + 2) p.y = -2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
+        ctx.fill();
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden />;
+}
+
 function NeuralCanvas2D({
   nodes,
   visibleLayers,
@@ -314,7 +377,7 @@ function NeuralCanvas2D({
     const loop = () => {
       const W = canvas.width; const H = canvas.height; const cx = W / 2;
       ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = '#000010'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(0,0,16,0.62)'; ctx.fillRect(0, 0, W, H);
       const scale = W / (BASE_SCALE_2D * zoom);
 
       const ciudades = ['Río Grande', 'Tolhuin', 'Ushuaia'];
@@ -563,6 +626,7 @@ function MobileTooltip({ node, onClose }: { node: TooltipData | null; onClose: (
    COMPONENTE PRINCIPAL
 ═══════════════════════════════════════════════════════════════ */
 export default function AdminDashboardPage() {
+  const { t } = useLanguage();
   const graphRef        = useRef<any>(null);
   const iframeRef       = useRef<HTMLIFrameElement>(null);
   const waveCounterRef  = useRef(0);
@@ -1014,7 +1078,7 @@ export default function AdminDashboardPage() {
       {/* Modo rendimiento: aviso cuando se pasó a 2D por timeout */}
       {force2D && !isMobile && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs font-bold tracking-wide">
-          Modo rendimiento (2D) — La vista 3D tardó en cargar
+          {t('nodos.modo_rendimiento')}
         </div>
       )}
 
@@ -1066,7 +1130,7 @@ export default function AdminDashboardPage() {
             <div className="absolute inset-0 flex items-center justify-center z-30">
               <div className="flex flex-col items-center gap-4">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"/>
-                <p className="text-slate-500 text-sm animate-pulse tracking-widest uppercase">Conectando con la base de datos</p>
+                <p className="text-slate-500 text-sm animate-pulse tracking-widest uppercase">{t('nodos.conectando')}</p>
               </div>
             </div>
           )}
@@ -1076,12 +1140,16 @@ export default function AdminDashboardPage() {
       {/* 7B. CANVAS 2D — Mobile o fallback por timeout (bajo recursos); en fallback cámara más lejos */}
       {(isMobile || force2D) && !loading && (
         <div className="absolute inset-0 z-20">
-          <NeuralCanvas2D
-            nodes={nodes2D}
-            visibleLayers={visibleLayers}
-            onNodeClick={n => setMobileTooltip({ name:n.name??'', type:n.type, subTipo:n.subTipo, ciudad:n.ciudad })}
-            zoomOut={force2D ? ZOOM_OUT_2D_FALLBACK : 1}
-          />
+          <div className="absolute inset-0 bg-[#000010]" aria-hidden />
+          <ParticlesBackground2D />
+          <div className="absolute inset-0">
+            <NeuralCanvas2D
+              nodes={nodes2D}
+              visibleLayers={visibleLayers}
+              onNodeClick={n => setMobileTooltip({ name:n.name??'', type:n.type, subTipo:n.subTipo, ciudad:n.ciudad })}
+              zoomOut={force2D ? ZOOM_OUT_2D_FALLBACK : 1}
+            />
+          </div>
           <MobileTooltip node={mobileTooltip} onClose={() => setMobileTooltip(null)}/>
         </div>
       )}
@@ -1089,7 +1157,7 @@ export default function AdminDashboardPage() {
         <div className="absolute inset-0 z-20 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500"/>
-            <p className="text-slate-500 text-sm animate-pulse tracking-widest uppercase">Conectando red...</p>
+            <p className="text-slate-500 text-sm animate-pulse tracking-widest uppercase">{t('nodos.conectando_red')}</p>
           </div>
         </div>
       )}

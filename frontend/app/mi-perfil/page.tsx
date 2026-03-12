@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { User, Briefcase, Plus, Edit, Trash2, Loader2, MapPin } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
 import ProfileHealth from '@/components/ProfileHealth';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function MisPerfilesPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [perfiles, setPerfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -66,10 +68,10 @@ export default function MisPerfilesPage() {
         <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8 border-b border-slate-800 pb-8">
             <div>
                 <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
-                    <Briefcase className="text-orange-500" size={32}/> Mis Perfiles Profesionales
+                    <Briefcase className="text-orange-500" size={32}/> {t('mi_perfil.mis_perfiles')}
                 </h1>
                 <p className="text-slate-400 text-lg">
-                    Gestiona tus identidades en la plataforma. Podés tener un perfil personal y otros empresariales.
+                    {t('mi_perfil.gestiona')}
                 </p>
             </div>
             
@@ -77,7 +79,7 @@ export default function MisPerfilesPage() {
                 href="/mi-perfil/crear" 
                 className="bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 px-6 rounded-xl transition flex items-center gap-2 shadow-lg shadow-orange-900/20"
             >
-                <Plus size={20}/> Nuevo Perfil
+                <Plus size={20}/> {t('mi_perfil.nuevo_perfil')}
             </Link>
         </div>
 
@@ -93,12 +95,12 @@ export default function MisPerfilesPage() {
                 <div className="bg-slate-800 p-6 rounded-full mb-6">
                     <User size={48} className="text-slate-500"/>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Aún no tienes perfiles activos</h3>
+                <h3 className="text-xl font-bold text-white mb-2">{t('mi_perfil.sin_perfiles')}</h3>
                 <p className="text-slate-400 mb-8 max-w-md">
-                    Crea tu primer perfil para aparecer en la Guía de Profesionales y aplicar a proyectos.
+                    {t('mi_perfil.crea_primero')}
                 </p>
                 <Link href="/mi-perfil/crear" className="text-orange-500 font-bold hover:text-orange-400 border border-orange-500/30 hover:bg-orange-500/10 px-6 py-3 rounded-xl transition">
-                    Crear mi primer perfil
+                    {t('mi_perfil.crear_primero')}
                 </Link>
             </div>
         ) : (

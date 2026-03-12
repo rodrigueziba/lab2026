@@ -16,6 +16,7 @@ import {
   Clapperboard,
   Info
 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // Importamos el componente 3D dinámicamente
 const SplatScrollLanding = dynamic(
@@ -25,6 +26,7 @@ const SplatScrollLanding = dynamic(
 
 // --- SECCIÓN: CÓMO FUNCIONA ---
 function ComoFuncionaSection() {
+  const { t } = useLanguage();
   const shouldReduceMotion = useReducedMotion();
   const containerVariants = shouldReduceMotion
     ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
@@ -63,16 +65,16 @@ function ComoFuncionaSection() {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/50 text-orange-500 text-xs font-bold tracking-widest uppercase mb-6 shadow-lg">
             <Sparkles size={14} />
-            Guía de la Plataforma
+            {t('landing.guia_plataforma')}
           </div>
           <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight">
-            Impulsá tu carrera en el <br className="hidden md:block"/>
+            {t('landing.impulsa_titulo')} <br className="hidden md:block"/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-500">
-              Sector Audiovisual
+              {t('landing.sector_audiovisual')}
             </span>
           </h1>
           <p className="text-lg text-slate-400">
-            Descubrí cómo la Film Commission TDF conecta tu talento con las mejores producciones de la provincia. Todo lo que necesitás saber si sos un prestador de servicios.
+            {t('landing.descubri_parrafo')}
           </p>
         </motion.div>
 
@@ -89,7 +91,7 @@ function ComoFuncionaSection() {
               {/* Efecto de barrido de luz */}
               <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 via-white/20 to-blue-400/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
               <Info size={22} className="relative z-10" />
-              <span className="relative z-10 text-lg">Más Información</span>
+              <span className="relative z-10 text-lg">{t('landing.mas_informacion')}</span>
             </button>
           </Link>
         </motion.div>
@@ -103,7 +105,7 @@ function ComoFuncionaSection() {
           className="mb-24"
         >
           <h3 className="text-2xl font-black text-white mb-10 text-center uppercase tracking-wider">
-            El recorrido del Prestador
+            {t('landing.recorrido_prestador')}
           </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -114,10 +116,8 @@ function ComoFuncionaSection() {
               <div className="relative z-10 w-14 h-14 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-blue-500/20 transition-all shadow-[0_0_15px_rgba(59,130,246,0.2)]">
                 <UserPlus size={28} />
               </div>
-              <h4 className="relative z-10 text-xl font-bold text-white mb-3">1. Creá tu Perfil</h4>
-              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">
-                Registrate y armá tu currículum digital. Podés crear múltiples perfiles (ej. como Sonidista freelance y como Productora). Utilizá nuestra IA integrada para redactar tu biografía profesional.
-              </p>
+              <h4 className="relative z-10 text-xl font-bold text-white mb-3">{t('landing.paso1_crea')}</h4>
+              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">{t('landing.paso1_texto')}</p>
             </motion.div>
 
             {/* Paso 2 */}
@@ -127,10 +127,8 @@ function ComoFuncionaSection() {
               <div className="relative z-10 w-14 h-14 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-orange-500/20 transition-all shadow-[0_0_15px_rgba(249,115,22,0.2)]">
                 <Search size={28} />
               </div>
-              <h4 className="relative z-10 text-xl font-bold text-white mb-3">2. Hacete Visible</h4>
-              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">
-                Al activar tu perfil, vas a aparecer automáticamente en la <strong>Guía de Talento</strong> pública. Directores y productoras van a poder filtrarte por ciudad y rubro para contratarte directamente.
-              </p>
+              <h4 className="relative z-10 text-xl font-bold text-white mb-3">{t('landing.paso2_visible')}</h4>
+              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">{t('landing.paso2_texto')}</p>
             </motion.div>
 
             {/* Paso 3 */}
@@ -140,10 +138,8 @@ function ComoFuncionaSection() {
               <div className="relative z-10 w-14 h-14 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-red-500/20 transition-all shadow-[0_0_15px_rgba(239,68,68,0.2)]">
                 <Briefcase size={28} />
               </div>
-              <h4 className="relative z-10 text-xl font-bold text-white mb-3">3. Encontrá Trabajo</h4>
-              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">
-                Revisá la <strong>Cartelera de Proyectos</strong>. Vas a poder ver los rodajes activos en la provincia y postularte con un solo clic a los puestos que las productoras están solicitando.
-              </p>
+              <h4 className="relative z-10 text-xl font-bold text-white mb-3">{t('landing.paso3_trabajo')}</h4>
+              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">{t('landing.paso3_texto')}</p>
             </motion.div>
 
             {/* Paso 4 */}
@@ -153,10 +149,8 @@ function ComoFuncionaSection() {
               <div className="relative z-10 w-14 h-14 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-emerald-500/20 transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]">
                 <Bell size={28} />
               </div>
-              <h4 className="relative z-10 text-xl font-bold text-white mb-3">4. Conectá</h4>
-              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">
-                Recibí notificaciones en tiempo real cuando un proyecto acepte tu postulación o cuando alguien solicite tus datos de contacto para una producción.
-              </p>
+              <h4 className="relative z-10 text-xl font-bold text-white mb-3">{t('landing.paso4_conecta')}</h4>
+              <p className="relative z-10 text-sm text-slate-400 leading-relaxed text-justify">{t('landing.paso4_texto')}</p>
             </motion.div>
 
           </div>
@@ -174,14 +168,12 @@ function ComoFuncionaSection() {
             <MapPin size={120} className="absolute -bottom-10 -right-10 text-slate-800/50 rotate-12" />
             <h4 className="text-2xl font-black text-white mb-4 flex items-center gap-3">
               <span className="p-2 bg-slate-800 rounded-lg text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"><MapPin size={20}/></span>
-              Catálogo de Locaciones
+              {t('landing.catalogo_locaciones')}
             </h4>
-            <p className="text-slate-400 mb-6 relative z-10 leading-relaxed text-justify">
-              ¿Conocés un lugar increíble para filmar? Como usuario registrado, podés proponer escenarios naturales, urbanos o abandonados. Subí fotos, sumá coordenadas y ayudá a enriquecer el mapa interactivo de Tierra del Fuego.
-            </p>
+            <p className="text-slate-400 mb-6 relative z-10 leading-relaxed text-justify">{t('landing.catalogo_texto')}</p>
             <Link href="/locaciones">
               <button className="text-sm font-bold text-orange-500 hover:text-orange-400 flex items-center gap-2 transition-colors relative z-10">
-                Explorar Locaciones <ArrowRight size={16} />
+                {t('landing.explorar_locaciones')} <ArrowRight size={16} />
               </button>
             </Link>
           </motion.div>
@@ -196,14 +188,12 @@ function ComoFuncionaSection() {
             <Clapperboard size={120} className="absolute -bottom-10 -right-10 text-slate-800/50 -rotate-12" />
             <h4 className="text-2xl font-black text-white mb-4 flex items-center gap-3">
               <span className="p-2 bg-slate-800 rounded-lg text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"><Video size={20}/></span>
-              Si sos Productora
+              {t('landing.si_sos_productora')}
             </h4>
-            <p className="text-slate-400 mb-6 relative z-10 leading-relaxed text-justify">
-              Usá la plataforma para publicar tus propios proyectos. Definí qué perfiles técnicos o artísticos necesitás, especificá si es un proyecto remunerado o colaborativo, y gestioná cómodamente a todos tus postulantes.
-            </p>
+            <p className="text-slate-400 mb-6 relative z-10 leading-relaxed text-justify">{t('landing.productora_texto')}</p>
             <Link href="/proyectos">
               <button className="text-sm font-bold text-blue-500 hover:text-blue-400 flex items-center gap-2 transition-colors relative z-10">
-                Ver Cartelera <ArrowRight size={16} />
+                {t('landing.ver_cartelera')} <ArrowRight size={16} />
               </button>
             </Link>
           </motion.div>
@@ -219,20 +209,20 @@ function ComoFuncionaSection() {
         >
           <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
           <h3 className="text-3xl md:text-5xl font-black text-white mb-6 tracking-tight relative z-10">
-            ¿Listo para mostrar tu talento?
+            {t('landing.listo_talento')}
           </h3>
           <p className="text-orange-100 mb-10 max-w-2xl mx-auto relative z-10 text-lg">
-            Sumate a la comunidad audiovisual de Tierra del Fuego. Es completamente gratis y solo lleva unos minutos.
+            {t('landing.sumate_texto')}
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4 relative z-10">
             <Link href="/registro">
               <button className="px-8 py-4 bg-white text-orange-600 rounded-xl font-bold hover:bg-slate-100 hover:scale-105 transition-all shadow-xl w-full sm:w-auto">
-                Crear mi Perfil Profesional
+                {t('landing.crear_perfil_pro')}
               </button>
             </Link>
             <Link href="/guia">
               <button className="px-8 py-4 bg-orange-700/50 text-white rounded-xl font-bold hover:bg-orange-700/70 border border-orange-400/50 hover:scale-105 transition-all w-full sm:w-auto backdrop-blur-sm">
-                Explorar Guía de Talento
+                {t('landing.explorar_guia')}
               </button>
             </Link>
           </div>

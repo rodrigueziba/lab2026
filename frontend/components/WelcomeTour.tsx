@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
+import { useLanguage } from '@/contexts/LanguageContext';
 
-const STORAGE_KEY_COMPLETED = 'tdffilm_tour_completed'; // Usuario logueado: solo una vez
-const STORAGE_KEY_GUEST_DATE = 'tdffilm_tour_guest_date'; // Invitado: última fecha (YYYY-MM-DD) que se mostró
+const STORAGE_KEY_COMPLETED = 'tdffilm_tour_completed';
+const STORAGE_KEY_GUEST_DATE = 'tdffilm_tour_guest_date';
 const DESKTOP_BREAKPOINT = 768;
 const DELAY_BEFORE_START_MS = 1500;
 
@@ -20,64 +21,33 @@ type Step = {
   content: string;
 };
 
-const STEP_WELCOME: Step = {
-  target: 'body',
-  placement: 'center',
-  title: '¡Te damos la bienvenida a TDF FILM! 🎬',
-  content:
-    'Estamos felices de tenerte en la comunidad audiovisual de Tierra del Fuego. Te mostraremos rápidamente cómo moverte por la plataforma.',
-};
-
-const STEP_USER_MENU: Step = {
-  target: '#tour-user-menu',
-  placement: 'bottom-end',
-  title: '1. Tu centro de mando',
-  content:
-    'Aquí está tu centro de mando. Despliega este menú para configurar tu Perfil Profesional y empezar a recibir ofertas.',
-};
-
-const STEP_PROYECTOS: Step = {
-  target: '#tour-proyectos',
-  placement: 'bottom',
-  title: '2. Cartelera de rodajes',
-  content:
-    '¿Buscas trabajo o quieres publicar un rodaje? Aquí encontrarás todas las producciones activas. Podés postularte a vacantes con un solo clic.',
-};
-
-const STEP_GUIA: Step = {
-  target: '#tour-guia',
-  placement: 'bottom',
-  title: '3. Guía de talento',
-  content:
-    'Una vez que publiques tu perfil, aparecerás aquí. Directores y productoras usan esta guía para contratar.',
-};
-
-const STEP_LOCACIONES: Step = {
-  target: '#tour-locaciones',
-  placement: 'bottom',
-  title: '4. Mapa de locaciones',
-  content:
-    'Explorá el talento local y descubrí escenarios increíbles en Tierra del Fuego. ¡Estás listo para empezar!',
-};
-
-// Invitado: sin menú de usuario, solo bienvenida + nav
-const STEPS_GUEST: Step[] = [STEP_WELCOME, STEP_PROYECTOS, STEP_GUIA, STEP_LOCACIONES];
-// Logueado: todos los pasos
-const STEPS_LOGGED: Step[] = [STEP_WELCOME, STEP_USER_MENU, STEP_PROYECTOS, STEP_GUIA, STEP_LOCACIONES];
+function buildSteps(t: (k: string) => string): { guest: Step[]; logged: Step[] } {
+  const welcome: Step = { target: 'body', placement: 'center', title: t('tour.welcome_title'), content: t('tour.welcome_content') };
+  const userMenu: Step = { target: '#tour-user-menu', placement: 'bottom-end', title: t('tour.centro_mando'), content: t('tour.centro_content') };
+  const proyectos: Step = { target: '#tour-proyectos', placement: 'bottom', title: t('tour.cartelera'), content: t('tour.cartelera_content') };
+  const guia: Step = { target: '#tour-guia', placement: 'bottom', title: t('tour.guia_talento'), content: t('tour.guia_content') };
+  const locaciones: Step = { target: '#tour-locaciones', placement: 'bottom', title: t('tour.locaciones'), content: t('tour.locaciones_content') };
+  return {
+    guest: [welcome, proyectos, guia, locaciones],
+    logged: [welcome, userMenu, proyectos, guia, locaciones],
+  };
+}
 
 export default function WelcomeTour() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [run, setRun] = useState(false);
-  const [isGuest, setIsGuest] = useState(true); // true = no logueado, false = logueado
+  const [isGuest, setIsGuest] = useState(true);
   const [stepIndex, setStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const stepRef = useRef(0);
   const isGuestRef = useRef(true);
-  const steps = isGuest ? STEPS_GUEST : STEPS_LOGGED;
+  const { guest: stepsGuest, logged: stepsLogged } = useMemo(() => buildSteps(t), [t]);
+  const steps = isGuest ? stepsGuest : stepsLogged;
 
   const updateTargetRect = useCallback(() => {
     if (typeof document === 'undefined') return;
-    const stepsList = isGuestRef.current ? STEPS_GUEST : STEPS_LOGGED;
+    const stepsList = isGuestRef.current ? stepsGuest : stepsLogged;
     const step = stepsList[stepRef.current];
     if (step.target === 'body') {
       setTargetRect(null);
@@ -89,7 +59,7 @@ export default function WelcomeTour() {
     } else {
       setTargetRect(null);
     }
-  }, []);
+  }, [stepsGuest, stepsLogged]);
 
   useEffect(() => {
     if (!run) return;
@@ -230,14 +200,14 @@ export default function WelcomeTour() {
               disabled={isFirst}
               className="text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed text-sm font-bold transition-colors"
             >
-              Atrás
+              {t('tour.atras')}
             </button>
             <button
               type="button"
               onClick={() => handleClose(false)}
               className="text-slate-500 hover:text-slate-300 text-sm font-bold ml-2 transition-colors"
             >
-              Omitir Tour
+              {t('tour.omitir')}
             </button>
           </div>
           <button
@@ -245,7 +215,7 @@ export default function WelcomeTour() {
             onClick={handleNext}
             className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-5 py-2.5 rounded-full text-sm transition-colors shadow-lg"
           >
-            {isLast ? '¡Empezar!' : 'Siguiente'}
+            {isLast ? t('tour.empezar') : t('tour.siguiente')}
           </button>
         </div>
         <div className="mt-4 text-[10px] text-slate-500 font-medium">

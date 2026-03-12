@@ -8,17 +8,18 @@ import {
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
 import { getSectionCache, setSectionCache, SECTION_KEYS } from '@/lib/sectionCache';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const getInitials = (name: string) => {
   return name ? name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() : 'NN';
 };
 
-const TIPOS_PERFIL = [
-  { label: "Todos", value: "Todos", icon: LayoutGrid },
-  { label: "Profesionales", value: "Profesional", icon: Users },
-  { label: "Productoras", value: "Productora", icon: Clapperboard },
-  { label: "Empresas", value: "Empresa", icon: Briefcase },
-  { label: "Estudiantes", value: "Estudiante", icon: GraduationCap },
+const TIPOS_PERFIL_KEYS = [
+  { labelKey: 'guia.todos', value: 'Todos', icon: LayoutGrid },
+  { labelKey: 'guia.profesionales', value: 'Profesional', icon: Users },
+  { labelKey: 'guia.productoras', value: 'Productora', icon: Clapperboard },
+  { labelKey: 'guia.empresas', value: 'Empresa', icon: Briefcase },
+  { labelKey: 'guia.estudiantes', value: 'Estudiante', icon: GraduationCap },
 ];
 
 const containerVariants: Variants = {
@@ -46,6 +47,7 @@ interface Prestador {
 }
 
 export default function GuiaPage() {
+  const { t } = useLanguage();
   const [prestadores, setPrestadores] = useState<Prestador[]>([]);
   const [prestadoresMostrados, setPrestadoresMostrados] = useState<Prestador[]>([]);
   const [loading, setLoading] = useState(true);
@@ -180,7 +182,7 @@ export default function GuiaPage() {
                     <Users className="text-orange-500" size={24} />
                   </div>
                   <h1 className="font-black tracking-tighter text-2xl leading-none">
-                    GUÍA DE <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">PRESTADORES</span>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">{t('guia.titulo')}</span>
                   </h1>
               </div>
 
@@ -190,7 +192,7 @@ export default function GuiaPage() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500" size={18} />
                   <input 
                     type="text" 
-                    placeholder="Buscar..."
+                    placeholder={t('guia.buscar_placeholder')}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 md:py-3 text-sm md:text-base outline-none text-white focus:border-orange-500 transition-all"
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltroTexto(e.target.value)}
                   />
@@ -202,7 +204,7 @@ export default function GuiaPage() {
                       
                       {/* Filtros Tipo: iconos más grandes; en móvil ocupan todo el ancho */}
                       <div className="flex flex-1 md:flex-none w-full md:w-[240px] min-w-0 min-h-10 gap-2 md:gap-0 bg-slate-900 p-1.5 md:p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-hide justify-between md:justify-between items-center">
-                          {TIPOS_PERFIL.map((tipo) => {
+                          {TIPOS_PERFIL_KEYS.map((tipo) => {
                               const Icon = tipo.icon;
                               const isActive = tipoSeleccionado === tipo.value;
                               return (
@@ -212,7 +214,7 @@ export default function GuiaPage() {
                                       className={`flex-1 min-w-0 md:flex-none md:shrink-0 p-2.5 md:p-2 rounded-lg transition-all flex items-center justify-center ${
                                           isActive ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'
                                       }`}
-                                      title={tipo.label}
+                                      title={t(tipo.labelKey)}
                                   >
                                       {Icon && <Icon size={22} />}
                                   </button>
@@ -278,14 +280,14 @@ export default function GuiaPage() {
         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
           <div className="flex items-center gap-2 text-slate-400">
             <Filter size={16}/>
-            <span className="text-sm font-medium">{prestadoresMostrados.length} resultados</span>
+            <span className="text-sm font-medium">{prestadoresMostrados.length} {t('guia.resultados')}</span>
           </div>
         </div>
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
-            <p className="text-slate-500 text-sm animate-pulse">Cargando talento...</p>
+            <p className="text-slate-500 text-sm animate-pulse">{t('guia.cargando')}</p>
           </div>
         ) : (
           <motion.div 
@@ -369,7 +371,7 @@ export default function GuiaPage() {
                                     <span>{p.ciudad || "TDF"}</span>
                                 </div>
                                 <span className="font-bold uppercase tracking-wider flex items-center gap-1 group-hover:gap-2 transition-all duration-300" style={{ color: tema }}>
-                                    Ver Perfil <ArrowRight size={12}/>
+                                    {t('guia.ver_perfil')} <ArrowRight size={12}/>
                                 </span>
                             </div>
                         </div>
@@ -385,9 +387,9 @@ export default function GuiaPage() {
         
         {!loading && prestadoresMostrados.length === 0 && (
             <div className="text-center py-20 opacity-50">
-                <p className="text-xl text-slate-400 font-light">No se encontraron profesionales.</p>
+                <p className="text-xl text-slate-400 font-light">{t('guia.sin_resultados')}</p>
                 <button onClick={() => {setFiltroTexto(''); setRubroSeleccionado('Todos'); setTipoSeleccionado('Todos');}} className="mt-4 text-orange-500 underline hover:text-orange-400">
-                    Limpiar filtros
+                    {t('common.limpiar_filtros')}
                 </button>
             </div>
         )}

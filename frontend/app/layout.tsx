@@ -7,6 +7,7 @@ import FooterWrapper from '../components/FooterWrapper';
 import PageTransitionWrapper from '../components/PageTransitionWrapper';
 import WelcomeTour from '../components/WelcomeTour';
 import { Toaster } from 'sonner';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,17 +32,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
       <body className={`${inter.className} bg-slate-950 text-white flex flex-col min-h-screen`}>
-       
-         {/* <main className="min-h-screen pt-24 bg-slate-950"></main> */}
-        <Navbar />
-        <WelcomeTour />
-        <main className="flex-1 flex flex-col min-h-0 bg-slate-950">
-          <PageTransitionWrapper>{children}</PageTransitionWrapper>
-          <Toaster position="bottom-right" richColors />
-        </main>
-        <FooterWrapper />
+        <LanguageProvider>
+          <Navbar />
+          <WelcomeTour />
+          <main className="flex-1 flex flex-col min-h-0 bg-slate-950">
+            <PageTransitionWrapper>{children}</PageTransitionWrapper>
+            <Toaster position="bottom-right" richColors />
+          </main>
+          <FooterWrapper />
+        </LanguageProvider>
       </body>
     </html>
   );
