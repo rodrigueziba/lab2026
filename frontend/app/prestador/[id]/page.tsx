@@ -193,7 +193,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
           <div className="flex flex-col gap-8">
               <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl flex-1 transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
                   <h3 className="text-orange-500 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2">{esEmpresa ? 'Sobre la Empresa' : 'Sobre el Profesional'}</h3>
-                  <p className="text-slate-300 text-lg leading-relaxed whitespace-pre-line">{prestador.descripcion || "Sin descripción."}</p>
+                  <p className="text-slate-300 text-lg leading-relaxed whitespace-pre-line text-justify">{prestador.descripcion || "Sin descripción."}</p>
 
                   {prestador.formacion && (
                     <div className="mt-6 pt-6 border-t border-slate-800">

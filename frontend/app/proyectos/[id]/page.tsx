@@ -171,16 +171,32 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
         </div>
       </div>
 
-      {/* BODY: escritorio = 2 columnas simétricas, vacantes arriba a la derecha, galería ancho completo */}
-      <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-        
+      {/* BODY: galería arriba de todo (ancho completo); luego 2 columnas */}
+      <div className="max-w-6xl mx-auto px-6 py-12 flex flex-col gap-8">
+        {/* GALERÍA: arriba de todo, ancho completo en PC */}
+        {galeria.length > 0 && (
+          <div className="w-full bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 duration-300">
+            <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
+              <ImageIcon size={20}/> {t('proyectos.galeria')}
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {galeria.map((img: string, idx: number) => (
+                <a key={idx} href={img} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden border border-slate-700 hover:border-orange-500/50 aspect-square object-cover">
+                  <img src={img} alt="" className="w-full h-full object-cover" />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* COLUMNA IZQUIERDA: La historia, Ficha, Video/Reel */}
         <div className="flex flex-col gap-8">
           <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
             <h3 className="text-orange-500 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
               <BookOpen size={20}/> {t('proyectos.la_historia')}
             </h3>
-            <p className="text-slate-300 text-lg leading-relaxed whitespace-pre-line">{proyecto.descripcion}</p>
+            <p className="text-slate-300 text-lg leading-relaxed whitespace-pre-line text-justify">{proyecto.descripcion}</p>
           </div>
 
           <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-8 shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] hover:-translate-y-1 duration-300">
@@ -308,22 +324,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
             </div>
           )}
         </div>
-
-        {/* GALERÍA: ancho completo en escritorio */}
-        {galeria.length > 0 && (
-          <div className="lg:col-span-2 w-full bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 duration-300">
-            <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
-              <ImageIcon size={20}/> {t('proyectos.galeria')}
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {galeria.map((img: string, idx: number) => (
-                <a key={idx} href={img} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden border border-slate-700 hover:border-orange-500/50 aspect-square object-cover">
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
+      </div>
       </div>
     </div>
   );
