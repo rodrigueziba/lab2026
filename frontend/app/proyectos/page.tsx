@@ -249,7 +249,7 @@ export default function CarteleraProyectosPage() {
   return (
     <div className="relative min-h-screen">
       {/* Fondo Anycolour solo escritorio: misma lógica que /guia; velocidad según scroll; clics para puntos de gravedad */}
-      <div className="hidden md:block fixed inset-0 z-0">
+      <div className="fixed inset-0 z-0">
         <AnycolourBackground backgroundOnly speedMultiplier={particleSpeedMultiplier} particleCount={1688} />
       </div>
 
