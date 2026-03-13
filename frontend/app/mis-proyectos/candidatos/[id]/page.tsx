@@ -72,6 +72,14 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
           c.id === postulacionId ? { ...c, estado: data.estado ?? nuevoEstado } : c
         ));
         if (nuevoEstado === 'Aceptada') alert('¡Postulación aceptada! 🎉');
+        const token = localStorage.getItem('token');
+        if (token) {
+          const resPost = await fetch(`${apiUrl}/postulacion/proyecto/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+          if (resPost.ok) {
+            const fresh = await resPost.json();
+            setCandidatos(fresh);
+          }
+        }
       } else {
         alert(data?.message || "Error al actualizar el estado.");
       }

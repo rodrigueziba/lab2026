@@ -186,7 +186,7 @@ export default function RegistroPrestadorPage() {
   const canSubmitStep3 = formData.email.trim() && formData.telefono.trim();
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white pt-28 pb-24 md:pb-12 px-6 font-sans flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 text-white pt-28 pb-32 md:pb-12 px-6 font-sans flex items-center justify-center relative overflow-hidden">
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none -translate-y-1/2 translate-x-1/3" aria-hidden />
 
       <div className="max-w-4xl w-full bg-slate-900 p-8 md:p-12 rounded-3xl border border-slate-800 shadow-2xl relative z-10">
@@ -395,8 +395,8 @@ export default function RegistroPrestadorPage() {
         </form>
       </div>
 
-      {/* Botón sticky en móvil: siempre visible abajo */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 p-4 bg-slate-950/95 backdrop-blur border-t border-slate-800 safe-area-pb">
+      {/* Botón sticky en móvil: z-[9999] para quedar por encima del menú móvil de la navbar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-[9999] p-4 bg-slate-950/95 backdrop-blur border-t border-slate-800 safe-area-pb pb-safe">
         {step < 3 ? (
           <div className="flex gap-3 max-w-4xl mx-auto">
             {step > 1 && (

@@ -10,6 +10,7 @@ export default function GestionSolicitudesPage() {
   const router = useRouter();
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   useEffect(() => {
@@ -37,13 +38,13 @@ export default function GestionSolicitudesPage() {
 
   const handleStatusChange = async (id: number, nuevoEstado: 'Aprobada' | 'Rechazada') => {
     const token = localStorage.getItem('token');
+    setUpdatingId(id);
     try {
-      // Optimista
       setSolicitudes(prev => prev.map(sol => 
-        sol.id === id ? { ...sol, estado: nuevoEstado } : sol
+        Number(sol.id) === Number(id) ? { ...sol, estado: nuevoEstado } : sol
       ));
 
-      await fetch(`${apiUrl}/solicitud/${id}`, {
+      const res = await fetch(`${apiUrl}/solicitud/${id}`, {
         method: 'PATCH',
         headers: { 
             'Content-Type': 'application/json',
@@ -52,9 +53,17 @@ export default function GestionSolicitudesPage() {
         body: JSON.stringify({ estado: nuevoEstado })
       });
 
+      if (res.ok) {
+        await fetchSolicitudes();
+      } else {
+        alert("Error al actualizar.");
+        await fetchSolicitudes();
+      }
     } catch (error) {
       alert("Error al actualizar.");
-      fetchSolicitudes();
+      await fetchSolicitudes();
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -117,8 +126,10 @@ export default function GestionSolicitudesPage() {
                             </div>
 
                             {/* Botones */}
-                            <div className="flex gap-3">
-                                {sol.estado === 'Pendiente' ? (
+                            <div className="flex gap-3 items-center">
+                                {updatingId === sol.id ? (
+                                    <span className="text-slate-400 text-sm">Actualizando...</span>
+                                ) : sol.estado === 'Pendiente' ? (
                                     <>
                                         <button onClick={() => handleStatusChange(sol.id, 'Rechazada')} className="px-4 py-2 border border-slate-700 hover:bg-red-500/10 text-red-400 rounded-lg text-sm font-bold">Rechazar</button>
                                         <button onClick={() => handleStatusChange(sol.id, 'Aprobada')} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-emerald-900/20">Aprobar</button>

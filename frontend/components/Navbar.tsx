@@ -100,10 +100,19 @@ export default function Navbar() {
       }
 
       try {
-        setUser(JSON.parse(userStr));
         const res = await fetch(`${apiUrl}/notificacion`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          setTienePerfilPrestador(null);
+          setNotificaciones([]);
+          setUnreadCount(0);
+          return;
+        }
+        setUser(JSON.parse(userStr));
         if (res.ok) {
           const data = await res.json();
           setNotificaciones(Array.isArray(data) ? data : []);
@@ -111,10 +120,18 @@ export default function Navbar() {
         } else {
           setNotificaciones([]);
         }
-        // Comprobar si tiene al menos un perfil de prestador para mostrar CTA
         const perfilesRes = await fetch(`${apiUrl}/prestador/mis-perfiles`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (perfilesRes.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          setTienePerfilPrestador(null);
+          setNotificaciones([]);
+          setUnreadCount(0);
+          return;
+        }
         if (perfilesRes.ok) {
           const perfiles = await perfilesRes.json();
           setTienePerfilPrestador(Array.isArray(perfiles) && perfiles.length > 0);

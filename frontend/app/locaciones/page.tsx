@@ -164,7 +164,7 @@ export default function CatalogoLocacionesPage() {
   };
 
   return (
-    <div className="h-screen bg-slate-950 text-white font-sans overflow-hidden flex flex-col pt-40 md:pt-44 selection:bg-orange-500/30">
+    <div className="h-screen bg-slate-950 text-white font-sans overflow-hidden flex flex-col pt-52 md:pt-48 selection:bg-orange-500/30">
       
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
