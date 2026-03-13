@@ -10,6 +10,7 @@ import {
 import DepthAwareImage from '@/components/DepthAwareImage';
 import OpalBackground, { type OpalBackgroundParams } from '@/components/OpalBackground';
 import { isProfileHealth100 } from '@/lib/profileHealth';
+import { usePrestadorVisit } from '@/contexts/PrestadorVisitContext';
 
 const DEFAULT_PRESTADOR_OPAL_PARAMS: Required<OpalBackgroundParams> = {
   speed: 0.1,
@@ -65,11 +66,37 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
     pointerEvents: "none" as const 
   };
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const prestadorVisit = usePrestadorVisit();
+
   useEffect(() => {
     params.then(unwrap => {
       fetchData(unwrap.id);
     });
   }, [params]);
+
+  // En escritorio: exponer música del prestador a la navbar para play/pause
+  useEffect(() => {
+    if (!prestador?.musicaYoutubeUrl?.trim() || typeof window === 'undefined' || window.innerWidth < 768) {
+      prestadorVisit?.setMusicaYoutubeUrl(null);
+      return;
+    }
+    prestadorVisit?.setMusicaYoutubeUrl(prestador.musicaYoutubeUrl.trim());
+    return () => { prestadorVisit?.setMusicaYoutubeUrl(null); };
+  }, [prestador?.id, prestador?.musicaYoutubeUrl, prestadorVisit]);
+
+  // Parámetros del fondo animado guardados en el perfil (color, velocidad, brillo) + opacidad filtro TV
+  useEffect(() => {
+    if (!prestador) return;
+    setOpalParams((p) => ({
+      ...p,
+      ...(prestador.colorFondo?.trim() && { paletteBase: prestador.colorFondo }),
+      ...(typeof prestador.opalSpeed === 'number' && { speed: prestador.opalSpeed }),
+      ...(typeof prestador.opalBrightness === 'number' && { brightness: prestador.opalBrightness })
+    }));
+    if (typeof prestador.opalTvFilterOpacity === 'number') {
+      setTvFilterOpacity(prestador.opalTvFilterOpacity);
+    }
+  }, [prestador?.id, prestador?.colorFondo, prestador?.opalSpeed, prestador?.opalBrightness, prestador?.opalTvFilterOpacity]);
 
   const fetchData = async (id: string) => {
     try {
@@ -254,8 +281,8 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
           }}
           aria-hidden
         />
-        <div className={`relative z-10 ${hideCards ? 'pointer-events-none invisible' : ''}`} aria-hidden={hideCards}>
-        <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch pointer-events-none">
+        <div className={hideCards ? 'pointer-events-none invisible' : 'pointer-events-none'} aria-hidden={hideCards}>
+        <div className="relative z-10 max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch pointer-events-none">
           
           {/* COLUMNA IZQUIERDA: tarjetas con hover tipo proyectos */}
           <div className="flex flex-col gap-8 pointer-events-auto">

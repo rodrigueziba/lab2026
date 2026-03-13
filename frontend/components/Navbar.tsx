@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeUnlocked } from '@/contexts/ThemeUnlockedContext';
+import { usePrestadorVisit } from '@/contexts/PrestadorVisitContext';
 
 const RAINBOW_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
 
@@ -16,6 +17,17 @@ const RAINBOW_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '
 const NAVBAR_MP3_FILES = ['anycolour.mp3', 'echoes.mp3', 'music.mp3'];
 const THEME_UNLOCK_HOVER_MS = 60000; // 1 minuto de hover para desbloquear tema + música
 const WAVE_COLOR_INTERVAL_MS = 3200; // Cambio de color lento tipo olas (solo cuando themeUnlocked)
+
+function getYoutubeVideoId(url: string | null): string | null {
+  if (!url?.trim()) return null;
+  const u = url.trim();
+  const patterns = [/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/, /[?&]v=([a-zA-Z0-9_-]{11})/];
+  for (const re of patterns) {
+    const m = u.match(re);
+    if (m?.[1]) return m[1];
+  }
+  return null;
+}
 
 export default function Navbar() {
   const router = useRouter();
@@ -40,7 +52,11 @@ export default function Navbar() {
   const themeCtx = useThemeUnlocked();
   const themeUnlocked = themeCtx?.themeUnlocked ?? false;
   const setThemeUnlocked = themeCtx?.setThemeUnlocked ?? (() => {});
+  const prestadorVisit = usePrestadorVisit();
+  const musicaYoutubeUrl = prestadorVisit?.musicaYoutubeUrl ?? null;
+  const isOnPrestadorPage = pathname?.startsWith('/prestador/') && pathname !== '/prestador';
   const [musicPlaying, setMusicPlaying] = useState(false);
+  const [prestadorMusicPlaying, setPrestadorMusicPlaying] = useState(false);
   const [playlistIndex, setPlaylistIndex] = useState(0);
   const [playlist] = useState(() => {
     const first = NAVBAR_MP3_FILES[0];
@@ -305,6 +321,20 @@ export default function Navbar() {
     setPlaylistIndex((i) => (i + 1) % playlist.length);
   };
 
+  const prestadorVideoId = getYoutubeVideoId(musicaYoutubeUrl);
+  const showPrestadorMusic = isOnPrestadorPage && prestadorVideoId && typeof window !== 'undefined' && window.innerWidth >= 768;
+
+  const handlePrestadorMusicPlayPause = () => {
+    setPrestadorMusicPlaying((p) => !p);
+  };
+
+  // Auto-play música del prestador al visitar su perfil (solo escritorio)
+  useEffect(() => {
+    const onPrestadorWithMusic = isOnPrestadorPage && !!prestadorVideoId && typeof window !== 'undefined' && window.innerWidth >= 768;
+    if (onPrestadorWithMusic) setPrestadorMusicPlaying(true);
+    else setPrestadorMusicPlaying(false);
+  }, [pathname, musicaYoutubeUrl]);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -415,6 +445,29 @@ export default function Navbar() {
                 <SkipForward size={20} strokeWidth={2} />
               </button>
             </div>
+          )}
+          {/* Música del perfil del prestador (solo escritorio, cuando se visita /prestador/[id] y tiene link) */}
+          {showPrestadorMusic && (
+            <div className="hidden md:flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handlePrestadorMusicPlayPause}
+                className="flex items-center justify-center opacity-[0.12] hover:opacity-100 transition-opacity duration-300 text-white hover:text-emerald-400 rounded-full p-1.5 hover:ring-1 hover:ring-emerald-400/60"
+                title={prestadorMusicPlaying ? 'Pausar música del perfil' : 'Reproducir música del perfil'}
+                aria-label={prestadorMusicPlaying ? 'Pausar música del perfil' : 'Reproducir música del perfil'}
+              >
+                {prestadorMusicPlaying ? <Pause size={20} strokeWidth={2} /> : <Play size={20} strokeWidth={2} />}
+              </button>
+            </div>
+          )}
+          {prestadorVideoId && prestadorMusicPlaying && (
+            <iframe
+              title="Música del perfil"
+              src={`https://www.youtube.com/embed/${prestadorVideoId}?autoplay=1&loop=1&playlist=${prestadorVideoId}`}
+              className="fixed w-0 h-0 opacity-0 pointer-events-none"
+              allow="autoplay"
+              allowFullScreen
+            />
           )}
         </div>
 

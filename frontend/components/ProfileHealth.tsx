@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { CheckCircle, Circle, Link2, Image as ImageIcon, User, Briefcase, Sparkles, Settings, MousePointerClick } from 'lucide-react';
+import { CheckCircle, Circle, Link2, Image as ImageIcon, User, Briefcase, Sparkles, Settings, MousePointerClick, Egg, Music, Palette, LayoutGrid, Images, MousePointer } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 function Kbd({ children }: { children: React.ReactNode }) {
@@ -45,10 +45,26 @@ interface ProfileHealthProps {
     videoReel?: string | null;
     web?: string | null;
   }>;
+  aplicoAProyecto?: boolean;
   className?: string;
 }
 
-export default function ProfileHealth({ perfiles, className = '' }: ProfileHealthProps) {
+const BENEFICIOS_APLICAR = [
+  { labelKey: 'profile_health.beneficio_easter_egg', icon: Egg },
+  { labelKey: 'profile_health.beneficio_musica_youtube', icon: Music },
+  { labelKey: 'profile_health.beneficio_fondos_animados', icon: Palette },
+  { labelKey: 'profile_health.beneficio_reorganizar_tarjetas', icon: LayoutGrid },
+  { labelKey: 'profile_health.beneficio_galeria_interactiva', icon: Images },
+] as const;
+
+const LOGRASTE_ITEMS = [
+  { labelKey: 'profile_health.lograste_hover_nombre', icon: MousePointer },
+  { labelKey: 'profile_health.lograste_editar_musica', icon: Music },
+  { labelKey: 'profile_health.lograste_editar_color', icon: Palette },
+  { labelKey: 'profile_health.lograste_editar_galeria', icon: Images },
+] as const;
+
+export default function ProfileHealth({ perfiles, aplicoAProyecto = false, className = '' }: ProfileHealthProps) {
   const { t } = useLanguage();
   const tieneCuenta = true;
   const tieneDatosProfesionales = perfiles.some(
@@ -111,26 +127,65 @@ export default function ProfileHealth({ perfiles, className = '' }: ProfileHealt
       </ul>
 
       {porcentaje === 100 && (
-        <div className="mt-6 pt-6 border-t border-slate-800">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
-            {t('profile_health.beneficios_titulo')}
-          </p>
-          <ul className="space-y-3">
-            {tips100.map((tip) => {
-              const Icon = tip.icon;
-              const text = t(tip.labelKey);
-              const content = tip.useKeys
-                ? renderTipWithKeys(text, t('profile_health.kbd_shift'), t('profile_health.kbd_space'))
-                : text;
-              return (
-                <li key={tip.labelKey} className="flex items-start gap-3 text-sm text-slate-300">
-                  <Icon size={18} className="text-orange-500 shrink-0 mt-0.5" aria-hidden />
-                  <span>{content}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        <>
+          <div className="mt-6 pt-6 border-t border-slate-800">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+              {t('profile_health.beneficios_titulo')}
+            </p>
+            <ul className="space-y-3">
+              {tips100.map((tip) => {
+                const Icon = tip.icon;
+                const text = t(tip.labelKey);
+                const content = tip.useKeys
+                  ? renderTipWithKeys(text, t('profile_health.kbd_shift'), t('profile_health.kbd_space'))
+                  : text;
+                return (
+                  <li key={tip.labelKey} className="flex items-start gap-3 text-sm text-slate-300">
+                    <Icon size={18} className="text-orange-500 shrink-0 mt-0.5" aria-hidden />
+                    <span>{content}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-slate-800">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+              {t('profile_health.beneficios_aplicar_titulo')}
+            </p>
+            <ul className="space-y-3">
+              {BENEFICIOS_APLICAR.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <li key={item.labelKey} className="flex items-start gap-3 text-sm text-slate-400">
+                    <Icon size={18} className="text-slate-500 shrink-0 mt-0.5" aria-hidden />
+                    <span>{t(item.labelKey)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {aplicoAProyecto && (
+            <div className="mt-6 pt-6 border-t border-slate-800">
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-500 mb-3">
+                {t('profile_health.lograste_objetivo_titulo')}
+              </p>
+              <ul className="space-y-3">
+                {LOGRASTE_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.labelKey} className="flex items-start gap-3 text-sm text-slate-300">
+                      <CheckCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" aria-hidden />
+                      <Icon size={16} className="text-orange-500 shrink-0 mt-0.5" aria-hidden />
+                      <span>{t(item.labelKey)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

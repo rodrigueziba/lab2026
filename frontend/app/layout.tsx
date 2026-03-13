@@ -9,6 +9,7 @@ import WelcomeTour from '../components/WelcomeTour';
 import { Toaster } from 'sonner';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ThemeUnlockedProvider } from '@/contexts/ThemeUnlockedContext';
+import { PrestadorVisitProvider } from '@/contexts/PrestadorVisitContext';
 import ThemeUnlockedContent from '../components/ThemeUnlockedContent';
 
 const inter = Inter({ subsets: ["latin"] });
@@ -38,6 +39,7 @@ export default function RootLayout({
       <body className={`${inter.className} bg-slate-950 text-white flex flex-col min-h-screen`}>
         <LanguageProvider>
           <ThemeUnlockedProvider>
+            <PrestadorVisitProvider>
             <Navbar />
             <WelcomeTour />
             <main className="flex-1 flex flex-col min-h-0 bg-slate-950 relative">
@@ -49,6 +51,7 @@ export default function RootLayout({
             <div className="relative z-20 shrink-0">
               <FooterWrapper />
             </div>
+            </PrestadorVisitProvider>
           </ThemeUnlockedProvider>
         </LanguageProvider>
       </body>

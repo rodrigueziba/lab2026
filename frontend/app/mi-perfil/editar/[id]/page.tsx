@@ -6,8 +6,10 @@ import DepthAwareImage from '@/components/DepthAwareImage';
 import { 
   User, Briefcase, Mail, Phone, Globe, MapPin, 
   Camera, Save, Loader2, ArrowLeft, Palette, 
-  Image as ImageIcon, Trash2, Plus, Youtube 
+  Image as ImageIcon, Trash2, Plus, Youtube, Music, Images, Film 
 } from 'lucide-react';
+
+type ExperienciaItem = { proyecto: string; anio: string; rol: string };
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,7 +53,14 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
     videoReel: '',
     ciudad: 'Ushuaia',
     colorTema: '#ea580c',
-    galeria: [] as string[]
+    galeria: [] as string[],
+    musicaYoutubeUrl: '',
+    colorFondo: '#1a6b9e',
+    galeriaInteractivaHabilitada: false,
+    opalSpeed: 0.1,
+    opalBrightness: 0.35,
+    opalTvFilterOpacity: 0.92,
+    experiencias: [] as ExperienciaItem[]
   });
 
   // Estados para manejo de archivos nuevos
@@ -95,7 +104,20 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
                 videoReel: data.videoReel || '',
                 ciudad: data.ciudad || 'Ushuaia',
                 colorTema: data.colorTema || '#ea580c',
-                galeria: data.galeria || []
+                galeria: data.galeria || [],
+                musicaYoutubeUrl: data.musicaYoutubeUrl || '',
+                colorFondo: data.colorFondo ?? '#1a6b9e',
+                galeriaInteractivaHabilitada: Boolean(data.galeriaInteractivaHabilitada),
+                opalSpeed: typeof data.opalSpeed === 'number' ? data.opalSpeed : 0.1,
+                opalBrightness: typeof data.opalBrightness === 'number' ? data.opalBrightness : 0.35,
+                opalTvFilterOpacity: typeof data.opalTvFilterOpacity === 'number' ? data.opalTvFilterOpacity : 0.92,
+                experiencias: Array.isArray(data.experiencias)
+                    ? data.experiencias.map((e: { proyecto?: string; anio?: string; rol?: string }) => ({
+                        proyecto: e.proyecto ?? '',
+                        anio: e.anio ?? '',
+                        rol: e.rol ?? ''
+                      }))
+                    : []
             });
             // Si ya tiene foto, la ponemos como preview inicial
             if (data.foto) setPreviewFoto(data.foto);
@@ -110,7 +132,9 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const target = e.target;
+    const value = target.type === 'checkbox' ? (target as HTMLInputElement).checked : target.value;
+    setFormData({ ...formData, [target.name]: value });
   };
 
   const handleFileChange = (e: any) => {
@@ -150,6 +174,29 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
     newPreviews.splice(index, 1);
     setNewGaleriaFiles(newFiles);
     setPreviewNewGaleria(newPreviews);
+  };
+
+  const addExperiencia = () => {
+    setFormData((prev) => ({
+      ...prev,
+      experiencias: [...prev.experiencias, { proyecto: '', anio: '', rol: '' }]
+    }));
+  };
+
+  const removeExperiencia = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      experiencias: prev.experiencias.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateExperiencia = (index: number, field: keyof ExperienciaItem, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      experiencias: prev.experiencias.map((exp, i) =>
+        i === index ? { ...exp, [field]: value } : exp
+      )
+    }));
   };
 
   // Función auxiliar para subir a Supabase
@@ -194,6 +241,10 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
         finalGaleria = [...finalGaleria, ...uploadedUrls];
       }
 
+      const experienciasToSend = formData.experiencias.filter(
+        (e) => e.proyecto?.trim() && e.anio?.trim() && e.rol?.trim()
+      ).map((e) => ({ proyecto: e.proyecto.trim(), anio: e.anio.trim(), rol: e.rol.trim() }));
+
       const res = await fetch(`${apiUrl}/prestador/${profileId}`, {
         method: 'PATCH',
         headers: { 
@@ -204,7 +255,11 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
             ...formData,
             foto: finalFoto,
             fotoProfundidad: finalFotoProfundidad,
-            galeria: finalGaleria
+            galeria: finalGaleria,
+            experiencias: experienciasToSend,
+            opalSpeed: formData.opalSpeed,
+            opalBrightness: formData.opalBrightness,
+            opalTvFilterOpacity: formData.opalTvFilterOpacity
         })
       });
 
@@ -226,8 +281,8 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white"><Loader2 className="animate-spin"/></div>;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans pt-28 pb-12 px-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-slate-950 text-white font-sans pt-24 md:pt-28 pb-12 px-4 sm:px-6">
+      <div className="max-w-4xl mx-auto w-full">
         
         <button onClick={() => router.back()} className="text-slate-400 hover:text-white flex items-center gap-2 mb-6 transition">
             <ArrowLeft size={18}/> Cancelar
@@ -237,7 +292,7 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
             <Briefcase className="text-orange-500" size={32}/> Editar Perfil
         </h1>
 
-        <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-xl space-y-10">
+        <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 rounded-2xl md:rounded-3xl p-5 sm:p-6 md:p-8 shadow-xl space-y-8 md:space-y-10">
             
             {error && (
                 <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-xl text-sm">
@@ -310,8 +365,62 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
 
                 <div>
                     <label className="block text-sm text-slate-400 mb-2">Biografía / Descripción</label>
-                    <textarea name="descripcion" rows={4} value={formData.descripcion} onChange={handleChange}
-                        className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl focus:border-orange-500 outline-none transition resize-none"/>
+                    <textarea name="descripcion" rows={10} value={formData.descripcion} onChange={handleChange}
+                        className="w-full min-h-[220px] md:min-h-[280px] bg-slate-950 border border-slate-800 p-4 rounded-xl focus:border-orange-500 outline-none transition resize-y"/>
+                </div>
+
+                {/* Experiencia / Filmografía */}
+                <div className="space-y-4 pt-4 border-t border-slate-800/50">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800 pb-2 flex items-center gap-2">
+                        <Film size={16}/> Experiencia / Filmografía
+                    </h3>
+                    <p className="text-xs text-slate-500">Proyectos en los que participaste (nombre del proyecto, año, rol).</p>
+                    <div className="space-y-4">
+                        {formData.experiencias.map((exp, idx) => (
+                            <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 p-4 rounded-xl bg-slate-950/80 border border-slate-800">
+                                <div className="md:col-span-5">
+                                    <label className="block text-xs text-slate-500 mb-1">Proyecto</label>
+                                    <input
+                                        type="text"
+                                        value={exp.proyecto}
+                                        onChange={(e) => updateExperiencia(idx, 'proyecto', e.target.value)}
+                                        placeholder="Nombre del proyecto"
+                                        className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-lg text-sm focus:border-orange-500 outline-none transition"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs text-slate-500 mb-1">Año</label>
+                                    <input
+                                        type="text"
+                                        value={exp.anio}
+                                        onChange={(e) => updateExperiencia(idx, 'anio', e.target.value)}
+                                        placeholder="Año"
+                                        className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-lg text-sm focus:border-orange-500 outline-none transition"
+                                    />
+                                </div>
+                                <div className="md:col-span-4">
+                                    <label className="block text-xs text-slate-500 mb-1">Rol</label>
+                                    <input
+                                        type="text"
+                                        value={exp.rol}
+                                        onChange={(e) => updateExperiencia(idx, 'rol', e.target.value)}
+                                        placeholder="Tu rol"
+                                        className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-lg text-sm focus:border-orange-500 outline-none transition"
+                                    />
+                                </div>
+                                <div className="md:col-span-1 flex items-end">
+                                    <button type="button" onClick={() => removeExperiencia(idx)} aria-label="Quitar"
+                                        className="p-2.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition">
+                                        <Trash2 size={18}/>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                        <button type="button" onClick={addExperiencia}
+                            className="flex items-center gap-2 text-sm font-bold text-orange-500 hover:text-orange-400 border border-dashed border-slate-600 hover:border-orange-500/50 rounded-xl px-4 py-3 transition w-full justify-center">
+                            <Plus size={18}/> Agregar experiencia
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -372,6 +481,72 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
                                 </label>
                             </>
                         )}
+                    </div>
+                </div>
+            </div>
+
+            {/* SECCIÓN: BENEFICIOS (música, color fondo, galería interactiva) */}
+            <div className="space-y-6 pt-6 border-t border-slate-800/50">
+                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800 pb-2 flex items-center gap-2">
+                    <Music size={16}/> Música y fondo (beneficios por postularte)
+                </h3>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold uppercase text-slate-500 mb-2 flex items-center gap-2">
+                            <Youtube size={14}/> Link de música (YouTube)
+                        </label>
+                        <input name="musicaYoutubeUrl" type="url" value={formData.musicaYoutubeUrl} placeholder="https://youtube.com/watch?v=..."
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-orange-500 transition placeholder:text-slate-700"
+                            onChange={handleChange} />
+                        <p className="text-xs text-slate-500 mt-1">Cuando alguien visite tu perfil en escritorio, podrá reproducir esta música desde la barra de menú.</p>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold uppercase text-slate-500 mb-2 flex items-center gap-2">
+                            <Palette size={14}/> Color prioritario del fondo animado
+                        </label>
+                        <div className="flex items-center gap-3 bg-slate-950 border border-slate-800 p-2 rounded-xl">
+                            <Palette size={18} className="text-slate-500 ml-2"/>
+                            <input type="color" name="colorFondo" value={formData.colorFondo} onChange={handleChange}
+                                className="bg-transparent border-none w-full h-8 cursor-pointer rounded"/>
+                            <span className="text-slate-400 text-sm font-mono">{formData.colorFondo}</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <input type="checkbox" id="galeria-interactiva" name="galeriaInteractivaHabilitada" checked={formData.galeriaInteractivaHabilitada} onChange={handleChange}
+                            className="w-4 h-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-500"/>
+                        <label htmlFor="galeria-interactiva" className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                            <Images size={16} className="text-orange-500"/> Habilitar galería interactiva de tus trabajos
+                        </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-800/50">
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-2">Velocidad del fondo animado</label>
+                            <div className="flex items-center gap-3">
+                                <input type="range" min={0.02} max={0.4} step={0.01} value={formData.opalSpeed} name="opalSpeed"
+                                    onChange={(e) => setFormData((p) => ({ ...p, opalSpeed: Number(e.target.value) }))}
+                                    className="flex-1 h-2 rounded-full bg-slate-800 accent-orange-500"/>
+                                <span className="text-xs font-mono text-slate-400 w-10 tabular-nums">{(formData.opalSpeed * 100).toFixed(0)}%</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-2">Brillo del fondo</label>
+                            <div className="flex items-center gap-3">
+                                <input type="range" min={0.1} max={0.9} step={0.05} value={formData.opalBrightness} name="opalBrightness"
+                                    onChange={(e) => setFormData((p) => ({ ...p, opalBrightness: Number(e.target.value) }))}
+                                    className="flex-1 h-2 rounded-full bg-slate-800 accent-orange-500"/>
+                                <span className="text-xs font-mono text-slate-400 w-10 tabular-nums">{(formData.opalBrightness * 100).toFixed(0)}%</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-2">Opacidad filtro TV</label>
+                            <div className="flex items-center gap-3">
+                                <input type="range" min={0.3} max={1} step={0.05} value={formData.opalTvFilterOpacity} name="opalTvFilterOpacity"
+                                    onChange={(e) => setFormData((p) => ({ ...p, opalTvFilterOpacity: Number(e.target.value) }))}
+                                    className="flex-1 h-2 rounded-full bg-slate-800 accent-orange-500"/>
+                                <span className="text-xs font-mono text-slate-400 w-10 tabular-nums">{(formData.opalTvFilterOpacity * 100).toFixed(0)}%</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

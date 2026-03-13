@@ -11,6 +11,7 @@ export default function MisPerfilesPage() {
   const router = useRouter();
   const { t } = useLanguage();
   const [perfiles, setPerfiles] = useState<any[]>([]);
+  const [aplicoAProyecto, setAplicoAProyecto] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -22,12 +23,23 @@ export default function MisPerfilesPage() {
     if (!userStr || !token) return router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'));
     setUser(JSON.parse(userStr));
 
-    fetchPerfiles(token);
+    const load = async () => {
+      await fetchPerfiles(token);
+      try {
+        const resPost = await fetch(`${apiUrl}/postulacion/mis-postulaciones`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (resPost.ok) {
+          const postulaciones = await resPost.json();
+          setAplicoAProyecto(Array.isArray(postulaciones) && postulaciones.length > 0);
+        }
+      } catch (_) {}
+    };
+    load();
   }, [router]);
 
   const fetchPerfiles = async (token: string) => {
     try {
-      
       const res = await fetch(`${apiUrl}/prestador/mis-perfiles`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -85,7 +97,7 @@ export default function MisPerfilesPage() {
 
         {perfiles.length > 0 && (
           <div className="mb-10">
-            <ProfileHealth perfiles={perfiles} />
+            <ProfileHealth perfiles={perfiles} aplicoAProyecto={aplicoAProyecto} />
           </div>
         )}
 

@@ -58,7 +58,13 @@ model Prestador {
 
   colorTema   String?  @default("#ea580c") // Naranja por defecto
   videoReel   String?  // URL de YouTube/Vimeo
-  galeria     String[] // Array de URLs de fotos 
+  galeria     String[] // Array de URLs de fotos
+  musicaYoutubeUrl String?  // Link de música para visitantes del perfil (solo escritorio)
+  colorFondo  String?  @default("#1a6b9e") // Color base del fondo animado
+  galeriaInteractivaHabilitada Boolean @default(false) // Galería interactiva de trabajos
+  opalSpeed             Float?   // Velocidad del fondo animado (beneficio por postulación)
+  opalBrightness        Float?   // Brillo del fondo animado
+  opalTvFilterOpacity   Float?   // Opacidad del filtro TV sobre el fondo
   
   // Relación OBLIGATORIA con el dueño
   ciudad      String?  @default("Ushuaia")

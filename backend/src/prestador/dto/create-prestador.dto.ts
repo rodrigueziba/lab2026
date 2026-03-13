@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, IsEmail, ValidateNested, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsArray, IsEmail, ValidateNested, IsDateString, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Clase auxiliar para validar cada renglón de experiencia
@@ -89,6 +89,27 @@ export class CreatePrestadorDto {
   @IsString({ each: true })
   @IsOptional()
   galeria?: string[];
+
+  @IsString()
+  @IsOptional()
+  musicaYoutubeUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  colorFondo?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  galeriaInteractivaHabilitada?: boolean;
+
+  @IsOptional()
+  opalSpeed?: number;
+
+  @IsOptional()
+  opalBrightness?: number;
+
+  @IsOptional()
+  opalTvFilterOpacity?: number;
 
   @IsString()
   @IsOptional()
