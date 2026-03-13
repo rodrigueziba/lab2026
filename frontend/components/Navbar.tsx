@@ -4,11 +4,17 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
   Menu, X, ChevronDown, LogOut, Film, User, 
-  Briefcase, MapPin, Users, Clapperboard, Bell, Shield, Inbox, Atom, Info, Globe
+  Briefcase, MapPin, Users, Clapperboard, Bell, Shield, Inbox, Atom, Info, Globe,
+  Play, Pause, SkipForward
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const RAINBOW_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
+
+// Lista de MP3 en /public (anycolour primero; el resto se reproduce en orden aleatorio)
+const NAVBAR_MP3_FILES = ['anycolour.mp3', 'echoes.mp3', 'music.mp3'];
+const THEME_UNLOCK_HOVER_MS = 60000; // 1 minuto de hover para desbloquear tema + música
+const WAVE_COLOR_INTERVAL_MS = 3200; // Cambio de color lento tipo olas (solo cuando themeUnlocked)
 
 export default function Navbar() {
   const router = useRouter();
@@ -30,13 +36,28 @@ export default function Navbar() {
   const [userBlockHover, setUserBlockHover] = useState(false);
   const [beamColorIndex, setBeamColorIndex] = useState(0);
   const [userGlowProgress, setUserGlowProgress] = useState(0); // 0 = recién hover, 1 = 60s
+  const [themeUnlocked, setThemeUnlocked] = useState(false); // Tras 1 min hover: música + ondas lentas hasta recarga (solo escritorio)
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [playlistIndex, setPlaylistIndex] = useState(0);
+  const [playlist] = useState(() => {
+    const first = NAVBAR_MP3_FILES[0];
+    const rest = NAVBAR_MP3_FILES.slice(1);
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    return [first, ...rest];
+  });
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const mobileMenuPanelRef = useRef<HTMLDivElement>(null);
   const userHoverStartRef = useRef<number>(0);
   const userLastColorAdvanceRef = useRef<number>(0);
+  const themeWaveColorRef = useRef<number>(0);
+  const [wavePhase, setWavePhase] = useState(0); // 0..1 para olas de gradiente cuando themeUnlocked
   const lastScrollYRef = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [mobileNavVisible, setMobileNavVisible] = useState(true);
 
   // Al abrir el menú móvil, resetear scroll del panel para evitar hueco cuando la página estaba scrolleada
@@ -159,8 +180,9 @@ export default function Navbar() {
     return () => { document.body.style.overflow = prev; };
   }, [isMobileMenuOpen]);
 
-  // Bloque usuario: brillo con transición suave; a más tiempo hover, más rápido el cambio de color y más brillo (a 1 min ilumina toda la pantalla)
+  // Bloque usuario: brillo con transición suave; a más tiempo hover, más rápido el cambio de color y más brillo. A 1 min (solo escritorio) se desbloquea tema + música y pasan a ondas lentas.
   useEffect(() => {
+    if (themeUnlocked) return;
     if (!userBlockHover) {
       setUserGlowProgress(0);
       return;
@@ -171,11 +193,16 @@ export default function Navbar() {
     const tick = () => {
       const now = Date.now();
       const elapsed = now - userHoverStartRef.current;
-      const progress = Math.min(elapsed / 60000, 1); // 60 s = 1
+      const progress = Math.min(elapsed / THEME_UNLOCK_HOVER_MS, 1);
 
       setUserGlowProgress(progress);
 
-      // Velocidad variable: cuanto más tiempo, más rápido el cambio (650ms → ~120ms)
+      if (progress >= 1 && typeof window !== 'undefined' && window.innerWidth >= 768) {
+        setUserGlowProgress(1);
+        setThemeUnlocked(true);
+        return;
+      }
+
       const intervalMs = 650 * (1 - progress * 0.82) + 120;
       if (now - userLastColorAdvanceRef.current >= intervalMs) {
         userLastColorAdvanceRef.current = now;
@@ -186,7 +213,58 @@ export default function Navbar() {
     tick();
     const t = setInterval(tick, 100);
     return () => clearInterval(t);
-  }, [userBlockHover]);
+  }, [userBlockHover, themeUnlocked]);
+
+  // Cuando themeUnlocked: cambio de color lento tipo olas + fase de onda para gradiente (solo escritorio)
+  useEffect(() => {
+    if (!themeUnlocked || typeof window === 'undefined' || window.innerWidth < 768) return;
+    const colorInterval = setInterval(() => {
+      themeWaveColorRef.current = (themeWaveColorRef.current + 1) % RAINBOW_COLORS.length;
+      setBeamColorIndex(themeWaveColorRef.current);
+    }, WAVE_COLOR_INTERVAL_MS);
+    const waveInterval = setInterval(() => {
+      setWavePhase((p) => (p + 0.02) % 1);
+    }, 80);
+    return () => {
+      clearInterval(colorInterval);
+      clearInterval(waveInterval);
+    };
+  }, [themeUnlocked]);
+
+  // Audio: reproducir lista (anycolour primero, luego el resto en orden aleatorio); solo escritorio cuando themeUnlocked
+  useEffect(() => {
+    if (!themeUnlocked || typeof window === 'undefined' || window.innerWidth < 768) return;
+    const audio = new Audio(`/${playlist[playlistIndex]}`);
+    audioRef.current = audio;
+    audio.play().then(() => setMusicPlaying(true)).catch(() => setMusicPlaying(false));
+    const onEnded = () => {
+      const next = (playlistIndex + 1) % playlist.length;
+      setPlaylistIndex(next);
+    };
+    const onPause = () => setMusicPlaying(false);
+    const onPlay = () => setMusicPlaying(true);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('play', onPlay);
+    return () => {
+      audio.pause();
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('play', onPlay);
+      audioRef.current = null;
+    };
+  }, [themeUnlocked, playlistIndex, playlist]);
+
+  const handleMusicPlayPause = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (musicPlaying) a.pause();
+    else a.play();
+  };
+
+  const handleNextTrack = () => {
+    setPlaylistIndex((i) => (i + 1) % playlist.length);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -276,6 +354,29 @@ export default function Navbar() {
           >
             <Atom size={20} strokeWidth={1.5} />
           </Link>
+          {/* Controles de música (solo escritorio, visibles tras 1 min hover en usuario) */}
+          {themeUnlocked && (
+            <div className="hidden md:flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleMusicPlayPause}
+                className="flex items-center justify-center opacity-[0.12] hover:opacity-100 transition-opacity duration-300 text-white hover:text-emerald-400 rounded-full p-1.5 hover:ring-1 hover:ring-emerald-400/60"
+                title={musicPlaying ? 'Pausar' : 'Reproducir'}
+                aria-label={musicPlaying ? 'Pausar' : 'Reproducir'}
+              >
+                {musicPlaying ? <Pause size={20} strokeWidth={2} /> : <Play size={20} strokeWidth={2} />}
+              </button>
+              <button
+                type="button"
+                onClick={handleNextTrack}
+                className="flex items-center justify-center opacity-[0.12] hover:opacity-100 transition-opacity duration-300 text-white hover:text-amber-400 rounded-full p-1.5 hover:ring-1 hover:ring-amber-400/60"
+                title="Siguiente tema"
+                aria-label="Siguiente tema"
+              >
+                <SkipForward size={20} strokeWidth={2} />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Centro: Locaciones, Prestadores, Proyectos — siempre centrados (solo escritorio); IDs para Tour de Bienvenida */}
@@ -362,16 +463,21 @@ export default function Navbar() {
 
                 {/* MENU USUARIO — hover: brillo extendido; cambio de color suave; a más tiempo, más rápido y más luz (1 min = ilumina pantalla) */}
                 <div className="relative" ref={dropdownRef}>
-                {userBlockHover && userGlowProgress > 0.12 && (
+                {((userBlockHover && userGlowProgress > 0.12) || themeUnlocked) && (
                   <div
                     className="fixed inset-0 pointer-events-none z-[99] transition-opacity duration-500"
                     style={{
-                      opacity: Math.min(1, (userGlowProgress - 0.12) / 0.88) * (0.5 + 0.5 * userGlowProgress),
+                      opacity: themeUnlocked
+                        ? 0.5 + 0.25 * (0.5 + 0.5 * Math.sin(wavePhase * Math.PI * 2))
+                        : Math.min(1, (userGlowProgress - 0.12) / 0.88) * (0.5 + 0.5 * userGlowProgress),
                       background: (() => {
                         const c = RAINBOW_COLORS[beamColorIndex];
                         const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
-                        const radius = 60 + 340 * userGlowProgress;
-                        return `radial-gradient(circle at 85% 50%, rgba(${r},${g},${b},${0.12 + 0.5 * userGlowProgress}) 0%, transparent ${radius}%)`;
+                        const progress = themeUnlocked ? 1 : userGlowProgress;
+                        const radius = themeUnlocked
+                          ? 120 + 280 * (0.5 + 0.5 * Math.sin(wavePhase * Math.PI * 2))
+                          : 60 + 340 * progress;
+                        return `radial-gradient(circle at 85% 50%, rgba(${r},${g},${b},${themeUnlocked ? 0.35 + 0.15 * Math.sin(wavePhase * Math.PI * 2) : 0.12 + 0.5 * progress}) 0%, transparent ${radius}%)`;
                       })(),
                     }}
                     aria-hidden
@@ -387,15 +493,15 @@ export default function Navbar() {
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                     className={`relative flex items-center gap-3 border py-1.5 pl-1.5 pr-4 rounded-full duration-300 group ${isUserMenuOpen ? 'bg-slate-800 border-slate-600' : 'bg-transparent border-slate-800 hover:border-slate-600'}`}
                     style={{
-                      transition: 'border-color 0.7s ease, box-shadow 0.7s ease',
-                      ...(userBlockHover ? (() => {
+                      transition: themeUnlocked ? 'border-color 2s ease, box-shadow 2s ease' : 'border-color 0.7s ease, box-shadow 0.7s ease',
+                      ...((userBlockHover || themeUnlocked) ? (() => {
                         const c = RAINBOW_COLORS[beamColorIndex];
                         const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
-                        const p = userGlowProgress;
-                        const spread = 1 + p * 2.5;
-                        const op1 = 0.75 + p * 0.25;
-                        const op2 = 0.6 + p * 0.35;
-                        const op3 = 0.4 + p * 0.5;
+                        const p = themeUnlocked ? 1 : userGlowProgress;
+                        const spread = themeUnlocked ? 1.8 + 0.5 * Math.sin(wavePhase * Math.PI * 2) : 1 + p * 2.5;
+                        const op1 = themeUnlocked ? 0.5 : 0.75 + p * 0.25;
+                        const op2 = themeUnlocked ? 0.4 : 0.6 + p * 0.35;
+                        const op3 = themeUnlocked ? 0.25 : 0.4 + p * 0.5;
                         return {
                           borderColor: c,
                           boxShadow: `0 0 ${24 * spread}px ${c}, 0 0 ${48 * spread}px rgba(${r},${g},${b},${op1}), 0 0 ${90 * spread}px rgba(${r},${g},${b},${op2}), 0 0 ${140 * spread}px rgba(${r},${g},${b},${op3})`,
