@@ -8,6 +8,8 @@ import PageTransitionWrapper from '../components/PageTransitionWrapper';
 import WelcomeTour from '../components/WelcomeTour';
 import { Toaster } from 'sonner';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { ThemeUnlockedProvider } from '@/contexts/ThemeUnlockedContext';
+import ThemeUnlockedContent from '../components/ThemeUnlockedContent';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,13 +37,17 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body className={`${inter.className} bg-slate-950 text-white flex flex-col min-h-screen`}>
         <LanguageProvider>
-          <Navbar />
-          <WelcomeTour />
-          <main className="flex-1 flex flex-col min-h-0 bg-slate-950">
-            <PageTransitionWrapper>{children}</PageTransitionWrapper>
-            <Toaster position="bottom-right" richColors />
-          </main>
-          <FooterWrapper />
+          <ThemeUnlockedProvider>
+            <Navbar />
+            <WelcomeTour />
+            <main className="flex-1 flex flex-col min-h-0 bg-slate-950 relative">
+              <ThemeUnlockedContent>
+                <PageTransitionWrapper>{children}</PageTransitionWrapper>
+              </ThemeUnlockedContent>
+              <Toaster position="bottom-right" richColors />
+            </main>
+            <FooterWrapper />
+          </ThemeUnlockedProvider>
         </LanguageProvider>
       </body>
     </html>

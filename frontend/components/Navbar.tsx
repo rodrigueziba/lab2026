@@ -8,6 +8,7 @@ import {
   Play, Pause, SkipForward
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useThemeUnlocked } from '@/contexts/ThemeUnlockedContext';
 
 const RAINBOW_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
 
@@ -36,7 +37,9 @@ export default function Navbar() {
   const [userBlockHover, setUserBlockHover] = useState(false);
   const [beamColorIndex, setBeamColorIndex] = useState(0);
   const [userGlowProgress, setUserGlowProgress] = useState(0); // 0 = recién hover, 1 = 60s
-  const [themeUnlocked, setThemeUnlocked] = useState(false); // Tras 1 min hover: música + ondas lentas hasta recarga (solo escritorio)
+  const themeCtx = useThemeUnlocked();
+  const themeUnlocked = themeCtx?.themeUnlocked ?? false;
+  const setThemeUnlocked = themeCtx?.setThemeUnlocked ?? (() => {});
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [playlistIndex, setPlaylistIndex] = useState(0);
   const [playlist] = useState(() => {
@@ -236,7 +239,13 @@ export default function Navbar() {
     if (!themeUnlocked || typeof window === 'undefined' || window.innerWidth < 768) return;
     const audio = new Audio(`/${playlist[playlistIndex]}`);
     audioRef.current = audio;
-    audio.play().then(() => setMusicPlaying(true)).catch(() => setMusicPlaying(false));
+    const play = () => {
+      audio.play().then(() => setMusicPlaying(true)).catch(() => setMusicPlaying(false));
+    };
+    play();
+    // Garantizar que empiece a reproducir al cambiar a la vista Anycolour (retry por si el primer play fue bloqueado)
+    const t1 = setTimeout(play, 200);
+    const t2 = setTimeout(play, 600);
     const onEnded = () => {
       const next = (playlistIndex + 1) % playlist.length;
       setPlaylistIndex(next);
@@ -247,6 +256,8 @@ export default function Navbar() {
     audio.addEventListener('pause', onPause);
     audio.addEventListener('play', onPlay);
     return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
       audio.pause();
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('pause', onPause);
@@ -379,8 +390,8 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Centro: Locaciones, Prestadores, Proyectos — siempre centrados (solo escritorio); IDs para Tour de Bienvenida */}
-        <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-2 bg-black/20 backdrop-blur-sm p-1.5 rounded-full border border-white/5">
+        {/* Centro: Locaciones, Prestadores, Proyectos — z-[101] para quedar por encima del overlay de glow (z-[99]) y ser clickeables */}
+        <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-2 bg-black/20 backdrop-blur-sm p-1.5 rounded-full border border-white/5 z-[101]">
           <div id="tour-locaciones"><NavLink href="/locaciones" icon={MapPin} label={t('nav.locaciones')} /></div>
           <div id="tour-guia"><NavLink href="/guia" icon={Users} label={t('nav.prestadores')} /></div>
           <div id="tour-proyectos"><NavLink href="/proyectos" icon={Clapperboard} label={t('nav.proyectos')} /></div>
