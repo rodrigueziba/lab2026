@@ -46,7 +46,9 @@ export default function RootLayout({
               </ThemeUnlockedContent>
               <Toaster position="bottom-right" richColors />
             </main>
-            <FooterWrapper />
+            <div className="relative z-20 shrink-0">
+              <FooterWrapper />
+            </div>
           </ThemeUnlockedProvider>
         </LanguageProvider>
       </body>

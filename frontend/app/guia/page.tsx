@@ -185,13 +185,13 @@ export default function GuiaPage() {
 
   return (
     <div className="relative min-h-screen">
-      {/* Fondo Anycolour solo escritorio: detrás de todo, sin capturar clics */}
-      <div className="hidden md:block fixed inset-0 z-0 pointer-events-none">
+      {/* Fondo Anycolour solo escritorio: detrás de todo, permite clics en zonas sin tarjetas */}
+      <div className="hidden md:block fixed inset-0 z-0">
         <AnycolourBackground backgroundOnly />
       </div>
 
-      {/* Contenido de la guía y tarjetas encima (z-10); fondo semi-transparente para ver partículas detrás */}
-      <div className="relative z-10 min-h-screen bg-slate-950/85 text-white font-sans selection:bg-orange-500/30 pt-80 md:pt-48 flex flex-col">
+      {/* Contenido de la guía y tarjetas encima (z-10); opacidad baja para ver más el fondo animado; pointer-events-none para clics en el fondo */}
+      <div className="relative z-10 min-h-screen bg-slate-950/75 text-white font-sans selection:bg-orange-500/30 pt-80 md:pt-48 flex flex-col pointer-events-none">
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .guia-page-header[data-header-hidden="true"] {
@@ -203,7 +203,7 @@ export default function GuiaPage() {
       {/* --- HEADER FLUIDO --- (se disuelve al bajar scroll y reaparece al subir; móvil y escritorio) */}
       <div 
         data-header-hidden={!headerVisible}
-        className={`guia-page-header fixed top-16 md:top-20 left-0 right-0 z-40 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/95 transition-[opacity,box-shadow] duration-300 ease-out ${
+        className={`guia-page-header fixed top-16 md:top-20 left-0 right-0 z-40 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/55 transition-[opacity,box-shadow] duration-300 ease-out pointer-events-auto ${
           isScrolled ? 'shadow-2xl' : ''
         }`}
       >
@@ -310,7 +310,7 @@ export default function GuiaPage() {
       </div>
 
       {/* --- LISTADO DE TARJETAS --- */}
-      <div className="max-w-7xl mx-auto px-6 pb-20 flex-1 w-full">
+      <div className="max-w-7xl mx-auto px-6 pb-20 flex-1 w-full pointer-events-auto">
         
         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
           <div className="flex items-center gap-2 text-slate-400">
