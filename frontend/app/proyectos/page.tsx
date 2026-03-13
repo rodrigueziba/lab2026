@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
@@ -10,6 +11,8 @@ import {
 import DepthAwareImage from '@/components/DepthAwareImage';
 import { getSectionCache, setSectionCache, SECTION_KEYS } from '@/lib/sectionCache';
 import { useLanguage } from '@/contexts/LanguageContext';
+
+const AnycolourBackground = dynamic(() => import('@/components/anycolour'), { ssr: false });
 
 const getYoutubeId = (url: string) => {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -87,6 +90,7 @@ export default function CarteleraProyectosPage() {
   // UI
   const [isScrolled, setIsScrolled] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
+  const [particleSpeedMultiplier, setParticleSpeedMultiplier] = useState(0.2);
   const lastScrollY = useRef(0);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef<HTMLDivElement>(null); 
@@ -189,6 +193,18 @@ export default function CarteleraProyectosPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Escritorio: velocidad del fondo Anycolour según scroll (inicio muy bajo; scroll abajo = más rápido, efecto notable)
+  useEffect(() => {
+    const update = () => {
+      const y = window.scrollY;
+      const mult = Math.max(0.2, Math.min(4, 0.2 + y / 250));
+      setParticleSpeedMultiplier(mult);
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
+
   // Cabecera se disuelve al bajar y reaparece al subir (solo en escritorio, ≥768px)
   // Cabecera se disuelve al bajar y reaparece al subir (escritorio y móvil)
   useEffect(() => {
@@ -230,8 +246,14 @@ export default function CarteleraProyectosPage() {
   };
 
   return (
-    // Móvil: pt reducido cuando filtros colapsados; al expandir filtros se usa más espacio
-    <div className={`min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-500/30 flex flex-col overscroll-y-none pt-52 md:pt-64 ${mobileFiltersOpen ? 'max-md:pt-80' : ''}`}>
+    <div className="relative min-h-screen">
+      {/* Fondo Anycolour solo escritorio: misma lógica que /guia; velocidad según scroll; clics para puntos de gravedad */}
+      <div className="hidden md:block fixed inset-0 z-0">
+        <AnycolourBackground backgroundOnly speedMultiplier={particleSpeedMultiplier} particleCount={1688} />
+      </div>
+
+      {/* Contenido encima (z-10); opacidad baja para ver fondo animado; pointer-events-none para clics en el fondo */}
+      <div className={`relative z-10 min-h-screen bg-slate-950/55 text-white font-sans selection:bg-orange-500/30 flex flex-col overscroll-y-none pt-52 md:pt-64 pointer-events-none ${mobileFiltersOpen ? 'max-md:pt-80' : ''}`}>
       
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -242,11 +264,11 @@ export default function CarteleraProyectosPage() {
         }
       `}</style>
 
-      {/* --- HEADER FLUIDO --- (se disuelve al bajar scroll y reaparece al subir; móvil y escritorio) */}
+      {/* --- HEADER FLUIDO --- (se disuelve al bajar scroll y reaparece al subir; fondo transparente para ver Anycolour) */}
       <div 
         data-header-hidden={!headerVisible}
-        className={`proyectos-page-header fixed top-16 md:top-20 left-0 right-0 z-40 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/95 pb-3 transition-[opacity,box-shadow] duration-300 ease-out ${
-          isScrolled ? 'shadow-2xl' : ''
+        className={`proyectos-page-header fixed top-16 md:top-20 left-0 right-0 z-40 w-full border-b border-white/5 backdrop-blur-xl pb-3 transition-[opacity,box-shadow,background-color] duration-300 ease-out pointer-events-auto ${
+          isScrolled ? 'bg-slate-950/60 shadow-2xl' : 'bg-slate-950/50'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col gap-4 py-4">
@@ -395,7 +417,7 @@ export default function CarteleraProyectosPage() {
       </div>
 
       {/* --- GRILLA DE CONTENIDO --- */}
-      <div className="max-w-7xl mx-auto px-6 py-8 flex-1 w-full">
+      <div className="max-w-7xl mx-auto px-6 py-8 flex-1 w-full pointer-events-auto">
         
         <div className="flex justify-between items-center mb-8 pb-4 border-b border-slate-800">
           <div className="flex items-center gap-2 text-slate-400">
@@ -559,6 +581,7 @@ export default function CarteleraProyectosPage() {
             </div>
         )}
 
+      </div>
       </div>
     </div>
   );

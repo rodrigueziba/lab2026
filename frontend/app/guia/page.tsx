@@ -61,6 +61,7 @@ export default function GuiaPage() {
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
+  const [particleSpeedMultiplier, setParticleSpeedMultiplier] = useState(0.2);
   const lastScrollY = useRef(0);
   const filtersRef = useRef<HTMLDivElement>(null);
   const dataLoadedRef = useRef(false);
@@ -148,6 +149,18 @@ export default function GuiaPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Escritorio: velocidad del fondo Anycolour según scroll (inicio muy bajo; scroll abajo = mucho más rápido, efecto muy notable)
+  useEffect(() => {
+    const update = () => {
+      const y = window.scrollY;
+      const mult = Math.max(0.2, Math.min(4, 0.2 + y / 250));
+      setParticleSpeedMultiplier(mult);
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
+
   // Cabecera se disuelve al bajar y reaparece al subir (escritorio y móvil)
   useEffect(() => {
     const SCROLL_THRESHOLD = 60;
@@ -185,9 +198,9 @@ export default function GuiaPage() {
 
   return (
     <div className="relative min-h-screen">
-      {/* Fondo Anycolour solo escritorio: detrás de todo, permite clics en zonas sin tarjetas */}
+      {/* Fondo Anycolour solo escritorio: velocidad según scroll (abajo más rápido, arriba más lento) */}
       <div className="hidden md:block fixed inset-0 z-0">
-        <AnycolourBackground backgroundOnly />
+        <AnycolourBackground backgroundOnly speedMultiplier={particleSpeedMultiplier} particleCount={1688} />
       </div>
 
       {/* Contenido de la guía y tarjetas encima (z-10); opacidad baja para ver más el fondo animado; pointer-events-none para clics en el fondo */}
@@ -203,7 +216,7 @@ export default function GuiaPage() {
       {/* --- HEADER FLUIDO --- (se disuelve al bajar scroll y reaparece al subir; móvil y escritorio) */}
       <div 
         data-header-hidden={!headerVisible}
-        className={`guia-page-header fixed top-16 md:top-20 left-0 right-0 z-40 w-full border-b border-white/5 backdrop-blur-xl bg-slate-950/55 transition-[opacity,box-shadow] duration-300 ease-out pointer-events-auto ${
+        className={`guia-page-header fixed top-16 md:top-20 left-0 right-0 z-40 w-full border-b border-white/5 backdrop-blur-xl bg-transparent transition-[opacity,box-shadow] duration-300 ease-out pointer-events-auto ${
           isScrolled ? 'shadow-2xl' : ''
         }`}
       >

@@ -54,15 +54,20 @@ const SNAP_R = 18;
 interface DustSimProps {
   /** En true solo se muestra el canvas (sin botón Debug ni hint); para usar como fondo en otras páginas */
   backgroundOnly?: boolean;
+  /** Multiplicador de velocidad (ej. desde scroll en /guia). 1 = base, >1 más rápido, <1 más lento */
+  speedMultiplier?: number;
+  /** Cantidad de partículas (por defecto DEFAULT_CONFIG.particleCount). Ej. 2250 = 25% menos */
+  particleCount?: number;
 }
 
-export default function DustSim({ backgroundOnly = false }: DustSimProps) {
+export default function DustSim({ backgroundOnly = false, speedMultiplier = 1, particleCount }: DustSimProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showDebugButton, setShowDebugButton] = useState(false); // Shift para mostrar/ocultar; por defecto oculto
   const [debugOpen, setDebugOpen] = useState(false);
 
   const sr = useRef({
     config:     { ...DEFAULT_CONFIG },
+    speedMultiplier: 1 as number,
     palette:    buildPalette(DEFAULT_CONFIG.baseColor),
     paletteRgb: buildPalette(DEFAULT_CONFIG.baseColor).map(hexToRgb) as [number,number,number][],
     particles:  [] as Particle[],
@@ -84,10 +89,17 @@ export default function DustSim({ backgroundOnly = false }: DustSimProps) {
     p2Frames:[] as number[],
   });
 
+  useEffect(() => {
+    sr.current.speedMultiplier = speedMultiplier;
+  }, [speedMultiplier]);
+
+  if (particleCount != null) sr.current.config.particleCount = particleCount;
+
   // ── particle factory ──────────────────────────────────────────────────────
   const newParticle = useCallback(():Particle => {
     const s=sr.current, {W,H,config}=s;
-    const base=config.speed*(0.5+Math.random()*0.5), r=config.randomness;
+    const mult = s.speedMultiplier ?? 1;
+    const base=config.speed*mult*(0.5+Math.random()*0.5), r=config.randomness;
     let x:number,y:number,vx:number,vy:number;
     const side=['left','right','top','bottom'][Math.floor(Math.random()*4)];
     if(side==='left')      {x=-10;    y=H*(0.1+Math.random()*0.8); vx= base*(0.8+r*0.4); vy=(Math.random()-0.5)*base*r*2;}
@@ -162,6 +174,7 @@ export default function DustSim({ backgroundOnly = false }: DustSimProps) {
 
   // ── physics step (shared) ─────────────────────────────────────────────────
   function stepParticles(particles:Particle[], gravPoints:GravPoint[], config:typeof DEFAULT_CONFIG, W:number, H:number, dt:number, newP:()=>Particle){
+    const mult = sr.current.speedMultiplier ?? 1;
     for(let i=0;i<particles.length;i++){
       const p=particles[i];
       p.life+=dt;
@@ -171,7 +184,7 @@ export default function DustSim({ backgroundOnly = false }: DustSimProps) {
         const force=(config.gravStrength*gp.type)/(dist2*0.01+dist*2+20);
         p.vx+=(dx/dist)*force*dt*0.016; p.vy+=(dy/dist)*force*dt*0.016;
       }
-      const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy),maxSpd=config.speed*10;
+      const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy),maxSpd=config.speed*mult*10;
       if(spd>maxSpd){p.vx=(p.vx/spd)*maxSpd;p.vy=(p.vy/spd)*maxSpd;}
       p.x+=p.vx*dt; p.y+=p.vy*dt;
     }
