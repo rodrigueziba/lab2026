@@ -725,6 +725,15 @@ export default function Navbar() {
                   <MobileNavLink href="/mis-postulaciones" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Briefcase} label={t('nav.mis_postulaciones')} />
                   <MobileNavLink href="/mis-perfiles/solicitudes" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Inbox} label={t('nav.solicitudes_recibidas')} />
                   <MobileNavLink href="/mi-perfil" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={User} label={t('nav.mi_perfil')} />
+                  <Link href="/notificaciones" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 text-xl font-bold transition-colors min-h-[44px] py-3 px-4 touch-manipulation text-slate-300 hover:text-white">
+                    <Bell size={22} className={pathname === '/notificaciones' ? 'text-orange-500' : ''} />
+                    {t('nav.notifications')}
+                    {unreadCount > 0 && (
+                      <span className="ml-auto w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </Link>
                   <MobileNavLink href="/mi-cuenta" pathname={pathname} onClick={() => setIsMobileMenuOpen(false)} icon={Shield} label={t('nav.mi_cuenta')} />
                   <div className="h-px bg-slate-700 my-1" />
                   <div className="flex items-center justify-between px-3 py-2">

@@ -8,6 +8,7 @@ import {
   ChevronLeft, ChevronRight, ArrowRight, LayoutGrid, Plus, Dice5, HelpCircle 
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
+import TdfFilmLoader from '@/components/TdfFilmLoader';
 import { getSectionCache, setSectionCache, SECTION_KEYS } from '@/lib/sectionCache';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -198,8 +199,8 @@ export default function GuiaPage() {
 
   return (
     <div className="relative min-h-screen">
-      {/* Fondo Anycolour solo escritorio: velocidad según scroll (abajo más rápido, arriba más lento) */}
-      <div className="hidden md:block fixed inset-0 z-0">
+      {/* Fondo Anycolour (móvil y escritorio): velocidad según scroll (abajo más rápido, arriba más lento) */}
+      <div className="fixed inset-0 z-0">
         <AnycolourBackground backgroundOnly speedMultiplier={particleSpeedMultiplier} particleCount={1688} />
       </div>
 
@@ -333,9 +334,8 @@ export default function GuiaPage() {
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
-            <p className="text-slate-500 text-sm animate-pulse">{t('guia.cargando')}</p>
+          <div className="flex flex-col items-center justify-center py-20">
+            <TdfFilmLoader />
           </div>
         ) : (
           <motion.div 

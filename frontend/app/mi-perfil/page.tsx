@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { User, Briefcase, Plus, Edit, Trash2, Loader2, MapPin } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
 import ProfileHealth from '@/components/ProfileHealth';
+import TdfFilmLoader from '@/components/TdfFilmLoader';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function MisPerfilesPage() {
@@ -70,7 +71,7 @@ export default function MisPerfilesPage() {
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white"><Loader2 className="animate-spin"/></div>;
+  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white"><TdfFilmLoader /></div>;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-sans pt-28 pb-12 px-6">

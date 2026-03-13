@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { 
   ArrowLeft, CheckCircle, XCircle, Clock, User, Mail, ShieldCheck, ExternalLink
 } from 'lucide-react';
+import TdfFilmLoader from '@/components/TdfFilmLoader';
 
 export default function GestionSolicitudesPage() {
   const router = useRouter();
@@ -67,7 +68,7 @@ export default function GestionSolicitudesPage() {
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Cargando...</div>;
+  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white"><TdfFilmLoader /></div>;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white pt-28 pb-12 px-6 font-sans">

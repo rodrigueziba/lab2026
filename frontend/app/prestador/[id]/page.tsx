@@ -11,6 +11,7 @@ import DepthAwareImage from '@/components/DepthAwareImage';
 import OpalBackground, { type OpalBackgroundParams } from '@/components/OpalBackground';
 import { isProfileHealth100 } from '@/lib/profileHealth';
 import { usePrestadorVisit } from '@/contexts/PrestadorVisitContext';
+import TdfFilmLoader from '@/components/TdfFilmLoader';
 
 const DEFAULT_PRESTADOR_OPAL_PARAMS: Required<OpalBackgroundParams> = {
   speed: 0.1,
@@ -228,7 +229,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
     return urls[key] || v;
   };
 
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Cargando...</div>;
+  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white"><TdfFilmLoader /></div>;
   if (!prestador) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-red-400">Error cargando perfil.</div>;
 
   const videoId = getYoutubeId(prestador.videoReel);

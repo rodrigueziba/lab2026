@@ -28,3 +28,14 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes tdffilm-brightness-pulse {
+  0%, 100% {
+    opacity: 0.9;
+    filter: brightness(0.9);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.3);
+  }
+}

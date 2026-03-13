@@ -24,8 +24,6 @@ export default function TopologyBackground(props = {}) {
   }, [props.LINES, props.STEPS, props.BASE_SPEED, props.WAVE_AMP, props.MOUSE_RADIUS, props.MOUSE_FORCE, props.gradientColors]);
 
   useEffect(() => {
-    if (window.innerWidth < 1024) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -174,9 +172,8 @@ export default function TopologyBackground(props = {}) {
         height:        "100%",
         pointerEvents: "none",
         zIndex:        0,
-        display:       "none",
       }}
-      className="lg:!block"
+      className="block"
     />
   );
 }
