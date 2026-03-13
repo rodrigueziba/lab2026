@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
@@ -9,6 +10,8 @@ import {
 import DepthAwareImage from '@/components/DepthAwareImage';
 import { getSectionCache, setSectionCache, SECTION_KEYS } from '@/lib/sectionCache';
 import { useLanguage } from '@/contexts/LanguageContext';
+
+const AnycolourBackground = dynamic(() => import('@/components/anycolour'), { ssr: false });
 
 const getInitials = (name: string) => {
   return name ? name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() : 'NN';
@@ -181,8 +184,14 @@ export default function GuiaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-500/30 pt-80 md:pt-48 flex flex-col">
-      
+    <div className="relative min-h-screen">
+      {/* Fondo Anycolour solo escritorio: detrás de todo, sin capturar clics */}
+      <div className="hidden md:block fixed inset-0 z-0 pointer-events-none">
+        <AnycolourBackground backgroundOnly />
+      </div>
+
+      {/* Contenido de la guía y tarjetas encima (z-10); fondo semi-transparente para ver partículas detrás */}
+      <div className="relative z-10 min-h-screen bg-slate-950/85 text-white font-sans selection:bg-orange-500/30 pt-80 md:pt-48 flex flex-col">
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .guia-page-header[data-header-hidden="true"] {
@@ -420,6 +429,7 @@ export default function GuiaPage() {
             </div>
         )}
 
+      </div>
       </div>
     </div>
   );

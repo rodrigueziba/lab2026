@@ -51,7 +51,12 @@ const DEFAULT_CONFIG = {
 const SNAP_R = 18;
 
 // ─── component ────────────────────────────────────────────────────────────────
-export default function DustSim() {
+interface DustSimProps {
+  /** En true solo se muestra el canvas (sin botón Debug ni hint); para usar como fondo en otras páginas */
+  backgroundOnly?: boolean;
+}
+
+export default function DustSim({ backgroundOnly = false }: DustSimProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showDebugButton, setShowDebugButton] = useState(false); // Shift para mostrar/ocultar; por defecto oculto
   const [debugOpen, setDebugOpen] = useState(false);
@@ -250,7 +255,7 @@ export default function DustSim() {
     const canvas=canvasRef.current!;
     canvas.addEventListener('click',handlePointer);
     canvas.addEventListener('contextmenu',handlePointer);
-    const onKey=(e:KeyboardEvent)=>{if(e.key==='Shift')setShowDebugButton((v)=>!v);};
+    const onKey=(e:KeyboardEvent)=>{if(!backgroundOnly&&e.key==='Shift')setShowDebugButton((v)=>!v);};
     document.addEventListener('keydown',onKey);
     window.addEventListener('resize',setupCanvas);
     sr.current.animId=requestAnimationFrame(animate);
@@ -261,7 +266,7 @@ export default function DustSim() {
       document.removeEventListener('keydown',onKey);
       window.removeEventListener('resize',setupCanvas);
     };
-  },[setupCanvas,initParticles,animate,handlePointer]);
+  },[setupCanvas,initParticles,animate,handlePointer,backgroundOnly]);
 
   // ── panel bindings ────────────────────────────────────────────────────────
   useEffect(()=>{
@@ -304,7 +309,8 @@ export default function DustSim() {
       <div className="fixed inset-0 bg-black overflow-hidden font-[inherit]">
         <canvas ref={canvasRef} className="ds-canvas" />
 
-        {/* Debug: Shift muestra/oculta el botón; por defecto oculto. Panel siempre en DOM para bindings. */}
+        {/* Debug: solo si no es backgroundOnly. Shift muestra/oculta el botón; por defecto oculto. Panel siempre en DOM para bindings. */}
+        {!backgroundOnly && (
         <div className={`fixed left-6 top-[38%] -translate-y-1/2 z-[60] flex items-center gap-2 ${showDebugButton ? '' : 'hidden'}`}>
           <button
             type="button"
@@ -382,10 +388,13 @@ export default function DustSim() {
               </div>
             </div>
         </div>
+        )}
 
+        {!backgroundOnly && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 text-xs tracking-widest uppercase text-white/30 pointer-events-none whitespace-nowrap font-[inherit]">
           click izq: gravedad · click der: repulsión · sobre punto: borrar · shift: botón debug
         </div>
+        )}
       </div>
     </>
   );

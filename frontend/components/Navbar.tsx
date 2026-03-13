@@ -266,6 +266,17 @@ export default function Navbar() {
     };
   }, [themeUnlocked, playlistIndex, playlist]);
 
+  // Al cambiar a la vista Anycolour se dispara este evento; forzar play() para garantizar reproducción
+  useEffect(() => {
+    const onRequestPlay = () => {
+      if (audioRef.current) {
+        audioRef.current.play().then(() => setMusicPlaying(true)).catch(() => setMusicPlaying(false));
+      }
+    };
+    window.addEventListener('theme-unlocked-request-play', onRequestPlay);
+    return () => window.removeEventListener('theme-unlocked-request-play', onRequestPlay);
+  }, []);
+
   const handleMusicPlayPause = () => {
     const a = audioRef.current;
     if (!a) return;
