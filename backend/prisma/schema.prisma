@@ -34,6 +34,15 @@ model User {
   createdAt   DateTime @default(now())
   postulaciones       Postulacion[]
   solicitudesEnviadas SolicitudContacto[] @relation("SolicitudesEnviadas")
+  loginLogs   LoginLog[] // Registro de logueos para puntaje (últimos 30 días)
+}
+
+// Registro de cada login (para puntaje 0-1 en últimos 30 días, se “resetea” por ventana móvil)
+model LoginLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }
 
 // 2. EL PRESTADOR (Los Perfiles Públicos)

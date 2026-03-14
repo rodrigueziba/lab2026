@@ -112,14 +112,39 @@ export class PrestadorService {
     return { message: 'Solicitud enviada. Se ha notificado al profesional.' };
   }
 
-  findAll() {
-    return this.prisma.prestador.findMany({
-      include: { 
-        user: { select: { nombre: true } },
-        experiencias: true 
-      },
-      orderBy: { createdAt: 'desc' }
+  /** Puntaje 0–1 según logueos en los últimos 30 días (ventana móvil, “reset” implícito). */
+  private async getLoginScoresByUser(): Promise<Map<number, number>> {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const counts = await this.prisma.loginLog.groupBy({
+      by: ['userId'],
+      where: { createdAt: { gte: thirtyDaysAgo } },
+      _count: { id: true },
     });
+
+    const map = new Map<number, number>();
+    for (const row of counts) {
+      const score = Math.min(1, row._count.id / 30);
+      map.set(row.userId, score);
+    }
+    return map;
+  }
+
+  async findAll() {
+    const prestadores = await this.prisma.prestador.findMany({
+      include: {
+        user: { select: { nombre: true } },
+        experiencias: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const scoreByUser = await this.getLoginScoresByUser();
+    return prestadores.map((p) => ({
+      ...p,
+      loginScore: scoreByUser.get(p.userId) ?? 0,
+    }));
   }
 
   findAllByUser(userId: number) {

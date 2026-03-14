@@ -61,6 +61,7 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    await this.prisma.loginLog.create({ data: { userId: user.id } });
     return this.generateToken(user);
   }
 
@@ -78,6 +79,7 @@ export class AuthService {
             data: { googleId }
          });
       }
+      await this.prisma.loginLog.create({ data: { userId: user.id } });
       return this.generateToken(user);
     }
     console.log(`Creando usuario nuevo de Google: ${email}`);
@@ -96,6 +98,7 @@ export class AuthService {
       },
     });
 
+    await this.prisma.loginLog.create({ data: { userId: newUser.id } });
     return this.generateToken(newUser);
   }
 

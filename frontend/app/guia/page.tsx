@@ -47,7 +47,25 @@ interface Prestador {
   fotoProfundidad?: string | null;
   ciudad?: string;
   colorTema?: string;
+  loginScore?: number;
   [key: string]: unknown;
+}
+
+/** Tercio por puntaje: 0–0.33 inferior, 0.34–0.66 medio, 0.67–1 superior. Orden por defecto: superior primero. */
+function tierFromLoginScore(score: number | undefined): number {
+  const s = score ?? 0;
+  if (s >= 0.67) return 3;
+  if (s >= 0.34) return 2;
+  return 1;
+}
+
+function sortPrestadoresByLoginTier(list: Prestador[]): Prestador[] {
+  return [...list].sort((a, b) => {
+    const ta = tierFromLoginScore(a.loginScore);
+    const tb = tierFromLoginScore(b.loginScore);
+    if (tb !== ta) return tb - ta;
+    return (b.loginScore ?? 0) - (a.loginScore ?? 0);
+  });
 }
 
 export default function GuiaPage() {
@@ -78,8 +96,9 @@ export default function GuiaPage() {
     const cached = getSectionCache<Prestador[]>(SECTION_KEYS.guia);
     if (cached != null) {
       dataLoadedRef.current = true;
-      setPrestadores(cached);
-      setPrestadoresMostrados(cached);
+      const sorted = sortPrestadoresByLoginTier(cached);
+      setPrestadores(sorted);
+      setPrestadoresMostrados(sorted);
       setLoading(false);
       return;
     }
@@ -88,9 +107,10 @@ export default function GuiaPage() {
       .then(data => {
           if (dataLoadedRef.current) return;
           dataLoadedRef.current = true;
-          setPrestadores(data);
-          setPrestadoresMostrados(data);
-          setSectionCache(SECTION_KEYS.guia, data);
+          const sorted = sortPrestadoresByLoginTier(Array.isArray(data) ? data : []);
+          setPrestadores(sorted);
+          setPrestadoresMostrados(sorted);
+          setSectionCache(SECTION_KEYS.guia, sorted);
           setLoading(false);
       })
       .catch(err => console.error(err));
