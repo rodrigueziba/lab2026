@@ -518,47 +518,47 @@ export default function CarteleraProyectosPage() {
                       </div>
 
                       {/* CONTENIDO */}
-                      <div className="p-4 max-[800px]:p-3 md:p-5 lg:p-7 flex-1 flex flex-col bg-slate-900 relative z-10 -mt-8 max-[800px]:-mt-6 md:-mt-10 lg:-mt-12 rounded-t-xl max-[800px]:rounded-t-2xl md:rounded-t-[2rem]">
+                      <div className="p-5 max-[800px]:p-4 md:p-6 lg:p-8 flex-1 flex flex-col bg-slate-900 relative z-10 -mt-8 max-[800px]:-mt-6 md:-mt-10 lg:-mt-12 rounded-t-xl max-[800px]:rounded-t-2xl md:rounded-t-[2rem]">
                         
-                        {/* Título Grande */}
-                        <h3 className="text-lg max-[800px]:text-base md:text-2xl lg:text-3xl font-black text-white mb-2 max-[800px]:mb-2 md:mb-3 leading-none group-hover:text-orange-500 transition-colors tracking-tight">
+                        {/* Título Grande — centrado */}
+                        <h3 className="text-base max-[800px]:text-sm md:text-xl lg:text-2xl font-black text-white mb-3 max-[800px]:mb-3 md:mb-4 leading-tight group-hover:text-orange-500 transition-colors tracking-tight text-center">
                             {p.titulo}
                         </h3>
 
-                        {/* Ubicación e Inicio */}
-                        <div className="flex items-center gap-2 max-[800px]:gap-2 md:gap-4 text-[10px] max-[800px]:text-[10px] md:text-xs text-slate-400 mb-2 max-[800px]:mb-2 md:mb-4 font-medium">
-                            <span className="flex items-center gap-1"><MapPin size={12} className="text-orange-500"/> {p.ciudad}</span>
-                            {p.fechaInicio && <span className="flex items-center gap-1"><Calendar size={12}/> {new Date(p.fechaInicio).toLocaleDateString()}</span>}
+                        {/* Ubicación e Inicio — centrado */}
+                        <div className="flex items-center justify-center gap-2 max-[800px]:gap-2 md:gap-4 text-[10px] max-[800px]:text-[10px] md:text-xs text-slate-400 mb-3 max-[800px]:mb-3 md:mb-5 font-medium text-center">
+                            <span className="flex items-center gap-1"><MapPin size={11} className="text-orange-500"/> {p.ciudad}</span>
+                            {p.fechaInicio && <span className="flex items-center gap-1"><Calendar size={11}/> {new Date(p.fechaInicio).toLocaleDateString()}</span>}
                         </div>
 
-                        <p className="text-slate-400 text-xs max-[800px]:text-[11px] md:text-sm line-clamp-2 max-[800px]:line-clamp-2 md:line-clamp-3 mb-3 max-[800px]:mb-3 md:mb-6 font-light leading-relaxed">
+                        <p className="text-slate-400 text-[11px] max-[800px]:text-[11px] md:text-xs line-clamp-2 max-[800px]:line-clamp-2 md:line-clamp-3 mb-4 max-[800px]:mb-4 md:mb-6 font-light leading-relaxed text-justify">
                             {p.descripcion}
                         </p>
 
                         {/* Roles */}
-                        <div className="mt-auto pt-2 max-[800px]:pt-2 md:pt-4 border-t border-slate-800">
-                            <div className="flex flex-wrap gap-1 max-[800px]:gap-1 md:gap-1.5 mb-2 max-[800px]:mb-2 md:mb-4">
+                        <div className="mt-auto pt-3 max-[800px]:pt-3 md:pt-5 border-t border-slate-800">
+                            <div className="flex flex-wrap gap-1.5 max-[800px]:gap-1.5 md:gap-2 mb-3 max-[800px]:mb-3 md:mb-4">
                                 {p.puestos && p.puestos.length > 0 ? (
                                     p.puestos.slice(0, 3).map((puesto: Puesto) => (
-                                        <span key={puesto.id} className="text-[10px] font-bold uppercase bg-slate-800 text-slate-300 px-2 py-1 rounded border border-slate-700">
+                                        <span key={puesto.id} className="text-[9px] font-bold uppercase bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
                                             {puesto.nombre}
                                         </span>
                                     ))
-                                ) : <span className="text-xs text-slate-600 italic">Equipo completo</span>}
-                                {p.puestos && p.puestos.length > 3 && <span className="text-[10px] text-slate-500 px-1">+{p.puestos.length - 3}</span>}
+                                ) : <span className="text-[11px] text-slate-600 italic">Equipo completo</span>}
+                                {p.puestos && p.puestos.length > 3 && <span className="text-[9px] text-slate-500 px-1">+{p.puestos.length - 3}</span>}
                             </div>
 
                             <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400 border border-slate-700">
+                                    <div className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[9px] font-bold text-slate-400 border border-slate-700">
                                         {p.user?.nombre?.[0] || 'U'}
                                     </div>
-                                    <span className="text-[10px] text-slate-500 uppercase tracking-widest truncate max-w-[80px]">
+                                    <span className="text-[9px] text-slate-500 uppercase tracking-widest truncate max-w-[72px]">
                                         {p.user?.nombre || 'Productor'}
                                     </span>
                                 </div>
-                                <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-orange-500 group-hover:gap-2 transition-all">
-                                    Ver Ficha <Eye size={12}/>
+                                <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-orange-500 group-hover:gap-2 transition-all">
+                                    Ver Ficha <Eye size={11}/>
                                 </span>
                             </div>
                         </div>
