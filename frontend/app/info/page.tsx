@@ -30,7 +30,7 @@ const FEATURES = [
   { icon: "🌐", color: "purple", title: "Mapa Nodal 3D",           desc: "Visualización interactiva que muestra tu nodo y sus conexiones con proyectos, locaciones y otros prestadores." },
   { icon: "🎞️", color: "green",  title: "Cartelera de Proyectos", desc: "Accedé al catálogo de producciones activas: largometrajes, series, documentales, publicidades y más." },
   { icon: "📍", color: "gold",   title: "Catálogo de Locaciones",  desc: "Explorá los espacios disponibles para filmación en Ushuaia, Tolhuin y Río Grande." },
-  { icon: "🔒", color: "blue",   title: "Acceso Seguro",           desc: "Autenticación JWT y cifrado bcrypt. Tu información está protegida y solo vos podés editar tu perfil." },
+  { icon: "🔒", color: "blue",   title: "Acceso Seguro",           desc: "Autenticación JWT y cifrado bcrypt. Tu información está protegida y solo vos podés editar tu perfil. Tus datos de contacto nunca son visibles por defecto. Ningún dato guardado se comparte con ninguna IA." },
 ];
 
 const TIPS = [

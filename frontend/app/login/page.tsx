@@ -165,7 +165,7 @@ const DEFAULT_LOGIN_DEBUG = {
   topColor: '#0a198c',
   bottomColor: '#11133b',
   bloomStrength: 1.0,
-  speed: 0.2,
+  speed: 0.069, // ~30% más lento que 0.098 (inicio muy suave)
   lightIntensity: 1.2,
   rgbShiftAmount: 0.001,
 };
