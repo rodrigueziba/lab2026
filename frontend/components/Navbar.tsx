@@ -13,7 +13,7 @@ import { usePrestadorVisit } from '@/contexts/PrestadorVisitContext';
 
 const RAINBOW_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-// Lista de MP3 en /public (anycolour primero; el resto se reproduce en orden aleatorio)
+// Orden fijo del easter egg: anycolour → echoes → music
 const NAVBAR_MP3_FILES = ['anycolour.mp3', 'echoes.mp3', 'music.mp3'];
 const THEME_UNLOCK_HOVER_MS = 60000; // 1 minuto de hover para desbloquear tema + música
 const WAVE_COLOR_INTERVAL_MS = 3200; // Cambio de color lento tipo olas (solo cuando themeUnlocked)
@@ -58,15 +58,7 @@ export default function Navbar() {
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [prestadorMusicPlaying, setPrestadorMusicPlaying] = useState(false);
   const [playlistIndex, setPlaylistIndex] = useState(0);
-  const [playlist] = useState(() => {
-    const first = NAVBAR_MP3_FILES[0];
-    const rest = NAVBAR_MP3_FILES.slice(1);
-    for (let i = rest.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [rest[i], rest[j]] = [rest[j], rest[i]];
-    }
-    return [first, ...rest];
-  });
+  const [playlist] = useState(() => [...NAVBAR_MP3_FILES]);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -267,7 +259,7 @@ export default function Navbar() {
     };
   }, [themeUnlocked]);
 
-  // Audio: reproducir lista (anycolour primero, luego el resto en orden aleatorio); solo escritorio cuando themeUnlocked
+  // Audio: reproducir lista en orden fijo (anycolour → echoes → music); solo escritorio cuando themeUnlocked
   useEffect(() => {
     if (!themeUnlocked || typeof window === 'undefined' || window.innerWidth < 768) return;
     const audio = new Audio(`/${playlist[playlistIndex]}`);

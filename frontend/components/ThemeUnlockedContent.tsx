@@ -7,17 +7,24 @@ import dynamic from 'next/dynamic';
 const Anycolour = dynamic(() => import('@/components/anycolour'), { ssr: false });
 
 const THEME_UNLOCKED_REQUEST_PLAY = 'theme-unlocked-request-play';
+
+// Scroll: arriba = más velocidad, paleta hacia arriba (índice +1), más RGB shift. Abajo = menos velocidad, paleta hacia abajo, menos shift.
+const SPEED_STEP = 0.04;
+const SPEED_MIN = 0.35;
+const SPEED_MAX = 2.2;
+const PALETTE_SIZE = 7;
+const RGB_SHIFT_STEP = 0.25;
 const RGB_SHIFT_MIN = 0;
-const RGB_SHIFT_MAX = 12;
-const RGB_SHIFT_SCROLL_SENSITIVITY = 0.15;
+const RGB_SHIFT_MAX = 5;
 
 export default function ThemeUnlockedContent({ children }: { children: React.ReactNode }) {
   const ctx = useThemeUnlocked();
   const themeUnlocked = ctx?.themeUnlocked ?? false;
-  const [rgbShift, setRgbShift] = useState(0);
-  const scrollYRef = useRef(0);
+  const [speedMultiplier, setSpeedMultiplier] = useState(1);
+  const [paletteIndex, setPaletteIndex] = useState(0);
+  const [rgbShiftAmount, setRgbShiftAmount] = useState(0);
 
-  // Al mostrar la vista Anycolour, pedir al Navbar que reproduzca (por si el primer play fue bloqueado por el navegador)
+  // Al mostrar la vista Anycolour, pedir al Navbar que reproduzca
   useEffect(() => {
     if (!themeUnlocked) return;
     const fire = () => window.dispatchEvent(new CustomEvent(THEME_UNLOCKED_REQUEST_PLAY));
@@ -32,46 +39,33 @@ export default function ThemeUnlockedContent({ children }: { children: React.Rea
     };
   }, [themeUnlocked]);
 
-  // RGB shift según scroll: scroll arriba aumenta, scroll abajo disminuye (solo en vista easter egg)
+  // Rueda del mouse / trackpad: la vista es fixed y no hace scroll, así que usamos wheel
   useEffect(() => {
     if (!themeUnlocked) return;
-    const handleScroll = () => {
-      const y = window.scrollY;
-      const delta = y - scrollYRef.current;
-      scrollYRef.current = y;
-      setRgbShift((prev) => {
-        const next = prev - delta * RGB_SHIFT_SCROLL_SENSITIVITY;
-        return Math.max(RGB_SHIFT_MIN, Math.min(RGB_SHIFT_MAX, next));
-      });
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY < 0) {
+        setSpeedMultiplier((prev) => Math.min(SPEED_MAX, prev + SPEED_STEP));
+        setPaletteIndex((prev) => (prev + 1) % PALETTE_SIZE);
+        setRgbShiftAmount((prev) => Math.min(RGB_SHIFT_MAX, prev + RGB_SHIFT_STEP));
+      } else if (e.deltaY > 0) {
+        setSpeedMultiplier((prev) => Math.max(SPEED_MIN, prev - SPEED_STEP));
+        setPaletteIndex((prev) => (prev - 1 + PALETTE_SIZE) % PALETTE_SIZE);
+        setRgbShiftAmount((prev) => Math.max(RGB_SHIFT_MIN, prev - RGB_SHIFT_STEP));
+      }
     };
-    scrollYRef.current = window.scrollY;
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    return () => window.removeEventListener('wheel', handleWheel);
   }, [themeUnlocked]);
 
   if (themeUnlocked) {
-    const amount = Math.max(0, rgbShift);
     return (
       <div className="fixed inset-0 z-[50] flex flex-col min-h-screen">
-        <svg className="absolute w-0 h-0" aria-hidden>
-          <defs>
-            <filter id="theme-rgb-shift" colorInterpolationFilters="sRGB">
-              <feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r" />
-              <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g" />
-              <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b" />
-              <feOffset in="r" dx={amount} dy="0" result="ro" />
-              <feOffset in="b" dx={-amount} dy="0" result="bo" />
-              <feBlend in="ro" in2="g" mode="normal" result="rg" />
-              <feBlend in="rg" in2="bo" mode="normal" />
-            </filter>
-          </defs>
-        </svg>
-        <div
-          className="w-full h-full"
-          style={{ filter: amount > 0.5 ? `url(#theme-rgb-shift)` : 'none' }}
-        >
-          <Anycolour />
-        </div>
+        <Anycolour
+          backgroundOnly={false}
+          speedMultiplier={speedMultiplier}
+          easterEggPaletteIndex={paletteIndex}
+          easterEggRgbShift={rgbShiftAmount}
+        />
       </div>
     );
   }

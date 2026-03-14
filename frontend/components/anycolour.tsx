@@ -38,6 +38,13 @@ function buildPalette(hex:string):string[]{
   return Array.from({length:10},(_,i)=>hslToHex((h+i*36)%360,s*(0.7+(i%3)*0.15),Math.min(85,l*(0.75+(i%4)*0.1))));
 }
 
+// 7 colores complementarios (hues cada ~51°) para el easter egg por scroll
+const EASTER_EGG_HUES = [0, 51, 102, 153, 204, 255, 306];
+function buildEasterEggPalette(rotationIndex: number): string[] {
+  const s = 75, l = 65;
+  return EASTER_EGG_HUES.map((_, i) => hslToHex((EASTER_EGG_HUES[(i + rotationIndex) % 7] + 0) % 360, s, l));
+}
+
 // ─── default config ───────────────────────────────────────────────────────────
 const DEFAULT_CONFIG = {
   baseColor: '#aaff00',
@@ -58,9 +65,13 @@ interface DustSimProps {
   speedMultiplier?: number;
   /** Cantidad de partículas (por defecto DEFAULT_CONFIG.particleCount). Ej. 2250 = 25% menos */
   particleCount?: number;
+  /** Easter egg: índice 0–6 para paleta de 7 colores complementarios (scroll arriba/abajo) */
+  easterEggPaletteIndex?: number;
+  /** Easter egg: desplazamiento en px para RGB shift por partícula (rojo izq, azul der) */
+  easterEggRgbShift?: number;
 }
 
-export default function DustSim({ backgroundOnly = false, speedMultiplier = 1, particleCount }: DustSimProps) {
+export default function DustSim({ backgroundOnly = false, speedMultiplier = 1, particleCount, easterEggPaletteIndex, easterEggRgbShift = 0 }: DustSimProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showDebugButton, setShowDebugButton] = useState(false); // Shift para mostrar/ocultar; por defecto oculto
   const [debugOpen, setDebugOpen] = useState(false);
@@ -77,21 +88,33 @@ export default function DustSim({ backgroundOnly = false, speedMultiplier = 1, p
     pixelRatio: typeof window!=='undefined' ? Math.min(window.devicePixelRatio||1,2) : 1,
     animId:     0,
     lastTime:   0,
-    // mode
     usePixelMode: false,
-    // perf phase 1: first 5s, detect <10fps → pixel mode
     p1Done:  false,
     p1Start: 0,
     p1Frames:[] as number[],
-    // perf phase 2: next 10s, detect <30fps → reduce
     p2Done:  false,
     p2Start: 0,
     p2Frames:[] as number[],
+    easterEggPaletteIndex: undefined as number | undefined,
+    easterEggRgbShift: 0 as number,
   });
 
   useEffect(() => {
     sr.current.speedMultiplier = speedMultiplier;
   }, [speedMultiplier]);
+
+  useEffect(() => {
+    sr.current.easterEggPaletteIndex = easterEggPaletteIndex;
+    sr.current.easterEggRgbShift = easterEggRgbShift ?? 0;
+  }, [easterEggPaletteIndex, easterEggRgbShift]);
+
+  // Cuando hay paleta easter egg (7 colores), usarla en lugar de la base
+  useEffect(() => {
+    if (easterEggPaletteIndex == null) return;
+    const pal = buildEasterEggPalette(easterEggPaletteIndex);
+    sr.current.palette = pal;
+    sr.current.paletteRgb = pal.map(hexToRgb) as [number,number,number][];
+  }, [easterEggPaletteIndex]);
 
   if (particleCount != null) sr.current.config.particleCount = particleCount;
 
@@ -204,17 +227,24 @@ export default function DustSim({ backgroundOnly = false, speedMultiplier = 1, p
       ctx.beginPath();ctx.arc(gp.x,gp.y,3.5,0,Math.PI*2);ctx.fillStyle=gp.type===1?'#ff3333':'#3399ff';ctx.fill();
     }
     stepParticles(s.particles,s.gravPoints,s.config,W,H,dt,newParticle);
+    const shift = s.easterEggRgbShift ?? 0;
     for(const p of s.particles){
-      ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fillStyle=s.palette[p.colorIdx];ctx.fill();
+      const idx = p.colorIdx % s.paletteRgb.length;
+      const [r,g,b]=s.paletteRgb[idx];
+      if(shift > 0){
+        ctx.beginPath();ctx.arc(p.x-shift,p.y,p.size,0,Math.PI*2);ctx.fillStyle=`rgba(${r},0,0,0.9)`;ctx.fill();
+        ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fillStyle=`rgba(0,${g},0,0.9)`;ctx.fill();
+        ctx.beginPath();ctx.arc(p.x+shift,p.y,p.size,0,Math.PI*2);ctx.fillStyle=`rgba(0,0,${b},0.9)`;ctx.fill();
+      } else {
+        ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fillStyle=s.palette[p.colorIdx];ctx.fill();
+      }
     }
   },[newParticle]);
 
   // ── pixel renderer ────────────────────────────────────────────────────────
   const renderPixel = useCallback((ctx:CanvasRenderingContext2D,dt:number,W:number,H:number)=>{
     const s=sr.current;
-    // fade
     ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fillRect(0,0,W,H);
-    // grav point markers (cross, no arc)
     for(const gp of s.gravPoints){
       ctx.fillStyle=gp.type===1?'#ff3333':'#3399ff';
       ctx.fillRect(gp.x-1,gp.y-5,2,10); ctx.fillRect(gp.x-5,gp.y-1,10,2);
@@ -222,19 +252,28 @@ export default function DustSim({ backgroundOnly = false, speedMultiplier = 1, p
       ctx.fillRect(gp.x-16,gp.y-16,32,32);
     }
     stepParticles(s.particles,s.gravPoints,s.config,W,H,dt,newParticle);
-    // write pixels via ImageData
+    const shift = Math.round(s.easterEggRgbShift ?? 0);
     const imgData=ctx.getImageData(0,0,W,H);
     const data=imgData.data;
     for(const p of s.particles){
       const px=Math.round(p.x),py=Math.round(p.y);
-      if(px<0||px>=W||py<0||py>=H)continue;
-      const [cr,cg,cb]=s.paletteRgb[p.colorIdx];
+      const idx = p.colorIdx % s.paletteRgb.length;
+      const [cr,cg,cb]=s.paletteRgb[idx];
       const sz=p.size>1.2?2:1;
-      for(let dy2=0;dy2<sz;dy2++)for(let dx2=0;dx2<sz;dx2++){
-        const nx=px+dx2,ny=py+dy2;
-        if(nx>=W||ny>=H)continue;
-        const idx=(ny*W+nx)*4;
-        data[idx]=cr;data[idx+1]=cg;data[idx+2]=cb;data[idx+3]=255;
+      if(shift > 0){
+        for(let dy2=0;dy2<sz;dy2++)for(let dx2=0;dx2<sz;dx2++){
+          const nx=px+dx2,ny=py+dy2;
+          if(ny<0||ny>=H)continue;
+          const idxC=(ny*W+nx)*4;
+          if(nx>=0&&nx<W){ data[idxC]=Math.min(255,data[idxC]+0); data[idxC+1]=Math.min(255,data[idxC+1]+cg); data[idxC+2]=Math.min(255,data[idxC+2]+0); data[idxC+3]=255; }
+          if(nx-shift>=0&&nx-shift<W){ const i=(ny*W+(nx-shift))*4; data[i]=Math.min(255,data[i]+cr); data[i+3]=255; }
+          if(nx+shift>=0&&nx+shift<W){ const i=(ny*W+(nx+shift))*4; data[i+2]=Math.min(255,data[i+2]+cb); data[i+3]=255; }
+        }
+      } else {
+        for(let dy2=0;dy2<sz;dy2++)for(let dx2=0;dx2<sz;dx2++){
+          const nx=px+dx2,ny=py+dy2;
+          if(nx>=0&&nx<W&&ny>=0&&ny<H){ const idx=(ny*W+nx)*4; data[idx]=cr;data[idx+1]=cg;data[idx+2]=cb;data[idx+3]=255; }
+        }
       }
     }
     ctx.putImageData(imgData,0,0);
@@ -322,84 +361,86 @@ export default function DustSim({ backgroundOnly = false, speedMultiplier = 1, p
       <div className="fixed inset-0 bg-black overflow-hidden font-[inherit]">
         <canvas ref={canvasRef} className="ds-canvas" />
 
-        {/* Debug: solo si no es backgroundOnly. Shift muestra/oculta el botón; por defecto oculto. Panel siempre en DOM para bindings. */}
+        {/* Debug: centrado verticalmente; en pantallas < 1080px se achica para que entre bien */}
         {!backgroundOnly && (
-        <div className={`fixed left-6 top-[38%] -translate-y-1/2 z-[60] flex items-center gap-2 ${showDebugButton ? '' : 'hidden'}`}>
-          <button
-            type="button"
-            onClick={() => setDebugOpen((o) => !o)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950/90 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-white hover:border-orange-500/40 hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] transition-all font-bold text-sm"
-          >
-            <Settings2 size={18} />
-            Debug
-          </button>
-          <div className={`fixed left-24 top-1/2 -translate-y-1/2 w-72 rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[61] ${debugOpen ? 'block' : 'hidden'}`}>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">DustSim</span>
+        <div className={`fixed left-6 top-1/2 -translate-y-1/2 z-[60] flex items-center gap-2 ${showDebugButton ? '' : 'hidden'}`}>
+          <div className="flex items-center gap-2 max-[1080px]:scale-90 max-[1080px]:origin-left">
+            <button
+              type="button"
+              onClick={() => setDebugOpen((o) => !o)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950/90 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-white hover:border-orange-500/40 hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] transition-all font-bold text-sm max-[1080px]:px-3 max-[1080px]:py-2 max-[1080px]:text-xs"
+            >
+              <Settings2 size={18} className="max-[1080px]:w-4 max-[1080px]:h-4" />
+              Debug
+            </button>
+            <div className={`w-72 max-[1080px]:w-60 max-[1080px]:max-h-[85vh] rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[61] ${debugOpen ? 'block' : 'hidden'}`}>
+              <div className="flex items-center justify-between px-4 py-3 max-[1080px]:px-3 max-[1080px]:py-2 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest max-[1080px]:text-[10px] max-[1080px]:tracking-wider">Anycolouryoulike</span>
                 <button
                   type="button"
                   onClick={() => setDebugOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
+                  className="p-1.5 max-[1080px]:p-1 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
                   aria-label="Cerrar"
                 >
-                  <X size={18} />
+                  <X size={18} className="max-[1080px]:w-4 max-[1080px]:h-4" />
                 </button>
               </div>
-              <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/5 pb-1 mb-1">Partículas</div>
-                <div className="flex items-center justify-between gap-2">
-                  <label htmlFor="ds-baseColor" className="text-xs font-bold text-slate-400">Color base</label>
-                  <input type="color" id="ds-baseColor" defaultValue={DEFAULT_CONFIG.baseColor} className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent" />
+              <div className="p-4 space-y-4 max-h-[70vh] max-[1080px]:p-3 max-[1080px]:space-y-2.5 max-[1080px]:max-h-[60vh] overflow-y-auto">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/5 pb-1 mb-1 max-[1080px]:text-[10px] max-[1080px]:pb-0.5 max-[1080px]:mb-0.5">Partículas</div>
+                <div className="flex items-center justify-between gap-2 max-[1080px]:gap-1.5">
+                  <label htmlFor="ds-baseColor" className="text-xs font-bold text-slate-400 max-[1080px]:text-[10px]">Color base</label>
+                  <input type="color" id="ds-baseColor" defaultValue={DEFAULT_CONFIG.baseColor} className="w-10 h-10 max-[1080px]:w-8 max-[1080px]:h-8 rounded-lg border border-white/10 cursor-pointer bg-transparent" />
                 </div>
-                <div>
-                  <label className="flex justify-between items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-slate-400">Cantidad</span>
-                    <span className="text-xs font-mono text-orange-400" id="ds-particleCountVal">{DEFAULT_CONFIG.particleCount}</span>
+                <div className="max-[1080px]:space-y-0.5">
+                  <label className="flex justify-between items-center gap-2 mb-1 max-[1080px]:mb-0.5">
+                    <span className="text-xs font-bold text-slate-400 max-[1080px]:text-[10px]">Cantidad</span>
+                    <span className="text-xs font-mono text-orange-400 max-[1080px]:text-[10px]" id="ds-particleCountVal">{DEFAULT_CONFIG.particleCount}</span>
                   </label>
-                  <input type="range" id="ds-particleCount" min="100" max="30000" step="500" defaultValue={DEFAULT_CONFIG.particleCount} className="w-full h-2 rounded-full bg-slate-800 accent-orange-500" />
+                  <input type="range" id="ds-particleCount" min="100" max="30000" step="500" defaultValue={DEFAULT_CONFIG.particleCount} className="w-full h-2 max-[1080px]:h-1.5 rounded-full bg-slate-800 accent-orange-500" />
                 </div>
-                <div>
-                  <label className="flex justify-between items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-slate-400">Velocidad</span>
-                    <span className="text-xs font-mono text-orange-400" id="ds-speedVal">{DEFAULT_CONFIG.speed.toFixed(2)}</span>
+                <div className="max-[1080px]:space-y-0.5">
+                  <label className="flex justify-between items-center gap-2 mb-1 max-[1080px]:mb-0.5">
+                    <span className="text-xs font-bold text-slate-400 max-[1080px]:text-[10px]">Velocidad</span>
+                    <span className="text-xs font-mono text-orange-400 max-[1080px]:text-[10px]" id="ds-speedVal">{DEFAULT_CONFIG.speed.toFixed(2)}</span>
                   </label>
-                  <input type="range" id="ds-speed" min="0.05" max="10" step="0.05" defaultValue={DEFAULT_CONFIG.speed} className="w-full h-2 rounded-full bg-slate-800 accent-orange-500" />
+                  <input type="range" id="ds-speed" min="0.05" max="10" step="0.05" defaultValue={DEFAULT_CONFIG.speed} className="w-full h-2 max-[1080px]:h-1.5 rounded-full bg-slate-800 accent-orange-500" />
                 </div>
-                <div>
-                  <label className="flex justify-between items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-slate-400">Loop (s)</span>
-                    <span className="text-xs font-mono text-orange-400" id="ds-loopDurationVal">{DEFAULT_CONFIG.loopDuration.toFixed(1)}</span>
+                <div className="max-[1080px]:space-y-0.5">
+                  <label className="flex justify-between items-center gap-2 mb-1 max-[1080px]:mb-0.5">
+                    <span className="text-xs font-bold text-slate-400 max-[1080px]:text-[10px]">Loop (s)</span>
+                    <span className="text-xs font-mono text-orange-400 max-[1080px]:text-[10px]" id="ds-loopDurationVal">{DEFAULT_CONFIG.loopDuration.toFixed(1)}</span>
                   </label>
-                  <input type="range" id="ds-loopDuration" min="1" max="60" step="0.5" defaultValue={DEFAULT_CONFIG.loopDuration} className="w-full h-2 rounded-full bg-slate-800 accent-orange-500" />
+                  <input type="range" id="ds-loopDuration" min="1" max="60" step="0.5" defaultValue={DEFAULT_CONFIG.loopDuration} className="w-full h-2 max-[1080px]:h-1.5 rounded-full bg-slate-800 accent-orange-500" />
                 </div>
-                <div>
-                  <label className="flex justify-between items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-slate-400">Aleatoriedad</span>
-                    <span className="text-xs font-mono text-orange-400" id="ds-randomnessVal">{DEFAULT_CONFIG.randomness.toFixed(2)}</span>
+                <div className="max-[1080px]:space-y-0.5">
+                  <label className="flex justify-between items-center gap-2 mb-1 max-[1080px]:mb-0.5">
+                    <span className="text-xs font-bold text-slate-400 max-[1080px]:text-[10px]">Aleatoriedad</span>
+                    <span className="text-xs font-mono text-orange-400 max-[1080px]:text-[10px]" id="ds-randomnessVal">{DEFAULT_CONFIG.randomness.toFixed(2)}</span>
                   </label>
-                  <input type="range" id="ds-randomness" min="0" max="1" step="0.01" defaultValue={DEFAULT_CONFIG.randomness} className="w-full h-2 rounded-full bg-slate-800 accent-orange-500" />
+                  <input type="range" id="ds-randomness" min="0" max="1" step="0.01" defaultValue={DEFAULT_CONFIG.randomness} className="w-full h-2 max-[1080px]:h-1.5 rounded-full bg-slate-800 accent-orange-500" />
                 </div>
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/5 pb-1 mb-1 pt-2">Gravedad</div>
-                <div>
-                  <label className="flex justify-between items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-slate-400">Fuerza</span>
-                    <span className="text-xs font-mono text-orange-400" id="ds-gravStrengthVal">{DEFAULT_CONFIG.gravStrength}</span>
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/5 pb-1 mb-1 pt-2 max-[1080px]:text-[10px] max-[1080px]:pt-1.5 max-[1080px]:pb-0.5 max-[1080px]:mb-0.5">Gravedad</div>
+                <div className="max-[1080px]:space-y-0.5">
+                  <label className="flex justify-between items-center gap-2 mb-1 max-[1080px]:mb-0.5">
+                    <span className="text-xs font-bold text-slate-400 max-[1080px]:text-[10px]">Fuerza</span>
+                    <span className="text-xs font-mono text-orange-400 max-[1080px]:text-[10px]" id="ds-gravStrengthVal">{DEFAULT_CONFIG.gravStrength}</span>
                   </label>
-                  <input type="range" id="ds-gravStrength" min="10" max="5000" step="10" defaultValue={DEFAULT_CONFIG.gravStrength} className="w-full h-2 rounded-full bg-slate-800 accent-orange-500" />
+                  <input type="range" id="ds-gravStrength" min="10" max="5000" step="10" defaultValue={DEFAULT_CONFIG.gravStrength} className="w-full h-2 max-[1080px]:h-1.5 rounded-full bg-slate-800 accent-orange-500" />
                 </div>
-                <div>
-                  <label className="flex justify-between items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-slate-400">Máx. puntos</span>
-                    <span className="text-xs font-mono text-orange-400" id="ds-maxPointsVal">{DEFAULT_CONFIG.maxPoints}</span>
+                <div className="max-[1080px]:space-y-0.5">
+                  <label className="flex justify-between items-center gap-2 mb-1 max-[1080px]:mb-0.5">
+                    <span className="text-xs font-bold text-slate-400 max-[1080px]:text-[10px]">Máx. puntos</span>
+                    <span className="text-xs font-mono text-orange-400 max-[1080px]:text-[10px]" id="ds-maxPointsVal">{DEFAULT_CONFIG.maxPoints}</span>
                   </label>
-                  <input type="range" id="ds-maxPoints" min="1" max="30" step="1" defaultValue={DEFAULT_CONFIG.maxPoints} className="w-full h-2 rounded-full bg-slate-800 accent-orange-500" />
+                  <input type="range" id="ds-maxPoints" min="1" max="30" step="1" defaultValue={DEFAULT_CONFIG.maxPoints} className="w-full h-2 max-[1080px]:h-1.5 rounded-full bg-slate-800 accent-orange-500" />
                 </div>
-                <div className="flex gap-2 pt-2">
-                  <button type="button" id="ds-clearPoints" className="flex-1 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:border-orange-500/30 transition-colors">Limpiar puntos</button>
-                  <button type="button" id="ds-resetParticles" className="flex-1 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:border-orange-500/30 transition-colors">Reset</button>
+                <div className="flex gap-2 pt-2 max-[1080px]:gap-1.5 max-[1080px]:pt-1.5">
+                  <button type="button" id="ds-clearPoints" className="flex-1 py-2 max-[1080px]:py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:border-orange-500/30 transition-colors max-[1080px]:text-[10px]">Limpiar puntos</button>
+                  <button type="button" id="ds-resetParticles" className="flex-1 py-2 max-[1080px]:py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:border-orange-500/30 transition-colors max-[1080px]:text-[10px]">Reset</button>
                 </div>
               </div>
             </div>
+          </div>
         </div>
         )}
 
