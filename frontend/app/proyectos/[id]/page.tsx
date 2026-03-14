@@ -1,15 +1,19 @@
 'use client';
 import { useState, useEffect, use, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { 
   Calendar, MapPin, Clock, DollarSign, GraduationCap, 
   Users, ChevronLeft, Mail, Star, CheckCircle, Film, 
-  Image as ImageIcon, ExternalLink, BookOpen, X, Settings2, Play, Pause
+  Image as ImageIcon, ExternalLink, BookOpen, X, Settings2, Play, Pause, Maximize2
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OpalBackground, { type OpalBackgroundParams } from '@/components/OpalBackground';
+import TdfFilmLoader from '@/components/TdfFilmLoader';
 import { isProfileHealth100 } from '@/lib/profileHealth';
+
+const DepthGallery = dynamic(() => import('@/components/Depthgallery'), { ssr: false });
 
 const DEFAULT_OPAL_PARAMS: Required<OpalBackgroundParams> = {
   speed: 0.1,
@@ -50,6 +54,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   const [tvFilterOpacity, setTvFilterOpacity] = useState(DEFAULT_TV_OPACITY);
   const [showOpalBackground, setShowOpalBackground] = useState(false);
   const [hideCards, setHideCards] = useState(false);
+  const [galleryFullscreen, setGalleryFullscreen] = useState(false);
   const [echoesPlaying, setEchoesPlaying] = useState(false);
   const echoesRef = useRef<HTMLAudioElement>(null);
 
@@ -164,7 +169,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Cargando...</div>;
+  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white"><TdfFilmLoader /></div>;
   if (!proyecto) return <div className="text-white text-center py-20">{t('proyectos.proyecto_no_encontrado')}</div>;
 
   const videoRef = proyecto.referencias?.find((r: string) => r && (r.includes('youtu') || r.includes('vimeo')));
@@ -176,16 +181,27 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   const bodyContent = (
     <div className="relative z-10 max-w-6xl mx-auto px-6 py-12 flex flex-col gap-8 pointer-events-none">
         {galeria.length > 0 && (
-          <div className="w-full bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl p-6 shadow-xl transition-all hover:border-orange-500/30 duration-300 pointer-events-auto">
-            <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
-              <ImageIcon size={20}/> {t('proyectos.galeria')}
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {galeria.map((img: string, idx: number) => (
-                <a key={idx} href={img} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden border border-slate-700 hover:border-orange-500/50 aspect-square object-cover">
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                </a>
-              ))}
+          <div className="w-full bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl overflow-hidden shadow-xl transition-all hover:border-orange-500/30 duration-300 pointer-events-auto">
+            <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-800">
+              <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg flex items-center gap-2">
+                <ImageIcon size={20}/> {t('proyectos.galeria')}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setGalleryFullscreen(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition text-sm font-bold"
+                aria-label="Pantalla completa"
+              >
+                <Maximize2 size={18}/> Pantalla completa
+              </button>
+            </div>
+            <div className="relative w-full h-[320px] sm:h-[380px] md:h-[420px]">
+              <DepthGallery
+                items={galeria.map((src: string) => ({ src }))}
+                title={proyecto.titulo}
+                subtitle={proyecto.tipo}
+                height="100%"
+              />
             </div>
           </div>
         )}
@@ -391,6 +407,31 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
       <div className="relative min-h-[50vh] bg-slate-950">
         {bodyContent}
       </div>
+      )}
+
+      {/* Galería en pantalla completa */}
+      {galleryFullscreen && proyecto && galeria.length > 0 && (
+        <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/95 shrink-0">
+            <h3 className="text-cyan-400 font-bold text-lg">{t('proyectos.galeria')} — {proyecto.titulo}</h3>
+            <button
+              type="button"
+              onClick={() => setGalleryFullscreen(false)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition text-sm font-bold"
+              aria-label="Cerrar pantalla completa"
+            >
+              <X size={20}/> Cerrar
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 w-full">
+            <DepthGallery
+              items={galeria.map((src: string) => ({ src }))}
+              title={proyecto.titulo}
+              subtitle={proyecto.tipo}
+              height="100%"
+            />
+          </div>
+        </div>
       )}
 
       {/* Debug: activado con Shift en escritorio, solo si hay fondo Opal */}

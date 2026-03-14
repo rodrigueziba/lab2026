@@ -1,17 +1,20 @@
 'use client';
-import { useState, useEffect, use, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import Swal from 'sweetalert2'; // 👈 Importamos SweetAlert
 import { 
   MapPin, Mail, Phone, Globe, User, Briefcase, 
   Image as ImageIcon, CheckCircle, Loader2, Lock, Clock, XCircle,
-  GraduationCap, Film, ExternalLink, Settings2, X, Play, Pause
+  GraduationCap, Film, ExternalLink, Settings2, X, Play, Pause, Maximize2
 } from 'lucide-react';
 import DepthAwareImage from '@/components/DepthAwareImage';
 import OpalBackground, { type OpalBackgroundParams } from '@/components/OpalBackground';
 import { isProfileHealth100 } from '@/lib/profileHealth';
 import { usePrestadorVisit } from '@/contexts/PrestadorVisitContext';
 import TdfFilmLoader from '@/components/TdfFilmLoader';
+
+const DepthGallery = dynamic(() => import('@/components/Depthgallery'), { ssr: false });
 
 const DEFAULT_PRESTADOR_OPAL_PARAMS: Required<OpalBackgroundParams> = {
   speed: 0.1,
@@ -40,6 +43,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
   const [echoesPlaying, setEchoesPlaying] = useState(false);
   const [opalParams, setOpalParams] = useState<Required<OpalBackgroundParams>>(DEFAULT_PRESTADOR_OPAL_PARAMS);
   const [tvFilterOpacity, setTvFilterOpacity] = useState(DEFAULT_PRESTADOR_TV_OPACITY);
+  const [galleryFullscreen, setGalleryFullscreen] = useState(false);
   const echoesRef = useRef<HTMLAudioElement>(null);
 
   const handleOpalRipple = useCallback(() => {
@@ -452,6 +456,35 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
 
               </div>
           </div>
+
+          {/* Galería interactiva 3D (ancho completo, solo si está habilitada en el perfil) */}
+          {Boolean(prestador.galeriaInteractivaHabilitada) && Array.isArray(prestador.galeria) && prestador.galeria.length > 0 && (
+            <div className="lg:col-span-2 w-full pointer-events-auto">
+              <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl overflow-hidden shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] duration-300">
+                <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-800">
+                  <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg flex items-center gap-2">
+                    <ImageIcon size={20}/> Galería interactiva
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setGalleryFullscreen(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition text-sm font-bold"
+                    aria-label="Pantalla completa"
+                  >
+                    <Maximize2 size={18}/> Pantalla completa
+                  </button>
+                </div>
+                <div className="relative w-full h-[320px] sm:h-[380px] md:h-[420px]">
+                  <DepthGallery
+                    items={prestador.galeria.map((src: string) => ({ src }))}
+                    title={prestador.nombre}
+                    subtitle={prestador.rubro}
+                    height="100%"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
       </div>
       </div>
       </OpalBackground>
@@ -607,8 +640,62 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
                   </div>
               </div>
           </div>
+
+          {/* Galería interactiva 3D (ancho completo, solo si está habilitada en el perfil) */}
+          {Boolean(prestador.galeriaInteractivaHabilitada) && Array.isArray(prestador.galeria) && prestador.galeria.length > 0 && (
+            <div className="lg:col-span-2 w-full">
+              <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-3xl overflow-hidden shadow-xl transition-all hover:border-orange-500/30 hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] duration-300">
+                <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-800">
+                  <h3 className="text-cyan-400 font-black uppercase tracking-widest text-lg flex items-center gap-2">
+                    <ImageIcon size={20}/> Galería interactiva
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setGalleryFullscreen(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition text-sm font-bold"
+                    aria-label="Pantalla completa"
+                  >
+                    <Maximize2 size={18}/> Pantalla completa
+                  </button>
+                </div>
+                <div className="relative w-full h-[320px] sm:h-[380px] md:h-[420px]">
+                  <DepthGallery
+                    items={prestador.galeria.map((src: string) => ({ src }))}
+                    title={prestador.nombre}
+                    subtitle={prestador.rubro}
+                    height="100%"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+      )}
+
+      {/* Galería en pantalla completa */}
+      {galleryFullscreen && prestador && Boolean(prestador.galeriaInteractivaHabilitada) && Array.isArray(prestador.galeria) && prestador.galeria.length > 0 && (
+        <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/95 shrink-0">
+            <h3 className="text-cyan-400 font-bold text-lg">Galería interactiva — {prestador.nombre}</h3>
+            <button
+              type="button"
+              onClick={() => setGalleryFullscreen(false)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition text-sm font-bold"
+              aria-label="Cerrar pantalla completa"
+            >
+              <X size={20}/> Cerrar
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 w-full">
+            <DepthGallery
+              items={prestador.galeria.map((src: string) => ({ src }))}
+              title={prestador.nombre}
+              subtitle={prestador.rubro}
+              height="100%"
+            />
+          </div>
+        </div>
       )}
 
       {/* Debug: activado con Shift en escritorio, solo si hay fondo Opal */}

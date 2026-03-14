@@ -154,12 +154,14 @@ export class PrestadorService {
     });
     if (!prestador) return null;
 
-    // Aquí mantenemos la censura por defecto para la vista pública general
+    // Aquí mantenemos la censura por defecto para la vista pública general.
+    // Incluimos explícitamente campos que el cliente puede no recibir si la migración es reciente.
     return {
       ...prestador,
-      email: '🔒 Solicitar contacto', 
+      email: '🔒 Solicitar contacto',
       telefono: '🔒 Solicitar contacto',
       _emailReal: prestador.email,
+      galeriaInteractivaHabilitada: prestador.galeriaInteractivaHabilitada ?? false,
     };
   }
 
