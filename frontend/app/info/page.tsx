@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { X, Settings2 } from "lucide-react";
+import { X, Settings2, Activity, CheckCircle, User, Briefcase, ImageIcon, Link2, Egg, Music, Palette, LayoutGrid, Images, LogIn, ArrowUp, CircleDot, Bell, Zap, Mail, Send, Handshake } from "lucide-react";
 import TopologyBackground from "./TopologyBackground";
 
 // Ruta del audio: colocar el archivo MP3 en frontend/public/music.mp3 (o cambiar la ruta aquí)
@@ -40,6 +40,36 @@ const TIPS = [
   { icon: "🎯", title: "Elegí bien tu categoría",       body: "La categoría define en qué búsquedas aparecer. Detallá el resto en la descripción." },
   { icon: "🌐", title: "Revisá la cartelera",           body: "Los proyectos en preproducción son los que más buscan prestadores nuevos." },
   { icon: "🤝", title: "Explorá el directorio",         body: "Conocé otros prestadores y locaciones. Las conexiones del grafo reflejan la red real." },
+];
+
+const HEALTH_STEPS = [
+  { label: "Cuenta creada", Icon: User },
+  { label: "Completar datos profesionales (nombre, rubro, descripción)", Icon: Briefcase },
+  { label: "Subir foto o logo", Icon: ImageIcon },
+  { label: "Añadir enlaces al reel o portafolio", Icon: Link2 },
+];
+
+const HEALTH_BENEFITS_100 = [
+  { label: "Acceso a un easter egg interactivo", Icon: Egg },
+  { label: "Agregar un link de YouTube para que suene tu música cuando alguien visite tu perfil", Icon: Music },
+  { label: "Editar fondos animados de tu perfil", Icon: Palette },
+  { label: "Reorganizar el orden de las tarjetas de tu perfil", Icon: LayoutGrid },
+  { label: "Habilitar la galería interactiva de tus trabajos", Icon: Images },
+];
+
+const REGULAR_USE_ITEMS = [
+  { label: "Si te logueás seguido en la plataforma tenés mayor visibilidad", Icon: LogIn },
+  { label: "Aparecés más arriba en los listados", Icon: ArrowUp },
+  { label: "Tu esfera en el mapa de nodos se destaca más", Icon: CircleDot },
+  { label: "Enterate antes que nadie de proyectos en tu área", Icon: Bell },
+];
+
+const MATCHMAKING_ITEMS = [
+  { title: "Matchmaking automático", desc: "Cuando se publica un proyecto, la plataforma cruza ciudad y roles y te envía alertas directas: «¡Nuevo proyecto en tu área y rubro!».", Icon: Zap },
+  { title: "Correos y estado", desc: "Recibís correos y en la plataforma ves el estado de tus postulaciones (Vista, En consideración, Aceptada, etc.).", Icon: Mail },
+  { title: "Postulación directa", desc: "Cuando te postulás a un rol, el productor recibe una notificación con tu perfil.", Icon: Send },
+  { title: "Solicitud de contacto", desc: "Si alguien solicita tu contacto desde la guía, recibís una alerta para aprobar o rechazar compartir tus datos.", Icon: Handshake },
+  { title: "Candidatura", desc: "La plataforma te avisa cuando tu postulación fue aceptada o rechazada.", Icon: CheckCircle },
 ];
 
 const stepNumClass = {
@@ -262,14 +292,14 @@ export default function GuiaPrestadorPage() {
         {/* HERO */}
         <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pt-28 pb-20">
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-500 text-xs font-semibold tracking-widest uppercase mb-8 animate-fade-up">
-            📽 Guía para Prestadores · Film Commission TDF
+            📽 Guía para Prestadores
           </span>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.08] tracking-tight max-w-3xl animate-fade-up [animation-delay:100ms]">
             Todo lo que necesitás saber para{" "}
             <span className="text-orange-500">aparecer en el mapa</span>
           </h1>
           <p className="mt-5 text-slate-400 max-w-xl text-lg animate-fade-up [animation-delay:200ms]">
-            Sumá tu perfil a la plataforma oficial de la industria audiovisual de Tierra del Fuego.
+            Sumá tu perfil a la plataforma de la industria audiovisual de Tierra del Fuego.
             Conectá con producciones, locaciones y talento del Fin del Mundo.
           </p>
           <div className="mt-10 flex flex-wrap gap-3 justify-center animate-fade-up [animation-delay:300ms]">
@@ -301,7 +331,7 @@ export default function GuiaPrestadorPage() {
                 <div key={c.title} className="bg-[#111827]/80 backdrop-blur-sm border border-white/7 rounded-2xl p-7 transition-all duration-300 hover:-translate-y-1 hover:border-orange-500/35 hover:shadow-[0_12px_40px_rgba(0,0,0,.4)]">
                   <div className="text-3xl mb-4">{c.icon}</div>
                   <h3 className="font-bold mb-1">{c.title}</h3>
-                  <p className="text-slate-400 text-sm">{c.desc}</p>
+                  <p className="text-slate-400 text-sm text-justify">{c.desc}</p>
                 </div>
               ))}
             </div>
@@ -324,7 +354,7 @@ export default function GuiaPrestadorPage() {
                     <div className={`flex-shrink-0 w-14 h-14 rounded-full border-2 flex items-center justify-center font-extrabold text-base relative z-10 ${stepNumClass[s.color as keyof typeof stepNumClass] ?? ""}`}>{s.num}</div>
                     <div>
                       <h3 className="font-bold text-lg mb-1">{s.title}</h3>
-                      <p className="text-slate-400 text-sm mb-3">{s.desc}</p>
+                      <p className="text-slate-400 text-sm mb-3 text-justify">{s.desc}</p>
                       <div className="flex flex-wrap gap-2">
                         {s.tags.map((t) => (
                           <span key={t} className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/5 border border-white/7 text-slate-400">{t}</span>
@@ -351,7 +381,7 @@ export default function GuiaPrestadorPage() {
                 <div key={f.title} data-animate className="bg-[#111827]/80 backdrop-blur-sm border border-white/7 rounded-2xl p-7 opacity-0 translate-y-5 transition-all duration-500 hover:border-[#4f9cf9]/30 hover:shadow-[0_12px_48px_rgba(0,0,0,.5)]" style={{ transitionDelay: `${i * 80}ms` }}>
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5 ${featIconClass[f.color as keyof typeof featIconClass] ?? ""}`}>{f.icon}</div>
                   <h3 className="font-bold mb-2">{f.title}</h3>
-                  <p className="text-slate-400 text-sm">{f.desc}</p>
+                  <p className="text-slate-400 text-sm text-justify">{f.desc}</p>
                 </div>
               ))}
             </div>
@@ -404,9 +434,117 @@ export default function GuiaPrestadorPage() {
               {TIPS.map((t) => (
                 <div key={t.title} className="rounded-xl p-6 border-l-2 border-orange-500 bg-orange-500/[.03] text-sm text-slate-400 transition-all duration-200 hover:bg-orange-500/[.06] hover:translate-x-1">
                   <span className="block text-slate-200 font-bold mb-1.5 text-[.9rem]">{t.icon} {t.title}</span>
-                  {t.body}
+                  <span className="block text-justify">{t.body}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <div className="h-px bg-gradient-to-r from-transparent via-white/7 to-transparent" />
+
+        {/* SALUD DE PERFIL */}
+        <section id="salud-perfil" className="py-24 px-4 bg-[#0d1120]/60 backdrop-blur-sm">
+          <div className="max-w-5xl mx-auto">
+            <span className="text-orange-500 text-xs font-bold tracking-[.15em] uppercase">Prestador</span>
+            <h2 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Salud de perfil y sus beneficios</h2>
+            <p className="mt-3 text-slate-400 max-w-lg">En <Link href="/mi-perfil" className="text-orange-500/90 hover:text-orange-500 underline">Mi perfil</Link> podés ver el progreso de tu perfil. Completando los pasos desbloqueás beneficios exclusivos.</p>
+            <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div data-animate className="bg-[#111827]/80 backdrop-blur-sm border border-white/7 rounded-2xl p-7 opacity-0 translate-y-5 transition-all duration-500 hover:border-orange-500/35 hover:shadow-[0_12px_40px_rgba(0,0,0,.4)]" style={{ transitionDelay: "0ms" }}>
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-orange-500/10 text-orange-500 mb-5">
+                  <Activity size={24} />
+                </div>
+                <h3 className="font-bold text-lg mb-4">Pasos para completar tu perfil</h3>
+                <ul className="space-y-3">
+                  {HEALTH_STEPS.map((s) => {
+                    const Icon = s.Icon;
+                    return (
+                      <li key={s.label} className="flex items-center gap-3 text-sm text-slate-300">
+                        <CheckCircle size={18} className="text-emerald-500 shrink-0" />
+                        <Icon size={16} className="text-slate-500 shrink-0" />
+                        <span className="text-justify">{s.label}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <div data-animate className="bg-[#111827]/80 backdrop-blur-sm border border-white/7 rounded-2xl p-7 opacity-0 translate-y-5 transition-all duration-500 hover:border-[#4f9cf9]/30 hover:shadow-[0_12px_40px_rgba(0,0,0,.4)]" style={{ transitionDelay: "80ms" }}>
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[#4f9cf9]/10 text-[#4f9cf9] mb-5">
+                  <Egg size={24} />
+                </div>
+                <h3 className="font-bold text-lg mb-4">Beneficios al llegar al 100%</h3>
+                <p className="text-slate-400 text-sm mb-4 text-justify">Al completar los pasos y aplicar a un rol en un proyecto, desbloqueás:</p>
+                <ul className="space-y-3">
+                  {HEALTH_BENEFITS_100.map((b) => {
+                    const Icon = b.Icon;
+                    return (
+                      <li key={b.label} className="flex items-start gap-3 text-sm text-slate-300">
+                        <Icon size={18} className="text-orange-500 shrink-0 mt-0.5" />
+                        <span className="text-justify">{b.label}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="h-px bg-gradient-to-r from-transparent via-white/7 to-transparent" />
+
+        {/* BENEFICIOS POR USO REGULAR */}
+        <section id="uso-regular" className="py-24 px-4">
+          <div className="max-w-5xl mx-auto">
+            <span className="text-orange-500 text-xs font-bold tracking-[.15em] uppercase">Visibilidad</span>
+            <h2 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Beneficios por usar la plataforma regularmente</h2>
+            <p className="mt-3 text-slate-400 max-w-lg">Si te logueás seguido en la plataforma tenés mayor visibilidad y ventajas en la guía y en el mapa nodal.</p>
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {REGULAR_USE_ITEMS.map((item, i) => {
+                const Icon = item.Icon;
+                return (
+                  <div
+                    key={item.label}
+                    data-animate
+                    className="bg-[#111827]/80 backdrop-blur-sm border border-white/7 rounded-2xl p-7 opacity-0 translate-y-5 transition-all duration-500 hover:border-emerald-500/35 hover:shadow-[0_12px_40px_rgba(0,0,0,.4)]"
+                    style={{ transitionDelay: `${i * 60}ms` }}
+                  >
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-emerald-500/10 text-emerald-500 mb-4">
+                      <Icon size={24} />
+                    </div>
+                    <p className="text-sm text-slate-300 font-medium leading-snug text-justify">{item.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <div className="h-px bg-gradient-to-r from-transparent via-white/7 to-transparent" />
+
+        {/* MATCHMAKING Y ALERTAS */}
+        <section id="matchmaking-alertas" className="py-24 px-4 bg-[#0d1120]/60 backdrop-blur-sm">
+          <div className="max-w-5xl mx-auto">
+            <span className="text-orange-500 text-xs font-bold tracking-[.15em] uppercase">Comunicación</span>
+            <h2 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Matchmaking y alertas</h2>
+            <p className="mt-3 text-slate-400 max-w-lg">La plataforma cruza datos y te mantiene informado en tiempo real sobre proyectos y solicitudes.</p>
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {MATCHMAKING_ITEMS.map((item, i) => {
+                const Icon = item.Icon;
+                return (
+                  <div
+                    key={item.title}
+                    data-animate
+                    className="bg-[#111827]/80 backdrop-blur-sm border border-white/7 rounded-2xl p-7 opacity-0 translate-y-5 transition-all duration-500 hover:border-[#f59e0b]/40 hover:shadow-[0_12px_40px_rgba(0,0,0,.4)]"
+                    style={{ transitionDelay: `${i * 70}ms` }}
+                  >
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[#f59e0b]/10 text-[#f59e0b] mb-4">
+                      <Icon size={24} />
+                    </div>
+                    <h3 className="font-bold text-lg mb-2">{item.title}</h3>
+                    <p className="text-slate-400 text-sm leading-relaxed text-justify">{item.desc}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>

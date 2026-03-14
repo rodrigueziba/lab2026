@@ -24,7 +24,7 @@ export default function Footer() {
         </div>
         <div>
           <h5 className="font-bold text-white mb-4 uppercase text-xs tracking-wider">{t('footer.contact')}</h5>
-          <p className="text-sm text-slate-500 mb-2">info@filmcommissiontdf.com.ar</p>
+          <p className="text-sm text-slate-500 mb-2">info@nosoyoficial.com.ar</p>
           <p className="text-sm text-slate-500">Ushuaia, Tierra del Fuego, Argentina</p>
         </div>
       </div>
