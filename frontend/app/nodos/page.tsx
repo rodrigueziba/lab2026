@@ -194,23 +194,18 @@ function makeNodeObject(node: any): THREE.Object3D {
   const color  = new THREE.Color(hex);
   const radius = node.type === 'proyecto' ? 7 : node.type === 'locacion' ? 5 : 4;
 
-  // Brillo de esfera para prestadores: puntaje de logueo 0–1 → opacidad (más puntaje = más brillo)
-  const loginScore = node.type === 'prestador' ? (node.loginScore ?? 0) : 1;
-  const coreOpacity = node.type === 'prestador' ? 0.4 + 0.6 * loginScore : 0.95;
-  const haloOpacity = node.type === 'prestador' ? 0.05 + 0.15 * loginScore : 0.08;
-
-  // Núcleo (menos polígonos)
+  // Núcleo emissive (menos polígonos)
   group.add(new THREE.Mesh(
     new THREE.SphereGeometry(radius, SPHERE_SEGMENTS_LOW, SPHERE_SEGMENTS_LOW),
     new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: coreOpacity,
+      color, transparent: true, opacity: 0.95,
     })
   ));
-  // Halo
+  // Halo más ligero
   group.add(new THREE.Mesh(
     new THREE.SphereGeometry(radius * 2.2, HALO_SEGMENTS_LOW, HALO_SEGMENTS_LOW),
     new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: haloOpacity,
+      color, transparent: true, opacity: 0.08,
       side: THREE.BackSide,
       blending: THREE.AdditiveBlending, depthWrite: false,
     })
@@ -740,7 +735,7 @@ export default function AdminDashboardPage() {
           if (loc) links.push({ source:`proj_${proj.id}`, target:loc.id });
         });
 
-        // Prestadores (loginScore 0–1 para brillo de esfera en /nodos)
+        // Prestadores
         resPrest.forEach((prest: any) => {
           const ciudad  = normalizarCiudad(prest.ciudad);
           const cfg     = CIUDAD_CONFIG[ciudad] ?? CIUDAD_CONFIG['Ushuaia'];
@@ -748,7 +743,6 @@ export default function AdminDashboardPage() {
           nodes.push({
             id:`prest_${prest.id}`, name:prest.nombre, type:'prestador', subTipo, ciudad,
             foto:prest.foto||prest.avatar,
-            loginScore: prest.loginScore ?? 0,
             _angle: Math.random() * Math.PI * 2, _tilt: (Math.random() - 0.5) * 0.4,
             x:(Math.random()-0.5)*70, y:cfg.y+(Math.random()-0.5)*70, z:120, val:6,
           });
