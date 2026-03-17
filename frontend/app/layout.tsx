@@ -10,7 +10,9 @@ import { Toaster } from 'sonner';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ThemeUnlockedProvider } from '@/contexts/ThemeUnlockedContext';
 import { PrestadorVisitProvider } from '@/contexts/PrestadorVisitContext';
+import { ScreensaverProvider } from '@/contexts/ScreensaverContext';
 import ThemeUnlockedContent from '../components/ThemeUnlockedContent';
+import ScreensaverOverlay from '../components/ScreensaverOverlay';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -40,7 +42,9 @@ export default function RootLayout({
         <LanguageProvider>
           <ThemeUnlockedProvider>
             <PrestadorVisitProvider>
+            <ScreensaverProvider>
             <Navbar />
+            <ScreensaverOverlay />
             <WelcomeTour />
             <main className="flex-1 flex flex-col min-h-0 bg-slate-950 relative">
               <ThemeUnlockedContent>
@@ -51,6 +55,7 @@ export default function RootLayout({
             <div className="relative z-20 shrink-0">
               <FooterWrapper />
             </div>
+            </ScreensaverProvider>
             </PrestadorVisitProvider>
           </ThemeUnlockedProvider>
         </LanguageProvider>

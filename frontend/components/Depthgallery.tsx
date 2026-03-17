@@ -21,6 +21,8 @@ export interface GalleryItem {
   mood?: { background: string; blob1: string; blob2: string };
   positionX?: number;
   colorLabel?: string;
+  /** Si está definido, al hacer click se abre este enlace (ej. YouTube reel) */
+  videoUrl?: string;
 }
 
 export interface DepthGalleryProps {

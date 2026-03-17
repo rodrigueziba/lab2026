@@ -10,6 +10,7 @@ import {
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeUnlocked } from '@/contexts/ThemeUnlockedContext';
 import { usePrestadorVisit } from '@/contexts/PrestadorVisitContext';
+import { useScreensaver } from '@/contexts/ScreensaverContext';
 
 const RAINBOW_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
 
@@ -54,6 +55,9 @@ export default function Navbar() {
   const setThemeUnlocked = themeCtx?.setThemeUnlocked ?? (() => {});
   const prestadorVisit = usePrestadorVisit();
   const musicaYoutubeUrl = prestadorVisit?.musicaYoutubeUrl ?? null;
+  const screensaver = useScreensaver();
+  const screensaverProgress = screensaver?.indicatorProgress ?? 0;
+  const showScreensaverIndicator = (screensaver?.isDesktop ?? false) && screensaverProgress > 0 && !screensaver?.isScreensaverActive;
   const isOnPrestadorPage = pathname?.startsWith('/prestador/') && pathname !== '/prestador';
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [prestadorMusicPlaying, setPrestadorMusicPlaying] = useState(false);
@@ -471,6 +475,32 @@ export default function Navbar() {
         </div>
 
         <div className="hidden md:flex items-center gap-4">
+          {/* Indicador protector de pantalla: círculo que se llena entre 15s y 65s sin interacción */}
+          {showScreensaverIndicator && (
+            <button
+              type="button"
+              onClick={() => screensaver?.activateScreensaver()}
+              className="flex items-center justify-center opacity-90 hover:opacity-100 transition-opacity text-white rounded-full p-1 hover:ring-1 hover:ring-orange-400/60"
+              title="Galería (inactividad)"
+              aria-label="Ver galería de prestadores"
+            >
+              <svg width="28" height="28" viewBox="0 0 28 28" className="rotate-[-90deg]">
+                <circle cx="14" cy="14" r="11" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.25" />
+                <circle
+                  cx="14"
+                  cy="14"
+                  r="11"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 11}
+                  strokeDashoffset={2 * Math.PI * 11 * (1 - screensaverProgress)}
+                  className="text-orange-400 transition-[stroke-dashoffset] duration-300"
+                />
+              </svg>
+            </button>
+          )}
           {/* Selector de idioma */}
           <div className="relative" ref={langRef}>
             <button
