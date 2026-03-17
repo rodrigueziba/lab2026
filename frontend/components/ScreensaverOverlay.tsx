@@ -72,7 +72,10 @@ function buildGalleryItems(prestadores: Prestador[]): GalleryItem[] {
 }
 
 export default function ScreensaverOverlay() {
-  const { isDesktop, isScreensaverActive, closeScreensaver } = useScreensaver();
+  const screensaver = useScreensaver();
+  const isDesktop = screensaver?.isDesktop ?? false;
+  const isScreensaverActive = screensaver?.isScreensaverActive ?? false;
+  const closeScreensaver = screensaver?.closeScreensaver ?? (() => {});
   const [prestadores, setPrestadores] = useState<Prestador[]>([]);
   const [loading, setLoading] = useState(true);
 
