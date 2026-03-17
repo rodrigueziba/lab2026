@@ -1,13 +1,5 @@
 'use client';
 
-/**
- * DepthGallery.tsx — v4
- * Fixes:
- *  - Imágenes correctamente dimensionadas (no gigantes)
- *  - Sin flash/reinicio (useRef para items, no useEffect con [items])
- *  - Cámara a distancia correcta de los planos
- *  - Planos invisibles hasta que carga la textura (no aparecen grises)
- */
 
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
