@@ -1,8 +1,8 @@
 'use client';
-import { useState, useEffect, Suspense, useRef } from 'react';
+import { useState, useEffect, Suspense, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Mail, Lock, Loader2, AlertCircle, Settings2, X } from 'lucide-react';
+import { Mail, Lock, Loader2, AlertCircle, Settings2, X, Activity } from 'lucide-react';
 
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -13,15 +13,67 @@ import { RGBShiftShader } from 'three/examples/jsm/shaders/RGBShiftShader.js';
 
 import { useLanguage } from '@/contexts/LanguageContext';
 
-// ─── YouTube Video ID ────────────────────────────────────────────────────────
-const YT_VIDEO_ID = '5V06rl6i-Ic';
+const MUSIC_FIRST = '/music.mp3';
+
+// Shuffle array in-place (Fisher-Yates)
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Build playlist: music.mp3 first, then remaining mp3s shuffled.
+// Since we can't read the filesystem from the browser, we rely on a
+// /api/music-list endpoint OR fall back to a static scan of known files.
+// The audio player will also auto-advance via the `ended` event.
+async function fetchPlaylist(): Promise<string[]> {
+  try {
+    // Optional API route: GET /api/music-list → { files: ['music.mp3', 'track2.mp3', ...] }
+    const res = await fetch('/api/music-list');
+    if (res.ok) {
+      const data = await res.json();
+      const files: string[] = (data.files as string[]).filter((f: string) => f.endsWith('.mp3'));
+      const rest = shuffle(files.filter(f => f !== 'music.mp3').map(f => `/${f}`));
+      return [MUSIC_FIRST, ...rest];
+    }
+  } catch (_) {}
+  // Fallback: just loop music.mp3
+  return [MUSIC_FIRST];
+}
+
+// ─── 8-band audio state ───────────────────────────────────────────────────────
+interface AudioBands {
+  subBass: number; bass: number; lowMid: number; mid: number;
+  highMid: number; presence: number; brilliance: number; air: number;
+  rms: number; beat: number;
+}
+const zeroBands = (): AudioBands => ({
+  subBass:0,bass:0,lowMid:0,mid:0,highMid:0,presence:0,brilliance:0,air:0,rms:0,beat:0
+});
+
+interface DebugParams {
+  topColor: string; bottomColor: string;
+  bloomStrength: number; speed: number; lightIntensity: number;
+  rgbShiftAmount: number; matrixIntensity: number;
+  reflectionStrength: number; ghostIntensity: number;
+  audioReactivity: number;
+}
+const DEFAULT_DEBUG: DebugParams = {
+  topColor:'#0a198c', bottomColor:'#11133b',
+  bloomStrength:1.0, speed:0.069, lightIntensity:1.2,
+  rgbShiftAmount:0.001, matrixIntensity:0.25,
+  reflectionStrength:0.35, ghostIntensity:1.0,
+  audioReactivity:1.0,
+};
 
 // ─── Login Form ───────────────────────────────────────────────────────────────
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLanguage();
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [formData, setFormData] = useState({ email:'', password:'' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -40,30 +92,18 @@ function LoginForm() {
   }, [searchParams, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+    e.preventDefault(); setLoading(true); setError('');
     try {
-      const res = await fetch(`${apiUrl}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      const res = await fetch(`${apiUrl}/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(formData)});
       if (res.ok) {
         const data = await res.json();
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('user', JSON.stringify(data.user));
         window.dispatchEvent(new Event('storage'));
-        const redirect = searchParams.get('redirect') || '/';
-        router.push(redirect);
-      } else {
-        setError(t('login.credenciales_invalidas'));
-      }
-    } catch (err) {
-      setError(t('login.error_conexion'));
-    } finally {
-      setLoading(false);
-    }
+        router.push(searchParams.get('redirect') || '/');
+      } else { setError(t('login.credenciales_invalidas')); }
+    } catch { setError(t('login.error_conexion')); }
+    finally { setLoading(false); }
   };
 
   const handleGoogleLogin = () => {
@@ -78,15 +118,8 @@ function LoginForm() {
         <h1 className="text-3xl font-black text-white mb-2">{t('login.bienvenido')}</h1>
         <p className="text-slate-400">{t('login.ingresa_cuenta')}</p>
       </div>
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
-          <AlertCircle size={16} /> {error}
-        </div>
-      )}
-      <button
-        onClick={handleGoogleLogin}
-        className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-3.5 rounded-xl transition flex justify-center items-center gap-3 mb-6 relative group overflow-hidden"
-      >
+      {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl mb-6 flex items-center gap-2 text-sm"><AlertCircle size={16}/>{error}</div>}
+      <button onClick={handleGoogleLogin} className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-3.5 rounded-xl transition flex justify-center items-center gap-3 mb-6">
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
           <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -96,1085 +129,767 @@ function LoginForm() {
         <span>{t('login.continuar_google')}</span>
       </button>
       <div className="relative flex py-2 items-center mb-6">
-        <div className="flex-grow border-t border-slate-700"></div>
+        <div className="flex-grow border-t border-slate-700"/>
         <span className="flex-shrink mx-4 text-slate-500 text-xs font-bold uppercase">{t('login.o_email')}</span>
-        <div className="flex-grow border-t border-slate-700"></div>
+        <div className="flex-grow border-t border-slate-700"/>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="relative">
-          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-          <input
-            type="email"
-            placeholder={t('login.correo')}
-            className="w-full bg-slate-950/80 border border-slate-800 p-4 pl-12 rounded-xl text-white focus:border-orange-500 focus:bg-slate-950 focus:outline-none placeholder:text-slate-600 transition-all"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            required
-          />
+          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
+          <input type="email" placeholder={t('login.correo')} className="w-full bg-slate-950/80 border border-slate-800 p-4 pl-12 rounded-xl text-white focus:border-orange-500 focus:outline-none placeholder:text-slate-600 transition-all" value={formData.email} onChange={(e)=>setFormData({...formData,email:e.target.value})} required/>
         </div>
         <div className="relative">
-          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-          <input
-            type="password"
-            placeholder={t('login.password')}
-            className="w-full bg-slate-950/80 border border-slate-800 p-4 pl-12 rounded-xl text-white focus:border-orange-500 focus:bg-slate-950 focus:outline-none placeholder:text-slate-600 transition-all"
-            value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            required
-          />
+          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
+          <input type="password" placeholder={t('login.password')} className="w-full bg-slate-950/80 border border-slate-800 p-4 pl-12 rounded-xl text-white focus:border-orange-500 focus:outline-none placeholder:text-slate-600 transition-all" value={formData.password} onChange={(e)=>setFormData({...formData,password:e.target.value})} required/>
         </div>
         <div className="flex justify-end">
-          <Link href="/login/olvide-password" className="text-sm text-orange-500 hover:text-orange-400 font-bold">
-            {t('login.olvidaste')}
-          </Link>
+          <Link href="/login/olvide-password" className="text-sm text-orange-500 hover:text-orange-400 font-bold">{t('login.olvidaste')}</Link>
         </div>
-        <button
-          disabled={loading}
-          className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 py-4 rounded-xl text-white font-bold flex justify-center items-center gap-2 transition-all shadow-lg shadow-orange-900/30 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? <Loader2 className="animate-spin" /> : t('login.iniciar')}
+        <button disabled={loading} className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 py-4 rounded-xl text-white font-bold flex justify-center items-center gap-2 transition-all shadow-lg shadow-orange-900/30 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed">
+          {loading?<Loader2 className="animate-spin"/>:t('login.iniciar')}
         </button>
       </form>
       <div className="mt-8 text-center">
-        <p className="text-slate-400 text-sm">
-          {t('login.no_cuenta')}{' '}
-          <Link href="/registro" className="text-orange-500 font-bold hover:text-orange-400">
-            {t('login.registrate_aqui')}
-          </Link>
-        </p>
+        <p className="text-slate-400 text-sm">{t('login.no_cuenta')}{' '}<Link href="/registro" className="text-orange-500 font-bold hover:text-orange-400">{t('login.registrate_aqui')}</Link></p>
       </div>
     </div>
   );
 }
 
-// ─── Audio hint UI ────────────────────────────────────────────────────────────
-function AudioHint({ playing }: { playing: boolean }) {
+// ─── Spectrum Canvas ─────────────────────────────────────────────────────────
+function SpectrumBars({ bandsRef }: { bandsRef: React.MutableRefObject<AudioBands> }) {
+  const cvRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const cv = cvRef.current; if(!cv) return;
+    const ctx = cv.getContext('2d')!;
+    let raf: number;
+    const KEYS: (keyof AudioBands)[] = ['subBass','bass','lowMid','mid','highMid','presence','brilliance','air'];
+    const LABELS = ['SUB','BASS','LO-M','MID','HI-M','PRES','BRIL','AIR'];
+    const COLORS = ['#ff3366','#ff6600','#ffaa00','#44ff88','#00ccff','#aa44ff','#ff44aa','#ffffff'];
+    function draw() {
+      raf = requestAnimationFrame(draw);
+      const b = bandsRef.current;
+      const W=cv!.width, H=cv!.height;
+      ctx.clearRect(0,0,W,H);
+      const bw = Math.floor(W/8)-2;
+      KEYS.forEach((k,i)=>{
+        const v = b[k] as number;
+        const x = i*(bw+2);
+        const bh = Math.max(1,Math.round(v*(H-14)));
+        ctx.shadowBlur=12; ctx.shadowColor=COLORS[i];
+        const g=ctx.createLinearGradient(0,H-14,0,H-14-bh);
+        g.addColorStop(0,COLORS[i]+'66'); g.addColorStop(1,COLORS[i]+'ff');
+        ctx.fillStyle=g;
+        ctx.fillRect(x,H-14-bh,bw,bh);
+        ctx.shadowBlur=0;
+        ctx.fillStyle='#ffffff44'; ctx.font='7px monospace';
+        ctx.textAlign='center'; ctx.fillText(LABELS[i],x+bw/2,H-2);
+      });
+    }
+    draw();
+    return ()=>cancelAnimationFrame(raf);
+  },[bandsRef]);
+  return <canvas ref={cvRef} width={200} height={60} className="w-full rounded-lg"/>;
+}
+
+// ─── Debug Panel ─────────────────────────────────────────────────────────────
+function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hideCard, onToggleCard, trackName, onSkip }: {
+  params: DebugParams;
+  onChange: (k: keyof DebugParams, v: number|string) => void;
+  onClose: ()=>void; onReset: ()=>void;
+  bandsRef: React.MutableRefObject<AudioBands>;
+  playing: boolean;
+  hideCard: boolean;
+  onToggleCard: ()=>void;
+  trackName: string;
+  onSkip: ()=>void;
+}) {
+  // Live values animated by audio
+  const [live, setLive] = useState(params);
+  const rafRef = useRef<number>();
+  useEffect(()=>{
+    function tick(){
+      rafRef.current=requestAnimationFrame(tick);
+      if(!playing){setLive(params);return;}
+      const b=bandsRef.current, r=params.audioReactivity;
+      setLive({
+        ...params,
+        bloomStrength:Math.min(3,params.bloomStrength+b.bass*1.8*r),
+        speed:Math.min(2,params.speed+b.beat*0.15*r),
+        lightIntensity:Math.min(3,params.lightIntensity+b.rms*1.0*r),
+        rgbShiftAmount:Math.min(0.02,params.rgbShiftAmount+b.brilliance*0.008*r),
+        matrixIntensity:Math.min(1,params.matrixIntensity+b.air*0.4*r),
+        reflectionStrength:Math.min(1,params.reflectionStrength+b.subBass*0.3*r),
+        ghostIntensity:Math.min(3,params.ghostIntensity+b.mid*0.8*r),
+      });
+    }
+    tick();
+    return ()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);};
+  },[params,bandsRef,playing]);
+
+  const SLIDERS: {label:string;key:keyof DebugParams;min:number;max:number;step:number;audioKey?:keyof AudioBands;col:string}[] = [
+    {label:'Bloom',        key:'bloomStrength',     min:0,    max:3,    step:0.05,  audioKey:'bass',       col:'#ff6600'},
+    {label:'Velocidad',    key:'speed',             min:0.02, max:2,    step:0.01,  audioKey:'beat',       col:'#44ff88'},
+    {label:'Luz',          key:'lightIntensity',    min:0.2,  max:3,    step:0.05,  audioKey:'rms',        col:'#ffaa00'},
+    {label:'RGB Shift',    key:'rgbShiftAmount',    min:0,    max:0.02, step:0.0005,audioKey:'brilliance', col:'#aa44ff'},
+    {label:'Matrix',       key:'matrixIntensity',   min:0,    max:1,    step:0.01,  audioKey:'air',        col:'#00ccff'},
+    {label:'Reflexión',    key:'reflectionStrength',min:0,    max:1,    step:0.01,  audioKey:'subBass',    col:'#ff3366'},
+    {label:'Ghost',        key:'ghostIntensity',    min:0,    max:3,    step:0.05,  audioKey:'mid',        col:'#ff44aa'},
+    {label:'Reactividad',  key:'audioReactivity',   min:0,    max:3,    step:0.05,  col:'#ffffff'},
+  ];
+
   return (
     <div
-      className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 hidden md:flex items-center gap-3 px-5 py-3 rounded-full border transition-all duration-700 pointer-events-none select-none
-        ${playing
-          ? 'bg-orange-950/60 border-orange-500/40 text-orange-300 opacity-0'
-          : 'bg-slate-950/80 border-white/10 text-slate-400 opacity-100'
-        }`}
-      style={{ backdropFilter: 'blur(12px)' }}
+      className="fixed z-[61] overflow-hidden rounded-2xl border border-white/10 bg-slate-950/97 backdrop-blur-xl shadow-2xl"
+      style={{
+        boxShadow:'0 0 60px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04)',
+        // Responsive positioning: on wide screens sit left-aligned; on <1080 centre on screen
+        left: 'clamp(8px, 4vw, 16px)',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        width: 'min(256px, calc(100vw - 16px))',
+        maxHeight: 'min(90vh, 680px)',
+      }}
     >
-      <span className="text-xs font-bold tracking-widest uppercase">SPACE</span>
-      <span className="text-xs opacity-60">— activar música reactiva</span>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-gradient-to-r from-slate-900/60 to-transparent">
+        <div className="flex items-center gap-2 min-w-0">
+          <Activity size={13} className={playing?'text-green-400 animate-pulse':'text-slate-600'}/>
+          <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest">Debug</span>
+          {playing&&<span className="text-[8px] font-bold text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded-full border border-green-400/20 whitespace-nowrap">LIVE</span>}
+        </div>
+        <button onClick={onClose} className="p-1 rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"><X size={13}/></button>
+      </div>
+
+      <div className="p-3 space-y-3 overflow-y-auto" style={{maxHeight:'calc(min(90vh, 680px) - 48px)'}}>
+        {/* Now playing */}
+        {playing && trackName && (
+          <div className="rounded-lg border border-white/5 bg-black/30 px-2.5 py-1.5 flex items-center gap-2 min-w-0">
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest flex-shrink-0">♪</span>
+            <span className="text-[9px] text-slate-400 truncate font-mono flex-1">{trackName}</span>
+            <button
+              onClick={onSkip}
+              title="Skip"
+              className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
+              style={{fontSize: 10}}
+            >
+              ⏭
+            </button>
+          </div>
+        )}
+
+        {/* Spectrum */}
+        {playing&&(
+          <div className="rounded-xl border border-white/5 bg-black/50 p-2">
+            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Espectro en vivo</p>
+            <SpectrumBars bandsRef={bandsRef}/>
+          </div>
+        )}
+
+        {/* Hide login card toggle */}
+        <label className="flex items-center justify-between gap-3 cursor-pointer rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 hover:bg-white/[0.04] transition-colors">
+          <span className="text-[10px] font-bold text-slate-400">Ocultar tarjeta login</span>
+          <div
+            onClick={onToggleCard}
+            className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0 ${hideCard?'bg-orange-500':'bg-slate-700'}`}
+          >
+            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${hideCard?'left-4':'left-0.5'}`}/>
+          </div>
+        </label>
+
+        {/* Colors */}
+        <div className="grid grid-cols-2 gap-2">
+          {(['topColor','bottomColor'] as const).map(k=>(
+            <div key={k}>
+              <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">{k==='topColor'?'Superior':'Inferior'}</p>
+              <div className="flex items-center gap-1.5">
+                <input type="color" value={params[k]} onChange={e=>onChange(k,e.target.value)}
+                  className="w-8 h-8 rounded-lg border border-white/10 cursor-pointer bg-transparent flex-shrink-0"/>
+                <span className="text-[9px] font-mono text-slate-500 truncate">{params[k]}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Sliders */}
+        {SLIDERS.map(({label,key,min,max,step,audioKey,col})=>{
+          const base = params[key] as number;
+          const lv = live[key] as number;
+          const pct = Math.min(100,((base-min)/(max-min))*100);
+          const lpct = Math.min(100,((lv-min)/(max-min))*100);
+          const delta = playing&&audioKey ? Math.max(0,lv-base) : 0;
+
+          return(
+            <div key={key}>
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] font-bold text-slate-400">{label}</span>
+                <div className="flex items-center gap-1.5">
+                  {delta>0.0005&&(
+                    <span className="text-[9px] font-mono transition-all" style={{color:col}}>+{delta.toFixed(3)}</span>
+                  )}
+                  <span className="text-[10px] font-mono" style={{color:delta>0.001?col:'#fb923c'}}>{lv.toFixed(3)}</span>
+                </div>
+              </div>
+              {/* Custom track */}
+              <div className="relative h-2.5 rounded-full bg-slate-800/80 cursor-pointer"
+                onClick={e=>{
+                  const r=e.currentTarget.getBoundingClientRect();
+                  const p=(e.clientX-r.left)/r.width;
+                  onChange(key,parseFloat(Math.min(max,Math.max(min,min+p*(max-min))).toFixed(5)));
+                }}>
+                {/* Live overlay */}
+                {playing&&delta>0&&(
+                  <div className="absolute inset-y-0 left-0 rounded-full opacity-25 pointer-events-none"
+                    style={{width:`${lpct}%`,background:col}}/>
+                )}
+                {/* Base fill */}
+                <div className="absolute inset-y-0 left-0 rounded-full pointer-events-none"
+                  style={{width:`${pct}%`,background:`linear-gradient(90deg,${col}55,${col})`}}/>
+                {/* Thumb */}
+                <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full border-2 border-white/90 pointer-events-none"
+                  style={{left:`${pct}%`,background:col,boxShadow:`0 0 8px ${col}99,0 0 2px ${col}`}}/>
+              </div>
+            </div>
+          );
+        })}
+
+        <button onClick={onReset} className="w-full py-2 rounded-xl text-[10px] font-bold text-slate-500 hover:text-white border border-white/5 hover:border-orange-500/20 transition-all mt-1">
+          ↺ Restaurar defaults
+        </button>
+      </div>
     </div>
   );
 }
-
-const DEFAULT_LOGIN_DEBUG = {
-  topColor: '#0a198c',
-  bottomColor: '#11133b',
-  bloomStrength: 1.0,
-  speed: 0.069,
-  lightIntensity: 1.2,
-  rgbShiftAmount: 0.001,
-};
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function LoginPage() {
   const mountRef = useRef<HTMLDivElement>(null);
-  const loginParamsRef = useRef({ ...DEFAULT_LOGIN_DEBUG });
-  const [showDebugButton, setShowDebugButton] = useState(false);
-  const [debugMenuOpen, setDebugMenuOpen] = useState(false);
-  const [loginDebugParams, setLoginDebugParams] = useState(DEFAULT_LOGIN_DEBUG);
-  const [hideLoginCard, setHideLoginCard] = useState(false);
+
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugParams, setDebugParams] = useState<DebugParams>({...DEFAULT_DEBUG});
+  const [hideCard, setHideCard] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
+  const [trackName, setTrackName] = useState('');
+  const debugRef = useRef<DebugParams>({...DEFAULT_DEBUG});
 
-  // Shared audio-reactive state via ref (read each animation frame)
-  const audioDataRef = useRef({
-    bass: 0,       // 0–1 normalized low freq energy
-    mid: 0,        // 0–1 mid freq
-    treble: 0,     // 0–1 high freq
-    rms: 0,        // 0–1 overall loudness
-    bpmSpeed: 0,   // extra speed burst on beats
-  });
+  const audioRef = useRef<HTMLAudioElement|null>(null);
+  const audioCtxRef = useRef<AudioContext|null>(null);
+  const analyserRef = useRef<AnalyserNode|null>(null);
+  const freqRef = useRef<Uint8Array|null>(null);
+  const bandsRef = useRef<AudioBands>(zeroBands());
+  const beatRef = useRef({prev:0,lastBeat:0});
+  const portalRef = useRef({active:false,opacity:0,nextShow:0,hold:0});
+  const playlistRef = useRef<string[]>([]);
+  const trackIdxRef = useRef(0);
+  const audioRampRef = useRef<{active: boolean}>({active: false});
 
-  // YouTube iframe + AudioContext refs
-  const ytPlayerRef = useRef<any>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  // getByteFrequencyData en TS tipa su destino como Uint8Array<ArrayBuffer>.
-  // Usamos el tipo explícito para que Vercel compile con TS estricto.
-  const analyserDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
-  const ytIframeContainerRef = useRef<HTMLDivElement>(null);
+  useEffect(()=>{ debugRef.current={...debugParams}; },[debugParams]);
 
-  // Beat detection
-  const beatRef = useRef({ lastEnergy: 0, lastBeat: 0, interval: 0.5 });
+  const handleChange = useCallback((k:keyof DebugParams, v:number|string)=>{
+    setDebugParams(p=>({...p,[k]:v}));
+  },[]);
 
-  // Scroll speed accumulator
-  const scrollSpeedRef = useRef(0);
+  // Skip to next track
+  const skipTrack = useCallback(()=>{
+    const audio = audioRef.current;
+    const pl = playlistRef.current;
+    if(!audio || pl.length === 0) return;
+    trackIdxRef.current = (trackIdxRef.current + 1) % pl.length;
+    const nextUrl = pl[trackIdxRef.current];
+    audio.src = nextUrl;
+    setTrackName(nextUrl.replace(/^\//, '').replace('.mp3',''));
+    audio.play().catch(()=>{});
+  },[]);
 
-  // Video-in-tunnel state
-  const tunnelVideoRef = useRef<{
-    active: boolean;
-    opacity: number;
-    nextShow: number;
-    fadeIn: boolean;
-  }>({ active: false, opacity: 0, nextShow: 0, fadeIn: false });
-
-  // ── Sync debug params to ref ─────────────────────────────────────────────
-  useEffect(() => {
-    loginParamsRef.current = { ...loginDebugParams };
-  }, [loginDebugParams]);
-
-  // ── Shift → debug button ─────────────────────────────────────────────────
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== 'ShiftLeft' && e.code !== 'ShiftRight') return;
-      if (window.innerWidth < 768) return;
-      setShowDebugButton((v) => !v);
+  // Shift → debug
+  useEffect(()=>{
+    const h=(e:KeyboardEvent)=>{
+      if(e.code!=='ShiftLeft'&&e.code!=='ShiftRight') return;
+      if(window.innerWidth<768) return;
+      setShowDebug(v=>!v);
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    window.addEventListener('keydown',h);
+    return ()=>window.removeEventListener('keydown',h);
+  },[]);
 
-  // ── Space → toggle YouTube audio ─────────────────────────────────────────
-  useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      if (e.code !== 'Space') return;
-      if (window.innerWidth < 768) return;
-      const activeEl = document.activeElement;
-      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
-
+  // Space → audio with playlist
+  useEffect(()=>{
+    const h=async(e:KeyboardEvent)=>{
+      if(e.code!=='Space') return;
+      if(window.innerWidth<768) return;
+      const ae=document.activeElement;
+      if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return;
       e.preventDefault();
 
-      if (!ytPlayerRef.current) {
-        initYouTubePlayer();
+      if(!audioCtxRef.current){
+        // First play: build playlist then start
+        const playlist = await fetchPlaylist();
+        playlistRef.current = playlist;
+        trackIdxRef.current = 0;
+
+        const audio = new Audio(playlist[0]);
+        audioRef.current = audio;
+        setTrackName(playlist[0].replace(/^\//, '').replace('.mp3',''));
+
+        const ctx = new AudioContext();
+        audioCtxRef.current = ctx;
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0.8;
+        analyserRef.current = analyser;
+        freqRef.current = new Uint8Array(analyser.frequencyBinCount);
+        const src = ctx.createMediaElementSource(audio);
+        src.connect(analyser);
+        analyser.connect(ctx.destination);
+
+        // Advance to next track when current ends
+        audio.addEventListener('ended', () => {
+          const pl = playlistRef.current;
+          if(pl.length <= 1) { audio.currentTime = 0; audio.play().catch(()=>{}); return; }
+          trackIdxRef.current = (trackIdxRef.current + 1) % pl.length;
+          const nextUrl = pl[trackIdxRef.current];
+          audio.src = nextUrl;
+          setTrackName(nextUrl.replace(/^\//, '').replace('.mp3',''));
+          audio.play().catch(()=>{});
+        });
+
+        await audio.play();
+        if(ctx.state==='suspended') await ctx.resume();
+        setAudioPlaying(true);
+        // Slowly ramp speed → 0.770 and audioReactivity → 1.2 over ~4s
+        audioRampRef.current.active = true;
         return;
       }
 
-      const player = ytPlayerRef.current;
-      const state = player.getPlayerState?.();
-      // YT.PlayerState.PLAYING = 1
-      if (state === 1) {
-        player.pauseVideo();
-        setAudioPlaying(false);
-      } else {
-        player.playVideo();
-        setAudioPlaying(true);
-        await tryConnectAudioContext();
-      }
+      const audio = audioRef.current!;
+      const ctx = audioCtxRef.current!;
+      if(ctx.state==='suspended') await ctx.resume();
+      if(audio.paused){await audio.play();setAudioPlaying(true);}
+      else{audio.pause();setAudioPlaying(false);}
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    window.addEventListener('keydown',h);
+    return ()=>window.removeEventListener('keydown',h);
+  },[audioPlaying]);
 
-  // ── Scroll → accumulate extra speed ──────────────────────────────────────
-  useEffect(() => {
-    const onWheel = (e: WheelEvent) => {
-      const scrollSensibility = 0.0015;
-      const r = loginParamsRef.current;
-      r.speed = Math.max(0.02, Math.min(r.speed - e.deltaY * scrollSensibility, 5.0));
-      // Also speed up the YouTube player if playing
-      if (ytPlayerRef.current) {
-        try {
-          const currentRate = ytPlayerRef.current.getPlaybackRate?.() ?? 1;
-          const delta = -e.deltaY * 0.0005;
-          const newRate = Math.max(0.25, Math.min(currentRate + delta, 2.0));
-          ytPlayerRef.current.setPlaybackRate(newRate);
-        } catch (_) {}
-      }
-      scrollSpeedRef.current += Math.abs(e.deltaY) * 0.0005;
+  // Scroll → speed + playbackRate
+  useEffect(()=>{
+    const h=(e:WheelEvent)=>{
+      setDebugParams(p=>({...p,speed:Math.max(0.02,Math.min(p.speed-e.deltaY*0.0015,2.0))}));
+      if(audioRef.current)
+        audioRef.current.playbackRate=Math.max(0.5,Math.min((audioRef.current.playbackRate||1)-e.deltaY*0.0003,2.0));
     };
-    window.addEventListener('wheel', onWheel);
-    return () => window.removeEventListener('wheel', onWheel);
-  }, []);
+    window.addEventListener('wheel',h,{passive:true});
+    return ()=>window.removeEventListener('wheel',h);
+  },[]);
 
-  // ── YouTube IFrame API ────────────────────────────────────────────────────
-  function initYouTubePlayer() {
-    if (typeof window === 'undefined') return;
-
-    // Load YT IFrame API if not loaded yet
-    if (!(window as any).YT) {
-      const script = document.createElement('script');
-      script.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(script);
+  // Analyse audio — called from Three.js loop
+  function analyseAudio(){
+    if(!analyserRef.current||!freqRef.current){bandsRef.current=zeroBands();return;}
+    analyserRef.current.getByteFrequencyData(freqRef.current);
+    const d=freqRef.current;
+    const sampleRate=audioCtxRef.current!.sampleRate;
+    const nyq=sampleRate/2;
+    const binHz=nyq/d.length;
+    function band(lo:number,hi:number){
+      let s=0,n=0;
+      for(let i=Math.floor(lo/binHz);i<=Math.min(d.length-1,Math.ceil(hi/binHz));i++){s+=d[i];n++;}
+      return n>0?s/(n*255):0;
     }
-
-    const createPlayer = () => {
-      if (!ytIframeContainerRef.current) return;
-
-      // Create the iframe div target
-      const div = document.createElement('div');
-      div.id = 'yt-player-hidden';
-      ytIframeContainerRef.current.appendChild(div);
-
-      ytPlayerRef.current = new (window as any).YT.Player('yt-player-hidden', {
-        videoId: YT_VIDEO_ID,
-        playerVars: {
-          autoplay: 1,
-          loop: 1,
-          playlist: YT_VIDEO_ID,
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
-          iv_load_policy: 3,
-          modestbranding: 1,
-          rel: 0,
-          mute: 0,
-        },
-        events: {
-          onReady: async (ev: any) => {
-            ev.target.setVolume(80);
-            ev.target.playVideo();
-            setAudioPlaying(true);
-            await tryConnectAudioContext();
-          },
-          onStateChange: (ev: any) => {
-            // YT.PlayerState.ENDED = 0 → replay
-            if (ev.data === 0) ev.target.playVideo();
-          },
-        },
-      });
-    };
-
-    if ((window as any).YT?.Player) {
-      createPlayer();
-    } else {
-      (window as any).onYouTubeIframeAPIReady = createPlayer;
-    }
+    const sub=band(20,60),bass=band(60,250),lm=band(250,500),mid=band(500,2000),
+          hm=band(2000,4000),pr=band(4000,6000),br=band(6000,12000),air=band(12000,20000);
+    const rms=sub*.2+bass*.25+lm*.15+mid*.15+hm*.1+pr*.07+br*.05+air*.03;
+    const energy=sub*.5+bass*.5;
+    const bs=beatRef.current;
+    let beat=bandsRef.current.beat*0.82;
+    const now=performance.now()/1000;
+    if(energy>bs.prev*1.35&&now-bs.lastBeat>0.18){beat=1.0;bs.lastBeat=now;}
+    bs.prev=THREE.MathUtils.lerp(bs.prev,energy,0.15);
+    bandsRef.current={subBass:sub,bass,lowMid:lm,mid,highMid:hm,presence:pr,brilliance:br,air,rms,beat};
   }
 
-  // ── Try to connect Web Audio to the YT iframe ────────────────────────────
-  async function tryConnectAudioContext() {
-    // The YT iframe is cross-origin, so we can't directly tap its audio.
-    // Strategy: use AudioContext + createMediaElementSource on the iframe's
-    // internal <video> element if same-origin, otherwise fall back to a
-    // simulated BPM analyser that pulses at roughly 128 BPM (the track's BPM).
-    try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new AudioContext();
-      }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') await ctx.resume();
+  // ─── Three.js ──────────────────────────────────────────────────────────────
+  useEffect(()=>{
+    if(window.innerWidth<768||!mountRef.current) return;
+    const mount=mountRef.current;
 
-      if (analyserRef.current) return; // already connected
+    const scene=new THREE.Scene();
+    scene.fog=new THREE.FogExp2(DEFAULT_DEBUG.topColor,0.008);
+    const camera=new THREE.PerspectiveCamera(85,window.innerWidth/window.innerHeight,0.1,1000);
+    const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
+    renderer.setSize(window.innerWidth,window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    mount.appendChild(renderer.domElement);
 
-      // Try to grab the actual iframe video element (works if same-origin or
-      // browser allows it – usually fails, but worth trying)
-      const iframe = ytIframeContainerRef.current?.querySelector('iframe') as HTMLIFrameElement | null;
-      if (iframe) {
-        try {
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-          const videoEl = iframeDoc?.querySelector('video');
-          if (videoEl) {
-            const source = ctx.createMediaElementSource(videoEl);
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 256;
-            source.connect(analyser);
-            analyser.connect(ctx.destination);
-            analyserRef.current = analyser;
-            analyserDataRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
-            return;
-          }
-        } catch (_) {
-          // Cross-origin block expected — fall through to simulated analyser
-        }
-      }
-
-      // ── Fallback: synthetic beat oscillator that mimics audio reactivity ──
-      // We create an oscillator-based "heartbeat" at ~128 BPM with noise,
-      // feeding a real AnalyserNode so the animation code stays identical.
-      if (analyserRef.current) return;
-
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-
-      // Kick drum simulation: short 60Hz sine bursts at BPM interval
-      const BPM = 128;
-      const beatInterval = 60 / BPM; // seconds
-      let lastBeatTime = ctx.currentTime;
-
-      analyserRef.current = analyser;
-      analyserDataRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
-
-      // Drive the analyser with periodic bursts
-      const bufferSize = ctx.sampleRate * 0.1; // 100ms buffer
-      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const noiseData = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) noiseData[i] = Math.random() * 2 - 1;
-
-      // Gain node for beat pulses
-      const beatGain = ctx.createGain();
-      beatGain.gain.setValueAtTime(0, ctx.currentTime);
-      beatGain.connect(analyser);
-      analyser.connect(ctx.destination);
-
-      // Schedule beats
-      function scheduleBeat() {
-        if (!audioCtxRef.current || !beatGain) return;
-        const now = ctx.currentTime;
-        if (now - lastBeatTime >= beatInterval) {
-          lastBeatTime = now;
-          const osc = ctx.createOscillator();
-          osc.frequency.setValueAtTime(80, now);
-          osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
-          const env = ctx.createGain();
-          env.gain.setValueAtTime(0.8, now);
-          env.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-          osc.connect(env);
-          env.connect(analyser);
-          osc.start(now);
-          osc.stop(now + 0.15);
-        }
-        requestAnimationFrame(scheduleBeat);
-      }
-      scheduleBeat();
-
-    } catch (err) {
-      console.warn('AudioContext failed:', err);
-    }
-  }
-
-  // ── Three.js scene ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (window.innerWidth < 768 || !mountRef.current) return;
-
-    const currentMount = mountRef.current;
-    const p = loginParamsRef.current;
-
-    const params = {
-      warpDrive: false,
-      speed: p.speed,
-      cameraOffsetY: 3.0,
-      angleOffset: -0.25,
-      topColor: p.topColor,
-      bottomColor: p.bottomColor,
-      bloomStrength: p.bloomStrength,
-      bloomRadius: 0.2,
-      bloomThreshold: 0.15,
-      lightIntensity: p.lightIntensity,
-      depthFade: 0.001,
-      showRings: true,
-      ringCount: 10.0,
-      rgbShiftAmount: p.rgbShiftAmount,
-      reflectionStrength: 0.35,
-      mouseParallax: 5.0,
-      ghostIntensity: 1.0,
-      matrixIntensity: 0.25
-    };
-
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(params.topColor, 0.008);
-
-    const camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    currentMount.appendChild(renderer.domElement);
-
-    const renderScene = new RenderPass(scene, camera);
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      params.bloomStrength, params.bloomRadius, params.bloomThreshold
-    );
-    const rgbShiftPass = new ShaderPass(RGBShiftShader);
-    rgbShiftPass.uniforms['amount'].value = params.rgbShiftAmount;
-
-    const composer = new EffectComposer(renderer);
-    composer.addPass(renderScene);
+    const composer=new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene,camera));
+    const bloomPass=new UnrealBloomPass(new THREE.Vector2(window.innerWidth,window.innerHeight),1.0,0.2,0.15);
     composer.addPass(bloomPass);
-    composer.addPass(rgbShiftPass);
+    const rgbPass=new ShaderPass(RGBShiftShader);
+    rgbPass.uniforms['amount'].value=0.001;
+    composer.addPass(rgbPass);
 
-    // ── Tunnel curve ──────────────────────────────────────────────────────
-    const points = [];
-    const segments = 400;
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-      const angle = t * Math.PI * 2;
-      const x = Math.cos(angle) * 350;
-      const z = Math.sin(angle * 2) * 250;
-      const y = Math.sin(angle * 3) * 35;
-      points.push(new THREE.Vector3(x, y, z));
-    }
-
-    const curve = new THREE.CatmullRomCurve3(points, true);
-    curve.computeFrenetFrames = function(segs: number) {
-      const tangents: THREE.Vector3[] = [], normals: THREE.Vector3[] = [], binormals: THREE.Vector3[] = [];
-      const up = new THREE.Vector3(0, 1, 0);
-      for (let i = 0; i <= segs; i++) {
-        const u = i / segs;
-        const tangent = this.getTangentAt(u).normalize();
-        tangents.push(tangent);
-        const binormal = new THREE.Vector3().crossVectors(tangent, up).normalize();
-        const normal = new THREE.Vector3().crossVectors(binormal, tangent).normalize();
-        binormals.push(binormal);
-        normals.push(normal);
+    // Curve
+    const N=400;
+    const pts=[];
+    for(let i=0;i<=N;i++){const t=i/N,a=t*Math.PI*2;pts.push(new THREE.Vector3(Math.cos(a)*350,Math.sin(a*3)*35,Math.sin(a*2)*250));}
+    const curve=new THREE.CatmullRomCurve3(pts,true);
+    (curve as any).computeFrenetFrames=function(s:number){
+      const T:THREE.Vector3[]=[],No:THREE.Vector3[]=[],B:THREE.Vector3[]=[];
+      const up=new THREE.Vector3(0,1,0);
+      for(let i=0;i<=s;i++){
+        const tan=this.getTangentAt(i/s).normalize();T.push(tan);
+        const bi=new THREE.Vector3().crossVectors(tan,up).normalize();B.push(bi);
+        No.push(new THREE.Vector3().crossVectors(bi,tan).normalize());
       }
-      return { tangents, normals, binormals };
+      return{tangents:T,normals:No,binormals:B};
     };
+    const TR=15;
+    const tubeGeo=new THREE.TubeGeometry(curve,N*2,TR,64,true);
 
-    const tubeRadius = 15;
-    const tubeGeometry = new THREE.TubeGeometry(curve, segments * 2, tubeRadius, 64, true);
+    // Matrix texture
+    const mc=document.createElement('canvas');mc.width=mc.height=1024;
+    const mctx=mc.getContext('2d')!;
+    mctx.fillStyle='#000';mctx.fillRect(0,0,1024,1024);
+    mctx.fillStyle='#fff';mctx.font='bold 44px monospace';mctx.textAlign='center';mctx.textBaseline='middle';
+    for(let y=24;y<1024;y+=48)for(let x=24;x<1024;x+=48){
+      mctx.globalAlpha=0.4+Math.random()*0.6;mctx.fillText(String.fromCharCode(0xFF66+Math.floor(Math.random()*55)),x,y);
+    }
+    const matTex=new THREE.CanvasTexture(mc);matTex.wrapS=matTex.wrapT=THREE.RepeatWrapping;
 
-    // ── Matrix canvas texture ─────────────────────────────────────────────
-    const matrixCanvas = document.createElement('canvas');
-    matrixCanvas.width = 1024;
-    matrixCanvas.height = 1024;
-    const ctx2d = matrixCanvas.getContext('2d');
-    if (ctx2d) {
-      ctx2d.fillStyle = '#000';
-      ctx2d.fillRect(0, 0, 1024, 1024);
-      ctx2d.fillStyle = '#fff';
-      ctx2d.font = 'bold 44px monospace';
-      ctx2d.textAlign = 'center';
-      ctx2d.textBaseline = 'middle';
-      for (let y = 24; y < 1024; y += 48) {
-        for (let x = 24; x < 1024; x += 48) {
-          const char = String.fromCharCode(0xFF66 + Math.floor(Math.random() * 55));
-          ctx2d.globalAlpha = 0.4 + Math.random() * 0.6;
-          ctx2d.fillText(char, x, y);
+    // Portal
+    const pc=document.createElement('canvas');pc.width=pc.height=512;
+    const pctx=pc.getContext('2d')!;
+    const pTex=new THREE.CanvasTexture(pc);
+    const pGeo=new THREE.CircleGeometry(TR*0.82,64);
+    const pMat=new THREE.MeshBasicMaterial({map:pTex,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
+    const pMesh=new THREE.Mesh(pGeo,pMat);scene.add(pMesh);
+
+    function drawPortal(opacity:number,b:AudioBands){
+      pctx.clearRect(0,0,512,512);
+      // Generative audio-reactive portal
+      const t=performance.now()/1000;
+      [[256*0.9,`rgba(${Math.round(80+175*b.subBass)},30,220,`],[256*0.65,`rgba(255,${Math.round(80+175*b.bass)},10,`],[256*0.4,`rgba(20,${Math.round(180+75*b.mid)},255,`]].forEach(([r,col])=>{
+        const g=pctx.createRadialGradient(256,256,(r as number)*0.05,256,256,r as number);
+        g.addColorStop(0,(col as string)+(opacity*0.95)+')');g.addColorStop(1,(col as string)+'0)');
+        pctx.beginPath();pctx.arc(256,256,r as number,0,Math.PI*2);pctx.fillStyle=g;pctx.fill();
+      });
+      // Beat flash
+      if(b.beat>0.2){pctx.beginPath();pctx.arc(256,256,100*b.beat,0,Math.PI*2);pctx.fillStyle=`rgba(255,255,255,${opacity*b.beat*0.7})`;pctx.fill();}
+      // Rotating streaks on presence
+      if(b.presence>0.1){
+        for(let i=0;i<6;i++){
+          const ang=t*2+i*(Math.PI/3);
+          pctx.save();pctx.translate(256,256);pctx.rotate(ang);
+          const sg=pctx.createLinearGradient(0,-256,0,256);
+          sg.addColorStop(0,'rgba(255,255,255,0)');sg.addColorStop(0.5,`rgba(255,180,50,${opacity*b.presence*0.3})`);sg.addColorStop(1,'rgba(255,255,255,0)');
+          pctx.fillStyle=sg;pctx.fillRect(-2,-256,4,512);pctx.restore();
         }
       }
-    }
-    const matrixTexture = new THREE.CanvasTexture(matrixCanvas);
-    matrixTexture.wrapS = THREE.RepeatWrapping;
-    matrixTexture.wrapT = THREE.RepeatWrapping;
-
-    // ── Tunnel Video Portal canvas texture ────────────────────────────────
-    // We render the YouTube iframe into a hidden canvas via drawImage (works
-    // only if the iframe is accessible; otherwise shows a solid colour portal)
-    const videoPortalCanvas = document.createElement('canvas');
-    videoPortalCanvas.width = 512;
-    videoPortalCanvas.height = 512;
-    const videoPortalCtx = videoPortalCanvas.getContext('2d')!;
-    const videoPortalTexture = new THREE.CanvasTexture(videoPortalCanvas);
-
-    // Draw a placeholder glow for the portal when video isn't accessible
-    function drawPortalPlaceholder(opacity: number) {
-      const grad = videoPortalCtx.createRadialGradient(256, 256, 10, 256, 256, 256);
-      grad.addColorStop(0, `rgba(255,120,20,${opacity * 0.9})`);
-      grad.addColorStop(0.4, `rgba(80,20,200,${opacity * 0.6})`);
-      grad.addColorStop(1, `rgba(0,0,0,0)`);
-      videoPortalCtx.clearRect(0, 0, 512, 512);
-      videoPortalCtx.fillStyle = grad;
-      videoPortalCtx.beginPath();
-      videoPortalCtx.arc(256, 256, 256, 0, Math.PI * 2);
-      videoPortalCtx.fill();
+      pTex.needsUpdate=true;
     }
 
-    // Try drawing actual video frame from iframe
-    function tryDrawVideoFrame() {
-      const iframe = ytIframeContainerRef.current?.querySelector('iframe') as HTMLIFrameElement | null;
-      if (!iframe) { drawPortalPlaceholder(tunnelVideoRef.current.opacity); return; }
-      try {
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        const videoEl = iframeDoc?.querySelector('video') as HTMLVideoElement | null;
-        if (videoEl && videoEl.readyState >= 2) {
-          videoPortalCtx.clearRect(0, 0, 512, 512);
-          // Clip to circle
-          videoPortalCtx.save();
-          videoPortalCtx.beginPath();
-          videoPortalCtx.arc(256, 256, 256, 0, Math.PI * 2);
-          videoPortalCtx.clip();
-          videoPortalCtx.globalAlpha = tunnelVideoRef.current.opacity;
-          videoPortalCtx.drawImage(videoEl, 0, 0, 512, 512);
-          videoPortalCtx.restore();
-        } else {
-          drawPortalPlaceholder(tunnelVideoRef.current.opacity);
-        }
-      } catch (_) {
-        drawPortalPlaceholder(tunnelVideoRef.current.opacity);
-      }
-      videoPortalTexture.needsUpdate = true;
+    // Shaders
+    const vert=`varying vec2 vUv;varying vec3 vWP;varying vec3 vWN;
+    void main(){vUv=uv;vWN=normalize(mat3(modelMatrix)*normal);vec4 wp=modelMatrix*vec4(position,1.0);vWP=wp.xyz;gl_Position=projectionMatrix*viewMatrix*wp;}`;
+
+    const frag=`
+    uniform float uTime;
+    uniform vec3 uTop,uBot;
+    uniform float uAngle,uIntensity,uDepth,uRefStr,uShowRings,uRingCount,uGhost,uMatrix;
+    uniform sampler2D uMatTex;
+    // audio
+    uniform float uSub,uBass,uLM,uMid,uHM,uPres,uBril,uAir,uBeat,uRMS;
+    varying vec2 vUv;varying vec3 vWP,vWN;
+
+    float rand(float n){return fract(sin(n)*43758.5453123);}
+
+    vec3 line(vec3 col,float uvP,float tgt,float w,float uvS,float id,float t,float spd,bool ring){
+      float sh=ring?tgt:tgt+(rand(id*8.2)-.5)*.12;
+      float wt=exp(-pow((uvP-sh)*w*(0.1+rand(id*4.5)*12.),2.));
+      float sp=(0.5+rand(id)*4.)*spd,dir=rand(id*2.1)>.5?1.:-1.;
+      float sc=ring?floor(2.+rand(id*1.3)*6.):.05+rand(id*1.3)*30.;
+      float ph=rand(id*1.7)*20.;
+      float pos=fract(uvS*sc+t*sp*dir+ph);
+      float len=.01+rand(id*3.4)*.93,fd=.01+rand(id*7.1)*.08;
+      float mask=smoothstep(0.,fd,pos)*smoothstep(len+fd,len,pos);
+      float bPos=fract(uvS*sc*.1+t*sp*.1*dir+ph*2.);
+      float bMask=smoothstep(0.,.1,bPos)*smoothstep(.9,.8,bPos);
+      return col*wt*(0.25*bMask+0.85*mask);
     }
 
-    // Portal disc mesh — placed far ahead in tunnel
-    const portalGeometry = new THREE.CircleGeometry(tubeRadius * 0.85, 64);
-    const portalMaterial = new THREE.MeshBasicMaterial({
-      map: videoPortalTexture,
-      transparent: true,
-      opacity: 0,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const portalMesh = new THREE.Mesh(portalGeometry, portalMaterial);
-    scene.add(portalMesh);
-
-    // ── Tube Shaders (unchanged) ──────────────────────────────────────────
-    const vertexShader = `
-      varying vec2 vUv;
-      varying vec3 vWorldPosition;
-      varying vec3 vWorldNormal;
-      void main() {
-          vUv = uv;
-          vWorldNormal = normalize(mat3(modelMatrix) * normal);
-          vec4 worldPos = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPos.xyz;
-          gl_Position = projectionMatrix * viewMatrix * worldPos;
-      }
-    `;
-
-    const fragmentShader = `
-      uniform float uTime;
-      uniform vec3 uTopColor;
-      uniform vec3 uBottomColor;
-      uniform float uAngleOffset;
-      uniform float uIntensity;
-      uniform float uDepthFade;
-      uniform float uReflectionStrength;
-      uniform float uShowRings;
-      uniform float uRingCount;
-      uniform float uGhostIntensity; 
-      uniform sampler2D uMatrixTex;
-      uniform float uMatrixIntensity;
-      uniform float uBass;
-      uniform float uMid;
-      uniform float uTreble;
-
-      varying vec2 vUv;
-      varying vec3 vWorldPosition;
-      varying vec3 vWorldNormal;
-
-      float rand(float n) { return fract(sin(n) * 43758.5453123); }
-
-      vec3 addSegmentedLine(vec3 color, float uvPrimary, float targetPrimary, float width, float uvSecondary, float id, float time, float speedMult, bool isRing) {
-          float shiftedTarget = targetPrimary;
-          if (!isRing) { shiftedTarget += (rand(id * 8.2) - 0.5) * 0.12; }
-          float actualWidth = width * (0.1 + rand(id * 4.5) * 12.0);
-          float weight = exp(-pow((uvPrimary - shiftedTarget) * actualWidth, 2.0));
-          float speed = (0.5 + rand(id) * 4.0) * speedMult;
-          float dir = rand(id * 2.1) > 0.5 ? 1.0 : -1.0;
-          float scale = isRing ? floor(2.0 + rand(id * 1.3) * 6.0) : 0.05 + rand(id * 1.3) * 30.0;
-          float phase = rand(id * 1.7) * 20.0;
-          float movingCoord = uvSecondary * scale + time * speed * dir + phase;
-          float dashPos = fract(movingCoord);
-          float dashLen = 0.01 + rand(id * 3.4) * 0.93;
-          float dashFade = 0.01 + rand(id * 7.1) * 0.08;
-          float mask = smoothstep(0.0, dashFade, dashPos) * smoothstep(dashLen + dashFade, dashLen, dashPos);
-          float baseScale = scale * (0.02 + rand(id * 5.2) * 0.3);
-          float baseSpeed = speed * 0.1;
-          float baseCoord = uvSecondary * baseScale + time * baseSpeed * dir + phase * 2.0;
-          float basePos = fract(baseCoord);
-          float baseLen = 0.1 + rand(id * 2.2) * 0.8;
-          float baseFade = 0.1;
-          float baseMask = smoothstep(0.0, baseFade, basePos) * smoothstep(baseLen + baseFade, baseLen, basePos);
-          return color * weight * (0.25 * baseMask + 0.85 * mask);
-      }
-
-      vec3 addParticleDot(vec3 color, float uvPrimary, float targetPrimary, float width, float uvSecondary, float id, float time, float speedMult) {
-          float actualWidth = width * (0.5 + rand(id * 6.1) * 3.0);
-          float weight = exp(-pow((uvPrimary - targetPrimary) * actualWidth, 2.0));
-          float speed = (2.0 + rand(id) * 4.0) * speedMult;
-          float dir = rand(id * 2.1) > 0.5 ? 1.0 : -1.0;
-          float scale = 10.0 + rand(id * 1.3) * 80.0;
-          float phase = rand(id * 1.7) * 10.0;
-          float movingCoord = uvSecondary * scale + time * speed * dir + phase;
-          float dashPos = fract(movingCoord);
-          float dashLen = 0.001 + rand(id * 3.4) * 0.015;
-          float dashFade = 0.005;
-          float mask = smoothstep(0.0, dashFade, dashPos) * smoothstep(dashLen + dashFade, dashLen, dashPos);
-          return color * weight * mask * 4.0;
-      }
-
-      vec3 getGhostLayer(float h, float uvX, float time, float seed) {
-          float scroll = uvX * 12.0 + time * 0.3 * (rand(seed) > 0.5 ? 1.0 : -1.0);
-          float idX = floor(scroll);
-          float localX = fract(scroll);
-          float hasPanel = step(0.70, rand(idX + seed));
-          float idY = floor(h * 80.0);
-          float hasBar = step(0.30, rand(idY * 15.0 + idX));
-          float pulse = pow(sin(time * 1.2 + rand(idX) * 10.0) * 0.5 + 0.5, 2.0);
-          float maskX = smoothstep(0.0, 0.2, localX) * smoothstep(1.0, 0.8, localX);
-          vec3 techColor = mix(vec3(0.2, 0.7, 1.0), vec3(1.0, 0.3, 0.7), rand(idX * 1.1));
-          vec3 panel = techColor * hasPanel * hasBar * maskX * pulse * 0.35;
-          float wave = sin(uvX * 5.0 + time * 0.5 + seed) * sin(h * 10.0 - time * 0.4 + seed) * 0.5 + 0.5;
-          wave = pow(wave, 5.0);
-          vec3 washColor = mix(vec3(0.1, 0.5, 1.0), vec3(0.8, 0.1, 0.5), rand(seed * 2.0));
-          vec3 wash = washColor * wave * 0.03;
-          return (panel + wash) * uGhostIntensity;
-      }
-
-      vec3 getRightSideColor(float h, float uvX, float time) {
-          vec3 c = vec3(0.0);
-          float hw = h + sin(uvX * 100.0) * 0.003;
-          // Audio reactive brightness boost on bass/mid
-          float boost = 1.0 + uBass * 1.5 + uMid * 0.8;
-          c += addSegmentedLine(vec3(0.2, 0.4, 1.0), hw, 0.35, 60.0,  uvX * 100.0, 10.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(1.0, 0.2, 0.7), hw, 0.28, 300.0, uvX * 100.0, 11.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(1.0, 0.6, 0.1), hw, 0.20, 120.0, uvX * 100.0, 12.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(0.0, 0.8, 1.0), hw, 0.10, 40.0,  uvX * 100.0, 13.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(1.0, 0.9, 0.2), hw, 0.02, 500.0, uvX * 100.0, 14.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(0.1, 0.9, 0.3), hw, -0.08, 150.0, uvX * 100.0, 15.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(1.0, 0.4, 0.0), hw, -0.18, 80.0,  uvX * 100.0, 16.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(1.0, 0.1, 0.1), hw, -0.28, 400.0, uvX * 100.0, 17.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(1.0), hw, 0.28, 450.0, uvX * 100.0, 18.0, time, 2.5, false) * 0.5;
-          c += addSegmentedLine(vec3(1.0), hw, 0.10, 800.0, uvX * 100.0, 19.0, time, 2.5, false) * 0.5;
-          c += addParticleDot(vec3(1.0, 0.5, 1.0), hw, 0.30, 400.0, uvX * 100.0, 80.0, time, 1.5);
-          c += addParticleDot(vec3(0.5, 1.0, 1.0), hw, 0.15, 350.0, uvX * 100.0, 81.0, time, 2.5);
-          c += addParticleDot(vec3(1.0, 1.0, 0.5), hw, -0.05, 450.0, uvX * 100.0, 82.0, time, 2.0);
-          c += addParticleDot(vec3(1.0, 0.2, 0.2), hw, -0.20, 300.0, uvX * 100.0, 83.0, time, 3.0);
-          c += getGhostLayer(hw, uvX, time, 112.3);
-          return c * boost;
-      }
-
-      vec3 getLeftSideColor(float h, float uvX, float time) {
-          vec3 c = vec3(0.0);
-          float hw = h + sin(uvX * 120.0 + 1.0) * 0.003;
-          float boost = 1.0 + uBass * 1.5 + uMid * 0.8;
-          c += addSegmentedLine(vec3(1.0, 0.4, 0.0), hw, 0.32,  70.0,  uvX * 100.0, 20.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(1.0, 0.1, 0.5), hw, 0.25,  350.0, uvX * 100.0, 21.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(0.1, 0.6, 1.0), hw, 0.15,  120.0, uvX * 100.0, 22.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(0.2, 0.9, 0.4), hw, 0.05,  50.0,  uvX * 100.0, 23.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(1.0, 0.8, 0.0), hw, -0.05, 450.0, uvX * 100.0, 24.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(1.0, 0.2, 0.1), hw, -0.15, 150.0, uvX * 100.0, 25.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(0.6, 0.1, 1.0), hw, -0.25, 60.0,  uvX * 100.0, 26.0, time, 2.0, false);
-          c += addSegmentedLine(vec3(1.0), hw, 0.15, 600.0, uvX * 100.0, 27.0, time, 2.5, false) * 0.5;
-          c += addSegmentedLine(vec3(1.0), hw, -0.05, 900.0, uvX * 100.0, 28.0, time, 2.5, false) * 0.5;
-          c += addParticleDot(vec3(1.0, 0.8, 0.2), hw, 0.28, 350.0, uvX * 100.0, 90.0, time, 1.8);
-          c += addParticleDot(vec3(0.2, 0.8, 1.0), hw, 0.10, 400.0, uvX * 100.0, 91.0, time, 2.2);
-          c += addParticleDot(vec3(0.5, 1.0, 0.5), hw, -0.10, 300.0, uvX * 100.0, 92.0, time, 1.5);
-          c += addParticleDot(vec3(1.0, 0.4, 0.8), hw, -0.20, 450.0, uvX * 100.0, 93.0, time, 2.7);
-          c += getGhostLayer(hw, uvX, time, 442.1);
-          return c * boost;
-      }
-
-      vec3 getColorfulRings(float uvX, float uvY, float time) {
-          vec3 c = vec3(0.0);
-          float localX = fract(uvX * uRingCount);
-          float cellId = floor(uvX * uRingCount);
-          float ringType = fract(rand(cellId) * 10.0);
-          vec3 rColor = vec3(0.0);
-          if (ringType < 0.2) rColor = vec3(1.0, 0.2, 0.7);
-          else if (ringType < 0.4) rColor = vec3(0.0, 0.8, 1.0);
-          else if (ringType < 0.6) rColor = vec3(1.0, 0.6, 0.1);
-          else if (ringType < 0.8) rColor = vec3(0.1, 0.9, 0.3);
-          else rColor = vec3(1.0, 0.9, 0.2);
-          // Bass pulse on rings
-          rColor *= (1.0 + uBass * 2.0);
-          c += addSegmentedLine(rColor, localX, 0.5, 60.0 + rand(cellId)*40.0, uvY, cellId, time, 1.0, true);
-          float activeMask = rand(cellId + 10.0) > 0.3 ? 1.0 : 0.0;
-          return c * activeMask;
-      }
-
-      void main() {
-          float y = fract(vUv.y + uAngleOffset);
-          float cy = sin(y * 6.2831853);
-          float cx = cos(y * 6.2831853);
-          vec3 bgColor = mix(uBottomColor, uTopColor, smoothstep(-0.2, 0.5, cy));
-          // Audio: bass pulses the bg brightness
-          bgColor *= (1.0 + uBass * 0.4);
-          vec3 streakColor = vec3(0.0);
-          if (cx > 0.0) {
-              streakColor = getRightSideColor(cy, vUv.x, uTime);
-          } else {
-              streakColor = getLeftSideColor(cy, vUv.x, uTime);
-          }
-          vec3 ceilingColor = vec3(0.0);
-          if (cy > 0.4) {
-              float hwCeiling = cy + sin(vUv.x * 80.0) * 0.005;
-              ceilingColor += addSegmentedLine(vec3(0.6, 0.8, 1.0), hwCeiling, 0.70, 500.0, vUv.x * 100.0, 30.0, uTime, 0.5, false) * 0.5;
-              ceilingColor += addSegmentedLine(vec3(0.8, 0.9, 1.0), hwCeiling, 0.82, 800.0, vUv.x * 100.0, 31.0, uTime, 0.4, false) * 0.7;
-              ceilingColor += addSegmentedLine(vec3(0.9, 0.95, 1.0), hwCeiling, 0.92, 1000.0, vUv.x * 100.0, 32.0, uTime, 0.6, false) * 0.9;
-              ceilingColor += addSegmentedLine(vec3(1.0, 1.0, 1.0), hwCeiling, 0.76, 600.0, vUv.x * 100.0, 40.0, uTime, 3.0, false) * 0.7;
-              ceilingColor += addSegmentedLine(vec3(0.5, 0.8, 1.0), hwCeiling, 0.88, 700.0, vUv.x * 100.0, 41.0, uTime, 2.5, false) * 0.6;
-          }
-          float sideMask = smoothstep(0.7, 0.1, abs(cy));
-          vec3 finalColor = bgColor + (streakColor * uIntensity * sideMask) + (ceilingColor * uIntensity);
-          if (uShowRings > 0.5) {
-              vec3 ringsColor = getColorfulRings(vUv.x, y, uTime);
-              float ringMask = smoothstep(-0.8, -0.4, cy);
-              finalColor += ringsColor * uIntensity * ringMask;
-          }
-          if (uMatrixIntensity > 0.0) {
-              vec2 texUv = vec2(vUv.x * 250.0, y * 14.0);
-              float textVal = texture2D(uMatrixTex, texUv).r;
-              float streamId = floor(texUv.y);
-              float speed = 0.5 + rand(streamId * 1.5) * 1.5;
-              float phase = rand(streamId * 7.1) * 10.0;
-              float dir = rand(streamId * 3.3) > 0.5 ? 1.0 : -1.0;
-              float trailCoord = vUv.x * 8.0 + uTime * speed * dir + phase;
-              float trailPos = fract(trailCoord);
-              float trailMask = smoothstep(0.0, 0.8, trailPos) * smoothstep(1.0, 0.95, trailPos);
-              float headMask = smoothstep(0.95, 1.0, trailPos);
-              float cellId = floor(texUv.x) + streamId * 100.0;
-              float flicker = sin(uTime * 15.0 + rand(cellId) * 20.0) * 0.5 + 0.5;
-              float matrixVisibility = (trailMask * 0.6 + headMask * 2.0) * (0.3 + 0.7 * flicker);
-              vec3 matrixBaseColor = vec3(0.0, 0.9, 0.3);
-              vec3 matrixHeadColor = vec3(0.6, 1.0, 0.8);
-              vec3 mColor = mix(matrixBaseColor, matrixHeadColor, headMask);
-              float matrixSideMask = smoothstep(0.8, 0.2, abs(cy));
-              // Treble reactive matrix
-              finalColor += mColor * textVal * matrixVisibility * (uMatrixIntensity + uTreble * 0.4) * matrixSideMask * uIntensity;
-          }
-          if (cy < -0.2 && uReflectionStrength > 0.0) {
-              float refCy = abs(cy);
-              float ripple = sin(vUv.x * 300.0 - uTime * 5.0) * 0.03 + sin(vUv.x * 1000.0) * 0.01;
-              float refCx = cx + ripple;
-              vec3 reflection = vec3(0.0);
-              if (refCx > 0.0) {
-                  reflection = getRightSideColor(refCy, vUv.x, uTime);
-              } else {
-                  reflection = getLeftSideColor(refCy, vUv.x, uTime);
-              }
-              float refMask = smoothstep(-0.2, -0.8, cy) * smoothstep(-1.0, -0.9, cy);
-              finalColor += reflection * uReflectionStrength * refMask;
-          }
-          float dist = length(cameraPosition - vWorldPosition);
-          float fogFactor = exp(-dist * uDepthFade);
-          vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-          float fresnel = max(0.0, dot(-vWorldNormal, viewDir));
-          float cavityShadow = mix(0.5, 1.0, smoothstep(0.0, 0.8, fresnel));
-          finalColor *= cavityShadow;
-          finalColor = mix(uBottomColor, finalColor, fogFactor);
-          gl_FragColor = vec4(finalColor, 1.0);
-      }
-    `;
-
-    const tubeMaterial = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      uniforms: {
-        uTime: { value: 0 },
-        uTopColor: { value: new THREE.Color(params.topColor) },
-        uBottomColor: { value: new THREE.Color(params.bottomColor) },
-        uAngleOffset: { value: params.angleOffset },
-        uIntensity: { value: params.lightIntensity },
-        uDepthFade: { value: params.depthFade },
-        uShowRings: { value: params.showRings ? 1.0 : 0.0 },
-        uRingCount: { value: params.ringCount },
-        uReflectionStrength: { value: params.reflectionStrength },
-        uGhostIntensity: { value: params.ghostIntensity },
-        uMatrixTex: { value: matrixTexture },
-        uMatrixIntensity: { value: params.matrixIntensity },
-        uBass: { value: 0.0 },
-        uMid: { value: 0.0 },
-        uTreble: { value: 0.0 },
-      },
-      side: THREE.BackSide
-    });
-
-    const tunnelMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
-    scene.add(tunnelMesh);
-
-    // ── Color palettes ────────────────────────────────────────────────────
-    const colorPalettes = [
-      { top: '#0a198c', bottom: '#11133b' },
-      { top: '#004d1a', bottom: '#001a08' },
-      { top: '#4a0072', bottom: '#1a0029' },
-      { top: '#801300', bottom: '#2b0600' },
-      { top: '#004059', bottom: '#00141c' }
-    ];
-    let currentPaletteIndex = 0;
-
-    // ── Mouse / keyboard / scroll event handlers ──────────────────────────
-    let mouseX = 0, mouseY = 0, targetMouseX = 0, targetMouseY = 0;
-
-    const onMouseMove = (e: MouseEvent) => {
-      targetMouseX = (e.clientX / window.innerWidth) * 2 - 1;
-      targetMouseY = -(e.clientY / window.innerHeight) * 2 + 1;
-    };
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      const active = document.activeElement;
-      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
-      if (e.code === 'Space') params.warpDrive = !params.warpDrive;
-    };
-
-    const onClick = () => {
-      currentPaletteIndex = (currentPaletteIndex + 1) % colorPalettes.length;
-      const nc = colorPalettes[currentPaletteIndex];
-      loginParamsRef.current = { ...loginParamsRef.current, topColor: nc.top, bottomColor: nc.bottom };
-      tubeMaterial.uniforms.uTopColor.value.set(nc.top);
-      tubeMaterial.uniforms.uBottomColor.value.set(nc.bottom);
-      if (scene.fog) scene.fog.color.set(nc.top);
-    };
-
-    const onWheel = (e: WheelEvent) => {
-      const r = loginParamsRef.current;
-      r.speed = Math.max(0.02, Math.min(r.speed - e.deltaY * 0.0015, 5.0));
-      if (params.warpDrive) params.warpDrive = false;
-    };
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('click', onClick);
-    window.addEventListener('wheel', onWheel);
-
-    // ── Helpers ───────────────────────────────────────────────────────────
-    const clock = new THREE.Clock();
-    let flightProgress = 0;
-    let currentSpeed = params.speed;
-    let animationId: number;
-
-    function getFloorPosition(t: number, yOffset: number) {
-      const pos = curve.getPointAt(t);
-      const tan = curve.getTangentAt(t).normalize();
-      const up = new THREE.Vector3(0, 1, 0);
-      const right = new THREE.Vector3().crossVectors(tan, up).normalize();
-      const normal = new THREE.Vector3().crossVectors(right, tan).normalize();
-      return pos.add(normal.multiplyScalar(yOffset));
+    vec3 dot3(vec3 col,float uvP,float tgt,float w,float uvS,float id,float t,float spd){
+      float wt=exp(-pow((uvP-tgt)*w*(0.5+rand(id*6.1)*3.),2.));
+      float sp=(2.+rand(id)*4.)*spd,dir=rand(id*2.1)>.5?1.:-1.;
+      float pos=fract(uvS*(10.+rand(id*1.3)*80.)+t*sp*dir+rand(id*1.7)*10.);
+      float len=.001+rand(id*3.4)*.015;
+      return col*wt*smoothstep(0.,.005,pos)*smoothstep(len+.005,len,pos)*4.;
     }
 
-    // ── Animation loop ────────────────────────────────────────────────────
-    function animate() {
-      animationId = requestAnimationFrame(animate);
-      const dt = clock.getDelta();
-      const time = clock.getElapsedTime();
-      const live = loginParamsRef.current;
+    vec3 ghost(float h,float uvX,float t,float seed){
+      float sc=uvX*12.+t*.3*(rand(seed)>.5?1.:-1.);
+      float idX=floor(sc),lx=fract(sc);
+      float hasP=step(.7,rand(idX+seed)),idY=floor(h*80.);
+      float hasB=step(.3,rand(idY*15.+idX));
+      float pulse=pow(sin(t*1.2+rand(idX)*10.)*.5+.5,2.);
+      float mx=smoothstep(0.,.2,lx)*smoothstep(1.,.8,lx);
+      vec3 tc=mix(vec3(.2,.7,1.),vec3(1.,.3,.7),rand(idX*1.1));
+      vec3 panel=tc*hasP*hasB*mx*pulse*.35;
+      float wave=pow(sin(uvX*5.+t*.5+seed)*sin(h*10.-t*.4+seed)*.5+.5,5.);
+      vec3 wash=mix(vec3(.1,.5,1.),vec3(.8,.1,.5),rand(seed*2.))*wave*.03;
+      return (panel+wash)*uGhost;
+    }
 
-      // ── Audio analysis ───────────────────────────────────────────────
-      const ad = audioDataRef.current;
-      if (analyserRef.current && analyserDataRef.current) {
-        const analyserData = analyserDataRef.current as Uint8Array<ArrayBuffer>;
-        analyserRef.current.getByteFrequencyData(analyserData);
-        const data = analyserData;
-        const len = data.length;
+    vec3 rightSide(float h,float uvX,float t){
+      vec3 c=vec3(0.);float hw=h+sin(uvX*100.)*.003;
+      float bB=1.+uBass*2.+uBeat*1.5,mB=1.+uMid*1.5+uHM,hB=1.+uPres*1.2+uBril*.8;
+      float sB=2.+uBass*3.,sM=2.+uMid*2.5,sH=2.+uPres*4.;
+      c+=line(vec3(.2,.4,1.)*bB,hw,.35,60.,uvX*100.,10.,t,sB,false);
+      c+=line(vec3(1.,.2,.7)*bB,hw,.28,300.,uvX*100.,11.,t,sB,false);
+      c+=line(vec3(1.,.6,.1)*bB,hw,.20,120.,uvX*100.,12.,t,sB,false);
+      c+=line(vec3(0.,.8,1.)*mB,hw,.10,40.,uvX*100.,13.,t,sM,false);
+      c+=line(vec3(1.,.9,.2)*mB,hw,.02,500.,uvX*100.,14.,t,sM,false);
+      c+=line(vec3(.1,.9,.3)*mB,hw,-.08,150.,uvX*100.,15.,t,sM,false);
+      c+=line(vec3(1.,.4,0.)*hB,hw,-.18,80.,uvX*100.,16.,t,sH,false);
+      c+=line(vec3(1.,.1,.1)*hB,hw,-.28,400.,uvX*100.,17.,t,sH,false);
+      // Beat flash white
+      float bf=.5+uBeat*2.;
+      c+=line(vec3(1.),hw,.28,450.,uvX*100.,18.,t,2.5+uBeat*5.,false)*bf;
+      c+=line(vec3(1.),hw,.10,800.,uvX*100.,19.,t,2.5+uBeat*5.,false)*bf;
+      // Air shimmer
+      c+=line(vec3(.8,.9,1.)*(1.+uAir*3.),hw,.40,2000.,uvX*100.,50.,t,1.+uAir*8.,false)*uAir;
+      c+=line(vec3(.6,1.,.8)*(1.+uAir*3.),hw,-.35,1500.,uvX*100.,51.,t,1.+uAir*6.,false)*uAir;
+      c+=dot3(vec3(1.,.5,1.)*mB,hw,.30,400.,uvX*100.,80.,t,1.5+uMid*2.);
+      c+=dot3(vec3(.5,1.,1.)*hB,hw,.15,350.,uvX*100.,81.,t,2.5+uHM*3.);
+      c+=dot3(vec3(1.,1.,.5)*mB,hw,-.05,450.,uvX*100.,82.,t,2.+uLM*2.);
+      c+=dot3(vec3(1.,.2,.2)*bB,hw,-.20,300.,uvX*100.,83.,t,3.+uBass*4.);
+      c+=ghost(hw,uvX,t,112.3);
+      return c;
+    }
 
-        // Bass: bins 0–5 (~0–300Hz), Mid: 6–30, Treble: 31–100
-        let bassSum = 0, midSum = 0, trebleSum = 0;
-        for (let i = 0; i < 6; i++) bassSum += data[i];
-        for (let i = 6; i < 30; i++) midSum += data[i];
-        for (let i = 30; i < Math.min(100, len); i++) trebleSum += data[i];
+    vec3 leftSide(float h,float uvX,float t){
+      vec3 c=vec3(0.);float hw=h+sin(uvX*120.+1.)*.003;
+      float bB=1.+uBass*2.+uBeat*1.5,mB=1.+uMid*1.5+uHM,hB=1.+uPres*1.2+uBril*.8;
+      float sB=2.+uBass*3.,sM=2.+uMid*2.5,sH=2.+uPres*4.;
+      c+=line(vec3(1.,.4,0.)*bB,hw,.32,70.,uvX*100.,20.,t,sB,false);
+      c+=line(vec3(1.,.1,.5)*bB,hw,.25,350.,uvX*100.,21.,t,sB,false);
+      c+=line(vec3(.1,.6,1.)*mB,hw,.15,120.,uvX*100.,22.,t,sM,false);
+      c+=line(vec3(.2,.9,.4)*mB,hw,.05,50.,uvX*100.,23.,t,sM,false);
+      c+=line(vec3(1.,.8,0.)*mB,hw,-.05,450.,uvX*100.,24.,t,sM,false);
+      c+=line(vec3(1.,.2,.1)*hB,hw,-.15,150.,uvX*100.,25.,t,sH,false);
+      c+=line(vec3(.6,.1,1.)*hB,hw,-.25,60.,uvX*100.,26.,t,sH,false);
+      float bf=.5+uBeat*2.;
+      c+=line(vec3(1.),hw,.15,600.,uvX*100.,27.,t,2.5+uBeat*5.,false)*bf;
+      c+=line(vec3(1.),hw,-.05,900.,uvX*100.,28.,t,2.5+uBeat*5.,false)*bf;
+      c+=line(vec3(.9,.8,1.)*(1.+uAir*3.),hw,.38,2000.,uvX*100.,52.,t,1.+uAir*8.,false)*uAir;
+      c+=dot3(vec3(1.,.8,.2)*mB,hw,.28,350.,uvX*100.,90.,t,1.8+uMid*2.);
+      c+=dot3(vec3(.2,.8,1.)*hB,hw,.10,400.,uvX*100.,91.,t,2.2+uHM*3.);
+      c+=dot3(vec3(.5,1.,.5)*mB,hw,-.10,300.,uvX*100.,92.,t,1.5+uLM*2.);
+      c+=dot3(vec3(1.,.4,.8)*bB,hw,-.20,450.,uvX*100.,93.,t,2.7+uBass*4.);
+      c+=ghost(hw,uvX,t,442.1);
+      return c;
+    }
 
-        ad.bass = Math.min(1, (bassSum / (6 * 255)) * 2.5);
-        ad.mid = Math.min(1, (midSum / (24 * 255)) * 2.0);
-        ad.treble = Math.min(1, (trebleSum / (70 * 255)) * 2.0);
-        ad.rms = (ad.bass * 0.6 + ad.mid * 0.3 + ad.treble * 0.1);
+    vec3 rings(float uvX,float uvY,float t){
+      vec3 c=vec3(0.);
+      float lx=fract(uvX*uRingCount),cid=floor(uvX*uRingCount),rt=fract(rand(cid)*10.);
+      vec3 rc;
+      if(rt<.2)      rc=vec3(1.,.2,.7)*(1.+uSub*3.);
+      else if(rt<.4) rc=vec3(0.,.8,1.)*(1.+uBass*2.5);
+      else if(rt<.6) rc=vec3(1.,.6,.1)*(1.+uLM*2.);
+      else if(rt<.8) rc=vec3(.1,.9,.3)*(1.+uMid*2.);
+      else           rc=vec3(1.,.9,.2)*(1.+uBeat*4.);
+      c+=line(rc,lx,.5,60.+rand(cid)*40.,uvY,cid,t,1.+uBass*2.,true);
+      return c*(rand(cid+10.)>.3?1.:0.);
+    }
 
-        // Beat detection: energy spike in bass
-        const beat = beatRef.current;
-        if (ad.bass > beat.lastEnergy * 1.3 && time - beat.lastBeat > 0.2) {
-          beat.lastBeat = time;
-          ad.bpmSpeed = 0.08; // speed burst on beat
-        }
-        beat.lastEnergy = THREE.MathUtils.lerp(beat.lastEnergy, ad.bass, 0.3);
-        ad.bpmSpeed = Math.max(0, ad.bpmSpeed - dt * 0.4);
-      } else {
-        // No audio — zero out
-        ad.bass = 0; ad.mid = 0; ad.treble = 0; ad.rms = 0; ad.bpmSpeed = 0;
+    void main(){
+      float y=fract(vUv.y+uAngle),cy=sin(y*6.2831853),cx=cos(y*6.2831853);
+      vec3 bg=mix(uBot,uTop,smoothstep(-.2,.5,cy))*(1.+uSub*.5+uBeat*.3);
+      vec3 st=cx>0.?rightSide(cy,vUv.x,uTime):leftSide(cy,vUv.x,uTime);
+      // Ceiling
+      vec3 ceil=vec3(0.);
+      if(cy>.4){
+        float hc=cy+sin(vUv.x*80.)*.005;float cs=.5+uMid*2.;
+        ceil+=line(vec3(.6,.8,1.),hc,.70,500.,vUv.x*100.,30.,uTime,cs,false)*.5;
+        ceil+=line(vec3(.8,.9,1.)*(1.+uHM),hc,.82,800.,vUv.x*100.,31.,uTime,cs,false)*.7;
+        ceil+=line(vec3(.9,.95,1.)*(1.+uPres),hc,.92,1000.,vUv.x*100.,32.,uTime,cs*1.2,false)*.9;
+        ceil+=line(vec3(1.)*(1.+uBeat*2.),hc,.76,600.,vUv.x*100.,40.,uTime,3.+uBeat*5.,false)*.7;
+      }
+      float sm=smoothstep(.7,.1,abs(cy));
+      vec3 fc=bg+(st*uIntensity*sm)+(ceil*uIntensity);
+      if(uShowRings>.5) fc+=rings(vUv.x,y,uTime)*uIntensity*smoothstep(-.8,-.4,cy);
+      // Matrix
+      if(uMatrix>0.){
+        vec2 tu=vec2(vUv.x*250.,y*14.);
+        float tv=texture2D(uMatTex,tu).r,sid=floor(tu.y);
+        float sp=.5+rand(sid*1.5)*1.5+uBril*3.,dir=rand(sid*3.3)>.5?1.:-1.;
+        float tp=fract(vUv.x*8.+uTime*sp*dir+rand(sid*7.1)*10.);
+        float trM=smoothstep(0.,.8,tp)*smoothstep(1.,.95,tp),hM=smoothstep(.95,1.,tp);
+        float fl=sin(uTime*15.+rand(floor(tu.x)+sid*100.)*20.)*.5+.5;
+        vec3 mc=mix(vec3(0.,.9,.3),vec3(.6,1.,.8),hM);
+        fc+=mc*tv*(trM*.6+hM*2.)*(0.3+0.7*fl)*(uMatrix+uAir*.5)*smoothstep(.8,.2,abs(cy))*uIntensity;
+      }
+      // Reflection
+      if(cy<-.2&&uRefStr>0.){
+        float rip=sin(vUv.x*300.-uTime*5.)*(0.03+uSub*.05)+sin(vUv.x*1000.)*.01;
+        float rcx=cx+rip;
+        vec3 ref=rcx>0.?rightSide(abs(cy),vUv.x,uTime):leftSide(abs(cy),vUv.x,uTime);
+        fc+=ref*uRefStr*smoothstep(-.2,-.8,cy)*smoothstep(-1.,-.9,cy);
+      }
+      float ff=exp(-length(cameraPosition-vWP)*uDepth);
+      float fr=max(0.,dot(-vWN,normalize(cameraPosition-vWP)));
+      fc*=mix(.5,1.,smoothstep(0.,.8,fr));
+      fc=mix(uBot,fc,ff);
+      gl_FragColor=vec4(fc,1.);
+    }`;
+
+    const U: Record<string,THREE.IUniform>={
+      uTime:{value:0},uTop:{value:new THREE.Color(DEFAULT_DEBUG.topColor)},uBot:{value:new THREE.Color(DEFAULT_DEBUG.bottomColor)},
+      uAngle:{value:-.25},uIntensity:{value:1.2},uDepth:{value:.001},uRefStr:{value:.35},
+      uShowRings:{value:1.},uRingCount:{value:10.},uGhost:{value:1.},
+      uMatTex:{value:matTex},uMatrix:{value:.25},
+      uSub:{value:0},uBass:{value:0},uLM:{value:0},uMid:{value:0},
+      uHM:{value:0},uPres:{value:0},uBril:{value:0},uAir:{value:0},uBeat:{value:0},uRMS:{value:0},
+    };
+    const tubeMat=new THREE.ShaderMaterial({vertexShader:vert,fragmentShader:frag,uniforms:U,side:THREE.BackSide});
+    scene.add(new THREE.Mesh(tubeGeo,tubeMat));
+
+    // Palettes
+    const pals=[{t:'#0a198c',b:'#11133b'},{t:'#004d1a',b:'#001a08'},{t:'#4a0072',b:'#1a0029'},{t:'#801300',b:'#2b0600'},{t:'#004059',b:'#00141c'}];
+    let pi=0;
+    let mx=0,my=0,tmx=0,tmy=0;
+    const onMouse=(e:MouseEvent)=>{tmx=(e.clientX/window.innerWidth)*2-1;tmy=-(e.clientY/window.innerHeight)*2+1;};
+    const onClick=()=>{pi=(pi+1)%pals.length;const nc=pals[pi];setDebugParams(p=>({...p,topColor:nc.t,bottomColor:nc.b}));};
+    window.addEventListener('mousemove',onMouse);window.addEventListener('click',onClick);
+
+    const clock=new THREE.Clock();
+    let prog=0,curSpd=DEFAULT_DEBUG.speed;
+    let animId:number;
+
+    function getPos(t:number,yo:number){
+      const pos=curve.getPointAt(t),tan=curve.getTangentAt(t).normalize();
+      const up=new THREE.Vector3(0,1,0),right=new THREE.Vector3().crossVectors(tan,up).normalize();
+      return pos.add(new THREE.Vector3().crossVectors(right,tan).normalize().multiplyScalar(yo));
+    }
+
+    function animate(){
+      animId=requestAnimationFrame(animate);
+      const dt=Math.min(clock.getDelta(),.05),time=clock.getElapsedTime();
+      analyseAudio();
+
+      // Slow ramp: when audio first starts, ease speed → 0.770 and audioReactivity → 1.2 over ~5s
+      if(audioRampRef.current.active){
+        const rampSpeed = 0.770, rampReact = 1.2, rampRate = dt * 0.18;
+        setDebugParams(p=>{
+          const newSpeed = Math.abs(p.speed - rampSpeed) < 0.002 ? rampSpeed : p.speed + (rampSpeed - p.speed) * rampRate;
+          const newReact = Math.abs(p.audioReactivity - rampReact) < 0.005 ? rampReact : p.audioReactivity + (rampReact - p.audioReactivity) * rampRate;
+          if(Math.abs(newSpeed - rampSpeed) < 0.002 && Math.abs(newReact - rampReact) < 0.005) audioRampRef.current.active = false;
+          return {...p, speed: newSpeed, audioReactivity: newReact};
+        });
       }
 
-      // Pass audio to shader
-      tubeMaterial.uniforms.uBass.value = THREE.MathUtils.lerp(tubeMaterial.uniforms.uBass.value, ad.bass, 0.15);
-      tubeMaterial.uniforms.uMid.value = THREE.MathUtils.lerp(tubeMaterial.uniforms.uMid.value, ad.mid, 0.12);
-      tubeMaterial.uniforms.uTreble.value = THREE.MathUtils.lerp(tubeMaterial.uniforms.uTreble.value, ad.treble, 0.1);
-
-      // Sync live debug params
-      tubeMaterial.uniforms.uTime.value = time;
-      tubeMaterial.uniforms.uTopColor.value.set(live.topColor);
-      tubeMaterial.uniforms.uBottomColor.value.set(live.bottomColor);
-      tubeMaterial.uniforms.uIntensity.value = live.lightIntensity + ad.rms * 0.8;
-      if (scene.fog) (scene.fog as THREE.FogExp2).color.set(live.topColor);
-
-      // Speed: base + audio beat burst
-      const audioSpeedBoost = ad.bpmSpeed;
-      const targetSpeed = params.warpDrive ? 1.2 : live.speed + audioSpeedBoost;
-      const targetFOV = params.warpDrive ? 130 : 85 + ad.bass * 8;
-      const targetRGB = params.warpDrive ? 0.008 : live.rgbShiftAmount + ad.treble * 0.005;
-      const targetBloom = params.warpDrive ? 2.5 : live.bloomStrength + ad.bass * 1.2;
-
-      currentSpeed = THREE.MathUtils.lerp(currentSpeed, targetSpeed, dt * 2.0);
-      camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, dt * 3.0);
+      const b=bandsRef.current,live=debugRef.current,ar=live.audioReactivity;
+      const L=0.12;
+      U.uSub.value=THREE.MathUtils.lerp(U.uSub.value,b.subBass*ar,L);
+      U.uBass.value=THREE.MathUtils.lerp(U.uBass.value,b.bass*ar,L);
+      U.uLM.value=THREE.MathUtils.lerp(U.uLM.value,b.lowMid*ar,L);
+      U.uMid.value=THREE.MathUtils.lerp(U.uMid.value,b.mid*ar,L);
+      U.uHM.value=THREE.MathUtils.lerp(U.uHM.value,b.highMid*ar,L);
+      U.uPres.value=THREE.MathUtils.lerp(U.uPres.value,b.presence*ar,L);
+      U.uBril.value=THREE.MathUtils.lerp(U.uBril.value,b.brilliance*ar,L);
+      U.uAir.value=THREE.MathUtils.lerp(U.uAir.value,b.air*ar,L);
+      U.uBeat.value=THREE.MathUtils.lerp(U.uBeat.value,b.beat*ar,.25);
+      U.uRMS.value=THREE.MathUtils.lerp(U.uRMS.value,b.rms*ar,L);
+      U.uTime.value=time;
+      U.uTop.value.set(live.topColor);U.uBot.value.set(live.bottomColor);
+      U.uIntensity.value=live.lightIntensity+b.rms*ar*.8;
+      U.uGhost.value=live.ghostIntensity;U.uMatrix.value=live.matrixIntensity;U.uRefStr.value=live.reflectionStrength;
+      if(scene.fog)(scene.fog as THREE.FogExp2).color.set(live.topColor);
+      curSpd=THREE.MathUtils.lerp(curSpd,live.speed+b.beat*.12*ar,dt*2.);
+      camera.fov=THREE.MathUtils.lerp(camera.fov,85+b.bass*10*ar,dt*3.);
       camera.updateProjectionMatrix();
-      rgbShiftPass.uniforms['amount'].value = THREE.MathUtils.lerp(rgbShiftPass.uniforms['amount'].value, targetRGB, dt * 3.0);
-      bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, targetBloom, dt * 3.0);
-
-      flightProgress += (currentSpeed * dt) * 0.1;
-      flightProgress = flightProgress % 1.0;
-
-      const camPos = getFloorPosition(flightProgress, params.cameraOffsetY);
-      const lookAtPos = curve.getPointAt((flightProgress + 0.012) % 1.0);
-
-      camera.position.copy(camPos);
-      camera.lookAt(lookAtPos);
-
-      mouseX = THREE.MathUtils.lerp(mouseX, targetMouseX, dt * 4.0);
-      mouseY = THREE.MathUtils.lerp(mouseY, targetMouseY, dt * 4.0);
-      camera.translateX(mouseX * params.mouseParallax);
-      camera.translateY(mouseY * params.mouseParallax * 0.5);
-      camera.rotateZ(-mouseX * 0.1 * params.mouseParallax);
-      camera.rotateX(mouseY * 0.05 * params.mouseParallax);
-
-      // ── Video portal ─────────────────────────────────────────────────
-      const tv = tunnelVideoRef.current;
-      if (time > tv.nextShow && !tv.active) {
-        tv.active = true;
-        tv.fadeIn = true;
-        // Next appearance: 15–40 seconds later
-        tv.nextShow = time + 15 + Math.random() * 25;
-      }
-
-      if (tv.active) {
-        if (tv.fadeIn) {
-          tv.opacity = Math.min(1, tv.opacity + dt * 0.8);
-          if (tv.opacity >= 1) tv.fadeIn = false;
-        } else {
-          // Hold for 4–8s then fade out
-          const holdEnd = tv.nextShow - 15; // rough hold window
-          tv.opacity = Math.max(0, tv.opacity - dt * 0.3);
-          if (tv.opacity <= 0) tv.active = false;
-        }
-        tryDrawVideoFrame();
-        portalMaterial.opacity = tv.opacity * 0.85;
-
-        // Position portal ahead of camera at end of visible tunnel
-        const portalT = (flightProgress + 0.08) % 1.0;
-        const portalPos = curve.getPointAt(portalT);
-        const portalTan = curve.getTangentAt(portalT).normalize();
-        portalMesh.position.copy(portalPos);
-        portalMesh.lookAt(portalPos.clone().add(portalTan));
-      } else {
-        portalMaterial.opacity = 0;
-      }
-      videoPortalTexture.needsUpdate = tv.active;
-
+      rgbPass.uniforms['amount'].value=THREE.MathUtils.lerp(rgbPass.uniforms['amount'].value,live.rgbShiftAmount+b.brilliance*.006*ar+b.beat*.003*ar,dt*3.);
+      bloomPass.strength=THREE.MathUtils.lerp(bloomPass.strength,live.bloomStrength+b.bass*1.5*ar+b.beat*.8*ar,dt*3.);
+      prog=(prog+curSpd*dt*.1)%1.;
+      const cp=getPos(prog,3.),la=curve.getPointAt((prog+.012)%1.);
+      camera.position.copy(cp);camera.lookAt(la);
+      mx=THREE.MathUtils.lerp(mx,tmx,dt*4.);my=THREE.MathUtils.lerp(my,tmy,dt*4.);
+      camera.translateX(mx*5.);camera.translateY(my*2.5);camera.rotateZ(-mx*.5);camera.rotateX(my*.25);
+      // Portal
+      const pv=portalRef.current;
+      if(!pv.active&&time>pv.nextShow){pv.active=true;pv.opacity=0;pv.hold=time+4+Math.random()*5;pv.nextShow=pv.hold+15+Math.random()*25;}
+      if(pv.active){
+        if(time<pv.hold)pv.opacity=Math.min(1,pv.opacity+dt*.7);
+        else{pv.opacity=Math.max(0,pv.opacity-dt*.35);if(pv.opacity<=0)pv.active=false;}
+        drawPortal(pv.opacity,b);pMat.opacity=pv.opacity*.9;
+        const pt=(prog+.08)%1.,ppos=curve.getPointAt(pt),ptan=curve.getTangentAt(pt).normalize();
+        pMesh.position.copy(ppos);pMesh.lookAt(ppos.clone().add(ptan));
+      } else pMat.opacity=0;
       composer.render();
     }
 
-    // Set initial portal show time: 8–20s after load
-    tunnelVideoRef.current.nextShow = 8 + Math.random() * 12;
-
-    const onResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      composer.setSize(window.innerWidth, window.innerHeight);
-    };
-    window.addEventListener('resize', onResize);
-
+    portalRef.current.nextShow=6+Math.random()*10;
+    const onResize=()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);composer.setSize(window.innerWidth,window.innerHeight);};
+    window.addEventListener('resize',onResize);
     animate();
 
-    return () => {
-      cancelAnimationFrame(animationId);
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('click', onClick);
-      window.removeEventListener('wheel', onWheel);
-      if (currentMount.contains(renderer.domElement)) currentMount.removeChild(renderer.domElement);
-      renderer.dispose();
-      tubeMaterial.dispose();
-      tubeGeometry.dispose();
-      portalGeometry.dispose();
-      portalMaterial.dispose();
-      videoPortalTexture.dispose();
-      matrixTexture.dispose();
+    return ()=>{
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize',onResize);window.removeEventListener('mousemove',onMouse);window.removeEventListener('click',onClick);
+      if(mount.contains(renderer.domElement))mount.removeChild(renderer.domElement);
+      renderer.dispose();tubeMat.dispose();tubeGeo.dispose();pGeo.dispose();pMat.dispose();pTex.dispose();matTex.dispose();
     };
-  }, []);
+  },[]);
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
 
-      {/* Hidden YouTube iframe container (audio source) */}
-      <div
-        ref={ytIframeContainerRef}
-        className="hidden"
-        aria-hidden="true"
-        style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}
-      />
-
-      {/* Debug (solo escritorio) */}
-      {showDebugButton && (
-        <div className="hidden md:block fixed left-6 top-[38%] -translate-y-1/2 z-[60] flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setDebugMenuOpen((o) => !o)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950/90 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-white hover:border-orange-500/40 hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] transition-all font-bold text-sm"
-          >
-            <Settings2 size={18} />
-            Debug
+      {/* Debug toggle */}
+      {showDebug&&(
+        <div className="fixed left-4 top-1/2 -translate-y-1/2 z-[60]" style={{display: debugOpen ? 'none' : 'block'}}>
+          <button type="button" onClick={()=>setDebugOpen(o=>!o)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950/90 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-white hover:border-orange-500/40 transition-all font-bold text-sm">
+            <Settings2 size={16}/>Debug
+            {audioPlaying&&<span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"/>}
           </button>
-          {debugMenuOpen && (
-            <div className="fixed left-24 top-1/2 -translate-y-1/2 w-72 rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[61]">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Fondo Login</span>
-                <button
-                  type="button"
-                  onClick={() => setDebugMenuOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
-                  aria-label="Cerrar"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
-                <label className="flex items-center justify-between gap-3 cursor-pointer py-2 border-b border-white/5">
-                  <span className="text-xs font-bold text-slate-400">Ocultar tarjeta de login (solo fondo)</span>
-                  <input
-                    type="checkbox"
-                    checked={hideLoginCard}
-                    onChange={(e) => setHideLoginCard(e.target.checked)}
-                    className="w-4 h-4 rounded border-white/20 bg-slate-800 text-orange-500 focus:ring-orange-500/50"
-                  />
-                </label>
-                {[
-                  { label: 'Color superior', key: 'topColor', type: 'color' },
-                  { label: 'Color inferior', key: 'bottomColor', type: 'color' },
-                ].map(({ label, key, type }) => (
-                  <div key={key}>
-                    <span className="text-xs font-bold text-slate-400 block mb-1">{label}</span>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={(loginDebugParams as any)[key]}
-                        onChange={(e) => setLoginDebugParams((p) => ({ ...p, [key]: e.target.value }))}
-                        className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent"
-                      />
-                      <span className="text-xs font-mono text-slate-500">{(loginDebugParams as any)[key]}</span>
-                    </div>
-                  </div>
-                ))}
-                {[
-                  { label: 'Bloom', key: 'bloomStrength', min: 0, max: 3, step: 0.05 },
-                  { label: 'Velocidad', key: 'speed', min: 0.02, max: 2, step: 0.01 },
-                  { label: 'Intensidad luz', key: 'lightIntensity', min: 0.2, max: 3, step: 0.05 },
-                  { label: 'RGB Shift', key: 'rgbShiftAmount', min: 0, max: 0.02, step: 0.0005 },
-                ].map(({ label, key, min, max, step }) => (
-                  <div key={key}>
-                    <label className="flex justify-between items-center gap-2 mb-1">
-                      <span className="text-xs font-bold text-slate-400">{label}</span>
-                      <span className="text-xs font-mono text-orange-400">{(loginDebugParams as any)[key].toFixed(4)}</span>
-                    </label>
-                    <input
-                      type="range"
-                      min={min} max={max} step={step}
-                      value={(loginDebugParams as any)[key]}
-                      onChange={(e) => setLoginDebugParams((p) => ({ ...p, [key]: parseFloat(e.target.value) }))}
-                      className="w-full h-2 rounded-full bg-slate-800 accent-orange-500"
-                    />
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setLoginDebugParams(DEFAULT_LOGIN_DEBUG)}
-                  className="w-full py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:border-orange-500/30 transition-colors"
-                >
-                  Restaurar valores
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Three.js mount */}
-      <div ref={mountRef} className="hidden md:block absolute inset-0 z-0" />
+      {debugOpen&&(
+        <DebugPanel
+          params={debugParams}
+          onChange={handleChange}
+          onClose={()=>setDebugOpen(false)}
+          onReset={()=>setDebugParams({...DEFAULT_DEBUG})}
+          bandsRef={bandsRef}
+          playing={audioPlaying}
+          hideCard={hideCard}
+          onToggleCard={()=>setHideCard(v=>!v)}
+          trackName={trackName}
+          onSkip={skipTrack}
+        />
+      )}
 
-      {/* CRT scanlines + vignette */}
-      <div
-        className="hidden md:block absolute inset-0 z-[1] pointer-events-none bg-black/60 shadow-[inset_0_0_150px_rgba(0,0,0,0.8)]"
-        style={{
-          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)'
-        }}
-      />
+      <div ref={mountRef} className="hidden md:block absolute inset-0 z-0"/>
+      <div className="hidden md:block absolute inset-0 z-[1] pointer-events-none bg-black/60 shadow-[inset_0_0_150px_rgba(0,0,0,0.8)]"
+        style={{backgroundImage:'repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.3) 2px,rgba(0,0,0,0.3) 4px)'}}/>
+      <div className="absolute md:hidden top-0 left-0 w-[500px] h-[500px] bg-orange-600/20 blur-[120px] rounded-full pointer-events-none -translate-x-1/2 -translate-y-1/2 z-0"/>
 
-      {/* Mobile fallback bg */}
-      <div className="absolute md:hidden top-0 left-0 w-[500px] h-[500px] bg-orange-600/20 blur-[120px] rounded-full pointer-events-none -translate-x-1/2 -translate-y-1/2 z-0" />
-
-      {/* Login card */}
-      <div className={`relative z-10 w-full max-w-md transition-opacity duration-200 ${hideLoginCard ? 'opacity-0 pointer-events-none' : ''}`}>
-        <Suspense fallback={<div className="text-white text-center">Cargando login...</div>}>
-          <LoginForm />
+      <div className={`relative z-10 w-full max-w-md transition-opacity duration-200 ${hideCard?'opacity-0 pointer-events-none':''}`}>
+        <Suspense fallback={<div className="text-white text-center">Cargando...</div>}>
+          <LoginForm/>
         </Suspense>
       </div>
 
       {/* Space hint */}
-      <AudioHint playing={audioPlaying} />
+      {!audioPlaying&&(
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 hidden md:flex items-center gap-3 px-5 py-2.5 rounded-full pointer-events-none select-none"
+          style={{background:'rgba(2,4,20,0.85)',backdropFilter:'blur(12px)',border:'1px solid rgba(255,255,255,0.07)'}}>
+          <kbd className="text-[10px] font-black tracking-widest text-slate-300 bg-white/10 px-2 py-1 rounded-md">SPACE</kbd>
+          <span className="text-[11px] text-slate-500">activar música reactiva</span>
+        </div>
+      )}
     </div>
   );
 }
