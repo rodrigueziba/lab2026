@@ -196,7 +196,9 @@ export default function LoginPage() {
   const ytPlayerRef = useRef<any>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const analyserDataRef = useRef<Uint8Array | null>(null);
+  // getByteFrequencyData en TS tipa su destino como Uint8Array<ArrayBuffer>.
+  // Usamos el tipo explícito para que Vercel compile con TS estricto.
+  const analyserDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const ytIframeContainerRef = useRef<HTMLDivElement>(null);
 
   // Beat detection
@@ -365,7 +367,7 @@ export default function LoginPage() {
             source.connect(analyser);
             analyser.connect(ctx.destination);
             analyserRef.current = analyser;
-            analyserDataRef.current = new Uint8Array(analyser.frequencyBinCount);
+            analyserDataRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
             return;
           }
         } catch (_) {
@@ -387,7 +389,7 @@ export default function LoginPage() {
       let lastBeatTime = ctx.currentTime;
 
       analyserRef.current = analyser;
-      analyserDataRef.current = new Uint8Array(analyser.frequencyBinCount);
+      analyserDataRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
 
       // Drive the analyser with periodic bursts
       const bufferSize = ctx.sampleRate * 0.1; // 100ms buffer
@@ -918,8 +920,9 @@ export default function LoginPage() {
       // ── Audio analysis ───────────────────────────────────────────────
       const ad = audioDataRef.current;
       if (analyserRef.current && analyserDataRef.current) {
-        analyserRef.current.getByteFrequencyData(analyserDataRef.current);
-        const data = analyserDataRef.current;
+        const analyserData = analyserDataRef.current as Uint8Array<ArrayBuffer>;
+        analyserRef.current.getByteFrequencyData(analyserData);
+        const data = analyserData;
         const len = data.length;
 
         // Bass: bins 0–5 (~0–300Hz), Mid: 6–30, Treble: 31–100
