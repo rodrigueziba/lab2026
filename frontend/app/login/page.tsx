@@ -206,7 +206,7 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
 }) {
   // Live values animated by audio
   const [live, setLive] = useState(params);
-  const rafRef = useRef<number>();
+  const rafRef = useRef<number | null>(null);
   useEffect(()=>{
     function tick(){
       rafRef.current=requestAnimationFrame(tick);
@@ -224,7 +224,7 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
       });
     }
     tick();
-    return ()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);};
+    return ()=>{if(rafRef.current != null) cancelAnimationFrame(rafRef.current);};
   },[params,bandsRef,playing]);
 
   const SLIDERS: {label:string;key:keyof DebugParams;min:number;max:number;step:number;audioKey?:keyof AudioBands;col:string}[] = [
@@ -376,7 +376,8 @@ export default function LoginPage() {
   const audioRef = useRef<HTMLAudioElement|null>(null);
   const audioCtxRef = useRef<AudioContext|null>(null);
   const analyserRef = useRef<AnalyserNode|null>(null);
-  const freqRef = useRef<Uint8Array|null>(null);
+  // Usamos la misma firma que espera getByteFrequencyData en TS estricto.
+  const freqRef = useRef<Uint8Array<ArrayBuffer>|null>(null);
   const bandsRef = useRef<AudioBands>(zeroBands());
   const beatRef = useRef({prev:0,lastBeat:0});
   const portalRef = useRef({active:false,opacity:0,nextShow:0,hold:0});
@@ -438,7 +439,7 @@ export default function LoginPage() {
         analyser.fftSize = 2048;
         analyser.smoothingTimeConstant = 0.8;
         analyserRef.current = analyser;
-        freqRef.current = new Uint8Array(analyser.frequencyBinCount);
+        freqRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
         const src = ctx.createMediaElementSource(audio);
         src.connect(analyser);
         analyser.connect(ctx.destination);
@@ -486,8 +487,9 @@ export default function LoginPage() {
   // Analyse audio — called from Three.js loop
   function analyseAudio(){
     if(!analyserRef.current||!freqRef.current){bandsRef.current=zeroBands();return;}
-    analyserRef.current.getByteFrequencyData(freqRef.current);
-    const d=freqRef.current;
+    const freq = freqRef.current;
+    analyserRef.current.getByteFrequencyData(freq);
+    const d = freq;
     const sampleRate=audioCtxRef.current!.sampleRate;
     const nyq=sampleRate/2;
     const binHz=nyq/d.length;
