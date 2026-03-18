@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
@@ -29,6 +29,40 @@ function getYoutubeVideoId(url: string | null): string | null {
   }
   return null;
 }
+
+// Enlaces centrales memoizados para no re-renderizar con wavePhase/beamColorIndex (evita parpadeo de hover y clicks bloqueados)
+const CenterNavLinks = memo(function CenterNavLinks({
+  pathname,
+  locacionesLabel,
+  prestadoresLabel,
+  proyectosLabel,
+}: {
+  pathname: string;
+  locacionesLabel: string;
+  prestadoresLabel: string;
+  proyectosLabel: string;
+}) {
+  const NavLink = ({ href, icon: Icon, label }: { href: string; icon: any; label: string }) => {
+    const isActive = pathname === href;
+    return (
+      <Link
+        href={href}
+        className={`relative group flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${isActive ? 'text-white bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.3)] border border-white/20' : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'}`}
+      >
+        <Icon size={18} className={`transition-all duration-300 ${isActive ? 'text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : ''}`} />
+        <span className={`text-sm font-bold tracking-wide ${isActive ? 'drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : ''}`}>{label}</span>
+        {isActive && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-orange-500 rounded-full shadow-[0_0_10px_4px_rgba(249,115,22,0.6)]"></span>}
+      </Link>
+    );
+  };
+  return (
+    <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-2 bg-black/20 backdrop-blur-sm p-1.5 rounded-full border border-white/5 z-[101] pointer-events-auto">
+      <div id="tour-locaciones"><NavLink href="/locaciones" icon={MapPin} label={locacionesLabel} /></div>
+      <div id="tour-guia"><NavLink href="/guia" icon={Users} label={prestadoresLabel} /></div>
+      <div id="tour-proyectos"><NavLink href="/proyectos" icon={Clapperboard} label={proyectosLabel} /></div>
+    </div>
+  );
+});
 
 export default function Navbar() {
   const router = useRouter();
@@ -391,20 +425,6 @@ export default function Navbar() {
     }
   };
 
-  const NavLink = ({ href, icon: Icon, label }: { href: string, icon: any, label: string }) => {
-    const isActive = pathname === href;
-    return (
-      <Link 
-        href={href} 
-        className={`relative group flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${isActive ? 'text-white bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.3)] border border-white/20' : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'}`}
-      >
-        <Icon size={18} className={`transition-all duration-300 ${isActive ? 'text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : ''}`}/>
-        <span className={`text-sm font-bold tracking-wide ${isActive ? 'drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : ''}`}>{label}</span>
-        {isActive && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-orange-500 rounded-full shadow-[0_0_10px_4px_rgba(249,115,22,0.6)]"></span>}
-      </Link>
-    );
-  };
-
   const MobileNavLink = ({ href, pathname: p, onClick, icon: Icon, label }: { href: string; pathname: string; onClick: () => void; icon: any; label: string }) => {
     const isActive = p === href || (href !== '/' && p.startsWith(href));
     return (
@@ -505,12 +525,13 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Centro: Locaciones, Prestadores, Proyectos — z-[101] para quedar por encima del overlay de glow (z-[99]) y ser clickeables */}
-        <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-2 bg-black/20 backdrop-blur-sm p-1.5 rounded-full border border-white/5 z-[101]">
-          <div id="tour-locaciones"><NavLink href="/locaciones" icon={MapPin} label={t('nav.locaciones')} /></div>
-          <div id="tour-guia"><NavLink href="/guia" icon={Users} label={t('nav.prestadores')} /></div>
-          <div id="tour-proyectos"><NavLink href="/proyectos" icon={Clapperboard} label={t('nav.proyectos')} /></div>
-        </div>
+        {/* Centro: Locaciones, Prestadores, Proyectos — memoizado para no re-renderizar con glow/onda; z-[101] y pointer-events-auto para ser clickeables */}
+        <CenterNavLinks
+          pathname={pathname}
+          locacionesLabel={t('nav.locaciones')}
+          prestadoresLabel={t('nav.prestadores')}
+          proyectosLabel={t('nav.proyectos')}
+        />
 
         <div className="hidden md:flex items-center gap-4">
           {/* Indicador protector de pantalla: círculo que se llena entre 15s y 65s sin interacción */}

@@ -57,6 +57,8 @@ interface DebugParams {
   topColor: string; bottomColor: string;
   bloomStrength: number; speed: number; lightIntensity: number;
   rgbShiftAmount: number; matrixIntensity: number;
+  /** 1 = filtro TV activo (matrix), 0 = desactivado */
+  tvFilterEnabled: number;
   reflectionStrength: number; ghostIntensity: number;
   audioReactivity: number;
 }
@@ -64,6 +66,7 @@ const DEFAULT_DEBUG: DebugParams = {
   topColor:'#0a198c', bottomColor:'#11133b',
   bloomStrength:1.0, speed:0.069, lightIntensity:1.2,
   rgbShiftAmount:0.001, matrixIntensity:0.25,
+  tvFilterEnabled:1,
   reflectionStrength:0.35, ghostIntensity:1.0,
   audioReactivity:1.0,
 };
@@ -294,6 +297,19 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
             className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0 ${hideCard?'bg-orange-500':'bg-slate-700'}`}
           >
             <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${hideCard?'left-4':'left-0.5'}`}/>
+          </div>
+        </label>
+
+        {/* TV filter toggle */}
+        <label className="flex items-center justify-between gap-3 cursor-pointer rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 hover:bg-white/[0.04] transition-colors">
+          <span className="text-[10px] font-bold text-slate-400">Desactivar filtro TV</span>
+          <div
+            onClick={() => onChange('tvFilterEnabled', params.tvFilterEnabled > 0 ? 0 : 1)}
+            className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0 ${params.tvFilterEnabled > 0 ? 'bg-slate-700' : 'bg-orange-500'}`}
+          >
+            <div
+              className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${params.tvFilterEnabled > 0 ? 'left-0.5' : 'left-4'}`}
+            />
           </div>
         </label>
 
@@ -838,7 +854,10 @@ export default function LoginPage() {
       U.uTime.value=time;
       U.uTop.value.set(live.topColor);U.uBot.value.set(live.bottomColor);
       U.uIntensity.value=live.lightIntensity+b.rms*ar*.8;
-      U.uGhost.value=live.ghostIntensity;U.uMatrix.value=live.matrixIntensity;U.uRefStr.value=live.reflectionStrength;
+      U.uGhost.value=live.ghostIntensity;
+      // uMatrix controla el bloque "Matrix" del shader. Multiplicar por tvFilterEnabled apaga el filtro TV sin afectar los demás efectos.
+      U.uMatrix.value=live.matrixIntensity * (live.tvFilterEnabled > 0 ? 1 : 0);
+      U.uRefStr.value=live.reflectionStrength;
       if(scene.fog)(scene.fog as THREE.FogExp2).color.set(live.topColor);
       curSpd=THREE.MathUtils.lerp(curSpd,live.speed+b.beat*.12*ar,dt*2.);
       camera.fov=THREE.MathUtils.lerp(camera.fov,85+b.bass*10*ar,dt*3.);
