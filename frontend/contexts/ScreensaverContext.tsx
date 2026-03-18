@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 const IDLE_ACTIVATE_MS = 65 * 1000;   // 65 segundos → activar screensaver
 const IDLE_INDICATOR_MS = 15 * 1000;  // 15 segundos → mostrar círculo en navbar
@@ -33,6 +34,7 @@ export function ScreensaverProvider({ children }: { children: React.ReactNode })
   const [isScreensaverActive, setIsScreensaverActive] = useState(false);
   const lastActivityRef = useRef(Date.now());
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pathname = usePathname();
 
   const resetIdle = useCallback(() => {
     lastActivityRef.current = Date.now();
@@ -69,7 +71,8 @@ export function ScreensaverProvider({ children }: { children: React.ReactNode })
   }, [isDesktop, isScreensaverActive, resetIdle]);
 
   useEffect(() => {
-    if (!isDesktop || isScreensaverActive) return;
+    // En /login desactivamos el contador automático de inactividad (no se activa screensaver por timeout).
+    if (!isDesktop || isScreensaverActive || pathname === '/login') return;
     tickRef.current = setInterval(() => {
       const elapsed = (Date.now() - lastActivityRef.current) / 1000;
       setIdleSeconds(elapsed);

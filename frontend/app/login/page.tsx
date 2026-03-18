@@ -414,6 +414,40 @@ export default function LoginPage() {
     return ()=>window.removeEventListener('keydown',h);
   },[]);
 
+  // Sincronizar estado de música con la Navbar (para mostrar controles en /login)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const ev = new CustomEvent('login-music-state', { detail: { playing: audioPlaying } });
+    window.dispatchEvent(ev);
+  }, [audioPlaying]);
+
+  // Permitir que la Navbar controle play/pausa y "siguiente tema" en /login
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleToggle = async () => {
+      const audio = audioRef.current;
+      const ctx = audioCtxRef.current;
+      if (!audio || !ctx) return;
+      if (ctx.state === 'suspended') await ctx.resume();
+      if (audio.paused) {
+        await audio.play().catch(() => {});
+        setAudioPlaying(true);
+      } else {
+        audio.pause();
+        setAudioPlaying(false);
+      }
+    };
+    const handleSkip = () => {
+      skipTrack();
+    };
+    window.addEventListener('login-music-toggle', handleToggle as EventListener);
+    window.addEventListener('login-music-skip', handleSkip as EventListener);
+    return () => {
+      window.removeEventListener('login-music-toggle', handleToggle as EventListener);
+      window.removeEventListener('login-music-skip', handleSkip as EventListener);
+    };
+  }, [skipTrack]);
+
   // Space → audio with playlist
   useEffect(()=>{
     const h=async(e:KeyboardEvent)=>{

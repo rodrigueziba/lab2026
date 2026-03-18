@@ -57,10 +57,12 @@ export default function Navbar() {
   const musicaYoutubeUrl = prestadorVisit?.musicaYoutubeUrl ?? null;
   const screensaver = useScreensaver();
   const screensaverProgress = screensaver?.indicatorProgress ?? 0;
-  const showScreensaverIndicator = (screensaver?.isDesktop ?? false) && screensaverProgress > 0 && !screensaver?.isScreensaverActive;
+  const isLogin = pathname === '/login';
+  const showScreensaverIndicator = !isLogin && (screensaver?.isDesktop ?? false) && screensaverProgress > 0 && !screensaver?.isScreensaverActive;
   const isOnPrestadorPage = pathname?.startsWith('/prestador/') && pathname !== '/prestador';
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [prestadorMusicPlaying, setPrestadorMusicPlaying] = useState(false);
+  const [loginMusicPlaying, setLoginMusicPlaying] = useState(false);
   const [playlistIndex, setPlaylistIndex] = useState(0);
   const [playlist] = useState(() => [...NAVBAR_MP3_FILES]);
 
@@ -85,6 +87,19 @@ export default function Navbar() {
       return () => cancelAnimationFrame(t);
     }
   }, [isMobileMenuOpen]);
+
+  // Escuchar estado de música de /login para mostrar controles en navbar
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (event: Event) => {
+      const e = event as CustomEvent<{ playing?: boolean }>;
+      if (typeof e.detail?.playing === 'boolean') {
+        setLoginMusicPlaying(e.detail.playing);
+      }
+    };
+    window.addEventListener('login-music-state', handler as EventListener);
+    return () => window.removeEventListener('login-music-state', handler as EventListener);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -308,12 +323,25 @@ export default function Navbar() {
 
   const handleMusicPlayPause = () => {
     const a = audioRef.current;
+    // En /login delegamos el control al reproductor de esa página
+    if (isLogin) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('login-music-toggle'));
+      }
+      return;
+    }
     if (!a) return;
     if (musicPlaying) a.pause();
     else a.play();
   };
 
   const handleNextTrack = () => {
+    if (isLogin) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('login-music-skip'));
+      }
+      return;
+    }
     setPlaylistIndex((i) => (i + 1) % playlist.length);
   };
 
@@ -419,17 +447,24 @@ export default function Navbar() {
           >
             <Atom size={20} strokeWidth={1.5} />
           </Link>
-          {/* Controles de música (solo escritorio, visibles tras 1 min hover en usuario) */}
-          {themeUnlocked && (
+          {/* Controles de música (solo escritorio, visibles tras 1 min hover en usuario o cuando hay música activa en /login) */}
+          {(themeUnlocked || (isLogin && loginMusicPlaying)) && (
             <div className="hidden md:flex items-center gap-1">
+              {/** En /login usamos el estado de música de login; en el resto, el del easter egg */}
+              {(() => {
+                const playing = isLogin ? loginMusicPlaying : musicPlaying;
+                const title = playing ? 'Pausar' : 'Reproducir';
+                const aria = title;
+                return (
+                  <>
               <button
                 type="button"
                 onClick={handleMusicPlayPause}
                 className="flex items-center justify-center opacity-[0.12] hover:opacity-100 transition-opacity duration-300 text-white hover:text-emerald-400 rounded-full p-1.5 hover:ring-1 hover:ring-emerald-400/60"
-                title={musicPlaying ? 'Pausar' : 'Reproducir'}
-                aria-label={musicPlaying ? 'Pausar' : 'Reproducir'}
+                    title={title}
+                    aria-label={aria}
               >
-                {musicPlaying ? <Pause size={20} strokeWidth={2} /> : <Play size={20} strokeWidth={2} />}
+                    {playing ? <Pause size={20} strokeWidth={2} /> : <Play size={20} strokeWidth={2} />}
               </button>
               <button
                 type="button"
@@ -440,6 +475,9 @@ export default function Navbar() {
               >
                 <SkipForward size={20} strokeWidth={2} />
               </button>
+                  </>
+                );
+              })()}
             </div>
           )}
           {/* Música del perfil del prestador (solo escritorio, cuando se visita /prestador/[id] y tiene link) */}
