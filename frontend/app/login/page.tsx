@@ -391,16 +391,19 @@ export default function LoginPage() {
     setDebugParams(p=>({...p,[k]:v}));
   },[]);
 
-  // Skip to next track
+  // Skip to next track (Navbar + Debug usan esta función compartida)
   const skipTrack = useCallback(()=>{
     const audio = audioRef.current;
     const pl = playlistRef.current;
-    if(!audio || pl.length === 0) return;
+    if (!audio || pl.length === 0) return;
+    // Detener pista actual y saltar a la siguiente del mismo elemento <audio>
+    audio.pause();
+    audio.currentTime = 0;
     trackIdxRef.current = (trackIdxRef.current + 1) % pl.length;
     const nextUrl = pl[trackIdxRef.current];
     audio.src = nextUrl;
     setTrackName(nextUrl.replace(/^\//, '').replace('.mp3',''));
-    audio.play().catch(()=>{});
+    audio.play().then(() => setAudioPlaying(true)).catch(() => {});
   },[]);
 
   // Shift → debug
@@ -480,13 +483,8 @@ export default function LoginPage() {
 
         // Advance to next track when current ends
         audio.addEventListener('ended', () => {
-          const pl = playlistRef.current;
-          if(pl.length <= 1) { audio.currentTime = 0; audio.play().catch(()=>{}); return; }
-          trackIdxRef.current = (trackIdxRef.current + 1) % pl.length;
-          const nextUrl = pl[trackIdxRef.current];
-          audio.src = nextUrl;
-          setTrackName(nextUrl.replace(/^\//, '').replace('.mp3',''));
-          audio.play().catch(()=>{});
+          // Reutilizar la lógica centralizada de skipTrack para mantener todo sincronizado
+          skipTrack();
         });
 
         await audio.play();
