@@ -534,7 +534,7 @@ export default function Navbar() {
         />
 
         <div className="hidden md:flex items-center gap-4">
-          {/* Indicador protector de pantalla: círculo que se llena entre 15s y 65s sin interacción */}
+          {/* Indicador protector de pantalla: círculo que se llena entre 15s y 85s sin interacción */}
           {showScreensaverIndicator && (
             <button
               type="button"

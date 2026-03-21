@@ -13,8 +13,21 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 interface Prestador {
   id: number;
   nombre: string;
+  tipoPerfil?: string;
   galeria?: string[];
   videoReel?: string | null;
+}
+
+/** Tipos de perfil que se muestran en el screensaver (galería/videoreel) */
+const SCREENSAVER_TIPOS = ['PROFESIONAL', 'ESTUDIANTE'];
+
+function prestadorAllowedForScreensaver(p: Prestador): boolean {
+  const tipo = (p.tipoPerfil ?? '').toUpperCase().trim();
+  if (!SCREENSAVER_TIPOS.includes(tipo)) return false;
+  const galeria = Array.isArray(p.galeria) ? p.galeria : [];
+  const hasReel = !!p.videoReel?.trim() && !!getYoutubeVideoId(p.videoReel);
+  const hasImages = galeria.some((src) => src?.trim());
+  return hasImages || hasReel;
 }
 
 function getYoutubeVideoId(url: string | null | undefined): string | null {
@@ -46,12 +59,13 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function buildGalleryItems(prestadores: Prestador[]): GalleryItem[] {
-  const shuffled = shuffle(prestadores);
+  const filtered = prestadores.filter(prestadorAllowedForScreensaver);
+  const shuffled = shuffle(filtered);
   const items: GalleryItem[] = [];
   for (const p of shuffled) {
     const galeria = Array.isArray(p.galeria) ? p.galeria : [];
     const hasReel = !!p.videoReel?.trim() && !!getYoutubeVideoId(p.videoReel);
-    if (galeria.length === 0 && !hasReel) continue;
+    if (galeria.length === 0 && !hasReel) continue; // ya filtrados, pero por si acaso
     for (const src of galeria) {
       if (src?.trim()) {
         items.push({ src: src.trim(), title: p.nombre });
@@ -134,6 +148,8 @@ export default function ScreensaverOverlay() {
             title="TDF FILM"
             subtitle="Guía audiovisual"
             onItemClick={handleItemClick}
+            autoScrollAfterMs={10000}
+            autoScrollSpeed={1.5}
           />
         </div>
       )}

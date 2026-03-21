@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
-const IDLE_ACTIVATE_MS = 65 * 1000;   // 65 segundos → activar screensaver
+const IDLE_ACTIVATE_MS = 85 * 1000;   // 85 segundos → activar screensaver
 const IDLE_INDICATOR_MS = 15 * 1000;  // 15 segundos → mostrar círculo en navbar
 const TICK_MS = 200;                  // Actualizar progreso cada 200ms
 
@@ -12,7 +12,7 @@ type ScreensaverContextValue = {
   isDesktop: boolean;
   /** Segundos sin interacción (desde último reset) */
   idleSeconds: number;
-  /** 0 hasta 15s, luego 0..1 entre 15s y 65s (para llenar el círculo) */
+  /** 0 hasta 15s, luego 0..1 entre 15s y 85s (para llenar el círculo) */
   indicatorProgress: number;
   /** Screensaver a pantalla completa activo */
   isScreensaverActive: boolean;
@@ -51,8 +51,8 @@ export function ScreensaverProvider({ children }: { children: React.ReactNode })
     if (isDesktop) setIsScreensaverActive(true);
   }, [isDesktop]);
 
-  // Progreso para el círculo: 0 hasta 15s, luego lineal de 0 a 1 entre 15s y 65s
-  const indicatorProgress = idleSeconds < 15 ? 0 : Math.min(1, (idleSeconds - 15) / (65 - 15));
+  // Progreso para el círculo: 0 hasta 15s, luego lineal de 0 a 1 entre 15s y 85s
+  const indicatorProgress = idleSeconds < 15 ? 0 : Math.min(1, (idleSeconds - 15) / (85 - 15));
 
   useEffect(() => {
     const checkDesktop = () => setIsDesktop(typeof window !== 'undefined' && window.innerWidth >= 768);
@@ -76,7 +76,7 @@ export function ScreensaverProvider({ children }: { children: React.ReactNode })
     tickRef.current = setInterval(() => {
       const elapsed = (Date.now() - lastActivityRef.current) / 1000;
       setIdleSeconds(elapsed);
-      if (elapsed >= 65) {
+      if (elapsed >= 85) {
         setIsScreensaverActive(true);
         if (tickRef.current) {
           clearInterval(tickRef.current);
@@ -88,7 +88,7 @@ export function ScreensaverProvider({ children }: { children: React.ReactNode })
       if (tickRef.current) clearInterval(tickRef.current);
       tickRef.current = null;
     };
-  }, [isDesktop, isScreensaverActive]);
+  }, [isDesktop, isScreensaverActive, pathname]);
 
   const value: ScreensaverContextValue = {
     isDesktop,

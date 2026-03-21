@@ -23,6 +23,10 @@ export interface DepthGalleryProps {
   subtitle?: string;
   height?: string;
   onItemClick?: (item: GalleryItem, index: number) => void;
+  /** Si > 0, tras esta cantidad de ms se inicia scroll automático muy lento (ej. screensaver) */
+  autoScrollAfterMs?: number;
+  /** Velocidad de scroll automático en unidades de scroll por segundo (ej. 1.5 = muy lento) */
+  autoScrollSpeed?: number;
 }
 
 // ─── Shaders ─────────────────────────────────────────────────────────────────
@@ -153,6 +157,8 @@ export default function DepthGallery({
   subtitle,
   height = '100vh',
   onItemClick,
+  autoScrollAfterMs = 0,
+  autoScrollSpeed = 1.5,
 }: DepthGalleryProps) {
   const mountRef  = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -162,8 +168,11 @@ export default function DepthGallery({
   // recrea el array en cada render (causa del flash/reinicio)
   const itemsRef       = useRef(items);
   const onItemClickRef = useRef(onItemClick);
+  const autoScrollAfterMsRef = useRef(autoScrollAfterMs);
+  const autoScrollSpeedRef  = useRef(autoScrollSpeed);
   useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => { onItemClickRef.current = onItemClick; }, [onItemClick]);
+  useEffect(() => { autoScrollAfterMsRef.current = autoScrollAfterMs; autoScrollSpeedRef.current = autoScrollSpeed; }, [autoScrollAfterMs, autoScrollSpeed]);
 
   useEffect(() => {
     const items = itemsRef.current;
@@ -389,6 +398,14 @@ export default function DepthGallery({
       scrollCurrent = lerp(scrollCurrent, scrollTarget, SCROLL_SMOOTH);
       scrollCurrent = clamp(scrollCurrent, scrollMin, scrollMax);
       scrollTarget  = clamp(scrollTarget,  scrollMin, scrollMax);
+
+      // Auto-scroll lento tras N segundos (ej. screensaver)
+      const afterMs = autoScrollAfterMsRef.current;
+      const speed  = autoScrollSpeedRef.current;
+      if (afterMs > 0 && speed > 0 && t >= afterMs / 1000) {
+        scrollTarget += clock.getDelta() * speed;
+        scrollTarget  = clamp(scrollTarget, scrollMin, scrollMax);
+      }
 
       // Velocidad
       const rawVel = scrollCurrent - prevScroll;
