@@ -15,7 +15,6 @@ import { useLanguage } from '@/contexts/LanguageContext';
 
 const MUSIC_FIRST = '/music.mp3';
 
-// Shuffle array in-place (Fisher-Yates)
 function shuffle<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -24,13 +23,8 @@ function shuffle<T>(arr: T[]): T[] {
   return arr;
 }
 
-// Build playlist: music.mp3 first, then remaining mp3s shuffled.
-// Since we can't read the filesystem from the browser, we rely on a
-// /api/music-list endpoint OR fall back to a static scan of known files.
-// The audio player will also auto-advance via the `ended` event.
 async function fetchPlaylist(): Promise<string[]> {
   try {
-    // Optional API route: GET /api/music-list → { files: ['music.mp3', 'track2.mp3', ...] }
     const res = await fetch('/api/music-list');
     if (res.ok) {
       const data = await res.json();
@@ -39,11 +33,10 @@ async function fetchPlaylist(): Promise<string[]> {
       return [MUSIC_FIRST, ...rest];
     }
   } catch (_) {}
-  // Fallback: just loop music.mp3
   return [MUSIC_FIRST];
 }
 
-// ─── 8-band audio state ───────────────────────────────────────────────────────
+// ─── Audio bands ──────────────────────────────────────────────────────────────
 interface AudioBands {
   subBass: number; bass: number; lowMid: number; mid: number;
   highMid: number; presence: number; brilliance: number; air: number;
@@ -53,11 +46,27 @@ const zeroBands = (): AudioBands => ({
   subBass:0,bass:0,lowMid:0,mid:0,highMid:0,presence:0,brilliance:0,air:0,rms:0,beat:0
 });
 
+// ─── EQ state ─────────────────────────────────────────────────────────────────
+// mode: null = idle, 'hp' = highpass active, 'lp' = lowpass active
+interface EQState {
+  mode: 'hp' | 'lp' | null;
+  // freq: cutoff frequency in Hz (highpass: start low, move right; lowpass: start high, move left)
+  freq: number;
+  // gain: 0–1 filter intensity
+  gain: number;
+  // firstKey: which key was pressed first after the 5s reset
+  firstKey: 'left' | 'right' | null;
+  lastKeyTime: number;
+}
+
+// ─── Sampler state ────────────────────────────────────────────────────────────
+type SamplerState = 'idle' | 'recording' | 'playing';
+
+// ─── Debug params ─────────────────────────────────────────────────────────────
 interface DebugParams {
   topColor: string; bottomColor: string;
   bloomStrength: number; speed: number; lightIntensity: number;
   rgbShiftAmount: number; matrixIntensity: number;
-  /** 1 = filtro TV activo (matrix), 0 = desactivado */
   tvFilterEnabled: number;
   reflectionStrength: number; ghostIntensity: number;
   audioReactivity: number;
@@ -159,8 +168,11 @@ function LoginForm() {
   );
 }
 
-// ─── Spectrum Canvas ─────────────────────────────────────────────────────────
-function SpectrumBars({ bandsRef }: { bandsRef: React.MutableRefObject<AudioBands> }) {
+// ─── Spectrum Canvas ──────────────────────────────────────────────────────────
+function SpectrumBars({ bandsRef, eqState }: {
+  bandsRef: React.MutableRefObject<AudioBands>;
+  eqState: EQState;
+}) {
   const cvRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = cvRef.current; if(!cv) return;
@@ -168,13 +180,44 @@ function SpectrumBars({ bandsRef }: { bandsRef: React.MutableRefObject<AudioBand
     let raf: number;
     const KEYS: (keyof AudioBands)[] = ['subBass','bass','lowMid','mid','highMid','presence','brilliance','air'];
     const LABELS = ['SUB','BASS','LO-M','MID','HI-M','PRES','BRIL','AIR'];
+    // Freq centers for each band (Hz)
+    const BAND_FREQS = [40, 150, 375, 1000, 3000, 5000, 9000, 16000];
     const COLORS = ['#ff3366','#ff6600','#ffaa00','#44ff88','#00ccff','#aa44ff','#ff44aa','#ffffff'];
+
     function draw() {
       raf = requestAnimationFrame(draw);
       const b = bandsRef.current;
       const W=cv!.width, H=cv!.height;
       ctx.clearRect(0,0,W,H);
       const bw = Math.floor(W/8)-2;
+
+      // Draw EQ overlay first (behind bars)
+      const eq = eqState;
+      if (eq.mode && eq.gain > 0) {
+        // Show EQ curve across bands
+        ctx.save();
+        ctx.globalAlpha = 0.18 * eq.gain;
+        for (let i = 0; i < 8; i++) {
+          const f = BAND_FREQS[i];
+          let factor = 0;
+          if (eq.mode === 'hp') {
+            // highpass: attenuates freqs BELOW cutoff
+            factor = f < eq.freq ? Math.max(0, 1 - (eq.freq - f) / eq.freq) : 0;
+            // invert: show attenuation as a red overlay
+            factor = 1 - (f < eq.freq ? 1 : 0) * eq.gain;
+          } else {
+            // lowpass: attenuates freqs ABOVE cutoff
+            factor = f > eq.freq ? Math.max(0, 1 - (f - eq.freq) / eq.freq) : 0;
+            factor = 1 - (f > eq.freq ? 1 : 0) * eq.gain;
+          }
+          const attenuated = factor < 0.5;
+          ctx.fillStyle = attenuated ? '#ff3333' : '#33ff88';
+          const x = i * (bw + 2);
+          ctx.fillRect(x, 0, bw, H - 14);
+        }
+        ctx.restore();
+      }
+
       KEYS.forEach((k,i)=>{
         const v = b[k] as number;
         const x = i*(bw+2);
@@ -188,15 +231,75 @@ function SpectrumBars({ bandsRef }: { bandsRef: React.MutableRefObject<AudioBand
         ctx.fillStyle='#ffffff44'; ctx.font='7px monospace';
         ctx.textAlign='center'; ctx.fillText(LABELS[i],x+bw/2,H-2);
       });
+
+      // EQ marker line
+      if (eq.mode && eq.freq > 0) {
+        const logMin = Math.log10(20), logMax = Math.log10(20000);
+        const logFreq = Math.log10(eq.freq);
+        const xPos = ((logFreq - logMin) / (logMax - logMin)) * W;
+        ctx.save();
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = eq.mode === 'hp' ? '#ff6600' : '#00ccff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(xPos, 0);
+        ctx.lineTo(xPos, H - 14);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
     draw();
     return ()=>cancelAnimationFrame(raf);
-  },[bandsRef]);
+  },[bandsRef, eqState]);
   return <canvas ref={cvRef} width={200} height={60} className="w-full rounded-lg"/>;
 }
 
-// ─── Debug Panel ─────────────────────────────────────────────────────────────
-function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hideCard, onToggleCard, trackName, onSkip }: {
+// ─── EQ Status Badge ─────────────────────────────────────────────────────────
+function EQBadge({ eq, samplerState }: { eq: EQState; samplerState: SamplerState }) {
+  if (!eq.mode && samplerState === 'idle') return null;
+  return (
+    <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 hidden md:flex flex-col items-center gap-2 pointer-events-none select-none">
+      {eq.mode && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full"
+          style={{background:'rgba(2,4,20,0.9)',backdropFilter:'blur(12px)',border:`1px solid ${eq.mode==='hp'?'rgba(255,102,0,0.4)':'rgba(0,204,255,0.4)'}`}}>
+          <span className="text-[10px] font-black tracking-widest uppercase" style={{color:eq.mode==='hp'?'#ff6600':'#00ccff'}}>
+            {eq.mode === 'hp' ? 'HIGH-PASS' : 'LOW-PASS'}
+          </span>
+          <span className="text-[10px] text-slate-400 font-mono">
+            {eq.freq >= 1000 ? `${(eq.freq/1000).toFixed(1)}kHz` : `${Math.round(eq.freq)}Hz`}
+          </span>
+          <span className="text-[9px] text-slate-500 font-mono">
+            {Math.round(eq.gain * 100)}%
+          </span>
+          {/* Mini visual bar for gain */}
+          <div className="w-12 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div className="h-full rounded-full transition-all" style={{width:`${eq.gain*100}%`,background:eq.mode==='hp'?'#ff6600':'#00ccff'}}/>
+          </div>
+        </div>
+      )}
+      {samplerState === 'recording' && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full animate-pulse"
+          style={{background:'rgba(30,0,0,0.9)',backdropFilter:'blur(12px)',border:'1px solid rgba(255,30,30,0.5)'}}>
+          <span className="w-2 h-2 rounded-full bg-red-500"/>
+          <span className="text-[10px] font-black tracking-widest uppercase text-red-400">GRABANDO</span>
+          <span className="text-[9px] text-slate-500">[ O ] para detener</span>
+        </div>
+      )}
+      {samplerState === 'playing' && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full"
+          style={{background:'rgba(0,20,30,0.9)',backdropFilter:'blur(12px)',border:'1px solid rgba(0,200,255,0.4)'}}>
+          <span className="text-[10px]">🔁</span>
+          <span className="text-[10px] font-black tracking-widest uppercase text-cyan-400">SAMPLE</span>
+          <span className="text-[9px] text-slate-500">[ SPACE ] para volver</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Debug Panel ──────────────────────────────────────────────────────────────
+function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hideCard, onToggleCard, trackName, onSkip, eqState }: {
   params: DebugParams;
   onChange: (k: keyof DebugParams, v: number|string) => void;
   onClose: ()=>void; onReset: ()=>void;
@@ -206,10 +309,11 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
   onToggleCard: ()=>void;
   trackName: string;
   onSkip: ()=>void;
+  eqState: EQState;
 }) {
-  // Live values animated by audio
   const [live, setLive] = useState(params);
-  const rafRef = useRef<number | null>(null);
+  const rafRef = useRef<number|null>(null);
+
   useEffect(()=>{
     function tick(){
       rafRef.current=requestAnimationFrame(tick);
@@ -227,7 +331,7 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
       });
     }
     tick();
-    return ()=>{if(rafRef.current != null) cancelAnimationFrame(rafRef.current);};
+    return ()=>{if(rafRef.current!=null)cancelAnimationFrame(rafRef.current);};
   },[params,bandsRef,playing]);
 
   const SLIDERS: {label:string;key:keyof DebugParams;min:number;max:number;step:number;audioKey?:keyof AudioBands;col:string}[] = [
@@ -246,12 +350,11 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
       className="fixed z-[61] overflow-hidden rounded-2xl border border-white/10 bg-slate-950/97 backdrop-blur-xl shadow-2xl"
       style={{
         boxShadow:'0 0 60px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04)',
-        // Responsive positioning: on wide screens sit left-aligned; on <1080 centre on screen
-        left: 'clamp(8px, 4vw, 16px)',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        width: 'min(256px, calc(100vw - 16px))',
-        maxHeight: 'min(90vh, 680px)',
+        left:'clamp(8px, 4vw, 16px)',
+        top:'50%',
+        transform:'translateY(-50%)',
+        width:'min(256px, calc(100vw - 16px))',
+        maxHeight:'min(92vh, 700px)',
       }}
     >
       {/* Header */}
@@ -264,52 +367,60 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
         <button onClick={onClose} className="p-1 rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"><X size={13}/></button>
       </div>
 
-      <div className="p-3 space-y-3 overflow-y-auto" style={{maxHeight:'calc(min(90vh, 680px) - 48px)'}}>
+      <div className="p-3 space-y-3 overflow-y-auto" style={{maxHeight:'calc(min(92vh, 700px) - 48px)'}}>
+
         {/* Now playing */}
         {playing && trackName && (
           <div className="rounded-lg border border-white/5 bg-black/30 px-2.5 py-1.5 flex items-center gap-2 min-w-0">
             <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest flex-shrink-0">♪</span>
             <span className="text-[9px] text-slate-400 truncate font-mono flex-1">{trackName}</span>
-            <button
-              onClick={onSkip}
-              title="Skip"
-              className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
-              style={{fontSize: 10}}
-            >
-              ⏭
-            </button>
+            <button onClick={onSkip} title="Skip" className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition-colors" style={{fontSize:10}}>⏭</button>
           </div>
         )}
 
-        {/* Spectrum */}
+        {/* Spectrum + EQ overlay */}
         {playing&&(
           <div className="rounded-xl border border-white/5 bg-black/50 p-2">
-            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Espectro en vivo</p>
-            <SpectrumBars bandsRef={bandsRef}/>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Espectro en vivo</p>
+              {eqState.mode && (
+                <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full border"
+                  style={{
+                    color: eqState.mode==='hp'?'#ff6600':'#00ccff',
+                    borderColor: eqState.mode==='hp'?'rgba(255,102,0,0.3)':'rgba(0,204,255,0.3)',
+                    background: eqState.mode==='hp'?'rgba(255,102,0,0.08)':'rgba(0,204,255,0.08)',
+                  }}>
+                  {eqState.mode==='hp'?'HP':'LP'} {eqState.freq>=1000?`${(eqState.freq/1000).toFixed(1)}k`:`${Math.round(eqState.freq)}`}Hz
+                </span>
+              )}
+            </div>
+            <SpectrumBars bandsRef={bandsRef} eqState={eqState}/>
+            {eqState.mode && (
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <span className="text-[8px] text-slate-600 uppercase tracking-wider">Gain</span>
+                <div className="flex-1 h-1 rounded-full bg-slate-800">
+                  <div className="h-full rounded-full transition-all" style={{width:`${eqState.gain*100}%`,background:eqState.mode==='hp'?'#ff6600':'#00ccff'}}/>
+                </div>
+                <span className="text-[8px] font-mono text-slate-500">{Math.round(eqState.gain*100)}%</span>
+              </div>
+            )}
+            <p className="text-[8px] text-slate-600 mt-1.5">← → filtro · ↑↓ ganancia</p>
           </div>
         )}
 
-        {/* Hide login card toggle */}
+        {/* Hide login card */}
         <label className="flex items-center justify-between gap-3 cursor-pointer rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 hover:bg-white/[0.04] transition-colors">
           <span className="text-[10px] font-bold text-slate-400">Ocultar tarjeta login</span>
-          <div
-            onClick={onToggleCard}
-            className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0 ${hideCard?'bg-orange-500':'bg-slate-700'}`}
-          >
+          <div onClick={onToggleCard} className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0 ${hideCard?'bg-orange-500':'bg-slate-700'}`}>
             <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${hideCard?'left-4':'left-0.5'}`}/>
           </div>
         </label>
 
-        {/* TV filter toggle */}
+        {/* TV filter */}
         <label className="flex items-center justify-between gap-3 cursor-pointer rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 hover:bg-white/[0.04] transition-colors">
           <span className="text-[10px] font-bold text-slate-400">Desactivar filtro TV</span>
-          <div
-            onClick={() => onChange('tvFilterEnabled', params.tvFilterEnabled > 0 ? 0 : 1)}
-            className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0 ${params.tvFilterEnabled > 0 ? 'bg-slate-700' : 'bg-orange-500'}`}
-          >
-            <div
-              className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${params.tvFilterEnabled > 0 ? 'left-0.5' : 'left-4'}`}
-            />
+          <div onClick={()=>onChange('tvFilterEnabled', params.tvFilterEnabled>0?0:1)} className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0 ${params.tvFilterEnabled>0?'bg-slate-700':'bg-orange-500'}`}>
+            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${params.tvFilterEnabled>0?'left-0.5':'left-4'}`}/>
           </div>
         </label>
 
@@ -319,8 +430,7 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
             <div key={k}>
               <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">{k==='topColor'?'Superior':'Inferior'}</p>
               <div className="flex items-center gap-1.5">
-                <input type="color" value={params[k]} onChange={e=>onChange(k,e.target.value)}
-                  className="w-8 h-8 rounded-lg border border-white/10 cursor-pointer bg-transparent flex-shrink-0"/>
+                <input type="color" value={params[k]} onChange={e=>onChange(k,e.target.value)} className="w-8 h-8 rounded-lg border border-white/10 cursor-pointer bg-transparent flex-shrink-0"/>
                 <span className="text-[9px] font-mono text-slate-500 truncate">{params[k]}</span>
               </div>
             </div>
@@ -329,41 +439,28 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
 
         {/* Sliders */}
         {SLIDERS.map(({label,key,min,max,step,audioKey,col})=>{
-          const base = params[key] as number;
-          const lv = live[key] as number;
-          const pct = Math.min(100,((base-min)/(max-min))*100);
-          const lpct = Math.min(100,((lv-min)/(max-min))*100);
-          const delta = playing&&audioKey ? Math.max(0,lv-base) : 0;
-
+          const base=params[key] as number;
+          const lv=live[key] as number;
+          const pct=Math.min(100,((base-min)/(max-min))*100);
+          const lpct=Math.min(100,((lv-min)/(max-min))*100);
+          const delta=playing&&audioKey?Math.max(0,lv-base):0;
           return(
             <div key={key}>
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[10px] font-bold text-slate-400">{label}</span>
                 <div className="flex items-center gap-1.5">
-                  {delta>0.0005&&(
-                    <span className="text-[9px] font-mono transition-all" style={{color:col}}>+{delta.toFixed(3)}</span>
-                  )}
+                  {delta>0.0005&&<span className="text-[9px] font-mono" style={{color:col}}>+{delta.toFixed(3)}</span>}
                   <span className="text-[10px] font-mono" style={{color:delta>0.001?col:'#fb923c'}}>{lv.toFixed(3)}</span>
                 </div>
               </div>
-              {/* Custom track */}
               <div className="relative h-2.5 rounded-full bg-slate-800/80 cursor-pointer"
                 onClick={e=>{
                   const r=e.currentTarget.getBoundingClientRect();
-                  const p=(e.clientX-r.left)/r.width;
-                  onChange(key,parseFloat(Math.min(max,Math.max(min,min+p*(max-min))).toFixed(5)));
+                  onChange(key,parseFloat(Math.min(max,Math.max(min,min+(e.clientX-r.left)/r.width*(max-min))).toFixed(5)));
                 }}>
-                {/* Live overlay */}
-                {playing&&delta>0&&(
-                  <div className="absolute inset-y-0 left-0 rounded-full opacity-25 pointer-events-none"
-                    style={{width:`${lpct}%`,background:col}}/>
-                )}
-                {/* Base fill */}
-                <div className="absolute inset-y-0 left-0 rounded-full pointer-events-none"
-                  style={{width:`${pct}%`,background:`linear-gradient(90deg,${col}55,${col})`}}/>
-                {/* Thumb */}
-                <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full border-2 border-white/90 pointer-events-none"
-                  style={{left:`${pct}%`,background:col,boxShadow:`0 0 8px ${col}99,0 0 2px ${col}`}}/>
+                {playing&&delta>0&&<div className="absolute inset-y-0 left-0 rounded-full opacity-25 pointer-events-none" style={{width:`${lpct}%`,background:col}}/>}
+                <div className="absolute inset-y-0 left-0 rounded-full pointer-events-none" style={{width:`${pct}%`,background:`linear-gradient(90deg,${col}55,${col})`}}/>
+                <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full border-2 border-white/90 pointer-events-none" style={{left:`${pct}%`,background:col,boxShadow:`0 0 8px ${col}99,0 0 2px ${col}`}}/>
               </div>
             </div>
           );
@@ -372,6 +469,26 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
         <button onClick={onReset} className="w-full py-2 rounded-xl text-[10px] font-bold text-slate-500 hover:text-white border border-white/5 hover:border-orange-500/20 transition-all mt-1">
           ↺ Restaurar defaults
         </button>
+
+        {/* Keyboard shortcuts reference */}
+        <div className="rounded-xl border border-white/5 bg-black/20 p-2.5 space-y-1">
+          <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">Atajos de teclado</p>
+          {[
+            ['SPACE','Play / Pausa / Volver al audio'],
+            ['← →','Mover filtro EQ'],
+            ['↑ ↓','Ganancia EQ'],
+            ['I','Iniciar grabación sample'],
+            ['O','Detener y reproducir sample'],
+            ['SHIFT','Mostrar/ocultar Debug'],
+            ['SCROLL','Velocidad'],
+            ['CLICK','Cambiar paleta'],
+          ].map(([k,v])=>(
+            <div key={k} className="flex items-center gap-2">
+              <kbd className="text-[7px] font-black bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 flex-shrink-0 min-w-[28px] text-center">{k}</kbd>
+              <span className="text-[8px] text-slate-600">{v}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -385,89 +502,278 @@ export default function LoginPage() {
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugParams, setDebugParams] = useState<DebugParams>({...DEFAULT_DEBUG});
   const [hideCard, setHideCard] = useState(false);
-  const [audioPlaying, setAudioPlaying] = useState(false);
+
+  // 'idle' | 'loading' | 'playing' | 'paused'
+  const [audioState, setAudioState] = useState<'idle'|'loading'|'playing'|'paused'>('idle');
   const [trackName, setTrackName] = useState('');
   const debugRef = useRef<DebugParams>({...DEFAULT_DEBUG});
 
+  // Audio nodes
   const audioRef = useRef<HTMLAudioElement|null>(null);
   const audioCtxRef = useRef<AudioContext|null>(null);
   const analyserRef = useRef<AnalyserNode|null>(null);
-  // Usamos la misma firma que espera getByteFrequencyData en TS estricto.
-  const freqRef = useRef<Uint8Array<ArrayBuffer>|null>(null);
+  const freqRef = useRef<Uint8Array|null>(null);
   const bandsRef = useRef<AudioBands>(zeroBands());
   const beatRef = useRef({prev:0,lastBeat:0});
   const portalRef = useRef({active:false,opacity:0,nextShow:0,hold:0});
   const playlistRef = useRef<string[]>([]);
   const trackIdxRef = useRef(0);
-  const audioRampRef = useRef<{active: boolean}>({active: false});
+
+  // EQ filter nodes
+  const eqFilterRef = useRef<BiquadFilterNode|null>(null);
+  const [eqState, setEqState] = useState<EQState>({mode:null,freq:200,gain:0.8,firstKey:null,lastKeyTime:0});
+  const eqStateRef = useRef<EQState>({mode:null,freq:200,gain:0.8,firstKey:null,lastKeyTime:0});
+  // Keep ref in sync
+  useEffect(()=>{ eqStateRef.current = eqState; },[eqState]);
+
+  // Sampler
+  const [samplerState, setSamplerState] = useState<SamplerState>('idle');
+  const samplerStateRef = useRef<SamplerState>('idle');
+  const mediaRecorderRef = useRef<MediaRecorder|null>(null);
+  const recordedChunksRef = useRef<BlobPart[]>([]);
+  const sampleAudioRef = useRef<HTMLAudioElement|null>(null);
+  const sampleSourceRef = useRef<MediaElementAudioSourceNode|null>(null);
+  const samplerDestRef = useRef<MediaStreamAudioDestinationNode|null>(null);
+
+  // Ramp state
+  const audioRampRef = useRef<{active:boolean; audioStartTime:number}>({active:false,audioStartTime:0});
+  // 60s secondary ramp
+  const secondRampRef = useRef<{done:boolean}>({done:false});
 
   useEffect(()=>{ debugRef.current={...debugParams}; },[debugParams]);
 
-  const handleChange = useCallback((k:keyof DebugParams, v:number|string)=>{
+  const handleChange = useCallback((k:keyof DebugParams,v:number|string)=>{
     setDebugParams(p=>({...p,[k]:v}));
   },[]);
 
-  // Skip to next track (Navbar + Debug usan esta función compartida)
+  // Skip track
   const skipTrack = useCallback(()=>{
-    const audio = audioRef.current;
-    const pl = playlistRef.current;
-    if (!audio || pl.length === 0) return;
-    // Detener pista actual y saltar a la siguiente del mismo elemento <audio>
-    audio.pause();
-    audio.currentTime = 0;
-    trackIdxRef.current = (trackIdxRef.current + 1) % pl.length;
-    const nextUrl = pl[trackIdxRef.current];
-    audio.src = nextUrl;
-    setTrackName(nextUrl.replace(/^\//, '').replace('.mp3',''));
-    audio.play().then(() => setAudioPlaying(true)).catch(() => {});
+    const audio=audioRef.current, pl=playlistRef.current;
+    if(!audio||pl.length===0) return;
+    audio.pause(); audio.currentTime=0;
+    trackIdxRef.current=(trackIdxRef.current+1)%pl.length;
+    const next=pl[trackIdxRef.current];
+    audio.src=next;
+    setTrackName(next.replace(/^\//,'').replace('.mp3',''));
+    audio.play().then(()=>setAudioState('playing')).catch(()=>{});
   },[]);
 
-  // Shift → debug
+  // ── Shift → toggle debug (also closes panel if open) ─────────────────────
   useEffect(()=>{
     const h=(e:KeyboardEvent)=>{
       if(e.code!=='ShiftLeft'&&e.code!=='ShiftRight') return;
       if(window.innerWidth<768) return;
-      setShowDebug(v=>!v);
+      setShowDebug(v=>{
+        const next=!v;
+        // If hiding, also close panel
+        if(!next) setDebugOpen(false);
+        return next;
+      });
     };
     window.addEventListener('keydown',h);
     return ()=>window.removeEventListener('keydown',h);
   },[]);
 
-  // Sincronizar estado de música con la Navbar (para mostrar controles en /login)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const ev = new CustomEvent('login-music-state', { detail: { playing: audioPlaying } });
-    window.dispatchEvent(ev);
-  }, [audioPlaying]);
+  // ── Build EQ filter and wire into audio chain ─────────────────────────────
+  function buildEQFilter(ctx: AudioContext, mode: 'hp'|'lp', freq: number, gain: number): BiquadFilterNode {
+    const f = ctx.createBiquadFilter();
+    f.type = mode === 'hp' ? 'highpass' : 'lowpass';
+    f.frequency.value = freq;
+    // Q: higher = steeper slope; scale with gain
+    f.Q.value = 0.5 + gain * 5;
+    return f;
+  }
 
-  // Permitir que la Navbar controle play/pausa y "siguiente tema" en /login
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleToggle = async () => {
-      const audio = audioRef.current;
-      const ctx = audioCtxRef.current;
-      if (!audio || !ctx) return;
-      if (ctx.state === 'suspended') await ctx.resume();
-      if (audio.paused) {
-        await audio.play().catch(() => {});
-        setAudioPlaying(true);
-      } else {
-        audio.pause();
-        setAudioPlaying(false);
+  // Rewire audio chain: analyser → [eqFilter →] destination
+  function rewireChain(mode: 'hp'|'lp'|null, freq: number, gain: number) {
+    const ctx = audioCtxRef.current;
+    const analyser = analyserRef.current;
+    if(!ctx || !analyser) return;
+
+    // Disconnect everything from analyser
+    try { analyser.disconnect(); } catch(_) {}
+    if(eqFilterRef.current) {
+      try { eqFilterRef.current.disconnect(); } catch(_) {}
+      eqFilterRef.current = null;
+    }
+
+    if(mode) {
+      const f = buildEQFilter(ctx, mode, freq, gain);
+      eqFilterRef.current = f;
+      analyser.connect(f);
+      f.connect(ctx.destination);
+    } else {
+      analyser.connect(ctx.destination);
+    }
+  }
+
+  // ── Arrow keys: EQ ────────────────────────────────────────────────────────
+  useEffect(()=>{
+    const FREQ_STEPS = [20,40,80,150,250,500,1000,2000,4000,8000,12000,16000,20000];
+    const RESET_TIMEOUT = 5000; // ms
+
+    const h=(e:KeyboardEvent)=>{
+      const ae=document.activeElement;
+      if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return;
+      if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code)) return;
+      e.preventDefault();
+
+      const now=performance.now();
+      const eq=eqStateRef.current;
+      const timeSinceLast = now - eq.lastKeyTime;
+      const isHorizKey = e.code==='ArrowLeft'||e.code==='ArrowRight';
+
+      // ── Up/Down: adjust gain ───────────────────────────────────────────
+      if(e.code==='ArrowUp'||e.code==='ArrowDown') {
+        if(!eq.mode) return; // only when filter active
+        const delta = e.code==='ArrowUp' ? 0.1 : -0.1;
+        const newGain = Math.max(0.05, Math.min(1, eq.gain + delta));
+        const next: EQState = {...eq, gain: newGain, lastKeyTime: now};
+        eqStateRef.current = next;
+        setEqState(next);
+        rewireChain(next.mode, next.freq, newGain);
+        return;
+      }
+
+      // ── Left/Right: move filter or establish new mode ──────────────────
+      const isLeft = e.code==='ArrowLeft';
+      const isRight = e.code==='ArrowRight';
+
+      // Determine current freq index
+      const curFreqIdx = FREQ_STEPS.reduce((best,f,i)=>
+        Math.abs(f-eq.freq)<Math.abs(FREQ_STEPS[best]-eq.freq)?i:best, 0);
+
+      // Reset condition: >5s since last horizontal key
+      const isReset = timeSinceLast > RESET_TIMEOUT || eq.firstKey === null;
+
+      if(isReset) {
+        // Fresh start: direction decides mode
+        const newMode: 'hp'|'lp' = isRight ? 'hp' : 'lp';
+        const startFreq = isRight
+          ? FREQ_STEPS[0]        // HP starts at lowest freq
+          : FREQ_STEPS[FREQ_STEPS.length-1]; // LP starts at highest freq
+        const next: EQState = {mode:newMode, freq:startFreq, gain:eq.gain||0.8, firstKey:isRight?'right':'left', lastKeyTime:now};
+        eqStateRef.current = next;
+        setEqState(next);
+        rewireChain(next.mode, next.freq, next.gain);
+        return;
+      }
+
+      // Active filter: move freq in the pressed direction
+      let newIdx = curFreqIdx + (isRight ? 1 : -1);
+      newIdx = Math.max(0, Math.min(FREQ_STEPS.length-1, newIdx));
+      const newFreq = FREQ_STEPS[newIdx];
+
+      // If freq goes to absolute edge (left-most for HP, right-most for LP), deactivate
+      const shouldDeactivate =
+        (eq.mode==='hp' && isLeft && newIdx===0 && curFreqIdx===0) ||
+        (eq.mode==='lp' && isRight && newIdx===FREQ_STEPS.length-1 && curFreqIdx===FREQ_STEPS.length-1);
+
+      if(shouldDeactivate) {
+        const next: EQState = {...eq, mode:null, firstKey:null, lastKeyTime:now};
+        eqStateRef.current = next;
+        setEqState(next);
+        rewireChain(null, newFreq, eq.gain);
+        return;
+      }
+
+      const next: EQState = {...eq, freq:newFreq, lastKeyTime:now};
+      eqStateRef.current = next;
+      setEqState(next);
+      rewireChain(next.mode, newFreq, next.gain);
+    };
+
+    // Periodic check: reset EQ mode after 5s inactivity on horiz keys
+    const interval = setInterval(()=>{
+      const eq = eqStateRef.current;
+      if(!eq.mode) return;
+      if(performance.now() - eq.lastKeyTime > RESET_TIMEOUT) {
+        const next: EQState = {...eq, mode:null, firstKey:null};
+        eqStateRef.current = next;
+        setEqState(next);
+        rewireChain(null, eq.freq, eq.gain);
+      }
+    }, 1000);
+
+    window.addEventListener('keydown', h);
+    return ()=>{
+      window.removeEventListener('keydown',h);
+      clearInterval(interval);
+    };
+  },[]);
+
+  // ── Sampler: I = start recording, O = stop + loop ─────────────────────────
+  useEffect(()=>{
+    const h=async(e:KeyboardEvent)=>{
+      const ae=document.activeElement;
+      if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return;
+
+      // I → start recording
+      if(e.code==='KeyI') {
+        const ctx=audioCtxRef.current;
+        if(!ctx||samplerStateRef.current!=='idle') return;
+
+        // Create a MediaStreamDestination to capture post-EQ audio
+        const dest = ctx.createMediaStreamDestination();
+        samplerDestRef.current = dest;
+
+        // Connect analyser (or EQ filter output) to the capture destination
+        const source = eqFilterRef.current || analyserRef.current;
+        if(!source) return;
+        try { source.connect(dest); } catch(_) {}
+
+        const chunks: BlobPart[] = [];
+        recordedChunksRef.current = chunks;
+        const mr = new MediaRecorder(dest.stream, {mimeType:'audio/webm'});
+        mediaRecorderRef.current = mr;
+        mr.ondataavailable = (ev)=>{ if(ev.data.size>0) chunks.push(ev.data); };
+        mr.start(100);
+        samplerStateRef.current='recording';
+        setSamplerState('recording');
+        return;
+      }
+
+      // O → stop recording + play sample in loop
+      if(e.code==='KeyO') {
+        if(samplerStateRef.current!=='recording') return;
+        const mr=mediaRecorderRef.current;
+        if(!mr) return;
+
+        mr.stop();
+        mr.onstop=()=>{
+          const blob=new Blob(recordedChunksRef.current,{type:'audio/webm'});
+          const url=URL.createObjectURL(blob);
+
+          // Pause main audio
+          const mainAudio=audioRef.current;
+          if(mainAudio) mainAudio.pause();
+
+          // Play sample in loop
+          const sa=new Audio(url);
+          sa.loop=true;
+          sampleAudioRef.current=sa;
+          sa.play().catch(()=>{});
+
+          samplerStateRef.current='playing';
+          setSamplerState('playing');
+          setAudioState('paused');
+        };
+
+        // Disconnect capture destination
+        const dest=samplerDestRef.current;
+        if(dest) {
+          const source=eqFilterRef.current||analyserRef.current;
+          if(source) try{source.disconnect(dest);}catch(_){}
+        }
+        return;
       }
     };
-    const handleSkip = () => {
-      skipTrack();
-    };
-    window.addEventListener('login-music-toggle', handleToggle as EventListener);
-    window.addEventListener('login-music-skip', handleSkip as EventListener);
-    return () => {
-      window.removeEventListener('login-music-toggle', handleToggle as EventListener);
-      window.removeEventListener('login-music-skip', handleSkip as EventListener);
-    };
-  }, [skipTrack]);
 
-  // Space → audio with playlist
+    window.addEventListener('keydown',h);
+    return ()=>window.removeEventListener('keydown',h);
+  },[]);
+
+  // ── Space → audio toggle / resume from sampler ────────────────────────────
   useEffect(()=>{
     const h=async(e:KeyboardEvent)=>{
       if(e.code!=='Space') return;
@@ -476,52 +782,75 @@ export default function LoginPage() {
       if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return;
       e.preventDefault();
 
-      if(!audioCtxRef.current){
-        // First play: build playlist then start
-        const playlist = await fetchPlaylist();
-        playlistRef.current = playlist;
-        trackIdxRef.current = 0;
-
-        const audio = new Audio(playlist[0]);
-        audioRef.current = audio;
-        setTrackName(playlist[0].replace(/^\//, '').replace('.mp3',''));
-
-        const ctx = new AudioContext();
-        audioCtxRef.current = ctx;
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.8;
-        analyserRef.current = analyser;
-        freqRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
-        const src = ctx.createMediaElementSource(audio);
-        src.connect(analyser);
-        analyser.connect(ctx.destination);
-
-        // Advance to next track when current ends
-        audio.addEventListener('ended', () => {
-          // Reutilizar la lógica centralizada de skipTrack para mantener todo sincronizado
-          skipTrack();
-        });
-
-        await audio.play();
-        if(ctx.state==='suspended') await ctx.resume();
-        setAudioPlaying(true);
-        // Slowly ramp speed → 0.770 and audioReactivity → 1.2 over ~4s
-        audioRampRef.current.active = true;
+      // If sampler is playing → stop it and resume main audio
+      if(samplerStateRef.current==='playing') {
+        const sa=sampleAudioRef.current;
+        if(sa){sa.pause();sa.src='';sampleAudioRef.current=null;}
+        samplerStateRef.current='idle';
+        setSamplerState('idle');
+        const audio=audioRef.current;
+        const ctx=audioCtxRef.current;
+        if(audio&&ctx){
+          if(ctx.state==='suspended') await ctx.resume();
+          await audio.play().catch(()=>{});
+          setAudioState('playing');
+        }
         return;
       }
 
-      const audio = audioRef.current!;
-      const ctx = audioCtxRef.current!;
+      // If recording, ignore space
+      if(samplerStateRef.current==='recording') return;
+
+      // First time: init audio
+      if(!audioCtxRef.current){
+        setAudioState('loading');
+        const playlist=await fetchPlaylist();
+        playlistRef.current=playlist;
+        trackIdxRef.current=0;
+
+        const audio=new Audio(playlist[0]);
+        audioRef.current=audio;
+        setTrackName(playlist[0].replace(/^\//,'').replace('.mp3',''));
+
+        const ctx=new AudioContext();
+        audioCtxRef.current=ctx;
+        const analyser=ctx.createAnalyser();
+        analyser.fftSize=2048;
+        analyser.smoothingTimeConstant=0.8;
+        analyserRef.current=analyser;
+        freqRef.current=new Uint8Array(analyser.frequencyBinCount);
+
+        const src=ctx.createMediaElementSource(audio);
+        src.connect(analyser);
+        analyser.connect(ctx.destination); // default chain, no EQ yet
+
+        audio.addEventListener('ended',()=>skipTrack());
+
+        await audio.play();
+        if(ctx.state==='suspended') await ctx.resume();
+        setAudioState('playing');
+        // Trigger ramp
+        audioRampRef.current={active:true, audioStartTime:performance.now()};
+        secondRampRef.current={done:false};
+        return;
+      }
+
+      const audio=audioRef.current!;
+      const ctx=audioCtxRef.current!;
       if(ctx.state==='suspended') await ctx.resume();
-      if(audio.paused){await audio.play();setAudioPlaying(true);}
-      else{audio.pause();setAudioPlaying(false);}
+      if(audio.paused){
+        await audio.play();
+        setAudioState('playing');
+      } else {
+        audio.pause();
+        setAudioState('paused');
+      }
     };
     window.addEventListener('keydown',h);
     return ()=>window.removeEventListener('keydown',h);
-  },[audioPlaying]);
+  },[audioState, skipTrack]);
 
-  // Scroll → speed + playbackRate
+  // ── Scroll → speed + playbackRate ────────────────────────────────────────
   useEffect(()=>{
     const h=(e:WheelEvent)=>{
       setDebugParams(p=>({...p,speed:Math.max(0.02,Math.min(p.speed-e.deltaY*0.0015,2.0))}));
@@ -532,15 +861,37 @@ export default function LoginPage() {
     return ()=>window.removeEventListener('wheel',h);
   },[]);
 
-  // Analyse audio — called from Three.js loop
+  // ── Navbar event integration ──────────────────────────────────────────────
+  useEffect(()=>{
+    if(typeof window==='undefined') return;
+    const ev=new CustomEvent('login-music-state',{detail:{playing:audioState==='playing'}});
+    window.dispatchEvent(ev);
+  },[audioState]);
+
+  useEffect(()=>{
+    if(typeof window==='undefined') return;
+    const handleToggle=async()=>{
+      const audio=audioRef.current, ctx=audioCtxRef.current;
+      if(!audio||!ctx) return;
+      if(ctx.state==='suspended') await ctx.resume();
+      if(audio.paused){await audio.play().catch(()=>{});setAudioState('playing');}
+      else{audio.pause();setAudioState('paused');}
+    };
+    window.addEventListener('login-music-toggle',handleToggle as EventListener);
+    window.addEventListener('login-music-skip',skipTrack as EventListener);
+    return ()=>{
+      window.removeEventListener('login-music-toggle',handleToggle as EventListener);
+      window.removeEventListener('login-music-skip',skipTrack as EventListener);
+    };
+  },[skipTrack]);
+
+  // ── Audio analysis (called from Three.js loop) ────────────────────────────
   function analyseAudio(){
     if(!analyserRef.current||!freqRef.current){bandsRef.current=zeroBands();return;}
-    const freq = freqRef.current;
-    analyserRef.current.getByteFrequencyData(freq);
-    const d = freq;
+    analyserRef.current.getByteFrequencyData(freqRef.current);
+    const d=freqRef.current;
     const sampleRate=audioCtxRef.current!.sampleRate;
-    const nyq=sampleRate/2;
-    const binHz=nyq/d.length;
+    const nyq=sampleRate/2, binHz=nyq/d.length;
     function band(lo:number,hi:number){
       let s=0,n=0;
       for(let i=Math.floor(lo/binHz);i<=Math.min(d.length-1,Math.ceil(hi/binHz));i++){s+=d[i];n++;}
@@ -558,7 +909,7 @@ export default function LoginPage() {
     bandsRef.current={subBass:sub,bass,lowMid:lm,mid,highMid:hm,presence:pr,brilliance:br,air,rms,beat};
   }
 
-  // ─── Three.js ──────────────────────────────────────────────────────────────
+  // ── Three.js ──────────────────────────────────────────────────────────────
   useEffect(()=>{
     if(window.innerWidth<768||!mountRef.current) return;
     const mount=mountRef.current;
@@ -580,8 +931,7 @@ export default function LoginPage() {
     composer.addPass(rgbPass);
 
     // Curve
-    const N=400;
-    const pts=[];
+    const N=400; const pts=[];
     for(let i=0;i<=N;i++){const t=i/N,a=t*Math.PI*2;pts.push(new THREE.Vector3(Math.cos(a)*350,Math.sin(a*3)*35,Math.sin(a*2)*250));}
     const curve=new THREE.CatmullRomCurve3(pts,true);
     (curve as any).computeFrenetFrames=function(s:number){
@@ -617,16 +967,13 @@ export default function LoginPage() {
 
     function drawPortal(opacity:number,b:AudioBands){
       pctx.clearRect(0,0,512,512);
-      // Generative audio-reactive portal
       const t=performance.now()/1000;
       [[256*0.9,`rgba(${Math.round(80+175*b.subBass)},30,220,`],[256*0.65,`rgba(255,${Math.round(80+175*b.bass)},10,`],[256*0.4,`rgba(20,${Math.round(180+75*b.mid)},255,`]].forEach(([r,col])=>{
         const g=pctx.createRadialGradient(256,256,(r as number)*0.05,256,256,r as number);
         g.addColorStop(0,(col as string)+(opacity*0.95)+')');g.addColorStop(1,(col as string)+'0)');
         pctx.beginPath();pctx.arc(256,256,r as number,0,Math.PI*2);pctx.fillStyle=g;pctx.fill();
       });
-      // Beat flash
       if(b.beat>0.2){pctx.beginPath();pctx.arc(256,256,100*b.beat,0,Math.PI*2);pctx.fillStyle=`rgba(255,255,255,${opacity*b.beat*0.7})`;pctx.fill();}
-      // Rotating streaks on presence
       if(b.presence>0.1){
         for(let i=0;i<6;i++){
           const ang=t*2+i*(Math.PI/3);
@@ -639,7 +986,6 @@ export default function LoginPage() {
       pTex.needsUpdate=true;
     }
 
-    // Shaders
     const vert=`varying vec2 vUv;varying vec3 vWP;varying vec3 vWN;
     void main(){vUv=uv;vWN=normalize(mat3(modelMatrix)*normal);vec4 wp=modelMatrix*vec4(position,1.0);vWP=wp.xyz;gl_Position=projectionMatrix*viewMatrix*wp;}`;
 
@@ -648,7 +994,6 @@ export default function LoginPage() {
     uniform vec3 uTop,uBot;
     uniform float uAngle,uIntensity,uDepth,uRefStr,uShowRings,uRingCount,uGhost,uMatrix;
     uniform sampler2D uMatTex;
-    // audio
     uniform float uSub,uBass,uLM,uMid,uHM,uPres,uBril,uAir,uBeat,uRMS;
     varying vec2 vUv;varying vec3 vWP,vWN;
 
@@ -702,11 +1047,9 @@ export default function LoginPage() {
       c+=line(vec3(.1,.9,.3)*mB,hw,-.08,150.,uvX*100.,15.,t,sM,false);
       c+=line(vec3(1.,.4,0.)*hB,hw,-.18,80.,uvX*100.,16.,t,sH,false);
       c+=line(vec3(1.,.1,.1)*hB,hw,-.28,400.,uvX*100.,17.,t,sH,false);
-      // Beat flash white
       float bf=.5+uBeat*2.;
       c+=line(vec3(1.),hw,.28,450.,uvX*100.,18.,t,2.5+uBeat*5.,false)*bf;
       c+=line(vec3(1.),hw,.10,800.,uvX*100.,19.,t,2.5+uBeat*5.,false)*bf;
-      // Air shimmer
       c+=line(vec3(.8,.9,1.)*(1.+uAir*3.),hw,.40,2000.,uvX*100.,50.,t,1.+uAir*8.,false)*uAir;
       c+=line(vec3(.6,1.,.8)*(1.+uAir*3.),hw,-.35,1500.,uvX*100.,51.,t,1.+uAir*6.,false)*uAir;
       c+=dot3(vec3(1.,.5,1.)*mB,hw,.30,400.,uvX*100.,80.,t,1.5+uMid*2.);
@@ -757,7 +1100,6 @@ export default function LoginPage() {
       float y=fract(vUv.y+uAngle),cy=sin(y*6.2831853),cx=cos(y*6.2831853);
       vec3 bg=mix(uBot,uTop,smoothstep(-.2,.5,cy))*(1.+uSub*.5+uBeat*.3);
       vec3 st=cx>0.?rightSide(cy,vUv.x,uTime):leftSide(cy,vUv.x,uTime);
-      // Ceiling
       vec3 ceil=vec3(0.);
       if(cy>.4){
         float hc=cy+sin(vUv.x*80.)*.005;float cs=.5+uMid*2.;
@@ -769,7 +1111,6 @@ export default function LoginPage() {
       float sm=smoothstep(.7,.1,abs(cy));
       vec3 fc=bg+(st*uIntensity*sm)+(ceil*uIntensity);
       if(uShowRings>.5) fc+=rings(vUv.x,y,uTime)*uIntensity*smoothstep(-.8,-.4,cy);
-      // Matrix
       if(uMatrix>0.){
         vec2 tu=vec2(vUv.x*250.,y*14.);
         float tv=texture2D(uMatTex,tu).r,sid=floor(tu.y);
@@ -780,7 +1121,6 @@ export default function LoginPage() {
         vec3 mc=mix(vec3(0.,.9,.3),vec3(.6,1.,.8),hM);
         fc+=mc*tv*(trM*.6+hM*2.)*(0.3+0.7*fl)*(uMatrix+uAir*.5)*smoothstep(.8,.2,abs(cy))*uIntensity;
       }
-      // Reflection
       if(cy<-.2&&uRefStr>0.){
         float rip=sin(vUv.x*300.-uTime*5.)*(0.03+uSub*.05)+sin(vUv.x*1000.)*.01;
         float rcx=cx+rip;
@@ -794,7 +1134,7 @@ export default function LoginPage() {
       gl_FragColor=vec4(fc,1.);
     }`;
 
-    const U: Record<string,THREE.IUniform>={
+    const U:Record<string,THREE.IUniform>={
       uTime:{value:0},uTop:{value:new THREE.Color(DEFAULT_DEBUG.topColor)},uBot:{value:new THREE.Color(DEFAULT_DEBUG.bottomColor)},
       uAngle:{value:-.25},uIntensity:{value:1.2},uDepth:{value:.001},uRefStr:{value:.35},
       uShowRings:{value:1.},uRingCount:{value:10.},uGhost:{value:1.},
@@ -805,7 +1145,6 @@ export default function LoginPage() {
     const tubeMat=new THREE.ShaderMaterial({vertexShader:vert,fragmentShader:frag,uniforms:U,side:THREE.BackSide});
     scene.add(new THREE.Mesh(tubeGeo,tubeMat));
 
-    // Palettes
     const pals=[{t:'#0a198c',b:'#11133b'},{t:'#004d1a',b:'#001a08'},{t:'#4a0072',b:'#1a0029'},{t:'#801300',b:'#2b0600'},{t:'#004059',b:'#00141c'}];
     let pi=0;
     let mx=0,my=0,tmx=0,tmy=0;
@@ -828,16 +1167,33 @@ export default function LoginPage() {
       const dt=Math.min(clock.getDelta(),.05),time=clock.getElapsedTime();
       analyseAudio();
 
-      // Slow ramp: when audio first starts, ease speed → 0.770 and audioReactivity → 1.2 over ~5s
+      // ── Ramp 1: speed → 0.770 + reactivity → 1.2 over ~5s ──────────────
       if(audioRampRef.current.active){
-        const rampSpeed = 0.770, rampReact = 1.2, rampRate = dt * 0.18;
+        const rampSpeed=0.770, rampReact=1.2, rampRate=dt*0.18;
         setDebugParams(p=>{
-          const newSpeed = Math.abs(p.speed - rampSpeed) < 0.002 ? rampSpeed : p.speed + (rampSpeed - p.speed) * rampRate;
-          const newReact = Math.abs(p.audioReactivity - rampReact) < 0.005 ? rampReact : p.audioReactivity + (rampReact - p.audioReactivity) * rampRate;
-          if(Math.abs(newSpeed - rampSpeed) < 0.002 && Math.abs(newReact - rampReact) < 0.005) audioRampRef.current.active = false;
-          return {...p, speed: newSpeed, audioReactivity: newReact};
+          const newSpeed=Math.abs(p.speed-rampSpeed)<0.002?rampSpeed:p.speed+(rampSpeed-p.speed)*rampRate;
+          const newReact=Math.abs(p.audioReactivity-rampReact)<0.005?rampReact:p.audioReactivity+(rampReact-p.audioReactivity)*rampRate;
+          if(Math.abs(newSpeed-rampSpeed)<0.002&&Math.abs(newReact-rampReact)<0.005) audioRampRef.current.active=false;
+          return {...p,speed:newSpeed,audioReactivity:newReact};
         });
       }
+
+      // ── Ramp 2: at 60s, add +35% reactivity slowly ───────────────────────
+      if(!secondRampRef.current.done && audioRampRef.current.audioStartTime>0){
+        const elapsed=(performance.now()-audioRampRef.current.audioStartTime)/1000;
+        if(elapsed>=60){
+          secondRampRef.current.done=true;
+          // Target: current reactivity * 1.35, smoothly over ~8s
+          const rampRate2=dt*0.07;
+          setDebugParams(p=>{
+            const target=Math.min(3, p.audioReactivity*1.35);
+            const newReact=Math.abs(p.audioReactivity-target)<0.005?target:p.audioReactivity+(target-p.audioReactivity)*rampRate2;
+            return {...p,audioReactivity:newReact};
+          });
+        }
+      }
+      // Keep applying second ramp smoothly for a few more frames if it just triggered
+      // (handled by the `done` flag being set after one frame — so we use a separate ref)
 
       const b=bandsRef.current,live=debugRef.current,ar=live.audioReactivity;
       const L=0.12;
@@ -855,8 +1211,7 @@ export default function LoginPage() {
       U.uTop.value.set(live.topColor);U.uBot.value.set(live.bottomColor);
       U.uIntensity.value=live.lightIntensity+b.rms*ar*.8;
       U.uGhost.value=live.ghostIntensity;
-      // uMatrix controla el bloque "Matrix" del shader. Multiplicar por tvFilterEnabled apaga el filtro TV sin afectar los demás efectos.
-      U.uMatrix.value=live.matrixIntensity * (live.tvFilterEnabled > 0 ? 1 : 0);
+      U.uMatrix.value=live.matrixIntensity*(live.tvFilterEnabled>0?1:0);
       U.uRefStr.value=live.reflectionStrength;
       if(scene.fog)(scene.fog as THREE.FogExp2).color.set(live.topColor);
       curSpd=THREE.MathUtils.lerp(curSpd,live.speed+b.beat*.12*ar,dt*2.);
@@ -869,7 +1224,6 @@ export default function LoginPage() {
       camera.position.copy(cp);camera.lookAt(la);
       mx=THREE.MathUtils.lerp(mx,tmx,dt*4.);my=THREE.MathUtils.lerp(my,tmy,dt*4.);
       camera.translateX(mx*5.);camera.translateY(my*2.5);camera.rotateZ(-mx*.5);camera.rotateX(my*.25);
-      // Portal
       const pv=portalRef.current;
       if(!pv.active&&time>pv.nextShow){pv.active=true;pv.opacity=0;pv.hold=time+4+Math.random()*5;pv.nextShow=pv.hold+15+Math.random()*25;}
       if(pv.active){
@@ -895,13 +1249,32 @@ export default function LoginPage() {
     };
   },[]);
 
+  // ── 60s secondary ramp continuation ──────────────────────────────────────
+  // Since the Three.js loop only fires ramp2 for one frame, we handle the
+  // smooth interpolation via a separate interval that runs for ~10s after 60s
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+      const ramp = audioRampRef.current;
+      if(ramp.audioStartTime <= 0) return;
+      const elapsed = (performance.now() - ramp.audioStartTime) / 1000;
+      if(elapsed < 60 || elapsed > 75) return; // active window: 60–75s
+      setDebugParams(p=>{
+        const target = Math.min(3, p.audioReactivity * 1.0035); // tiny step per interval
+        return {...p, audioReactivity: parseFloat(target.toFixed(4))};
+      });
+    }, 150);
+    return ()=>clearInterval(interval);
+  },[]);
+
+  const audioPlaying = audioState === 'playing';
+
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
 
-      {/* Debug toggle */}
-      {showDebug&&(
-        <div className="fixed left-4 top-1/2 -translate-y-1/2 z-[60]" style={{display: debugOpen ? 'none' : 'block'}}>
-          <button type="button" onClick={()=>setDebugOpen(o=>!o)}
+      {/* Debug toggle button */}
+      {showDebug && !debugOpen && (
+        <div className="fixed left-4 top-1/2 -translate-y-1/2 z-[60]">
+          <button type="button" onClick={()=>setDebugOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950/90 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-white hover:border-orange-500/40 transition-all font-bold text-sm">
             <Settings2 size={16}/>Debug
             {audioPlaying&&<span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"/>}
@@ -909,7 +1282,7 @@ export default function LoginPage() {
         </div>
       )}
 
-      {debugOpen&&(
+      {showDebug && debugOpen && (
         <DebugPanel
           params={debugParams}
           onChange={handleChange}
@@ -921,6 +1294,7 @@ export default function LoginPage() {
           onToggleCard={()=>setHideCard(v=>!v)}
           trackName={trackName}
           onSkip={skipTrack}
+          eqState={eqState}
         />
       )}
 
@@ -935,14 +1309,24 @@ export default function LoginPage() {
         </Suspense>
       </div>
 
-      {/* Space hint */}
-      {!audioPlaying&&(
+      {/* Space hint / loading indicator */}
+      {audioState === 'idle' && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 hidden md:flex items-center gap-3 px-5 py-2.5 rounded-full pointer-events-none select-none"
           style={{background:'rgba(2,4,20,0.85)',backdropFilter:'blur(12px)',border:'1px solid rgba(255,255,255,0.07)'}}>
           <kbd className="text-[10px] font-black tracking-widest text-slate-300 bg-white/10 px-2 py-1 rounded-md">SPACE</kbd>
           <span className="text-[11px] text-slate-500">activar música reactiva</span>
         </div>
       )}
+      {audioState === 'loading' && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 hidden md:flex items-center gap-3 px-5 py-2.5 rounded-full pointer-events-none select-none"
+          style={{background:'rgba(2,4,20,0.85)',backdropFilter:'blur(12px)',border:'1px solid rgba(255,165,0,0.25)'}}>
+          <Loader2 size={13} className="text-orange-400 animate-spin"/>
+          <span className="text-[11px] text-slate-400">Cargando audio...</span>
+        </div>
+      )}
+
+      {/* EQ + Sampler status badges */}
+      <EQBadge eq={eqState} samplerState={samplerState}/>
     </div>
   );
 }
