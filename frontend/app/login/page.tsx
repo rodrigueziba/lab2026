@@ -512,7 +512,7 @@ export default function LoginPage() {
   const audioRef = useRef<HTMLAudioElement|null>(null);
   const audioCtxRef = useRef<AudioContext|null>(null);
   const analyserRef = useRef<AnalyserNode|null>(null);
-  const freqRef = useRef<Uint8Array|null>(null);
+  const freqRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const bandsRef = useRef<AudioBands>(zeroBands());
   const beatRef = useRef({prev:0,lastBeat:0});
   const portalRef = useRef({active:false,opacity:0,nextShow:0,hold:0});
@@ -818,7 +818,7 @@ export default function LoginPage() {
         analyser.fftSize=2048;
         analyser.smoothingTimeConstant=0.8;
         analyserRef.current=analyser;
-        freqRef.current=new Uint8Array(analyser.frequencyBinCount);
+        freqRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
 
         const src=ctx.createMediaElementSource(audio);
         src.connect(analyser);
