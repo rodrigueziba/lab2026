@@ -460,7 +460,7 @@ function GlassCursor({
   const glowRef = useRef<HTMLDivElement>(null);
   const pos = useRef({ x: -200, y: -200 });
   const vel = useRef({ x: 0, y: 0 });
-  const rafRef = useRef<number>();
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Init position offscreen until first mouse move
@@ -522,7 +522,7 @@ function GlassCursor({
       glow.style.background = `radial-gradient(circle, rgba(${r},${g},${bv},0.6) 0%, transparent 70%)`;
     }
     tick();
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    return () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); };
   }, [mousePixelRef, bandsRef, audioPlaying]);
 
   return (
@@ -577,7 +577,7 @@ export default function LoginPage() {
   const audioRef = useRef<HTMLAudioElement|null>(null);
   const audioCtxRef = useRef<AudioContext|null>(null);
   const analyserRef = useRef<AnalyserNode|null>(null);
-  const freqRef = useRef<Uint8Array|null>(null);
+  const freqRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const bandsRef = useRef<AudioBands>(zeroBands());
   const beatRef = useRef({prev:0,lastBeat:0});
   const portalRef = useRef({active:false,opacity:0,nextShow:0,hold:0});
@@ -866,7 +866,7 @@ export default function LoginPage() {
         const analyser=ctx.createAnalyser();
         analyser.fftSize=2048; analyser.smoothingTimeConstant=0.8;
         analyserRef.current=analyser;
-        freqRef.current=new Uint8Array(analyser.frequencyBinCount);
+        freqRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
         const src=ctx.createMediaElementSource(audio);
         src.connect(analyser);
         analyser.connect(ctx.destination);
@@ -1060,24 +1060,27 @@ export default function LoginPage() {
       vertexShader:sphereVert, fragmentShader:sphereSilFrag,
       uniforms:mkU(0x3366bb),
       transparent:true, side:THREE.FrontSide, depthWrite:false, depthTest:false,
-      blending:THREE.NormalBlending, renderOrder:1,
+      blending:THREE.NormalBlending,
     });
     const sphereRimMat = new THREE.ShaderMaterial({
       vertexShader:sphereVert, fragmentShader:sphereRimFrag,
       uniforms:{...mkU(0x4488ff), uRMS:{value:0}},
       transparent:true, side:THREE.FrontSide, depthWrite:false, depthTest:false,
-      blending:THREE.NormalBlending, renderOrder:2,
+      blending:THREE.NormalBlending,
     });
     const sphereHaloMat = new THREE.ShaderMaterial({
       vertexShader:sphereVert, fragmentShader:sphereHaloFrag,
       uniforms:{uTint:{value:new THREE.Color(0x2255cc)}, uBeat:{value:0}},
       transparent:true, side:THREE.BackSide, depthWrite:false, depthTest:false,
-      blending:THREE.AdditiveBlending, renderOrder:0,
+      blending:THREE.AdditiveBlending,
     });
 
     const sphereSilMesh  = new THREE.Mesh(sphereGeo, sphereSilMat);
     const sphereRimMesh  = new THREE.Mesh(sphereGeo, sphereRimMat);
     const sphereHaloMesh = new THREE.Mesh(haloGeo,   sphereHaloMat);
+    sphereHaloMesh.renderOrder = 0;
+    sphereSilMesh.renderOrder = 1;
+    sphereRimMesh.renderOrder = 2;
 
     const sphereGroup = new THREE.Group();
     sphereGroup.add(sphereHaloMesh);
