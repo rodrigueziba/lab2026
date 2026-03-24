@@ -72,6 +72,7 @@ interface DebugParams {
   reflectionStrength: number; ghostIntensity: number;
   audioReactivity: number;
   // Sphere
+  sphSize: number;            // 0.2–4  sphere scale multiplier  ← NEW
   sphRefraction: number;      // 0–1  refraction strength
   sphFractalSpeed: number;    // 0.1–3 zoom + animation speed
   sphFractalIter: number;     // 8–64  Julia iterations (detail)
@@ -86,10 +87,11 @@ const DEFAULT_DEBUG: DebugParams = {
   tvFilterEnabled:1,
   reflectionStrength:0.35, ghostIntensity:1.0,
   audioReactivity:1.0,
+  sphSize:1.0,               // ← NEW
   sphRefraction:0.71,
   sphFractalSpeed:1.49,
   sphFractalIter:61,
-  sphFractalIntensity:0.47,
+  sphFractalIntensity:0.44,
   sphFractalScale:1.47,
   sphPalette:0,
 };
@@ -200,7 +202,6 @@ function SpectrumBars({ bandsRef, eqState }: { bandsRef: React.MutableRefObject<
       ctx.clearRect(0,0,W,H);
       const bw = Math.floor(W/8)-2;
       const eq = eqState;
-      // EQ attenuation overlay
       if (eq.mode && eq.gain > 0) {
         for (let i = 0; i < 8; i++) {
           const f = BAND_FREQS[i];
@@ -226,7 +227,6 @@ function SpectrumBars({ bandsRef, eqState }: { bandsRef: React.MutableRefObject<
         ctx.fillStyle='#ffffff44'; ctx.font='7px monospace';
         ctx.textAlign='center'; ctx.fillText(LABELS[i],x+bw/2,H-2);
       });
-      // EQ cutoff line
       if (eq.mode && eq.freq > 0) {
         const logMin=Math.log10(20),logMax=Math.log10(20000);
         const xPos=((Math.log10(eq.freq)-logMin)/(logMax-logMin))*W;
@@ -323,7 +323,6 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
     {label:'Reactividad',  key:'audioReactivity',   min:0,    max:3,    step:0.05,  col:'#ffffff'},
   ];
 
-  // Height: leave room for navbar (≈56px) and bottom gap — so max is 100dvh - 56px - 16px
   const panelMaxH = 'min(calc(100dvh - 72px), 680px)';
 
   return (
@@ -331,24 +330,21 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
       style={{
         boxShadow:'0 0 60px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04)',
         left:'clamp(8px, 4vw, 16px)',
-        top:'clamp(64px, 8vh, 80px)', // below navbar
+        top:'clamp(64px, 8vh, 80px)',
         width:'min(256px, calc(100vw - 16px))',
         maxHeight: panelMaxH,
         height:'auto',
       }}
     >
-      {/* Header — sticky, never scrolls away */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-gradient-to-r from-slate-900/60 to-transparent flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <Activity size={13} className={playing?'text-green-400 animate-pulse':'text-slate-600'}/>
           <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest">Debug</span>
           {playing&&<span className="text-[8px] font-bold text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded-full border border-green-400/20 whitespace-nowrap">LIVE</span>}
         </div>
-        {/* X is always visible because panel starts below navbar */}
         <button onClick={onClose} className="p-1.5 rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0 ml-2"><X size={14}/></button>
       </div>
 
-      {/* Scrollable body */}
       <div className="p-3 space-y-3 overflow-y-auto flex-1 min-h-0">
         {playing && trackName && (
           <div className="rounded-lg border border-white/5 bg-black/30 px-2.5 py-1.5 flex items-center gap-2 min-w-0">
@@ -383,7 +379,6 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
           </div>
         )}
 
-        {/* Ocultar tarjeta */}
         <div className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">
           <span className="text-[10px] font-bold text-slate-400">Ocultar tarjeta login</span>
           <div onClick={onToggleCard} className={`relative w-8 h-4 rounded-full transition-colors cursor-pointer flex-shrink-0 ${hideCard?'bg-orange-500':'bg-slate-700'}`}>
@@ -391,7 +386,6 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
           </div>
         </div>
 
-        {/* Filtro TV — controla el div CRT overlay */}
         <div className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">
           <span className="text-[10px] font-bold text-slate-400">Filtro TV (scanlines)</span>
           <div onClick={()=>onChange('tvFilterEnabled',params.tvFilterEnabled>0?0:1)} className={`relative w-8 h-4 rounded-full transition-colors cursor-pointer flex-shrink-0 ${params.tvFilterEnabled>0?'bg-orange-500':'bg-slate-700'}`}>
@@ -399,7 +393,6 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
           </div>
         </div>
 
-        {/* Colors */}
         <div className="grid grid-cols-2 gap-2">
           {(['topColor','bottomColor'] as const).map(k=>(
             <div key={k}>
@@ -412,7 +405,6 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
           ))}
         </div>
 
-        {/* Sliders */}
         {SLIDERS.map(({label,key,min,max,step,audioKey,col})=>{
           const base=params[key] as number;
           const lv=live[key] as number;
@@ -484,8 +476,9 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
               </div>
             </div>
 
-            {/* Sphere sliders */}
+            {/* Sphere sliders — sphSize first ← NEW */}
             {([
+              {label:'Tamaño',      key:'sphSize'            as const, min:0.2, max:4,  step:0.1,  col:'#ffd700'},
               {label:'Refracción',  key:'sphRefraction'      as const, min:0,   max:1,  step:0.02, col:'#00ccff'},
               {label:'Vel. Fractal',key:'sphFractalSpeed'    as const, min:0.05,max:3,  step:0.05, col:'#aa44ff'},
               {label:'Iteraciones', key:'sphFractalIter'     as const, min:8,   max:64, step:4,    col:'#ff44aa'},
@@ -516,7 +509,7 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
 
         <div className="rounded-xl border border-white/5 bg-black/20 p-2.5 space-y-1">
           <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">Atajos</p>
-          {[['SPACE','Play / Pausa'],['← →','Mover filtro EQ'],['↑ ↓','Ganancia EQ'],['I','Grabar sample'],['O','Stop + loop'],['A→L','12 semitonos del sample'],['SHIFT','Debug'],['SCROLL','Velocidad'],['CLICK','Paleta']].map(([k,v])=>(
+          {[['SPACE','Play / Pausa'],['← →','Mover filtro EQ'],['↑ ↓','Ganancia EQ'],['I','Grabar sample'],['O','Stop + loop'],['A→L','12 semitonos del sample'],['SHIFT','Debug'],['SCROLL','Velocidad + tamaño esfera'],['CLICK','Paleta']].map(([k,v])=>(
             <div key={k} className="flex items-center gap-2">
               <kbd className="text-[7px] font-black bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 flex-shrink-0 min-w-[28px] text-center">{k}</kbd>
               <span className="text-[8px] text-slate-600">{v}</span>
@@ -545,56 +538,41 @@ function GlassCursor({
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Init position offscreen until first mouse move
     pos.current = { x: -200, y: -200 };
-
     function tick() {
       rafRef.current = requestAnimationFrame(tick);
       const el = elRef.current;
       const glow = glowRef.current;
       if (!el || !glow) return;
-
       const target = mousePixelRef.current;
       const b = bandsRef.current;
-
-      // Spring physics (pixel space)
       const dx = target.x - pos.current.x;
       const dy = target.y - pos.current.y;
-      const springK = 0.18;   // spring strength — lower = more lag
-      const damping  = 0.72;  // velocity decay — lower = bouncier
-
+      const springK = 0.18;
+      const damping  = 0.72;
       vel.current.x = vel.current.x * damping + dx * springK;
       vel.current.y = vel.current.y * damping + dy * springK;
       pos.current.x += vel.current.x;
       pos.current.y += vel.current.y;
-
-      // Base size + audio beat pulse
       const beat   = audioPlaying ? b.beat   : 0;
       const rms    = audioPlaying ? b.rms    : 0;
       const bass   = audioPlaying ? b.bass   : 0;
       const size   = 42 + beat * 22 + bass * 12;
       const blur   = 6  + rms  * 8;
-
-      // Colour: tint from subBass (red) + mid (green) + air (blue)
       const r = Math.round(60  + (audioPlaying ? b.subBass : 0) * 160);
       const g = Math.round(120 + (audioPlaying ? b.mid     : 0) * 100);
       const bv= Math.round(220 + (audioPlaying ? b.air     : 0) *  35);
       const rimAlpha = 0.7 + beat * 0.3;
-
       const half = size / 2;
       el.style.transform = `translate(${pos.current.x - half}px, ${pos.current.y - half}px)`;
       el.style.width  = `${size}px`;
       el.style.height = `${size}px`;
-
-      // Rim border colour
       el.style.boxShadow = [
         `0 0 ${blur}px rgba(${r},${g},${bv},0.5)`,
         `0 0 ${blur*3}px rgba(${r},${g},${bv},0.15)`,
         `inset 0 0 ${blur*0.5}px rgba(255,255,255,0.12)`,
       ].join(',');
       el.style.borderColor = `rgba(${r},${g},${bv},${rimAlpha})`;
-
-      // Outer halo
       const haloSize = size * (1.5 + beat * 0.4);
       const haloHalf = haloSize / 2;
       glow.style.transform = `translate(${pos.current.x - haloHalf}px, ${pos.current.y - haloHalf}px)`;
@@ -609,41 +587,23 @@ function GlassCursor({
 
   return (
     <>
-      {/* Outer halo */}
-      <div
-        ref={glowRef}
-        className="fixed top-0 left-0 rounded-full pointer-events-none hidden md:block"
-        style={{ zIndex: 9999, willChange: 'transform', mixBlendMode: 'screen' }}
-      />
-      {/* Glass sphere */}
-      <div
-        ref={elRef}
-        className="fixed top-0 left-0 rounded-full pointer-events-none hidden md:block"
+      <div ref={glowRef} className="fixed top-0 left-0 rounded-full pointer-events-none hidden md:block" style={{ zIndex: 9999, willChange: 'transform', mixBlendMode: 'screen' }}/>
+      <div ref={elRef} className="fixed top-0 left-0 rounded-full pointer-events-none hidden md:block"
         style={{
-          zIndex: 9999,
-          willChange: 'transform',
+          zIndex: 9999, willChange: 'transform',
           border: '1.5px solid rgba(140,180,255,0.7)',
           backdropFilter: 'blur(3px) saturate(160%)',
           WebkitBackdropFilter: 'blur(3px) saturate(160%)',
           background: 'radial-gradient(circle at 35% 35%, rgba(255,255,255,0.14) 0%, rgba(100,160,255,0.06) 45%, rgba(40,80,200,0.04) 100%)',
           boxShadow: '0 0 10px rgba(100,160,255,0.4), inset 0 0 6px rgba(255,255,255,0.1)',
-          // Inner specular highlight (top-left)
-          // pseudo-element not available here, using inner gradient
         }}
       >
-        {/* Specular highlight dot */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            width: '28%', height: '28%',
-            top: '14%', left: '18%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.55) 0%, transparent 80%)',
-          }}
-        />
+        <div className="absolute rounded-full" style={{ width: '28%', height: '28%', top: '14%', left: '18%', background: 'radial-gradient(circle, rgba(255,255,255,0.55) 0%, transparent 80%)' }}/>
       </div>
     </>
   );
 }
+
 export default function LoginPage() {
   const mountRef = useRef<HTMLDivElement>(null);
 
@@ -655,7 +615,6 @@ export default function LoginPage() {
   const [trackName, setTrackName] = useState('');
   const debugRef = useRef<DebugParams>({...DEFAULT_DEBUG});
 
-  // Audio nodes
   const audioRef = useRef<HTMLAudioElement|null>(null);
   const audioCtxRef = useRef<AudioContext|null>(null);
   const analyserRef = useRef<AnalyserNode|null>(null);
@@ -666,30 +625,26 @@ export default function LoginPage() {
   const playlistRef = useRef<string[]>([]);
   const trackIdxRef = useRef(0);
 
-  // EQ
   const eqFilterRef = useRef<BiquadFilterNode|null>(null);
   const [eqState, setEqState] = useState<EQState>({mode:null,freq:200,gain:0.8,firstKey:null,lastKeyTime:0});
   const eqStateRef = useRef<EQState>({mode:null,freq:200,gain:0.8,firstKey:null,lastKeyTime:0});
   useEffect(()=>{ eqStateRef.current=eqState; },[eqState]);
 
-  // Sampler
   const [samplerState, setSamplerState] = useState<SamplerState>('idle');
   const samplerStateRef = useRef<SamplerState>('idle');
   const mediaRecorderRef = useRef<MediaRecorder|null>(null);
   const recordedChunksRef = useRef<BlobPart[]>([]);
-  const sampleBlobUrlRef = useRef<string|null>(null); // stored URL for semitone players
-  const sampleAudioRef = useRef<HTMLAudioElement|null>(null); // default playback (A key / loop)
+  const sampleBlobUrlRef = useRef<string|null>(null);
+  const sampleAudioRef = useRef<HTMLAudioElement|null>(null);
   const samplerDestRef = useRef<MediaStreamAudioDestinationNode|null>(null);
-  // Active semitone players (to stop on space)
   const semitonePlayersRef = useRef<HTMLAudioElement[]>([]);
 
-  // Ramp refs
   const audioRampRef = useRef<{active:boolean;audioStartTime:number}>({active:false,audioStartTime:0});
   const secondRampRef = useRef<{done:boolean}>({done:false});
-  const thirdRampRef = useRef<{done:boolean}>({done:false}); // 2min ramp
+  const thirdRampRef = useRef<{done:boolean}>({done:false});
 
-  // Mouse position for sphere (normalized -1 to 1)
   const mousePosRef = useRef({x:0,y:0});
+  const mousePixelRef = useRef({x: -200, y: -200});
 
   useEffect(()=>{ debugRef.current={...debugParams}; },[debugParams]);
 
@@ -708,7 +663,6 @@ export default function LoginPage() {
     audio.play().then(()=>setAudioState('playing')).catch(()=>{});
   },[]);
 
-  // ── Shift → toggle debug (hides panel too) ───────────────────────────────
   useEffect(()=>{
     const h=(e:KeyboardEvent)=>{
       if(e.code!=='ShiftLeft'&&e.code!=='ShiftRight') return;
@@ -719,8 +673,6 @@ export default function LoginPage() {
     return ()=>window.removeEventListener('keydown',h);
   },[]);
 
-  // ── Mouse position tracking (pixel coords for CSS cursor) ───────────────
-  const mousePixelRef = useRef({x: -200, y: -200}); // start offscreen
   useEffect(()=>{
     const h=(e:MouseEvent)=>{
       mousePosRef.current={x:(e.clientX/window.innerWidth)*2-1, y:-(e.clientY/window.innerHeight)*2+1};
@@ -730,7 +682,6 @@ export default function LoginPage() {
     return ()=>window.removeEventListener('mousemove',h);
   },[]);
 
-  // ── EQ filter management ─────────────────────────────────────────────────
   function rewireChain(mode:'hp'|'lp'|null,freq:number,gain:number){
     const ctx=audioCtxRef.current,analyser=analyserRef.current;
     if(!ctx||!analyser) return;
@@ -749,7 +700,6 @@ export default function LoginPage() {
     }
   }
 
-  // Apply EQ to a sample audio element (connect through same filter chain)
   function connectSampleToEQ(sa:HTMLAudioElement){
     const ctx=audioCtxRef.current;
     if(!ctx) return;
@@ -761,7 +711,6 @@ export default function LoginPage() {
     }catch(_){}
   }
 
-  // ── Arrow keys: EQ ────────────────────────────────────────────────────────
   useEffect(()=>{
     const FREQ_STEPS=[20,40,80,150,250,500,1000,2000,4000,8000,12000,16000,20000];
     const RESET_MS=5000;
@@ -813,15 +762,11 @@ export default function LoginPage() {
     return ()=>{ window.removeEventListener('keydown',h); clearInterval(interval); };
   },[]);
 
-  // ── Sampler: I=record, O=stop+loop, A-L=semitones ───────────────────────
   useEffect(()=>{
     const h=async(e:KeyboardEvent)=>{
-      // CRITICAL: ignore OS key-repeat events — they cause the glitch
       if(e.repeat) return;
       const ae=document.activeElement;
       if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return;
-
-      // I → start recording
       if(e.code==='KeyI'){
         const ctx=audioCtxRef.current;
         if(!ctx||samplerStateRef.current!=='idle') return;
@@ -841,8 +786,6 @@ export default function LoginPage() {
         setSamplerState('recording');
         return;
       }
-
-      // O → stop recording + start looping
       if(e.code==='KeyO'){
         if(samplerStateRef.current!=='recording') return;
         const mr=mediaRecorderRef.current; if(!mr) return;
@@ -852,7 +795,6 @@ export default function LoginPage() {
           const url=URL.createObjectURL(blob);
           sampleBlobUrlRef.current=url;
           audioRef.current?.pause();
-          // Start default loop at root pitch
           const sa=new Audio(url);
           sa.loop=true;
           sampleAudioRef.current=sa;
@@ -866,48 +808,36 @@ export default function LoginPage() {
         if(dest){const src=eqFilterRef.current||analyserRef.current;if(src)try{src.disconnect(dest);}catch(_){}}
         return;
       }
-
-      // A–L → 12 semitones — only fires once per physical keydown (e.repeat=false)
       const keyIdx=SAMPLER_KEYS.indexOf(e.code);
       if(keyIdx!==-1&&sampleBlobUrlRef.current){
         const url=sampleBlobUrlRef.current;
-        const rate=Math.pow(2,keyIdx/12); // equal-temperament semitone
-
-        // If a player already running at this slot, do nothing (it keeps looping)
+        const rate=Math.pow(2,keyIdx/12);
         const existing=semitonePlayersRef.current[keyIdx];
         if(existing&&!existing.paused) return;
-
         const sp=new Audio(url);
         sp.loop=true;
         sp.playbackRate=rate;
         semitonePlayersRef.current[keyIdx]=sp;
         connectSampleToEQ(sp);
         sp.play().catch(()=>{});
-
-        // Mute default loop when any semitone key is held
         if(sampleAudioRef.current) sampleAudioRef.current.volume=0;
         return;
       }
     };
-
-    // Key-up: stop the semitone player (gate behaviour)
     const hUp=(e:KeyboardEvent)=>{
       const keyIdx=SAMPLER_KEYS.indexOf(e.code);
       if(keyIdx!==-1){
         const sp=semitonePlayersRef.current[keyIdx];
         if(sp){ sp.pause(); sp.currentTime=0; semitonePlayersRef.current[keyIdx]=undefined as any; }
-        // Restore default loop volume if no keys held
         const anyHeld=semitonePlayersRef.current.some(p=>p&&!p.paused);
         if(!anyHeld&&sampleAudioRef.current) sampleAudioRef.current.volume=1;
       }
     };
-
     window.addEventListener('keydown',h);
     window.addEventListener('keyup',hUp);
     return ()=>{ window.removeEventListener('keydown',h); window.removeEventListener('keyup',hUp); };
   },[]);
 
-  // ── Space → play/pause / resume from sampler ──────────────────────────────
   useEffect(()=>{
     const h=async(e:KeyboardEvent)=>{
       if(e.code!=='Space') return;
@@ -915,8 +845,6 @@ export default function LoginPage() {
       const ae=document.activeElement;
       if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return;
       e.preventDefault();
-
-      // Sampler playing → stop all and resume main
       if(samplerStateRef.current==='playing'){
         sampleAudioRef.current?.pause();
         sampleAudioRef.current=null;
@@ -934,8 +862,6 @@ export default function LoginPage() {
         return;
       }
       if(samplerStateRef.current==='recording') return;
-
-      // First time init
       if(!audioCtxRef.current){
         setAudioState('loading');
         const playlist=await fetchPlaylist();
@@ -970,17 +896,23 @@ export default function LoginPage() {
     return ()=>window.removeEventListener('keydown',h);
   },[audioState,skipTrack]);
 
-  // ── Scroll → speed + playbackRate ────────────────────────────────────────
+  // ── Scroll → speed + playbackRate + sphere size ← MODIFIED ──────────────
   useEffect(()=>{
     const h=(e:WheelEvent)=>{
-      setDebugParams(p=>({...p,speed:Math.max(0.02,Math.min(p.speed-e.deltaY*0.0015,2.0))}));
-      if(audioRef.current) audioRef.current.playbackRate=Math.max(0.5,Math.min((audioRef.current.playbackRate||1)-e.deltaY*0.0003,2.0));
+      const scrollDown = e.deltaY > 0;
+      setDebugParams(p=>({
+        ...p,
+        speed: Math.max(0.02, Math.min(p.speed - e.deltaY * 0.0015, 2.0)),
+        // scroll down (deltaY>0) → sphere bigger; scroll up → smaller
+        sphSize: parseFloat(Math.max(0.2, Math.min(p.sphSize + (scrollDown ? 0.06 : -0.06), 4.0)).toFixed(2)),
+      }));
+      if(audioRef.current)
+        audioRef.current.playbackRate = Math.max(0.5, Math.min((audioRef.current.playbackRate||1) - e.deltaY * 0.0003, 2.0));
     };
     window.addEventListener('wheel',h,{passive:true});
     return ()=>window.removeEventListener('wheel',h);
   },[]);
 
-  // ── Navbar events ─────────────────────────────────────────────────────────
   useEffect(()=>{
     if(typeof window==='undefined') return;
     window.dispatchEvent(new CustomEvent('login-music-state',{detail:{playing:audioState==='playing'}}));
@@ -1000,7 +932,6 @@ export default function LoginPage() {
     return ()=>{ window.removeEventListener('login-music-toggle',onToggle as EventListener); window.removeEventListener('login-music-skip',skipTrack as EventListener); };
   },[skipTrack]);
 
-  // ── Audio analysis ────────────────────────────────────────────────────────
   function analyseAudio(){
     if(!analyserRef.current||!freqRef.current){bandsRef.current=zeroBands();return;}
     analyserRef.current.getByteFrequencyData(freqRef.current);
@@ -1022,7 +953,6 @@ export default function LoginPage() {
     bandsRef.current={subBass:sub,bass,lowMid:lm,mid,highMid:hm,presence:pr,brilliance:br,air,rms,beat};
   }
 
-  // ── Three.js ──────────────────────────────────────────────────────────────
   useEffect(()=>{
     if(window.innerWidth<768||!mountRef.current) return;
     const mount=mountRef.current;
@@ -1043,7 +973,6 @@ export default function LoginPage() {
     rgbPass.uniforms['amount'].value=0.001;
     composer.addPass(rgbPass);
 
-    // Curve
     const N=400; const pts=[];
     for(let i=0;i<=N;i++){const t=i/N,a=t*Math.PI*2;pts.push(new THREE.Vector3(Math.cos(a)*350,Math.sin(a*3)*35,Math.sin(a*2)*250));}
     const curve=new THREE.CatmullRomCurve3(pts,true);
@@ -1060,14 +989,12 @@ export default function LoginPage() {
     const TR=15;
     const tubeGeo=new THREE.TubeGeometry(curve,N*2,TR,64,true);
 
-    // ── Ambient + directional lights (needed for sphere shading) ─────────────
     const ambientLight = new THREE.AmbientLight(0x334466, 0.6);
     scene.add(ambientLight);
     const dirLight = new THREE.DirectionalLight(0x8899ff, 0.8);
     dirLight.position.set(1, 2, 1);
     scene.add(dirLight);
 
-    // ── Background capture render target (for screen-space refraction) ───────
     const W = renderer.domElement.width;
     const H = renderer.domElement.height;
     const bgRT = new THREE.WebGLRenderTarget(W, H, {
@@ -1077,9 +1004,8 @@ export default function LoginPage() {
       type: THREE.UnsignedByteType,
     });
 
-    // ── Glass sphere — separate scene, fixed Z, single-material refraction ────
     const SPHERE_DIST = 5.0;
-    const SPHERE_R    = 0.65;  // ~3× CSS cursor at this depth
+    const SPHERE_R    = 0.65;
     const sphereScene = new THREE.Scene();
 
     const sphVert = `
@@ -1094,7 +1020,6 @@ export default function LoginPage() {
         gl_Position = projectionMatrix * mv;
       }`;
 
-    // ── Main glass shader — Julia fractal infinite zoom + screen refraction ───
     const sphGlassFrag = `
       uniform sampler2D uBgTex;
       uniform vec2  uRes;
@@ -1106,31 +1031,24 @@ export default function LoginPage() {
       uniform float uMid;
       uniform float uAir;
       uniform float uSub;
-      // Sphere debug params
-      uniform float uRefraction;        // 0-1 refraction strength
-      uniform float uFractalSpeed;      // zoom + animation speed
-      uniform float uFractalIter;       // max Julia iterations
-      uniform float uFractalIntensity;  // fractal vs refraction blend
-      uniform float uFractalScale;      // fractal window size
-      uniform float uPalette;           // 0-4 color palette index
+      uniform float uRefraction;
+      uniform float uFractalSpeed;
+      uniform float uFractalIter;
+      uniform float uFractalIntensity;
+      uniform float uFractalScale;
+      uniform float uPalette;
       varying vec3 vNormal; varying vec3 vViewDir; varying vec3 vWorldPos;
 
       vec2 rot2(vec2 p,float a){float c=cos(a),s=sin(a);return vec2(c*p.x-s*p.y,s*p.x+c*p.y);}
 
-      // Cosine palette: https://iquilezles.org/articles/palettes/
       vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
         return a + b*cos(6.28318*(c*t+d));
       }
       vec3 applyPalette(float t, float pal){
-        // 0: Electric Blue/Cyan
         if(pal<0.5) return palette(t, vec3(0.5,0.5,0.5), vec3(0.5,0.5,0.5), vec3(1.0,1.0,1.0), vec3(0.0,0.33,0.67));
-        // 1: Matrix Green
         if(pal<1.5) return palette(t, vec3(0.0,0.5,0.0), vec3(0.2,0.5,0.1), vec3(1.0,1.0,1.0), vec3(0.0,0.15,0.3));
-        // 2: Cyber Magenta/Purple
         if(pal<2.5) return palette(t, vec3(0.5,0.0,0.5), vec3(0.5,0.3,0.5), vec3(1.0,0.7,1.0), vec3(0.8,0.0,0.5));
-        // 3: Lava Red/Orange
         if(pal<3.5) return palette(t, vec3(0.5,0.2,0.0), vec3(0.5,0.3,0.0), vec3(1.0,0.8,0.6), vec3(0.0,0.1,0.2));
-        // 4: Ocean Teal
         return        palette(t, vec3(0.0,0.4,0.5), vec3(0.2,0.4,0.3), vec3(1.0,1.0,0.8), vec3(0.5,0.6,0.7));
       }
 
@@ -1140,7 +1058,6 @@ export default function LoginPage() {
         float ndv = max(0.0, dot(N,V));
         vec2 screenUV = gl_FragCoord.xy / uRes;
 
-        // ── Refraction ──────────────────────────────────────────────────────
         float IOR = 1.3 + uBass * 0.4;
         vec3 refr = refract(-V, N, 1.0/IOR);
         float refStr = uRefraction * (0.28 + uBeat*0.14 + uRMS*0.08);
@@ -1152,125 +1069,85 @@ export default function LoginPage() {
         float bC = texture2D(uBgTex, screenUV+refOff-caV ).b;
         vec3 bgCol = vec3(rC,gC,bC);
 
-        // ── Julia fractal — infinite zoom, always visible at centre ───────────
         float speed = uFractalSpeed * (1.0 + uBeat*0.6 + uRMS*0.25);
-
-        // ── Disk UV: centred on sphere face, varies across visible disk ──────
-        // vNormal.xy goes from (0,0) at centre to (1,0)/(0,1) at equator.
-        // Rotate slowly so the fractal appears to spin.
         vec2 diskUV = rot2(vNormal.xy, uTime * speed * 0.05);
 
-        // ── Dual-zoom crossfade — two cycles offset by half period, no gaps ──
         float period = 7.0;
         float zA_t = mod(uTime * speed * 0.22,         period);
         float zB_t = mod(uTime * speed * 0.22 + period*0.5, period);
-        float zoomA = exp(zA_t * 0.9);  // 1 → e^6.3 ≈ 545
+        float zoomA = exp(zA_t * 0.9);
         float zoomB = exp(zB_t * 0.9);
-        // Crossfade weights: each cycle fades in/out at its own endpoints
         float wA = smoothstep(0.0,0.12,zA_t/period) * smoothstep(1.0,0.88,zA_t/period);
         float wB = smoothstep(0.0,0.12,zB_t/period) * smoothstep(1.0,0.88,zB_t/period);
         float wSum = wA + wB + 0.001;
-        wA /= wSum; wB /= wSum;  // normalise so they always sum to 1
+        wA /= wSum; wB /= wSum;
 
-        // Pan targets — each zoom cycle drifts toward a different interesting region
         float pAngA = uTime * speed * 0.06;
         float pAngB = uTime * speed * 0.04 + 1.57;
         vec2 panA = vec2(cos(pAngA)*0.32, sin(pAngA*0.77)*0.24);
         vec2 panB = vec2(cos(pAngB)*0.28, sin(pAngB*0.61)*0.20);
 
-        // Julia c parameter — drifts slowly, modulated by bass/mid
         vec2 jc = vec2(
           -0.7269 + sin(uTime*speed*0.09)*0.22 + uBass*0.15,
            0.1889 + cos(uTime*speed*0.07)*0.16 + uMid *0.10
         );
 
-        // Helper: run Julia and return a colour value for a given UV
-        // (GLSL doesn't allow real functions with loops, inline via macros)
-        // We compute for fractal coords fcA and fcB, then mix.
         vec2 fcA = diskUV * uFractalScale / zoomA + panA;
         vec2 fcB = diskUV * uFractalScale / zoomB + panB;
-
         int maxI = int(uFractalIter);
 
-        // ── Compute Julia A ────────────────────────────────────────────────
         vec2 zA = fcA;
         float iterA=0.0, trapRA=1e5, trapLA=1e5, trapCA=1e5;
         for(int i=0;i<64;i++){
           if(i>=maxI) break;
           zA = vec2(zA.x*zA.x-zA.y*zA.y, 2.0*zA.x*zA.y) + jc;
           float rA=length(zA);
-          trapRA=min(trapRA,rA);
-          trapLA=min(trapLA,abs(zA.x*zA.y));
-          trapCA=min(trapCA,abs(rA-0.5));
-          if(rA>4.0){iterA=float(i);break;}
-          iterA=float(i);
+          trapRA=min(trapRA,rA); trapLA=min(trapLA,abs(zA.x*zA.y)); trapCA=min(trapCA,abs(rA-0.5));
+          if(rA>4.0){iterA=float(i);break;} iterA=float(i);
         }
-        float tA = (iterA - log2(max(1.0,log2(length(zA)))) + 4.0) / uFractalIter;
-        float palA = fract(mix(1.0-exp(-trapRA*3.0), 1.0-exp(-trapLA*7.0), 0.5)
-                          + uTime*speed*0.035 + uBeat*0.12);
+        float palA = fract(mix(1.0-exp(-trapRA*3.0), 1.0-exp(-trapLA*7.0), 0.5) + uTime*speed*0.035 + uBeat*0.12);
         vec3 fracA = applyPalette(palA, uPalette);
-        // Brightness: use trap values, ensure always luminous
         float brigA = 0.5 + (1.0-exp(-trapRA*2.5))*0.5 + (1.0-exp(-trapCA*5.0))*0.4;
         fracA *= brigA * (1.0 + uBeat*0.7 + uRMS*0.5);
 
-        // ── Compute Julia B ────────────────────────────────────────────────
         vec2 zB2 = fcB;
         float iterB=0.0, trapRB=1e5, trapLB=1e5, trapCB=1e5;
         for(int i=0;i<64;i++){
           if(i>=maxI) break;
           zB2 = vec2(zB2.x*zB2.x-zB2.y*zB2.y, 2.0*zB2.x*zB2.y) + jc;
           float rB=length(zB2);
-          trapRB=min(trapRB,rB);
-          trapLB=min(trapLB,abs(zB2.x*zB2.y));
-          trapCB=min(trapCB,abs(rB-0.5));
-          if(rB>4.0){iterB=float(i);break;}
-          iterB=float(i);
+          trapRB=min(trapRB,rB); trapLB=min(trapLB,abs(zB2.x*zB2.y)); trapCB=min(trapCB,abs(rB-0.5));
+          if(rB>4.0){iterB=float(i);break;} iterB=float(i);
         }
-        float tB = (iterB - log2(max(1.0,log2(length(zB2)))) + 4.0) / uFractalIter;
-        float palB = fract(mix(1.0-exp(-trapRB*3.0), 1.0-exp(-trapLB*7.0), 0.5)
-                          + uTime*speed*0.035 + uBeat*0.12 + 0.5);
+        float palB = fract(mix(1.0-exp(-trapRB*3.0), 1.0-exp(-trapLB*7.0), 0.5) + uTime*speed*0.035 + uBeat*0.12 + 0.5);
         vec3 fracB = applyPalette(palB, uPalette);
         float brigB = 0.5 + (1.0-exp(-trapRB*2.5))*0.5 + (1.0-exp(-trapCB*5.0))*0.4;
         fracB *= brigB * (1.0 + uBeat*0.7 + uRMS*0.5);
 
-        // ── Crossfade the two zoom cycles ─────────────────────────────────
         vec3 fractalCol = fracA * wA + fracB * wB;
+        float fracMask = smoothstep(0.0, 0.45, ndv) * uFractalIntensity * (0.9 + uRMS*0.5 + uBeat*0.4);
 
-        // ── Fractal mask: STRONG at centre, fades at silhouette ───────────
-        // ndv=1 at very centre of sphere disk, 0 at edge → fractal always visible at centre
-        float fracMask = smoothstep(0.0, 0.45, ndv)   // fade in from edge
-                       * uFractalIntensity
-                       * (0.9 + uRMS*0.5 + uBeat*0.4);
-
-        // ── Lens focus: amplify bgCol near centre ──────────────────────────
         float lensFocus = smoothstep(0.25, 0.85, ndv) * (0.35 + uRMS*0.55);
         bgCol = mix(bgCol, bgCol*(1.0+lensFocus*1.3), 0.65);
         bgCol *= 1.0 - smoothstep(0.85,0.5,ndv)*0.22;
 
-        // ── Fresnel rim ────────────────────────────────────────────────────
         float fresnel   = pow(1.0-ndv, 3.0);
         float sharpEdge = pow(1.0-ndv, 10.0);
-        vec3 rimSh = sin(vWorldPos.x*9.0+uTime*2.0)*sin(vWorldPos.y*7.0-uTime*1.6)*0.5+0.5
-                   * vec3(1.0);
+        vec3 rimSh = sin(vWorldPos.x*9.0+uTime*2.0)*sin(vWorldPos.y*7.0-uTime*1.6)*0.5+0.5 * vec3(1.0);
         vec3 rimCol = mix(vec3(0.6,0.9,1.0), uTint+0.2, rimSh.x);
         rimCol *= 1.0 + uBeat*1.8 + uRMS*0.7;
 
-        // ── Specular highlights ────────────────────────────────────────────
         vec3 L1=normalize(vec3(-0.5,0.75,0.4));
         vec3 L2=normalize(vec3(0.55,-0.3,0.3));
         float spec1=pow(max(0.0,dot(reflect(-V,N),L1)),40.0)*1.1;
         float spec2=pow(max(0.0,dot(reflect(-V,N),L2)),90.0)*0.6;
 
-        // ── Compose — fractal dominates centre, rim dominates edge ─────────
-        // At centre: ndv=1 → fracMask=uFractalIntensity, fresnel=0 → fractal visible
-        // At edge:   ndv=0 → fracMask=0, fresnel=1 → rim glow visible
-        vec3 col = mix(bgCol, fractalCol, fracMask)   // fractal replaces bg at centre
+        vec3 col = mix(bgCol, fractalCol, fracMask)
                  + rimCol * fresnel * 0.60
                  + vec3(1.0) * sharpEdge * 0.95
                  + vec3(1.0) * (spec1+spec2) * (0.9+uBeat*0.5);
 
-        // Alpha: sphere is solid at centre (fractal filled), transparent at edge
-        float alpha = fracMask * 0.85              // fractal fills centre
+        float alpha = fracMask * 0.85
                     + fresnel    * 0.65
                     + sharpEdge  * 0.95
                     + spec1      * 0.75
@@ -1279,10 +1156,8 @@ export default function LoginPage() {
         gl_FragColor = vec4(col, clamp(alpha,0.0,1.0));
       }`;
 
-    // No outer halo — cleaner look
     const sphGeo  = new THREE.SphereGeometry(SPHERE_R, 64, 64);
-    const haloGeo = new THREE.SphereGeometry(SPHERE_R, 32, 32); // kept for dispose, not added to scene
-
+    const haloGeo = new THREE.SphereGeometry(SPHERE_R, 32, 32);
     const BASE = { transparent:true, depthWrite:false, depthTest:false };
 
     const sphGlassMat = new THREE.ShaderMaterial({
@@ -1293,12 +1168,9 @@ export default function LoginPage() {
         uRes:   { value: new THREE.Vector2(W * renderer.getPixelRatio(), H * renderer.getPixelRatio()) },
         uTime:  { value: 0 },
         uTint:  { value: new THREE.Color(0.3, 0.65, 1.0) },
-        uBeat:  { value: 0 },
-        uRMS:   { value: 0 },
-        uBass:  { value: 0 },
-        uMid:   { value: 0 },
-        uAir:   { value: 0 },
-        uSub:   { value: 0 },
+        uBeat:  { value: 0 }, uRMS:  { value: 0 },
+        uBass:  { value: 0 }, uMid:  { value: 0 },
+        uAir:   { value: 0 }, uSub:  { value: 0 },
         uRefraction:         { value: DEFAULT_DEBUG.sphRefraction },
         uFractalSpeed:       { value: DEFAULT_DEBUG.sphFractalSpeed },
         uFractalIter:        { value: DEFAULT_DEBUG.sphFractalIter },
@@ -1310,23 +1182,17 @@ export default function LoginPage() {
       blending: THREE.NormalBlending,
     });
 
-    // No halo — keeps the sphere clean without the ring artefact
-    const sphHaloMat = null; // kept as null so dispose code still compiles
-
+    const sphHaloMat = null;
     const sphGroup = new THREE.Group();
     const sphGlassMesh = new THREE.Mesh(sphGeo, sphGlassMat);
     sphGlassMesh.renderOrder = 1;
-    sphGroup.add(sphGlassMesh); // single mesh, single material
+    sphGroup.add(sphGlassMesh);
     sphereScene.add(sphGroup);
 
-    // Spring state — X/Y camera-local, Z always fixed at SPHERE_DIST
     const sphSpring = { x:0, y:0, vx:0, vy:0 };
-
-    // Point light follows sphere — tints the tunnel with sphere colour
     const sphereLight = new THREE.PointLight(0x88aaff, 1.0, 22);
     scene.add(sphereLight);
 
-    // Matrix texture
     const mc=document.createElement('canvas');mc.width=mc.height=1024;
     const mctx=mc.getContext('2d')!;
     mctx.fillStyle='#000';mctx.fillRect(0,0,1024,1024);
@@ -1336,7 +1202,6 @@ export default function LoginPage() {
     }
     const matTex=new THREE.CanvasTexture(mc);matTex.wrapS=matTex.wrapT=THREE.RepeatWrapping;
 
-    // Portal
     const pc=document.createElement('canvas');pc.width=pc.height=512;
     const pctx=pc.getContext('2d')!;
     const pTex=new THREE.CanvasTexture(pc);
@@ -1488,7 +1353,6 @@ export default function LoginPage() {
       const dt=Math.min(clock.getDelta(),.05),time=clock.getElapsedTime();
       analyseAudio();
 
-      // ── Ramp 1: speed+reactivity on audio start ───────────────────────────
       if(audioRampRef.current.active){
         const rR=0.770,rA=1.2,rRate=dt*0.18;
         setDebugParams(p=>{
@@ -1504,7 +1368,7 @@ export default function LoginPage() {
       U.uSub.value=THREE.MathUtils.lerp(U.uSub.value,b.subBass*ar,L);U.uBass.value=THREE.MathUtils.lerp(U.uBass.value,b.bass*ar,L);U.uLM.value=THREE.MathUtils.lerp(U.uLM.value,b.lowMid*ar,L);U.uMid.value=THREE.MathUtils.lerp(U.uMid.value,b.mid*ar,L);U.uHM.value=THREE.MathUtils.lerp(U.uHM.value,b.highMid*ar,L);U.uPres.value=THREE.MathUtils.lerp(U.uPres.value,b.presence*ar,L);U.uBril.value=THREE.MathUtils.lerp(U.uBril.value,b.brilliance*ar,L);U.uAir.value=THREE.MathUtils.lerp(U.uAir.value,b.air*ar,L);U.uBeat.value=THREE.MathUtils.lerp(U.uBeat.value,b.beat*ar,.25);U.uRMS.value=THREE.MathUtils.lerp(U.uRMS.value,b.rms*ar,L);
       U.uTime.value=time;U.uTop.value.set(live.topColor);U.uBot.value.set(live.bottomColor);
       U.uIntensity.value=live.lightIntensity+b.rms*ar*.8;U.uGhost.value=live.ghostIntensity;
-      U.uMatrix.value=live.matrixIntensity;  // matrix shader (particles) always driven by matrixIntensity
+      U.uMatrix.value=live.matrixIntensity;
       U.uRefStr.value=live.reflectionStrength;
       if(scene.fog)(scene.fog as THREE.FogExp2).color.set(live.topColor);
       curSpd=THREE.MathUtils.lerp(curSpd,live.speed+b.beat*.12*ar,dt*2.);
@@ -1517,7 +1381,6 @@ export default function LoginPage() {
       mx=THREE.MathUtils.lerp(mx,tmx,dt*4.);my=THREE.MathUtils.lerp(my,tmy,dt*4.);
       camera.translateX(mx*5.);camera.translateY(my*2.5);camera.rotateZ(-mx*.5);camera.rotateX(my*.25);
 
-      // ── Sphere: fixed Z, spring X/Y in camera space ───────────────────────
       const mp = mousePosRef.current;
       camera.updateMatrixWorld();
       const camRight2 = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
@@ -1552,7 +1415,6 @@ export default function LoginPage() {
       sphGlassMat.uniforms.uAir.value  = b.air  * ar;
       sphGlassMat.uniforms.uSub.value  = b.subBass * ar;
       sphGlassMat.uniforms.uTint.value.copy(tint);
-      // Sync debug sphere params
       sphGlassMat.uniforms.uRefraction.value       = live.sphRefraction;
       sphGlassMat.uniforms.uFractalSpeed.value      = live.sphFractalSpeed;
       sphGlassMat.uniforms.uFractalIter.value       = live.sphFractalIter;
@@ -1560,12 +1422,12 @@ export default function LoginPage() {
       sphGlassMat.uniforms.uFractalScale.value      = live.sphFractalScale;
       sphGlassMat.uniforms.uPalette.value           = live.sphPalette;
       sphGroup.position.copy(sphWorldPos);
-      sphGroup.scale.setScalar(beatPulse);
+      // ── sphSize * beatPulse — scroll and debug slider both control size ← NEW
+      sphGroup.scale.setScalar(live.sphSize * beatPulse);
       sphereLight.position.copy(sphWorldPos);
       sphereLight.color.copy(tint);
       sphereLight.intensity = 0.6 + b.rms * ar * 1.4;
 
-      // Portal
       const pv=portalRef.current;
       if(!pv.active&&time>pv.nextShow){pv.active=true;pv.opacity=0;pv.hold=time+4+Math.random()*5;pv.nextShow=pv.hold+15+Math.random()*25;}
       if(pv.active){
@@ -1576,16 +1438,13 @@ export default function LoginPage() {
         pMesh.position.copy(ppos);pMesh.lookAt(ppos.clone().add(ptan));
       } else pMat.opacity=0;
 
-      // ── Pass 1: capture tunnel to bgRT (no bloom — pure colours for refraction)
       renderer.setRenderTarget(bgRT);
       renderer.clear();
       renderer.render(scene, camera);
       renderer.setRenderTarget(null);
 
-      // ── Pass 2: run EffectComposer — bloom + RGB shift → writes to canvas
       composer.render();
 
-      // ── Pass 3: sphere on top — depth cleared so nothing can occlude it
       renderer.autoClear = false;
       renderer.clearDepth();
       renderer.render(sphereScene, camera);
@@ -1612,9 +1471,7 @@ export default function LoginPage() {
     };
   },[]);
 
-  // ── Ramp intervals (run outside Three.js loop for smooth gradual effect) ──
   useEffect(()=>{
-    // 60s ramp: +35% reactivity over ~15s window
     const r60=setInterval(()=>{
       const ramp=audioRampRef.current;
       if(ramp.audioStartTime<=0) return;
@@ -1622,14 +1479,13 @@ export default function LoginPage() {
       if(elapsed<60||elapsed>75) return;
       setDebugParams(p=>({...p,audioReactivity:parseFloat(Math.min(3,p.audioReactivity*1.0035).toFixed(4))}));
     },150);
-    // 2min ramp: +25% ALL params over ~20s window
     const r120=setInterval(()=>{
       const ramp=audioRampRef.current;
       if(ramp.audioStartTime<=0) return;
       const elapsed=(performance.now()-ramp.audioStartTime)/1000;
       if(elapsed<120||elapsed>140) return;
       setDebugParams(p=>{
-        const f=1.0018; // small multiplier each tick → ~+25% over 20s (140 ticks × ln(1.0018) ≈ 0.252)
+        const f=1.0018;
         return {
           ...p,
           bloomStrength:    parseFloat(Math.min(3,   p.bloomStrength*f).toFixed(4)),
@@ -1652,7 +1508,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
 
-      {/* Debug toggle — always mounted when showDebug, visibility toggled via opacity */}
       {showDebug&&(
         <>
           <div
@@ -1677,26 +1532,21 @@ export default function LoginPage() {
         </>
       )}
 
-      {/* Three.js canvas */}
       <div ref={mountRef} className="hidden md:block absolute inset-0 z-0"/>
 
-      {/* TV CRT overlay — controlled by tvFilterEnabled */}
       {live.tvFilterEnabled>0&&(
         <div className="hidden md:block absolute inset-0 z-[1] pointer-events-none bg-black/60 shadow-[inset_0_0_150px_rgba(0,0,0,0.8)]"
           style={{backgroundImage:'repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.3) 2px,rgba(0,0,0,0.3) 4px)'}}/>
       )}
 
-      {/* Mobile fallback */}
       <div className="absolute md:hidden top-0 left-0 w-[500px] h-[500px] bg-orange-600/20 blur-[120px] rounded-full pointer-events-none -translate-x-1/2 -translate-y-1/2 z-0"/>
 
-      {/* Login card */}
       <div className={`relative z-10 w-full max-w-md transition-opacity duration-200 ${hideCard?'opacity-0 pointer-events-none':''}`}>
         <Suspense fallback={<div className="text-white text-center">Cargando...</div>}>
           <LoginForm/>
         </Suspense>
       </div>
 
-      {/* Audio state hints */}
       {audioState==='idle'&&(
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 hidden md:flex items-center gap-3 px-5 py-2.5 rounded-full pointer-events-none select-none"
           style={{background:'rgba(2,4,20,0.85)',backdropFilter:'blur(12px)',border:'1px solid rgba(255,255,255,0.07)'}}>
@@ -1712,7 +1562,6 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* EQ + Sampler badges */}
       <EQBadge eq={eqState} samplerState={samplerState}/>
 
       {/* Glass cursor — CSS spring physics — DISABLED (Three.js sphere active)
