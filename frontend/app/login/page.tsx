@@ -91,15 +91,18 @@ const DEFAULT_DEBUG: DebugParams = {
   sphRefraction:0.71,
   sphFractalSpeed:1.49,
   sphFractalIter:61,
-  sphFractalIntensity:0.44,
+  sphFractalIntensity:0.56,
   sphFractalScale:1.47,
   sphPalette:0,
 };
 
 // ─── Login Form ───────────────────────────────────────────────────────────────
-function LoginForm() {
+function LoginForm({ onMobilePlay }: { onMobilePlay?: () => Promise<void> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Rainbow gradient direction: random on each page load, stored in ref
+  const gradientDir = useRef(Math.random() > 0.5 ? 'normal' : 'reverse');
+  const gradientDeg = useRef(Math.floor(Math.random() * 360));
   const { t } = useLanguage();
   const [formData, setFormData] = useState({ email:'', password:'' });
   const [loading, setLoading] = useState(false);
@@ -180,6 +183,36 @@ function LoginForm() {
       <div className="mt-8 text-center">
         <p className="text-slate-400 text-sm">{t('login.no_cuenta')}{' '}<Link href="/registro" className="text-orange-500 font-bold hover:text-orange-400">{t('login.registrate_aqui')}</Link></p>
       </div>
+
+      {/* Mobile play button — only on mobile, rainbow animated gradient */}
+      {onMobilePlay && (
+        <>
+          <style>{`
+            @keyframes rainbow-ltr { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+            @keyframes rainbow-rtl { 0%{background-position:200% 50%} 100%{background-position:0% 50%} }
+            @keyframes pulse-play { 0%,100%{transform:scale(1)} 50%{transform:scale(1.22)} }
+          `}</style>
+          <div className="mt-5 md:hidden">
+            <div className="relative flex py-2 items-center mb-4">
+              <div className="flex-grow border-t border-slate-700"/>
+              <span className="flex-shrink mx-4 text-slate-500 text-xs font-bold uppercase">activar fondo</span>
+              <div className="flex-grow border-t border-slate-700"/>
+            </div>
+            <button
+              onClick={onMobilePlay}
+              className="w-full py-4 rounded-xl text-white font-black text-lg flex justify-center items-center gap-3 shadow-2xl active:scale-95 transition-transform"
+              style={{
+                background:`linear-gradient(${gradientDeg.current}deg, #ff0000, #ff6600, #ffff00, #00ff00, #00ccff, #0066ff, #cc00ff, #ff0066, #ff0000)`,
+                backgroundSize:'200% 100%',
+                animation:`${gradientDir.current==='normal'?'rainbow-ltr':'rainbow-rtl'} 3s linear infinite`,
+              }}
+            >
+              <span style={{display:'inline-block',animation:'pulse-play 1s ease-in-out infinite',fontSize:'1.4rem'}}>▶</span>
+              Reproducir música
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -278,7 +311,7 @@ function EQBadge({ eq, samplerState }: { eq: EQState; samplerState: SamplerState
 }
 
 // ─── Debug Panel ──────────────────────────────────────────────────────────────
-function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hideCard, onToggleCard, trackName, onSkip, eqState }: {
+function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hideCard, onToggleCard, trackName, onSkip, eqState, isMobile }: {
   params: DebugParams;
   onChange: (k: keyof DebugParams, v: number|string) => void;
   onClose: ()=>void; onReset: ()=>void;
@@ -289,6 +322,7 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
   trackName: string;
   onSkip: ()=>void;
   eqState: EQState;
+  isMobile?: boolean;
 }) {
   const [live, setLive] = useState(params);
   const rafRef = useRef<number|null>(null);
@@ -323,19 +357,26 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
     {label:'Reactividad',  key:'audioReactivity',   min:0,    max:3,    step:0.05,  col:'#ffffff'},
   ];
 
-  const panelMaxH = 'min(calc(100dvh - 72px), 680px)';
+  const panelMaxH = isMobile ? 'min(85dvh, 85vh)' : 'min(calc(100dvh - 72px), 680px)';
 
   return (
     <div className="fixed z-[61] rounded-2xl border border-white/10 bg-slate-950/97 backdrop-blur-xl shadow-2xl flex flex-col"
       style={{
         boxShadow:'0 0 60px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04)',
-        left:'clamp(8px, 4vw, 16px)',
-        top:'clamp(64px, 8vh, 80px)',
-        width:'min(256px, calc(100vw - 16px))',
+        // Mobile: full-width bottom drawer; Desktop: left panel
+        left: isMobile ? '0' : 'clamp(8px, 4vw, 16px)',
+        right: isMobile ? '0' : 'auto',
+        bottom: isMobile ? '0' : 'auto',
+        top: isMobile ? 'auto' : 'clamp(64px, 8vh, 80px)',
+        width: isMobile ? '100%' : 'min(256px, calc(100vw - 16px))',
+        borderRadius: isMobile ? '20px 20px 0 0' : '16px',
         maxHeight: panelMaxH,
         height:'auto',
       }}
     >
+      {/* Mobile drag handle */}
+      {isMobile && <div className="flex justify-center pt-2 pb-0 flex-shrink-0"><div className="w-10 h-1 rounded-full bg-white/20"/></div>}
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-gradient-to-r from-slate-900/60 to-transparent flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <Activity size={13} className={playing?'text-green-400 animate-pulse':'text-slate-600'}/>
@@ -613,6 +654,11 @@ export default function LoginPage() {
   const [hideCard, setHideCard] = useState(false);
   const [audioState, setAudioState] = useState<'idle'|'loading'|'playing'|'paused'>('idle');
   const [trackName, setTrackName] = useState('');
+  const [mobileActive, setMobileActive] = useState(false);   // ← NEW: mobile bg active
+  const [showShiftHint, setShowShiftHint] = useState(false); // ← NEW: "shift para opciones"
+  const [isPortrait, setIsPortrait] = useState(false);       // ← NEW: orientation warning
+  const mobileActiveRef = useRef(false);                     // ← NEW: ref for closures
+  const shiftHintShownRef = useRef(false);                   // ← NEW: only show once
   const debugRef = useRef<DebugParams>({...DEFAULT_DEBUG});
 
   const audioRef = useRef<HTMLAudioElement|null>(null);
@@ -648,6 +694,28 @@ export default function LoginPage() {
 
   useEffect(()=>{ debugRef.current={...debugParams}; },[debugParams]);
 
+  // ── "Shift para opciones" hint: show 10s after first audio play ──────────
+  useEffect(()=>{
+    if(audioState==='playing' && !shiftHintShownRef.current && window.innerWidth>=768){
+      shiftHintShownRef.current=true;
+      setShowShiftHint(true);
+      const t=setTimeout(()=>setShowShiftHint(false),10000);
+      return ()=>clearTimeout(t);
+    }
+  },[audioState]);
+
+  // ── Orientation tracking for mobile landscape hint ────────────────────────
+  useEffect(()=>{
+    const check=()=>setIsPortrait(window.innerHeight>window.innerWidth);
+    check();
+    window.addEventListener('resize',check);
+    window.addEventListener('orientationchange',check);
+    return ()=>{ window.removeEventListener('resize',check); window.removeEventListener('orientationchange',check); };
+  },[]);
+
+  // ── Sync mobileActive ref for use in closures ────────────────────────────
+  useEffect(()=>{ mobileActiveRef.current=mobileActive; },[mobileActive]);
+
   const handleChange = useCallback((k:keyof DebugParams,v:number|string)=>{
     setDebugParams(p=>({...p,[k]:v}));
   },[]);
@@ -666,7 +734,6 @@ export default function LoginPage() {
   useEffect(()=>{
     const h=(e:KeyboardEvent)=>{
       if(e.code!=='ShiftLeft'&&e.code!=='ShiftRight') return;
-      if(window.innerWidth<768) return;
       setShowDebug(v=>{ const next=!v; if(!next) setDebugOpen(false); return next; });
     };
     window.addEventListener('keydown',h);
@@ -841,7 +908,6 @@ export default function LoginPage() {
   useEffect(()=>{
     const h=async(e:KeyboardEvent)=>{
       if(e.code!=='Space') return;
-      if(window.innerWidth<768) return;
       const ae=document.activeElement;
       if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return;
       e.preventDefault();
@@ -895,6 +961,135 @@ export default function LoginPage() {
     window.addEventListener('keydown',h);
     return ()=>window.removeEventListener('keydown',h);
   },[audioState,skipTrack]);
+
+  // ── Mobile play handler ───────────────────────────────────────────────────
+  const handleMobilePlay = useCallback(async () => {
+    // iOS 13+ DeviceOrientation permission
+    if(typeof DeviceOrientationEvent !== 'undefined' &&
+       typeof (DeviceOrientationEvent as any).requestPermission === 'function'){
+      try{
+        const perm = await (DeviceOrientationEvent as any).requestPermission();
+        if(perm !== 'granted'){
+          alert('Se necesita acceso al sensor de movimiento para la experiencia completa.');
+        }
+      }catch(_){}
+    }
+
+    // Try landscape lock (Android Chrome; iOS ignores)
+    try{ await (screen.orientation as any).lock('landscape'); }catch(_){}
+
+    // Activate mobile background
+    setMobileActive(true);
+    setHideCard(true);
+    // Hide navbar/footer via custom events
+    window.dispatchEvent(new CustomEvent('login-hide-nav',{detail:{hide:true}}));
+    window.dispatchEvent(new CustomEvent('login-music-state',{detail:{playing:true}}));
+
+    // Start audio — same logic as SPACE
+    if(!audioCtxRef.current){
+      setAudioState('loading');
+      const playlist=await fetchPlaylist();
+      playlistRef.current=playlist; trackIdxRef.current=0;
+      const audio=new Audio(playlist[0]);
+      audioRef.current=audio;
+      setTrackName(playlist[0].replace(/^\//,'').replace('.mp3',''));
+      const ctx=new AudioContext();
+      audioCtxRef.current=ctx;
+      const analyser=ctx.createAnalyser();
+      analyser.fftSize=2048; analyser.smoothingTimeConstant=0.8;
+      analyserRef.current=analyser;
+      freqRef.current=new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
+      const src=ctx.createMediaElementSource(audio);
+      src.connect(analyser);
+      analyser.connect(ctx.destination);
+      audio.addEventListener('ended',()=>skipTrack());
+      await audio.play();
+      if(ctx.state==='suspended') await ctx.resume();
+      setAudioState('playing');
+      audioRampRef.current={active:true,audioStartTime:performance.now()};
+      secondRampRef.current={done:false};
+      thirdRampRef.current={done:false};
+    } else {
+      const audio=audioRef.current!,ctx=audioCtxRef.current!;
+      if(ctx.state==='suspended') await ctx.resume();
+      if(audio.paused){ await audio.play(); setAudioState('playing'); }
+    }
+  },[skipTrack]);
+
+  // ── Gyroscope → mousePosRef (mobile only) ────────────────────────────────
+  useEffect(()=>{
+    const h=(e:DeviceOrientationEvent)=>{
+      if(!mobileActiveRef.current) return;
+      const gamma=e.gamma??0;  // -90..90 left/right tilt
+      const beta =e.beta??45;  // -180..180 front/back tilt
+      // Map to -1..1: gamma for X, (beta-45)/45 centres around natural holding angle
+      mousePosRef.current={
+        x:Math.max(-1,Math.min(1, gamma/45)),
+        y:Math.max(-1,Math.min(1,-(beta-45)/45)),
+      };
+    };
+    window.addEventListener('deviceorientation',h,{passive:true});
+    return ()=>window.removeEventListener('deviceorientation',h);
+  },[]);
+
+  // ── Mobile touch events ───────────────────────────────────────────────────
+  useEffect(()=>{
+    // Two-finger tap → open debug
+    const onTouchStart=(e:TouchEvent)=>{
+      if(!mobileActiveRef.current) return;
+      if(e.touches.length>=2){ setShowDebug(true); setDebugOpen(true); }
+    };
+    // Single tap → palette change (same as mouse click)
+    let tapStartTime=0,tapStartX=0,tapStartY=0;
+    const onTouchEnd=(e:TouchEvent)=>{
+      if(!mobileActiveRef.current||e.changedTouches.length!==1) return;
+      const dt=Date.now()-tapStartTime;
+      const dx=e.changedTouches[0].clientX-tapStartX;
+      const dy=e.changedTouches[0].clientY-tapStartY;
+      // Short tap with little movement = palette change
+      if(dt<300&&Math.hypot(dx,dy)<15){
+        // Dispatch a click to trigger the onClick handler in Three.js
+        window.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+      }
+    };
+    const onTouchStartForTap=(e:TouchEvent)=>{
+      if(e.touches.length===1){
+        tapStartTime=Date.now();
+        tapStartX=e.touches[0].clientX;
+        tapStartY=e.touches[0].clientY;
+      }
+    };
+    window.addEventListener('touchstart',onTouchStart,{passive:true});
+    window.addEventListener('touchstart',onTouchStartForTap,{passive:true});
+    window.addEventListener('touchend',onTouchEnd,{passive:true});
+
+    // Touch scroll → speed + sphSize (same as wheel)
+    let lastTouchY=0;
+    const onTouchMoveStart=(e:TouchEvent)=>{
+      if(e.touches.length===1) lastTouchY=e.touches[0].clientY;
+    };
+    const onTouchMove=(e:TouchEvent)=>{
+      if(!mobileActiveRef.current||e.touches.length!==1) return;
+      const dy=lastTouchY-e.touches[0].clientY; // positive = scroll up
+      lastTouchY=e.touches[0].clientY;
+      const scrollDown=dy<0;
+      setDebugParams(p=>({
+        ...p,
+        speed:Math.max(0.02,Math.min(p.speed+dy*0.0008,2.0)),
+        sphSize:parseFloat(Math.max(0.2,Math.min(p.sphSize+(scrollDown?-0.04:0.04),4.0)).toFixed(2)),
+      }));
+    };
+    window.addEventListener('touchstart',onTouchMoveStart,{passive:true});
+    window.addEventListener('touchmove',onTouchMove,{passive:true});
+
+    return ()=>{
+      window.removeEventListener('touchstart',onTouchStart);
+      window.removeEventListener('touchstart',onTouchStartForTap);
+      window.removeEventListener('touchend',onTouchEnd);
+      window.removeEventListener('touchstart',onTouchMoveStart);
+      window.removeEventListener('touchmove',onTouchMove);
+    };
+  },[]);
 
   // ── Scroll → speed + playbackRate + sphere size ← MODIFIED ──────────────
   useEffect(()=>{
@@ -954,20 +1149,24 @@ export default function LoginPage() {
   }
 
   useEffect(()=>{
-    if(window.innerWidth<768||!mountRef.current) return;
+    if(!mountRef.current) return;
     const mount=mountRef.current;
+    const mobile=window.innerWidth<768;
 
     const scene=new THREE.Scene();
     scene.fog=new THREE.FogExp2(DEFAULT_DEBUG.topColor,0.008);
-    const camera=new THREE.PerspectiveCamera(85,window.innerWidth/window.innerHeight,0.1,1000);
-    const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
-    renderer.setSize(window.innerWidth,window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    // Mobile: use screen dimensions to handle landscape correctly
+    const canvasW = mobile ? Math.max(window.innerWidth,window.innerHeight) : window.innerWidth;
+    const canvasH = mobile ? Math.min(window.innerWidth,window.innerHeight) : window.innerHeight;
+    const camera=new THREE.PerspectiveCamera(85, canvasW/canvasH, 0.1, 1000);
+    const renderer=new THREE.WebGLRenderer({antialias:!mobile,powerPreference:'high-performance'});
+    renderer.setSize(canvasW, canvasH);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobile ? 1.5 : 2));
     mount.appendChild(renderer.domElement);
 
     const composer=new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene,camera));
-    const bloomPass=new UnrealBloomPass(new THREE.Vector2(window.innerWidth,window.innerHeight),1.0,0.2,0.15);
+    const bloomPass=new UnrealBloomPass(new THREE.Vector2(canvasW, canvasH),1.0,0.2,0.15);
     composer.addPass(bloomPass);
     const rgbPass=new ShaderPass(RGBShiftShader);
     rgbPass.uniforms['amount'].value=0.001;
@@ -1453,7 +1652,9 @@ export default function LoginPage() {
 
     portalRef.current.nextShow=6+Math.random()*10;
     const onResize=()=>{
-      const w=window.innerWidth,h=window.innerHeight;
+      const isMob=window.innerWidth<768;
+      const w=isMob?Math.max(window.innerWidth,window.innerHeight):window.innerWidth;
+      const h=isMob?Math.min(window.innerWidth,window.innerHeight):window.innerHeight;
       camera.aspect=w/h; camera.updateProjectionMatrix();
       renderer.setSize(w,h); composer.setSize(w,h);
       bgRT.setSize(w*renderer.getPixelRatio(), h*renderer.getPixelRatio());
@@ -1527,12 +1728,17 @@ export default function LoginPage() {
               bandsRef={bandsRef} playing={audioPlaying}
               hideCard={hideCard} onToggleCard={()=>setHideCard(v=>!v)}
               trackName={trackName} onSkip={skipTrack} eqState={eqState}
+              isMobile={window.innerWidth<768}
             />
           )}
         </>
       )}
 
-      <div ref={mountRef} className="hidden md:block absolute inset-0 z-0"/>
+      {/* Three.js canvas — desktop always, mobile only when active */}
+      <div ref={mountRef}
+        className={`absolute inset-0 z-0 ${mobileActive ? 'block' : 'hidden md:block'}`}
+        style={mobileActive ? {position:'fixed',inset:0,zIndex:0} : {}}
+      />
 
       {live.tvFilterEnabled>0&&(
         <div className="hidden md:block absolute inset-0 z-[1] pointer-events-none bg-black/60 shadow-[inset_0_0_150px_rgba(0,0,0,0.8)]"
@@ -1541,9 +1747,9 @@ export default function LoginPage() {
 
       <div className="absolute md:hidden top-0 left-0 w-[500px] h-[500px] bg-orange-600/20 blur-[120px] rounded-full pointer-events-none -translate-x-1/2 -translate-y-1/2 z-0"/>
 
-      <div className={`relative z-10 w-full max-w-md transition-opacity duration-200 ${hideCard?'opacity-0 pointer-events-none':''}`}>
+      <div className={`relative z-10 w-full max-w-md transition-opacity duration-200 ${(hideCard||mobileActive)?'opacity-0 pointer-events-none':''}`}>
         <Suspense fallback={<div className="text-white text-center">Cargando...</div>}>
-          <LoginForm/>
+          <LoginForm onMobilePlay={handleMobilePlay}/>
         </Suspense>
       </div>
 
@@ -1563,6 +1769,48 @@ export default function LoginPage() {
       )}
 
       <EQBadge eq={eqState} samplerState={samplerState}/>
+
+      {/* "Shift para opciones" hint — desktop only, 10s after music starts ← NEW */}
+      {showShiftHint && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 hidden md:flex items-center gap-3 px-5 py-2.5 rounded-full pointer-events-none select-none transition-opacity"
+          style={{background:'rgba(2,4,20,0.85)',backdropFilter:'blur(12px)',border:'1px solid rgba(255,255,255,0.1)'}}>
+          <kbd className="text-[10px] font-black tracking-widest text-slate-300 bg-white/10 px-2 py-1 rounded-md">SHIFT</kbd>
+          <span className="text-[11px] text-slate-400">Para opciones</span>
+        </div>
+      )}
+
+      {/* Mobile: landscape orientation suggestion */}
+      {mobileActive && isPortrait && (
+        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-slate-950/95 md:hidden" style={{backdropFilter:'blur(12px)'}}>
+          <div className="text-6xl mb-4" style={{animation:'spin 2s linear infinite'}}>⟳</div>
+          <p className="text-white font-black text-xl mb-2">Rotá el dispositivo</p>
+          <p className="text-slate-400 text-sm text-center px-8">La experiencia está optimizada para modo horizontal</p>
+          <button onClick={()=>setIsPortrait(false)} className="mt-6 px-6 py-2 rounded-xl bg-white/10 text-slate-300 text-sm border border-white/10">
+            Continuar igual
+          </button>
+          <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+        </div>
+      )}
+
+      {/* Mobile debug toggle button (two-finger tap also works) */}
+      {mobileActive && showDebug && !debugOpen && (
+        <button
+          className="fixed bottom-6 right-4 z-[60] w-12 h-12 rounded-full bg-slate-950/90 border border-white/10 flex items-center justify-center md:hidden"
+          style={{backdropFilter:'blur(12px)'}}
+          onClick={()=>setDebugOpen(true)}
+        >
+          <Settings2 size={20} className="text-slate-300"/>
+        </button>
+      )}
+      {mobileActive && !showDebug && (
+        <button
+          className="fixed bottom-6 right-4 z-[60] w-12 h-12 rounded-full bg-slate-950/90 border border-white/10 flex items-center justify-center md:hidden"
+          style={{backdropFilter:'blur(12px)'}}
+          onClick={()=>{ setShowDebug(true); setDebugOpen(true); }}
+        >
+          <Settings2 size={20} className="text-slate-400"/>
+        </button>
+      )}
 
       {/* Glass cursor — CSS spring physics — DISABLED (Three.js sphere active)
       <GlassCursor
