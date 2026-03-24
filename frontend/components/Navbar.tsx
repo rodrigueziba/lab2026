@@ -447,6 +447,22 @@ export default function Navbar() {
   const mobilePointer = mobileNavVisible ? 'pointer-events-auto' : 'pointer-events-none';
   const mdBg = isScrolled ? 'md:bg-slate-950/95 md:backdrop-blur-xl md:border-b md:border-white/5 md:shadow-2xl' : 'md:bg-transparent md:backdrop-blur-none md:shadow-none md:border-b-0';
 
+  const [loginImmersive, setLoginImmersive] = useState(false);
+  useEffect(() => {
+    const h = (e: Event) => {
+      const ce = e as CustomEvent<{ active?: boolean }>;
+      if (pathname !== '/login') return;
+      setLoginImmersive(!!ce.detail?.active);
+    };
+    window.addEventListener('login-immersive', h as EventListener);
+    return () => window.removeEventListener('login-immersive', h as EventListener);
+  }, [pathname]);
+  useEffect(() => {
+    if (pathname !== '/login') setLoginImmersive(false);
+  }, [pathname]);
+
+  if (isLogin && loginImmersive) return null;
+
   return (
     <>
     <nav

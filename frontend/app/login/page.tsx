@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Mail, Lock, Loader2, AlertCircle, Settings2, X, Activity } from 'lucide-react';
+import { Mail, Lock, Loader2, AlertCircle, Settings2, X, Activity, Play, Pause, SkipForward } from 'lucide-react';
 
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -97,12 +97,9 @@ const DEFAULT_DEBUG: DebugParams = {
 };
 
 // ─── Login Form ───────────────────────────────────────────────────────────────
-function LoginForm({ onMobilePlay }: { onMobilePlay?: () => Promise<void> }) {
+function LoginForm({ onMobilePlay }: { onMobilePlay?: () => void | Promise<void> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Rainbow gradient direction: random on each page load, stored in ref
-  const gradientDir = useRef(Math.random() > 0.5 ? 'normal' : 'reverse');
-  const gradientDeg = useRef(Math.floor(Math.random() * 360));
   const { t } = useLanguage();
   const [formData, setFormData] = useState({ email:'', password:'' });
   const [loading, setLoading] = useState(false);
@@ -184,34 +181,31 @@ function LoginForm({ onMobilePlay }: { onMobilePlay?: () => Promise<void> }) {
         <p className="text-slate-400 text-sm">{t('login.no_cuenta')}{' '}<Link href="/registro" className="text-orange-500 font-bold hover:text-orange-400">{t('login.registrate_aqui')}</Link></p>
       </div>
 
-      {/* Mobile play button — only on mobile, rainbow animated gradient */}
+      {/* Mobile: esfera cromada (sin texto ni iconos) — referencia estética tipo “mercury sphere” */}
       {onMobilePlay && (
-        <>
-          <style>{`
-            @keyframes rainbow-ltr { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
-            @keyframes rainbow-rtl { 0%{background-position:200% 50%} 100%{background-position:0% 50%} }
-            @keyframes pulse-play { 0%,100%{transform:scale(1)} 50%{transform:scale(1.22)} }
-          `}</style>
-          <div className="mt-5 md:hidden">
-            <div className="relative flex py-2 items-center mb-4">
-              <div className="flex-grow border-t border-slate-700"/>
-              <span className="flex-shrink mx-4 text-slate-500 text-xs font-bold uppercase">activar fondo</span>
-              <div className="flex-grow border-t border-slate-700"/>
-            </div>
-            <button
-              onClick={onMobilePlay}
-              className="w-full py-4 rounded-xl text-white font-black text-lg flex justify-center items-center gap-3 shadow-2xl active:scale-95 transition-transform"
-              style={{
-                background:`linear-gradient(${gradientDeg.current}deg, #ff0000, #ff6600, #ffff00, #00ff00, #00ccff, #0066ff, #cc00ff, #ff0066, #ff0000)`,
-                backgroundSize:'200% 100%',
-                animation:`${gradientDir.current==='normal'?'rainbow-ltr':'rainbow-rtl'} 3s linear infinite`,
-              }}
-            >
-              <span style={{display:'inline-block',animation:'pulse-play 1s ease-in-out infinite',fontSize:'1.4rem'}}>▶</span>
-              Reproducir música
-            </button>
-          </div>
-        </>
+        <div className="mt-8 flex justify-center md:hidden">
+          <button
+            type="button"
+            onClick={() => void onMobilePlay()}
+            aria-label="Activar música y fondo reactivo"
+            className="h-[88px] w-[88px] shrink-0 rounded-full active:scale-[0.96] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            style={{
+              background: `
+                radial-gradient(circle at 28% 26%, rgba(255,255,255,1) 0%, rgba(255,255,255,0.55) 6%, rgba(255,255,255,0.12) 14%, transparent 38%),
+                radial-gradient(circle at 18% 20%, rgba(255,255,255,0.9) 0%, transparent 12%),
+                radial-gradient(circle at 24% 30%, rgba(255,255,255,0.95) 0%, transparent 4%),
+                radial-gradient(circle at 78% 82%, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 38%, transparent 58%),
+                radial-gradient(circle at 50% 50%, #c4c4c4 0%, #6b7280 42%, #1f2937 72%, #0a0a0a 100%)
+              `,
+              boxShadow: `
+                inset -20px -26px 40px rgba(0,0,0,0.72),
+                inset 18px 22px 34px rgba(255,255,255,0.38),
+                0 14px 36px rgba(0,0,0,0.55),
+                0 0 0 1px rgba(255,255,255,0.08)
+              `,
+            }}
+          />
+        </div>
       )}
     </div>
   );
@@ -310,8 +304,77 @@ function EQBadge({ eq, samplerState }: { eq: EQState; samplerState: SamplerState
   );
 }
 
+// ─── Barra de scroll táctil (debug móvil inmersivo) ──────────────────────────
+function LoginMobileScrollRail({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement | null> }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [thumb, setThumb] = useState({ top: 0, h: 56, show: false });
+
+  const sync = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    if (scrollHeight <= clientHeight + 2) {
+      setThumb((t) => ({ ...t, show: false }));
+      return;
+    }
+    const thumbH = Math.max(52, (clientHeight / scrollHeight) * clientHeight);
+    const maxScroll = scrollHeight - clientHeight;
+    const maxTop = Math.max(0, clientHeight - thumbH);
+    const top = maxScroll > 0 ? (scrollTop / maxScroll) * maxTop : 0;
+    setThumb({ top, h: thumbH, show: true });
+  }, [scrollRef]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    sync();
+    el.addEventListener('scroll', sync, { passive: true });
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', sync);
+      ro.disconnect();
+    };
+  }, [scrollRef, sync]);
+
+  const applyClientY = (clientY: number) => {
+    const track = trackRef.current;
+    const el = scrollRef.current;
+    if (!track || !el || !thumb.show) return;
+    const tr = track.getBoundingClientRect();
+    const thumbH = thumb.h;
+    const usable = Math.max(1, tr.height - thumbH);
+    const rel = Math.max(0, Math.min(tr.height, clientY - tr.top));
+    const ratio = Math.max(0, Math.min(1, (rel - thumbH / 2) / usable));
+    el.scrollTop = ratio * (el.scrollHeight - el.clientHeight);
+  };
+
+  return (
+    <div
+      ref={trackRef}
+      className="relative flex-1 w-14 shrink-0 rounded-2xl bg-slate-900/95 border border-white/15 mx-1 mb-2 touch-none select-none"
+      style={{ minHeight: 140, touchAction: 'none' }}
+      onPointerDown={(e) => {
+        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+        applyClientY(e.clientY);
+      }}
+      onPointerMove={(e) => {
+        if (!(e.target as HTMLElement).hasPointerCapture?.(e.pointerId)) return;
+        applyClientY(e.clientY);
+      }}
+    >
+      {thumb.show && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 w-10 rounded-full bg-gradient-to-b from-slate-100 via-slate-400 to-slate-700 border-2 border-white/40 shadow-[0_0_0_4px_rgba(255,255,255,0.08)] pointer-events-none"
+          style={{ top: thumb.top, height: thumb.h }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Debug Panel ──────────────────────────────────────────────────────────────
-function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hideCard, onToggleCard, trackName, onSkip, eqState, isMobile }: {
+function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hideCard, onToggleCard, trackName, onSkip, eqState, isMobile, mobileImmersive, onTogglePlay }: {
   params: DebugParams;
   onChange: (k: keyof DebugParams, v: number|string) => void;
   onClose: ()=>void; onReset: ()=>void;
@@ -323,9 +386,12 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
   onSkip: ()=>void;
   eqState: EQState;
   isMobile?: boolean;
+  mobileImmersive?: boolean;
+  onTogglePlay?: () => void | Promise<void>;
 }) {
   const [live, setLive] = useState(params);
   const rafRef = useRef<number|null>(null);
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(()=>{
     function tick(){
@@ -357,41 +423,15 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
     {label:'Reactividad',  key:'audioReactivity',   min:0,    max:3,    step:0.05,  col:'#ffffff'},
   ];
 
-  const panelMaxH = isMobile ? 'min(85dvh, 85vh)' : 'min(calc(100dvh - 72px), 680px)';
-
-  return (
-    <div className="fixed z-[61] rounded-2xl border border-white/10 bg-slate-950/97 backdrop-blur-xl shadow-2xl flex flex-col"
-      style={{
-        boxShadow:'0 0 60px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04)',
-        // Mobile: full-width bottom drawer; Desktop: left panel
-        left: isMobile ? '0' : 'clamp(8px, 4vw, 16px)',
-        right: isMobile ? '0' : 'auto',
-        bottom: isMobile ? '0' : 'auto',
-        top: isMobile ? 'auto' : 'clamp(64px, 8vh, 80px)',
-        width: isMobile ? '100%' : 'min(256px, calc(100vw - 16px))',
-        borderRadius: isMobile ? '20px 20px 0 0' : '16px',
-        maxHeight: panelMaxH,
-        height:'auto',
-      }}
-    >
-      {/* Mobile drag handle */}
-      {isMobile && <div className="flex justify-center pt-2 pb-0 flex-shrink-0"><div className="w-10 h-1 rounded-full bg-white/20"/></div>}
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-gradient-to-r from-slate-900/60 to-transparent flex-shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <Activity size={13} className={playing?'text-green-400 animate-pulse':'text-slate-600'}/>
-          <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest">Debug</span>
-          {playing&&<span className="text-[8px] font-bold text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded-full border border-green-400/20 whitespace-nowrap">LIVE</span>}
-        </div>
-        <button onClick={onClose} className="p-1.5 rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0 ml-2"><X size={14}/></button>
-      </div>
-
-      <div className="p-3 space-y-3 overflow-y-auto flex-1 min-h-0">
+  const scrollBody = (
+        <>
         {playing && trackName && (
           <div className="rounded-lg border border-white/5 bg-black/30 px-2.5 py-1.5 flex items-center gap-2 min-w-0">
             <span className="text-[8px] font-bold text-slate-500 uppercase flex-shrink-0">♪</span>
             <span className="text-[9px] text-slate-400 truncate font-mono flex-1">{trackName}</span>
-            <button onClick={onSkip} title="Skip" className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition-colors" style={{fontSize:10}}>⏭</button>
+            {!mobileImmersive && (
+              <button type="button" onClick={onSkip} title="Skip" className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition-colors" style={{fontSize:10}}>⏭</button>
+            )}
           </div>
         )}
 
@@ -557,6 +597,95 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
             </div>
           ))}
         </div>
+        </>
+  );
+
+  const panelMaxH = mobileImmersive ? '100dvh' : (isMobile ? 'min(85dvh, 85vh)' : 'min(calc(100dvh - 72px), 680px)');
+
+  if (mobileImmersive) {
+    return (
+      <div
+        className="fixed inset-0 z-[61] flex flex-col w-full max-w-none bg-slate-950/98 backdrop-blur-xl border-0 rounded-none"
+        style={{
+          height: '100dvh',
+          maxHeight: '100dvh',
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
+      >
+        <div className="flex items-center gap-3 px-3 py-3 border-b border-white/10 flex-shrink-0 bg-slate-950/95">
+          {onTogglePlay && (
+            <button
+              type="button"
+              onClick={() => void onTogglePlay()}
+              className="flex items-center justify-center w-14 h-14 min-w-[56px] min-h-[56px] rounded-2xl bg-white/12 border border-white/20 text-white active:scale-95 transition-transform"
+              aria-label={playing ? 'Pausar' : 'Reproducir'}
+            >
+              {playing ? <Pause size={28} strokeWidth={2.2} /> : <Play size={28} className="ml-0.5" strokeWidth={2.2} />}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onSkip}
+            className="flex items-center justify-center w-14 h-14 min-w-[56px] min-h-[56px] rounded-2xl bg-white/12 border border-white/20 text-white active:scale-95 transition-transform"
+            aria-label="Siguiente tema"
+          >
+            <SkipForward size={28} strokeWidth={2.2} />
+          </button>
+          <div className="flex-1 min-w-0" />
+          <div className="flex items-center gap-2 shrink-0">
+            <Activity size={14} className={playing ? 'text-green-400 animate-pulse' : 'text-slate-600'} />
+            <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest">Debug</span>
+            {playing && (
+              <span className="text-[8px] font-bold text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded-full border border-green-400/20 whitespace-nowrap">LIVE</span>
+            )}
+          </div>
+          <button type="button" onClick={onClose} className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 shrink-0" aria-label="Cerrar">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="flex flex-1 min-h-0 w-full min-w-0 flex-row overflow-hidden">
+          <div
+            ref={mobileScrollRef}
+            className="flex-1 min-w-0 overflow-y-auto overscroll-y-contain p-3 space-y-3"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            {scrollBody}
+          </div>
+          <div className="flex flex-col shrink-0 w-14 min-w-[56px] border-l border-white/10 bg-slate-950/90">
+            <LoginMobileScrollRail scrollRef={mobileScrollRef} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed z-[61] rounded-2xl border border-white/10 bg-slate-950/97 backdrop-blur-xl shadow-2xl flex flex-col"
+      style={{
+        boxShadow:'0 0 60px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04)',
+        left: isMobile ? '0' : 'clamp(8px, 4vw, 16px)',
+        right: isMobile ? '0' : 'auto',
+        bottom: isMobile ? '0' : 'auto',
+        top: isMobile ? 'auto' : 'clamp(64px, 8vh, 80px)',
+        width: isMobile ? '100%' : 'min(256px, calc(100vw - 16px))',
+        borderRadius: isMobile ? '20px 20px 0 0' : '16px',
+        maxHeight: panelMaxH,
+        height:'auto',
+      }}
+    >
+      {isMobile && <div className="flex justify-center pt-2 pb-0 flex-shrink-0"><div className="w-10 h-1 rounded-full bg-white/20"/></div>}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-gradient-to-r from-slate-900/60 to-transparent flex-shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <Activity size={13} className={playing?'text-green-400 animate-pulse':'text-slate-600'}/>
+          <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest">Debug</span>
+          {playing&&<span className="text-[8px] font-bold text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded-full border border-green-400/20 whitespace-nowrap">LIVE</span>}
+        </div>
+        <button onClick={onClose} className="p-1.5 rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0 ml-2"><X size={14}/></button>
+      </div>
+
+      <div className="p-3 space-y-3 overflow-y-auto flex-1 min-h-0">
+        {scrollBody}
       </div>
     </div>
   );
@@ -656,7 +785,9 @@ export default function LoginPage() {
   const [trackName, setTrackName] = useState('');
   const [mobileActive, setMobileActive] = useState(false);   // ← NEW: mobile bg active
   const [showShiftHint, setShowShiftHint] = useState(false); // ← NEW: "shift para opciones"
-  const [isPortrait, setIsPortrait] = useState(false);       // ← NEW: orientation warning
+  const [viewportNarrow, setViewportNarrow] = useState(false);
+  /** Coherente con el viewport: retrato vs apaisado (giroscopio + resize canvas). */
+  const loginGyroLayoutRef = useRef<'portrait' | 'landscape'>('portrait');
   const mobileActiveRef = useRef(false);                     // ← NEW: ref for closures
   const shiftHintShownRef = useRef(false);                   // ← NEW: only show once
   const debugRef = useRef<DebugParams>({...DEFAULT_DEBUG});
@@ -691,8 +822,34 @@ export default function LoginPage() {
 
   const mousePosRef = useRef({x:0,y:0});
   const mousePixelRef = useRef({x: -200, y: -200});
+  const mobileImmersionT0Ref = useRef<number | null>(null);
+  const loginShellRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(()=>{ debugRef.current={...debugParams}; },[debugParams]);
+
+  useEffect(()=>{
+    return ()=>{
+      window.dispatchEvent(new CustomEvent('login-immersive',{detail:{active:false}}));
+      const a = audioRef.current;
+      if (a?.parentNode === document.body) {
+        try { document.body.removeChild(a); } catch (_) {}
+      }
+    };
+  },[]);
+
+  useEffect(() => {
+    const q = () => setViewportNarrow(window.innerWidth < 768);
+    q();
+    window.addEventListener('resize', q);
+    return () => window.removeEventListener('resize', q);
+  }, []);
+
+  // Móvil inmersivo: el botón Debug (FAB) desaparece solo a los 10s si el panel sigue cerrado
+  useEffect(()=>{
+    if(!mobileActive||!showDebug||debugOpen) return;
+    const t=setTimeout(()=>setShowDebug(false),10000);
+    return ()=>clearTimeout(t);
+  },[mobileActive,showDebug,debugOpen]);
 
   // ── "Shift para opciones" hint: show 10s after first audio play ──────────
   useEffect(()=>{
@@ -704,14 +861,20 @@ export default function LoginPage() {
     }
   },[audioState]);
 
-  // ── Orientation tracking for mobile landscape hint ────────────────────────
-  useEffect(()=>{
-    const check=()=>setIsPortrait(window.innerHeight>window.innerWidth);
-    check();
-    window.addEventListener('resize',check);
-    window.addEventListener('orientationchange',check);
-    return ()=>{ window.removeEventListener('resize',check); window.removeEventListener('orientationchange',check); };
-  },[]);
+  // ── Orientación del viewport (canvas + mapeo giroscopio) ──────────────────
+  useEffect(() => {
+    const sync = () => {
+      loginGyroLayoutRef.current =
+        typeof window !== 'undefined' && window.innerWidth >= window.innerHeight ? 'landscape' : 'portrait';
+    };
+    sync();
+    window.addEventListener('resize', sync);
+    window.addEventListener('orientationchange', sync);
+    return () => {
+      window.removeEventListener('resize', sync);
+      window.removeEventListener('orientationchange', sync);
+    };
+  }, []);
 
   // ── Sync mobileActive ref for use in closures ────────────────────────────
   useEffect(()=>{ mobileActiveRef.current=mobileActive; },[mobileActive]);
@@ -730,6 +893,41 @@ export default function LoginPage() {
     setTrackName(next.replace(/^\//,'').replace('.mp3',''));
     audio.play().then(()=>setAudioState('playing')).catch(()=>{});
   },[]);
+
+  const toggleAudioPlayPause = useCallback(async () => {
+    if (samplerStateRef.current === 'playing') {
+      sampleAudioRef.current?.pause();
+      sampleAudioRef.current = null;
+      semitonePlayersRef.current.forEach((sp) => { try { sp.pause(); } catch (_) {} });
+      semitonePlayersRef.current = [];
+      if (sampleBlobUrlRef.current) {
+        URL.revokeObjectURL(sampleBlobUrlRef.current);
+        sampleBlobUrlRef.current = null;
+      }
+      samplerStateRef.current = 'idle';
+      setSamplerState('idle');
+      const audio = audioRef.current;
+      const ctx = audioCtxRef.current;
+      if (audio && ctx) {
+        if (ctx.state === 'suspended') await ctx.resume();
+        await audio.play().catch(() => {});
+        setAudioState('playing');
+      }
+      return;
+    }
+    if (samplerStateRef.current === 'recording') return;
+    const audio = audioRef.current;
+    const ctx = audioCtxRef.current;
+    if (!audio || !ctx) return;
+    if (ctx.state === 'suspended') await ctx.resume();
+    if (audio.paused) {
+      await audio.play().catch(() => {});
+      setAudioState('playing');
+    } else {
+      audio.pause();
+      setAudioState('paused');
+    }
+  }, []);
 
   useEffect(()=>{
     const h=(e:KeyboardEvent)=>{
@@ -962,71 +1160,120 @@ export default function LoginPage() {
     return ()=>window.removeEventListener('keydown',h);
   },[audioState,skipTrack]);
 
-  // ── Mobile play handler ───────────────────────────────────────────────────
-  const handleMobilePlay = useCallback(async () => {
-    // iOS 13+ DeviceOrientation permission
-    if(typeof DeviceOrientationEvent !== 'undefined' &&
-       typeof (DeviceOrientationEvent as any).requestPermission === 'function'){
-      try{
-        const perm = await (DeviceOrientationEvent as any).requestPermission();
-        if(perm !== 'granted'){
-          alert('Se necesita acceso al sensor de movimiento para la experiencia completa.');
-        }
-      }catch(_){}
-    }
-
-    // Try landscape lock (Android Chrome; iOS ignores)
-    try{ await (screen.orientation as any).lock('landscape'); }catch(_){}
-
-    // Activate mobile background
-    setMobileActive(true);
-    setHideCard(true);
-    // Hide navbar/footer via custom events
-    window.dispatchEvent(new CustomEvent('login-hide-nav',{detail:{hide:true}}));
-    window.dispatchEvent(new CustomEvent('login-music-state',{detail:{playing:true}}));
-
-    // Start audio — same logic as SPACE
-    if(!audioCtxRef.current){
+  // ── Mobile play handler (gesto de usuario: sin await antes del audio; permisos en macrotarea — iOS) ──
+  const handleMobilePlay = useCallback(() => {
+    const kickAudio = (): void => {
+      if (audioCtxRef.current && audioRef.current) {
+        const audio = audioRef.current;
+        const ctx = audioCtxRef.current;
+        void ctx.resume().then(() => {
+          if (audio.paused) {
+            void audio.play().then(() => setAudioState('playing')).catch(() => {});
+          }
+        });
+        return;
+      }
       setAudioState('loading');
-      const playlist=await fetchPlaylist();
-      playlistRef.current=playlist; trackIdxRef.current=0;
-      const audio=new Audio(playlist[0]);
-      audioRef.current=audio;
-      setTrackName(playlist[0].replace(/^\//,'').replace('.mp3',''));
-      const ctx=new AudioContext();
-      audioCtxRef.current=ctx;
-      const analyser=ctx.createAnalyser();
-      analyser.fftSize=2048; analyser.smoothingTimeConstant=0.8;
-      analyserRef.current=analyser;
-      freqRef.current=new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
-      const src=ctx.createMediaElementSource(audio);
+      const audio = new Audio(MUSIC_FIRST);
+      audio.preload = 'auto';
+      audio.setAttribute('playsinline', '');
+      audio.setAttribute('webkit-playsinline', '');
+      (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
+      audio.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px;top:0;';
+      try {
+        document.body.appendChild(audio);
+      } catch (_) {}
+
+      const ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.8;
+      analyserRef.current = analyser;
+      freqRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
+      const src = ctx.createMediaElementSource(audio);
       src.connect(analyser);
       analyser.connect(ctx.destination);
-      audio.addEventListener('ended',()=>skipTrack());
-      await audio.play();
-      if(ctx.state==='suspended') await ctx.resume();
-      setAudioState('playing');
-      audioRampRef.current={active:true,audioStartTime:performance.now()};
-      secondRampRef.current={done:false};
-      thirdRampRef.current={done:false};
-    } else {
-      const audio=audioRef.current!,ctx=audioCtxRef.current!;
-      if(ctx.state==='suspended') await ctx.resume();
-      if(audio.paused){ await audio.play(); setAudioState('playing'); }
-    }
-  },[skipTrack]);
+      audio.addEventListener('ended', () => skipTrack());
 
-  // ── Gyroscope → mousePosRef (mobile only) ────────────────────────────────
+      audioRef.current = audio;
+      audioCtxRef.current = ctx;
+      playlistRef.current = [MUSIC_FIRST];
+      trackIdxRef.current = 0;
+      setTrackName('music');
+
+      try {
+        audio.load();
+      } catch (_) {}
+
+      void ctx.resume().then(() => {
+        void audio.play().then(() => {
+          setAudioState('playing');
+          audioRampRef.current = { active: true, audioStartTime: performance.now() };
+          secondRampRef.current = { done: false };
+          thirdRampRef.current = { done: false };
+        }).catch(() => {
+          setAudioState('idle');
+        });
+      });
+    };
+
+    mobileImmersionT0Ref.current = performance.now();
+    setMobileActive(true);
+    setHideCard(true);
+    setShowDebug(true);
+    window.dispatchEvent(new CustomEvent('login-immersive', { detail: { active: true } }));
+    window.dispatchEvent(new CustomEvent('login-music-state', { detail: { playing: true } }));
+
+    kickAudio();
+
+    requestAnimationFrame(() => {
+      const el = loginShellRef.current;
+      if (!el) return;
+      const anyEl = el as unknown as { requestFullscreen?: () => Promise<void>; webkitRequestFullscreen?: () => void };
+      const req = anyEl.requestFullscreen?.bind(el) ?? anyEl.webkitRequestFullscreen?.bind(el);
+      try {
+        void req?.();
+      } catch (_) {}
+    });
+
+    void fetchPlaylist().then((files) => {
+      if (!files.length || !audioRef.current) return;
+      playlistRef.current = files;
+    });
+
+    window.setTimeout(() => {
+      void (async () => {
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission === 'function') {
+          try {
+            const perm = await (DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission();
+            if (perm !== 'granted') {
+              alert('Se necesita acceso al sensor de movimiento para la experiencia completa.');
+            }
+          } catch (_) {}
+        }
+      })();
+    }, 0);
+  }, [skipTrack]);
+
+  // ── Gyroscope → mousePosRef (mobile only): retrato = eje actual; apaisado = ejes adaptados)
   useEffect(()=>{
     const h=(e:DeviceOrientationEvent)=>{
       if(!mobileActiveRef.current) return;
       const gamma=e.gamma??0;  // -90..90 left/right tilt
       const beta =e.beta??45;  // -180..180 front/back tilt
-      // Map to -1..1: gamma for X, (beta-45)/45 centres around natural holding angle
-      mousePosRef.current={
-        x:Math.max(-1,Math.min(1, gamma/45)),
-        y:Math.max(-1,Math.min(1,-(beta-45)/45)),
-      };
+      const landscape = loginGyroLayoutRef.current === 'landscape';
+      let x: number;
+      let y: number;
+      if (!landscape) {
+        x = Math.max(-1, Math.min(1, gamma / 45));
+        y = Math.max(-1, Math.min(1, -(beta - 45) / 45));
+      } else {
+        // Apaisado: intercambia la influencia de beta/gamma respecto a los ejes de pantalla
+        x = Math.max(-1, Math.min(1, (beta - 45) / 45));
+        y = Math.max(-1, Math.min(1, -gamma / 45));
+      }
+      mousePosRef.current = { x, y };
     };
     window.addEventListener('deviceorientation',h,{passive:true});
     return ()=>window.removeEventListener('deviceorientation',h);
@@ -1155,9 +1402,9 @@ export default function LoginPage() {
 
     const scene=new THREE.Scene();
     scene.fog=new THREE.FogExp2(DEFAULT_DEBUG.topColor,0.008);
-    // Mobile: use screen dimensions to handle landscape correctly
-    const canvasW = mobile ? Math.max(window.innerWidth,window.innerHeight) : window.innerWidth;
-    const canvasH = mobile ? Math.min(window.innerWidth,window.innerHeight) : window.innerHeight;
+    // Viewport real (retrato o apaisado); el canvas sigue al girar el dispositivo
+    const canvasW = window.innerWidth;
+    const canvasH = window.innerHeight;
     const camera=new THREE.PerspectiveCamera(85, canvasW/canvasH, 0.1, 1000);
     const renderer=new THREE.WebGLRenderer({antialias:!mobile,powerPreference:'high-performance'});
     renderer.setSize(canvasW, canvasH);
@@ -1581,13 +1828,24 @@ export default function LoginPage() {
       camera.translateX(mx*5.);camera.translateY(my*2.5);camera.rotateZ(-mx*.5);camera.rotateX(my*.25);
 
       const mp = mousePosRef.current;
+      let effX = mp.x;
+      let effY = mp.y;
+      if (mobileActiveRef.current && mobileImmersionT0Ref.current != null) {
+        const elapsedMs = performance.now() - mobileImmersionT0Ref.current;
+        if (elapsedMs > 10000) {
+          const u = Math.min(1, (elapsedMs - 10000) / 6500);
+          const s = u * u * (3 - 2 * u);
+          effX = mp.x * (1 - s);
+          effY = mp.y * (1 - s);
+        }
+      }
       camera.updateMatrixWorld();
       const camRight2 = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
       const camUp2    = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
       const camFwd2   = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 2).negate().normalize();
 
       const MAX_LAT = 3.0, MAX_VERT = 2.0;
-      const targetX = mp.x * MAX_LAT, targetY = mp.y * MAX_VERT;
+      const targetX = effX * MAX_LAT, targetY = effY * MAX_VERT;
       const SPR = 0.20, DAMP = 0.68;
       sphSpring.vx = sphSpring.vx * DAMP + (targetX - sphSpring.x) * SPR;
       sphSpring.vy = sphSpring.vy * DAMP + (targetY - sphSpring.y) * SPR;
@@ -1652,9 +1910,8 @@ export default function LoginPage() {
 
     portalRef.current.nextShow=6+Math.random()*10;
     const onResize=()=>{
-      const isMob=window.innerWidth<768;
-      const w=isMob?Math.max(window.innerWidth,window.innerHeight):window.innerWidth;
-      const h=isMob?Math.min(window.innerWidth,window.innerHeight):window.innerHeight;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
       camera.aspect=w/h; camera.updateProjectionMatrix();
       renderer.setSize(w,h); composer.setSize(w,h);
       bgRT.setSize(w*renderer.getPixelRatio(), h*renderer.getPixelRatio());
@@ -1707,12 +1964,19 @@ export default function LoginPage() {
   const live=debugParams;
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
+    <div
+      ref={loginShellRef}
+      className={
+        mobileActive
+          ? 'fixed inset-0 z-[5] flex min-h-[100dvh] w-full max-w-none flex-col items-center justify-center overflow-hidden bg-slate-950 p-0'
+          : 'relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-950 p-6'
+      }
+    >
 
       {showDebug&&(
         <>
           <div
-            className="fixed left-4 top-1/2 -translate-y-1/2 z-[60] transition-opacity duration-150"
+            className="fixed left-4 top-1/2 -translate-y-1/2 z-[60] transition-opacity duration-150 hidden md:block"
             style={{opacity: debugOpen ? 0 : 1, pointerEvents: debugOpen ? 'none' : 'auto'}}
           >
             <button type="button" onClick={()=>setDebugOpen(true)}
@@ -1728,7 +1992,9 @@ export default function LoginPage() {
               bandsRef={bandsRef} playing={audioPlaying}
               hideCard={hideCard} onToggleCard={()=>setHideCard(v=>!v)}
               trackName={trackName} onSkip={skipTrack} eqState={eqState}
-              isMobile={window.innerWidth<768}
+              isMobile={mobileActive || viewportNarrow}
+              mobileImmersive={mobileActive}
+              onTogglePlay={toggleAudioPlayPause}
             />
           )}
         </>
@@ -1779,19 +2045,6 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* Mobile: landscape orientation suggestion */}
-      {mobileActive && isPortrait && (
-        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-slate-950/95 md:hidden" style={{backdropFilter:'blur(12px)'}}>
-          <div className="text-6xl mb-4" style={{animation:'spin 2s linear infinite'}}>⟳</div>
-          <p className="text-white font-black text-xl mb-2">Rotá el dispositivo</p>
-          <p className="text-slate-400 text-sm text-center px-8">La experiencia está optimizada para modo horizontal</p>
-          <button onClick={()=>setIsPortrait(false)} className="mt-6 px-6 py-2 rounded-xl bg-white/10 text-slate-300 text-sm border border-white/10">
-            Continuar igual
-          </button>
-          <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
-        </div>
-      )}
-
       {/* Mobile debug toggle button (two-finger tap also works) */}
       {mobileActive && showDebug && !debugOpen && (
         <button
@@ -1802,16 +2055,6 @@ export default function LoginPage() {
           <Settings2 size={20} className="text-slate-300"/>
         </button>
       )}
-      {mobileActive && !showDebug && (
-        <button
-          className="fixed bottom-6 right-4 z-[60] w-12 h-12 rounded-full bg-slate-950/90 border border-white/10 flex items-center justify-center md:hidden"
-          style={{backdropFilter:'blur(12px)'}}
-          onClick={()=>{ setShowDebug(true); setDebugOpen(true); }}
-        >
-          <Settings2 size={20} className="text-slate-400"/>
-        </button>
-      )}
-
       {/* Glass cursor — CSS spring physics — DISABLED (Three.js sphere active)
       <GlassCursor
         mousePixelRef={mousePixelRef}
