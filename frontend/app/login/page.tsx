@@ -822,7 +822,8 @@ export default function LoginPage() {
 
   const mousePosRef = useRef({x:0,y:0});
   const mousePixelRef = useRef({x: -200, y: -200});
-  const mobileImmersionT0Ref = useRef<number | null>(null);
+  /** Último evento de giroscopio (móvil); si pasan 10s sin eventos, la esfera vuelve al centro. */
+  const lastGyroInputRef = useRef(0);
   const loginShellRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(()=>{ debugRef.current={...debugParams}; },[debugParams]);
@@ -1217,7 +1218,7 @@ export default function LoginPage() {
       });
     };
 
-    mobileImmersionT0Ref.current = performance.now();
+    lastGyroInputRef.current = performance.now();
     setMobileActive(true);
     setHideCard(true);
     setShowDebug(true);
@@ -1274,6 +1275,7 @@ export default function LoginPage() {
         y = Math.max(-1, Math.min(1, -gamma / 45));
       }
       mousePosRef.current = { x, y };
+      lastGyroInputRef.current = performance.now();
     };
     window.addEventListener('deviceorientation',h,{passive:true});
     return ()=>window.removeEventListener('deviceorientation',h);
@@ -1830,10 +1832,10 @@ export default function LoginPage() {
       const mp = mousePosRef.current;
       let effX = mp.x;
       let effY = mp.y;
-      if (mobileActiveRef.current && mobileImmersionT0Ref.current != null) {
-        const elapsedMs = performance.now() - mobileImmersionT0Ref.current;
-        if (elapsedMs > 10000) {
-          const u = Math.min(1, (elapsedMs - 10000) / 6500);
+      if (mobileActiveRef.current && lastGyroInputRef.current > 0) {
+        const inactiveMs = performance.now() - lastGyroInputRef.current;
+        if (inactiveMs > 10000) {
+          const u = Math.min(1, (inactiveMs - 10000) / 6500);
           const s = u * u * (3 - 2 * u);
           effX = mp.x * (1 - s);
           effY = mp.y * (1 - s);
