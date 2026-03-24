@@ -71,6 +71,13 @@ interface DebugParams {
   tvFilterEnabled: number;
   reflectionStrength: number; ghostIntensity: number;
   audioReactivity: number;
+  // Sphere
+  sphRefraction: number;      // 0–1  refraction strength
+  sphFractalSpeed: number;    // 0.1–3 zoom + animation speed
+  sphFractalIter: number;     // 8–64  Julia iterations (detail)
+  sphFractalIntensity: number;// 0–1  fractal vs plain refraction
+  sphFractalScale: number;    // 0.1–2 fractal window size (zoom out/in)
+  sphPalette: number;         // 0–4  color palette index
 }
 const DEFAULT_DEBUG: DebugParams = {
   topColor:'#0a198c', bottomColor:'#11133b',
@@ -79,6 +86,12 @@ const DEFAULT_DEBUG: DebugParams = {
   tvFilterEnabled:1,
   reflectionStrength:0.35, ghostIntensity:1.0,
   audioReactivity:1.0,
+  sphRefraction:0.71,
+  sphFractalSpeed:1.49,
+  sphFractalIter:61,
+  sphFractalIntensity:0.56,
+  sphFractalScale:1.47,
+  sphPalette:0,
 };
 
 // ─── Login Form ───────────────────────────────────────────────────────────────
@@ -432,6 +445,75 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
           ↺ Restaurar defaults
         </button>
 
+        {/* ── Sphere section ───────────────────────────────────────────── */}
+        <div className="rounded-xl border border-white/8 bg-white/[0.015] overflow-hidden">
+          <div className="px-3 py-2 border-b border-white/5 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-cyan-400/70"/>
+            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Esfera</span>
+          </div>
+          <div className="p-3 space-y-3">
+            {/* Palette picker */}
+            <div>
+              <p className="text-[9px] font-bold text-slate-500 uppercase mb-2">Paleta de colores</p>
+              <div className="flex gap-1.5">
+                {[
+                  {label:'Eléctrico', colors:['#0088ff','#00ffee']},
+                  {label:'Matrix',    colors:['#00ff44','#004422']},
+                  {label:'Cyber',     colors:['#cc00ff','#ff0088']},
+                  {label:'Lava',      colors:['#ff4400','#ffaa00']},
+                  {label:'Océano',    colors:['#004466','#00ccbb']},
+                ].map((pal,i)=>(
+                  <button
+                    key={i}
+                    onClick={()=>onChange('sphPalette',i)}
+                    title={pal.label}
+                    className="flex-1 h-6 rounded-lg border-2 transition-all relative overflow-hidden"
+                    style={{
+                      background:`linear-gradient(135deg,${pal.colors[0]},${pal.colors[1]})`,
+                      borderColor: params.sphPalette===i ? '#ffffff' : 'rgba(255,255,255,0.1)',
+                      boxShadow: params.sphPalette===i ? `0 0 8px ${pal.colors[0]}` : 'none',
+                    }}
+                  >
+                    {params.sphPalette===i && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 rounded-full bg-white shadow"/>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sphere sliders */}
+            {([
+              {label:'Refracción',  key:'sphRefraction'      as const, min:0,   max:1,  step:0.02, col:'#00ccff'},
+              {label:'Vel. Fractal',key:'sphFractalSpeed'    as const, min:0.05,max:3,  step:0.05, col:'#aa44ff'},
+              {label:'Iteraciones', key:'sphFractalIter'     as const, min:8,   max:64, step:4,    col:'#ff44aa'},
+              {label:'Intensidad',  key:'sphFractalIntensity'as const, min:0,   max:1,  step:0.02, col:'#44ff88'},
+              {label:'Escala',      key:'sphFractalScale'    as const, min:0.05,max:2,  step:0.05, col:'#ffaa00'},
+            ] as const).map(({label,key,min,max,step,col})=>{
+              const val = params[key] as number;
+              const pct = Math.min(100,((val-min)/(max-min))*100);
+              return(
+                <div key={key}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] font-bold text-slate-400">{label}</span>
+                    <span className="text-[10px] font-mono text-orange-400">{val.toFixed(key==='sphFractalIter'?0:2)}</span>
+                  </div>
+                  <div className="relative h-2.5 rounded-full bg-slate-800/80 cursor-pointer"
+                    onClick={e=>{
+                      const r=e.currentTarget.getBoundingClientRect();
+                      onChange(key, parseFloat(Math.min(max,Math.max(min,min+(e.clientX-r.left)/r.width*(max-min))).toFixed(key==='sphFractalIter'?0:5)));
+                    }}>
+                    <div className="absolute inset-y-0 left-0 rounded-full pointer-events-none" style={{width:`${pct}%`,background:`linear-gradient(90deg,${col}55,${col})`}}/>
+                    <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full border-2 border-white/90 pointer-events-none" style={{left:`${pct}%`,background:col,boxShadow:`0 0 8px ${col}99`}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="rounded-xl border border-white/5 bg-black/20 p-2.5 space-y-1">
           <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">Atajos</p>
           {[['SPACE','Play / Pausa'],['← →','Mover filtro EQ'],['↑ ↓','Ganancia EQ'],['I','Grabar sample'],['O','Stop + loop'],['A→L','12 semitonos del sample'],['SHIFT','Debug'],['SCROLL','Velocidad'],['CLICK','Paleta']].map(([k,v])=>(
@@ -460,7 +542,7 @@ function GlassCursor({
   const glowRef = useRef<HTMLDivElement>(null);
   const pos = useRef({ x: -200, y: -200 });
   const vel = useRef({ x: 0, y: 0 });
-  const rafRef = useRef<number | null>(null);
+  const rafRef = useRef<number>();
 
   useEffect(() => {
     // Init position offscreen until first mouse move
@@ -522,7 +604,7 @@ function GlassCursor({
       glow.style.background = `radial-gradient(circle, rgba(${r},${g},${bv},0.6) 0%, transparent 70%)`;
     }
     tick();
-    return () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); };
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [mousePixelRef, bandsRef, audioPlaying]);
 
   return (
@@ -577,7 +659,7 @@ export default function LoginPage() {
   const audioRef = useRef<HTMLAudioElement|null>(null);
   const audioCtxRef = useRef<AudioContext|null>(null);
   const analyserRef = useRef<AnalyserNode|null>(null);
-  const freqRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const freqRef = useRef<Uint8Array|null>(null);
   const bandsRef = useRef<AudioBands>(zeroBands());
   const beatRef = useRef({prev:0,lastBeat:0});
   const portalRef = useRef({active:false,opacity:0,nextShow:0,hold:0});
@@ -866,7 +948,7 @@ export default function LoginPage() {
         const analyser=ctx.createAnalyser();
         analyser.fftSize=2048; analyser.smoothingTimeConstant=0.8;
         analyserRef.current=analyser;
-        freqRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
+        freqRef.current=new Uint8Array(analyser.frequencyBinCount);
         const src=ctx.createMediaElementSource(audio);
         src.connect(analyser);
         analyser.connect(ctx.destination);
@@ -985,119 +1067,263 @@ export default function LoginPage() {
     dirLight.position.set(1, 2, 1);
     scene.add(dirLight);
 
-    // ── Glass sphere — rendered in a SEPARATE SCENE after composer ───────────
-    // This avoids depth-buffer conflicts with the BackSide tunnel mesh.
-    const SPHERE_R = 1.4;
-    const sphereScene = new THREE.Scene(); // isolated — no fog, no tunnel
+    // ── Background capture render target (for screen-space refraction) ───────
+    const W = renderer.domElement.width;
+    const H = renderer.domElement.height;
+    const bgRT = new THREE.WebGLRenderTarget(W, H, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      type: THREE.UnsignedByteType,
+    });
 
-    const sphereVert = `
+    // ── Glass sphere — separate scene, fixed Z, single-material refraction ────
+    const SPHERE_DIST = 5.0;
+    const SPHERE_R    = 0.65;  // ~3× CSS cursor at this depth
+    const sphereScene = new THREE.Scene();
+
+    const sphVert = `
       varying vec3 vNormal;
       varying vec3 vViewDir;
       varying vec3 vWorldPos;
       void main() {
-        vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-        vNormal   = normalize(normalMatrix * normal);
-        vViewDir  = normalize(-mvPos.xyz);
-        gl_Position = projectionMatrix * mvPos;
-      }
-    `;
+        vWorldPos = (modelMatrix * vec4(position,1.0)).xyz;
+        vec4 mv = modelViewMatrix * vec4(position,1.0);
+        vNormal  = normalize(normalMatrix * normal);
+        vViewDir = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`;
 
-    // Fill: dark semi-transparent interior — always visible over bright bg
-    const sphereSilFrag = `
-      uniform float uTime;
-      uniform vec3  uTint;
-      uniform float uBeat;
-      varying vec3 vNormal; varying vec3 vViewDir; varying vec3 vWorldPos;
-      void main() {
-        float ndv = max(0.0, dot(vNormal, vViewDir));
-        float alpha = smoothstep(0.6, 0.05, ndv) * 0.6;
-        float shimmer = sin(vWorldPos.x*5.0+uTime*1.5)*sin(vWorldPos.z*4.0-uTime*1.2)*0.5+0.5;
-        vec3 col = mix(vec3(0.02,0.04,0.12), uTint*0.25, shimmer);
-        gl_FragColor = vec4(col, alpha);
-      }
-    `;
-    // Rim: bright fresnel edge — sharp and always punchy
-    const sphereRimFrag = `
+    // ── Main glass shader — Julia fractal infinite zoom + screen refraction ───
+    const sphGlassFrag = `
+      uniform sampler2D uBgTex;
+      uniform vec2  uRes;
       uniform float uTime;
       uniform vec3  uTint;
       uniform float uBeat;
       uniform float uRMS;
+      uniform float uBass;
+      uniform float uMid;
+      uniform float uAir;
+      uniform float uSub;
+      // Sphere debug params
+      uniform float uRefraction;        // 0-1 refraction strength
+      uniform float uFractalSpeed;      // zoom + animation speed
+      uniform float uFractalIter;       // max Julia iterations
+      uniform float uFractalIntensity;  // fractal vs refraction blend
+      uniform float uFractalScale;      // fractal window size
+      uniform float uPalette;           // 0-4 color palette index
       varying vec3 vNormal; varying vec3 vViewDir; varying vec3 vWorldPos;
-      void main() {
-        float ndv     = max(0.0, dot(vNormal, vViewDir));
-        float fresnel = pow(1.0 - ndv, 2.8);
-        float edge    = pow(1.0 - ndv, 7.0);
-        float shimmer = sin(vWorldPos.x*8.0+uTime*2.0)*sin(vWorldPos.y*6.0-uTime*1.6)*0.5+0.5;
-        vec3 rimCol = mix(vec3(0.6, 0.85, 1.0), uTint+0.2, shimmer);
-        rimCol *= (1.0 + uBeat*1.5 + uRMS*0.5);
-        vec3 edgeCol = vec3(1.0)*(0.9+uBeat*0.5);
-        float alpha = fresnel*0.8 + edge*1.0;
-        gl_FragColor = vec4(rimCol*fresnel + edgeCol*edge, clamp(alpha,0.0,1.0));
+
+      vec2 rot2(vec2 p,float a){float c=cos(a),s=sin(a);return vec2(c*p.x-s*p.y,s*p.x+c*p.y);}
+
+      // Cosine palette: https://iquilezles.org/articles/palettes/
+      vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
+        return a + b*cos(6.28318*(c*t+d));
       }
-    `;
-    // Outer halo (additive, bigger sphere)
-    const sphereHaloFrag = `
-      uniform vec3  uTint;
-      uniform float uBeat;
-      varying vec3 vNormal; varying vec3 vViewDir;
-      void main() {
-        float ndv  = max(0.0, dot(vNormal, vViewDir));
-        float halo = pow(1.0-ndv, 3.5) * (0.4 + uBeat*0.5);
-        gl_FragColor = vec4(uTint*(1.2+uBeat), halo);
+      vec3 applyPalette(float t, float pal){
+        // 0: Electric Blue/Cyan
+        if(pal<0.5) return palette(t, vec3(0.5,0.5,0.5), vec3(0.5,0.5,0.5), vec3(1.0,1.0,1.0), vec3(0.0,0.33,0.67));
+        // 1: Matrix Green
+        if(pal<1.5) return palette(t, vec3(0.0,0.5,0.0), vec3(0.2,0.5,0.1), vec3(1.0,1.0,1.0), vec3(0.0,0.15,0.3));
+        // 2: Cyber Magenta/Purple
+        if(pal<2.5) return palette(t, vec3(0.5,0.0,0.5), vec3(0.5,0.3,0.5), vec3(1.0,0.7,1.0), vec3(0.8,0.0,0.5));
+        // 3: Lava Red/Orange
+        if(pal<3.5) return palette(t, vec3(0.5,0.2,0.0), vec3(0.5,0.3,0.0), vec3(1.0,0.8,0.6), vec3(0.0,0.1,0.2));
+        // 4: Ocean Teal
+        return        palette(t, vec3(0.0,0.4,0.5), vec3(0.2,0.4,0.3), vec3(1.0,1.0,0.8), vec3(0.5,0.6,0.7));
       }
-    `;
 
-    const mkU = (tint:number) => ({
-      uTime:{value:0}, uTint:{value:new THREE.Color(tint)},
-      uBeat:{value:0}, uRMS:{value:0},
+      void main() {
+        vec3 N = normalize(vNormal);
+        vec3 V = normalize(vViewDir);
+        float ndv = max(0.0, dot(N,V));
+        vec2 screenUV = gl_FragCoord.xy / uRes;
+
+        // ── Refraction ──────────────────────────────────────────────────────
+        float IOR = 1.3 + uBass * 0.4;
+        vec3 refr = refract(-V, N, 1.0/IOR);
+        float refStr = uRefraction * (0.28 + uBeat*0.14 + uRMS*0.08);
+        vec2 refOff = refr.xy * refStr;
+        float ca = uRefraction * (0.032 + uBeat*0.020 + uBass*0.012);
+        vec2 caV = vec2(ca, ca*0.5);
+        float rC = texture2D(uBgTex, screenUV+refOff+caV).r;
+        float gC = texture2D(uBgTex, screenUV+refOff     ).g;
+        float bC = texture2D(uBgTex, screenUV+refOff-caV ).b;
+        vec3 bgCol = vec3(rC,gC,bC);
+
+        // ── Julia fractal — infinite zoom, always visible at centre ───────────
+        float speed = uFractalSpeed * (1.0 + uBeat*0.6 + uRMS*0.25);
+
+        // ── Disk UV: centred on sphere face, varies across visible disk ──────
+        // vNormal.xy goes from (0,0) at centre to (1,0)/(0,1) at equator.
+        // Rotate slowly so the fractal appears to spin.
+        vec2 diskUV = rot2(vNormal.xy, uTime * speed * 0.05);
+
+        // ── Dual-zoom crossfade — two cycles offset by half period, no gaps ──
+        float period = 7.0;
+        float zA_t = mod(uTime * speed * 0.22,         period);
+        float zB_t = mod(uTime * speed * 0.22 + period*0.5, period);
+        float zoomA = exp(zA_t * 0.9);  // 1 → e^6.3 ≈ 545
+        float zoomB = exp(zB_t * 0.9);
+        // Crossfade weights: each cycle fades in/out at its own endpoints
+        float wA = smoothstep(0.0,0.12,zA_t/period) * smoothstep(1.0,0.88,zA_t/period);
+        float wB = smoothstep(0.0,0.12,zB_t/period) * smoothstep(1.0,0.88,zB_t/period);
+        float wSum = wA + wB + 0.001;
+        wA /= wSum; wB /= wSum;  // normalise so they always sum to 1
+
+        // Pan targets — each zoom cycle drifts toward a different interesting region
+        float pAngA = uTime * speed * 0.06;
+        float pAngB = uTime * speed * 0.04 + 1.57;
+        vec2 panA = vec2(cos(pAngA)*0.32, sin(pAngA*0.77)*0.24);
+        vec2 panB = vec2(cos(pAngB)*0.28, sin(pAngB*0.61)*0.20);
+
+        // Julia c parameter — drifts slowly, modulated by bass/mid
+        vec2 jc = vec2(
+          -0.7269 + sin(uTime*speed*0.09)*0.22 + uBass*0.15,
+           0.1889 + cos(uTime*speed*0.07)*0.16 + uMid *0.10
+        );
+
+        // Helper: run Julia and return a colour value for a given UV
+        // (GLSL doesn't allow real functions with loops, inline via macros)
+        // We compute for fractal coords fcA and fcB, then mix.
+        vec2 fcA = diskUV * uFractalScale / zoomA + panA;
+        vec2 fcB = diskUV * uFractalScale / zoomB + panB;
+
+        int maxI = int(uFractalIter);
+
+        // ── Compute Julia A ────────────────────────────────────────────────
+        vec2 zA = fcA;
+        float iterA=0.0, trapRA=1e5, trapLA=1e5, trapCA=1e5;
+        for(int i=0;i<64;i++){
+          if(i>=maxI) break;
+          zA = vec2(zA.x*zA.x-zA.y*zA.y, 2.0*zA.x*zA.y) + jc;
+          float rA=length(zA);
+          trapRA=min(trapRA,rA);
+          trapLA=min(trapLA,abs(zA.x*zA.y));
+          trapCA=min(trapCA,abs(rA-0.5));
+          if(rA>4.0){iterA=float(i);break;}
+          iterA=float(i);
+        }
+        float tA = (iterA - log2(max(1.0,log2(length(zA)))) + 4.0) / uFractalIter;
+        float palA = fract(mix(1.0-exp(-trapRA*3.0), 1.0-exp(-trapLA*7.0), 0.5)
+                          + uTime*speed*0.035 + uBeat*0.12);
+        vec3 fracA = applyPalette(palA, uPalette);
+        // Brightness: use trap values, ensure always luminous
+        float brigA = 0.5 + (1.0-exp(-trapRA*2.5))*0.5 + (1.0-exp(-trapCA*5.0))*0.4;
+        fracA *= brigA * (1.0 + uBeat*0.7 + uRMS*0.5);
+
+        // ── Compute Julia B ────────────────────────────────────────────────
+        vec2 zB2 = fcB;
+        float iterB=0.0, trapRB=1e5, trapLB=1e5, trapCB=1e5;
+        for(int i=0;i<64;i++){
+          if(i>=maxI) break;
+          zB2 = vec2(zB2.x*zB2.x-zB2.y*zB2.y, 2.0*zB2.x*zB2.y) + jc;
+          float rB=length(zB2);
+          trapRB=min(trapRB,rB);
+          trapLB=min(trapLB,abs(zB2.x*zB2.y));
+          trapCB=min(trapCB,abs(rB-0.5));
+          if(rB>4.0){iterB=float(i);break;}
+          iterB=float(i);
+        }
+        float tB = (iterB - log2(max(1.0,log2(length(zB2)))) + 4.0) / uFractalIter;
+        float palB = fract(mix(1.0-exp(-trapRB*3.0), 1.0-exp(-trapLB*7.0), 0.5)
+                          + uTime*speed*0.035 + uBeat*0.12 + 0.5);
+        vec3 fracB = applyPalette(palB, uPalette);
+        float brigB = 0.5 + (1.0-exp(-trapRB*2.5))*0.5 + (1.0-exp(-trapCB*5.0))*0.4;
+        fracB *= brigB * (1.0 + uBeat*0.7 + uRMS*0.5);
+
+        // ── Crossfade the two zoom cycles ─────────────────────────────────
+        vec3 fractalCol = fracA * wA + fracB * wB;
+
+        // ── Fractal mask: STRONG at centre, fades at silhouette ───────────
+        // ndv=1 at very centre of sphere disk, 0 at edge → fractal always visible at centre
+        float fracMask = smoothstep(0.0, 0.45, ndv)   // fade in from edge
+                       * uFractalIntensity
+                       * (0.9 + uRMS*0.5 + uBeat*0.4);
+
+        // ── Lens focus: amplify bgCol near centre ──────────────────────────
+        float lensFocus = smoothstep(0.25, 0.85, ndv) * (0.35 + uRMS*0.55);
+        bgCol = mix(bgCol, bgCol*(1.0+lensFocus*1.3), 0.65);
+        bgCol *= 1.0 - smoothstep(0.85,0.5,ndv)*0.22;
+
+        // ── Fresnel rim ────────────────────────────────────────────────────
+        float fresnel   = pow(1.0-ndv, 3.0);
+        float sharpEdge = pow(1.0-ndv, 10.0);
+        vec3 rimSh = sin(vWorldPos.x*9.0+uTime*2.0)*sin(vWorldPos.y*7.0-uTime*1.6)*0.5+0.5
+                   * vec3(1.0);
+        vec3 rimCol = mix(vec3(0.6,0.9,1.0), uTint+0.2, rimSh.x);
+        rimCol *= 1.0 + uBeat*1.8 + uRMS*0.7;
+
+        // ── Specular highlights ────────────────────────────────────────────
+        vec3 L1=normalize(vec3(-0.5,0.75,0.4));
+        vec3 L2=normalize(vec3(0.55,-0.3,0.3));
+        float spec1=pow(max(0.0,dot(reflect(-V,N),L1)),40.0)*1.1;
+        float spec2=pow(max(0.0,dot(reflect(-V,N),L2)),90.0)*0.6;
+
+        // ── Compose — fractal dominates centre, rim dominates edge ─────────
+        // At centre: ndv=1 → fracMask=uFractalIntensity, fresnel=0 → fractal visible
+        // At edge:   ndv=0 → fracMask=0, fresnel=1 → rim glow visible
+        vec3 col = mix(bgCol, fractalCol, fracMask)   // fractal replaces bg at centre
+                 + rimCol * fresnel * 0.60
+                 + vec3(1.0) * sharpEdge * 0.95
+                 + vec3(1.0) * (spec1+spec2) * (0.9+uBeat*0.5);
+
+        // Alpha: sphere is solid at centre (fractal filled), transparent at edge
+        float alpha = fracMask * 0.85              // fractal fills centre
+                    + fresnel    * 0.65
+                    + sharpEdge  * 0.95
+                    + spec1      * 0.75
+                    + spec2      * 0.45;
+
+        gl_FragColor = vec4(col, clamp(alpha,0.0,1.0));
+      }`;
+
+    // No outer halo — cleaner look
+    const sphGeo  = new THREE.SphereGeometry(SPHERE_R, 64, 64);
+    const haloGeo = new THREE.SphereGeometry(SPHERE_R, 32, 32); // kept for dispose, not added to scene
+
+    const BASE = { transparent:true, depthWrite:false, depthTest:false };
+
+    const sphGlassMat = new THREE.ShaderMaterial({
+      ...BASE,
+      vertexShader: sphVert, fragmentShader: sphGlassFrag,
+      uniforms: {
+        uBgTex: { value: bgRT.texture },
+        uRes:   { value: new THREE.Vector2(W * renderer.getPixelRatio(), H * renderer.getPixelRatio()) },
+        uTime:  { value: 0 },
+        uTint:  { value: new THREE.Color(0.3, 0.65, 1.0) },
+        uBeat:  { value: 0 },
+        uRMS:   { value: 0 },
+        uBass:  { value: 0 },
+        uMid:   { value: 0 },
+        uAir:   { value: 0 },
+        uSub:   { value: 0 },
+        uRefraction:         { value: DEFAULT_DEBUG.sphRefraction },
+        uFractalSpeed:       { value: DEFAULT_DEBUG.sphFractalSpeed },
+        uFractalIter:        { value: DEFAULT_DEBUG.sphFractalIter },
+        uFractalIntensity:   { value: DEFAULT_DEBUG.sphFractalIntensity },
+        uFractalScale:       { value: DEFAULT_DEBUG.sphFractalScale },
+        uPalette:            { value: DEFAULT_DEBUG.sphPalette },
+      },
+      side: THREE.FrontSide,
+      blending: THREE.NormalBlending,
+      renderOrder: 1,
     });
 
-    const sphereGeo   = new THREE.SphereGeometry(SPHERE_R, 64, 64);
-    const haloGeo     = new THREE.SphereGeometry(SPHERE_R*1.4, 32, 32);
+    // No halo — keeps the sphere clean without the ring artefact
+    const sphHaloMat = null; // kept as null so dispose code still compiles
 
-    const sphereSilMat = new THREE.ShaderMaterial({
-      vertexShader:sphereVert, fragmentShader:sphereSilFrag,
-      uniforms:mkU(0x3366bb),
-      transparent:true, side:THREE.FrontSide, depthWrite:false, depthTest:false,
-      blending:THREE.NormalBlending,
-    });
-    const sphereRimMat = new THREE.ShaderMaterial({
-      vertexShader:sphereVert, fragmentShader:sphereRimFrag,
-      uniforms:{...mkU(0x4488ff), uRMS:{value:0}},
-      transparent:true, side:THREE.FrontSide, depthWrite:false, depthTest:false,
-      blending:THREE.NormalBlending,
-    });
-    const sphereHaloMat = new THREE.ShaderMaterial({
-      vertexShader:sphereVert, fragmentShader:sphereHaloFrag,
-      uniforms:{uTint:{value:new THREE.Color(0x2255cc)}, uBeat:{value:0}},
-      transparent:true, side:THREE.BackSide, depthWrite:false, depthTest:false,
-      blending:THREE.AdditiveBlending,
-    });
+    const sphGroup = new THREE.Group();
+    sphGroup.add(new THREE.Mesh(sphGeo, sphGlassMat)); // single mesh, single material
+    sphereScene.add(sphGroup);
 
-    const sphereSilMesh  = new THREE.Mesh(sphereGeo, sphereSilMat);
-    const sphereRimMesh  = new THREE.Mesh(sphereGeo, sphereRimMat);
-    const sphereHaloMesh = new THREE.Mesh(haloGeo,   sphereHaloMat);
-    sphereHaloMesh.renderOrder = 0;
-    sphereSilMesh.renderOrder = 1;
-    sphereRimMesh.renderOrder = 2;
+    // Spring state — X/Y camera-local, Z always fixed at SPHERE_DIST
+    const sphSpring = { x:0, y:0, vx:0, vy:0 };
 
-    const sphereGroup = new THREE.Group();
-    sphereGroup.add(sphereHaloMesh);
-    sphereGroup.add(sphereSilMesh);
-    sphereGroup.add(sphereRimMesh);
-    sphereScene.add(sphereGroup);
-
-    // Light in main scene (illuminates tunnel around sphere position)
-    const sphereLight = new THREE.PointLight(0x88aaff, 1.2, 25);
+    // Point light follows sphere — tints the tunnel with sphere colour
+    const sphereLight = new THREE.PointLight(0x88aaff, 1.0, 22);
     scene.add(sphereLight);
-
-    // Physics state — will be corrected to camera position on first frame
-    const sphState = {
-      pos: new THREE.Vector3(352, 3, 4), // near curve t=0 — corrected first frame
-      vel: new THREE.Vector3(0, 0, 0),
-      initialized: false,
-    };
 
     // Matrix texture
     const mc=document.createElement('canvas');mc.width=mc.height=1024;
@@ -1239,7 +1465,11 @@ export default function LoginPage() {
     let pi=0;
     let mx=0,my=0,tmx=0,tmy=0;
     const onMouse=(e:MouseEvent)=>{tmx=(e.clientX/window.innerWidth)*2-1;tmy=-(e.clientY/window.innerHeight)*2+1;};
-    const onClick=()=>{pi=(pi+1)%pals.length;const nc=pals[pi];setDebugParams(p=>({...p,topColor:nc.t,bottomColor:nc.b}));};
+    const onClick=()=>{
+      pi=(pi+1)%pals.length;
+      const nc=pals[pi];
+      setDebugParams(p=>({...p,topColor:nc.t,bottomColor:nc.b,sphPalette:pi}));
+    };
     window.addEventListener('mousemove',onMouse);window.addEventListener('click',onClick);
 
     const clock=new THREE.Clock();
@@ -1286,71 +1516,53 @@ export default function LoginPage() {
       mx=THREE.MathUtils.lerp(mx,tmx,dt*4.);my=THREE.MathUtils.lerp(my,tmy,dt*4.);
       camera.translateX(mx*5.);camera.translateY(my*2.5);camera.rotateZ(-mx*.5);camera.rotateX(my*.25);
 
-      // ── Sphere physics ────────────────────────────────────────────────────
-      const mp=mousePosRef.current;
-      // Build camera axes AFTER all camera transforms so matrix is up to date
+      // ── Sphere: fixed Z, spring X/Y in camera space ───────────────────────
+      const mp = mousePosRef.current;
       camera.updateMatrixWorld();
-      const camRight=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0);
-      const camUp2=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1);
-      const camFwd=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,2).negate().normalize();
+      const camRight2 = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+      const camUp2    = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+      const camFwd2   = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 2).negate().normalize();
 
-      // On first frame, snap sphere in front of camera so it's immediately visible
-      if(!sphState.initialized){
-        sphState.pos.copy(camera.position).addScaledVector(camFwd, 3.5);
-        sphState.initialized=true;
-      }
+      const MAX_LAT = 3.0, MAX_VERT = 2.0;
+      const targetX = mp.x * MAX_LAT, targetY = mp.y * MAX_VERT;
+      const SPR = 0.20, DAMP = 0.68;
+      sphSpring.vx = sphSpring.vx * DAMP + (targetX - sphSpring.x) * SPR;
+      sphSpring.vy = sphSpring.vy * DAMP + (targetY - sphSpring.y) * SPR;
+      sphSpring.x += sphSpring.vx;
+      sphSpring.y += sphSpring.vy;
 
-      // Mouse target: 4 units ahead (very close), offset by mouse
-      const mouseTarget=camera.position.clone()
-        .addScaledVector(camFwd, 4.0)
-        .addScaledVector(camRight, mp.x * 3.5)
-        .addScaledVector(camUp2,  mp.y * 2.5);
+      const sphWorldPos = camera.position.clone()
+        .addScaledVector(camFwd2,   SPHERE_DIST)
+        .addScaledVector(camRight2, sphSpring.x)
+        .addScaledVector(camUp2,    sphSpring.y);
 
-      // Spring attraction toward mouse target (delayed / inertial)
-      const toTarget=mouseTarget.clone().sub(sphState.pos);
-      const distToMouse=toTarget.length();
-      const springK = 9.0; // tighter spring — follows mouse more responsively
-      sphState.vel.addScaledVector(toTarget.normalize(), Math.min(distToMouse * springK, 30) * dt);
-      // Fluid damping
-      sphState.vel.multiplyScalar(Math.exp(-10 * dt));
-      sphState.pos.addScaledVector(sphState.vel, dt);
-
-      // Wall constraint: clamp laterally within tunnel (sphere is close to camera, use smaller radius)
-      const toSphere=sphState.pos.clone().sub(camera.position);
-      const fwdProj=toSphere.dot(camFwd);
-      const lateral=toSphere.clone().addScaledVector(camFwd, -fwdProj);
-      const latLen=lateral.length();
-      const maxR = 5.5; // tight — sphere stays well within visible tunnel walls
-      if(latLen > maxR) {
-        const n=lateral.clone().normalize();
-        sphState.pos.addScaledVector(n, -(latLen - maxR));
-        const vDotN=sphState.vel.dot(n);
-        if(vDotN > 0) sphState.vel.addScaledVector(n, -vDotN * 1.4);
-      }
-
-      // Update sphere uniforms + position
-      const beatPulse = 1.0 + b.beat * 0.35;
+      const beatPulse = 1.0 + b.beat * 0.28;
       const tint = new THREE.Color(
-        0.3 + b.subBass * 0.7,
-        0.4 + b.mid * 0.6,
-        0.6 + b.air * 0.4
+        0.25 + b.subBass * 0.75,
+        0.40 + b.mid     * 0.60,
+        0.65 + b.air     * 0.35,
       );
-      // Update Three.js sphere meshes (separate scene)
-      sphereRimMat.uniforms.uTime.value  = time;
-      sphereRimMat.uniforms.uBeat.value  = b.beat * ar;
-      sphereRimMat.uniforms.uRMS.value   = b.rms  * ar;
-      sphereRimMat.uniforms.uTint.value.copy(tint);
-      sphereSilMat.uniforms.uTime.value  = time;
-      sphereSilMat.uniforms.uBeat.value  = b.beat * ar;
-      sphereSilMat.uniforms.uTint.value.copy(tint.clone().multiplyScalar(0.5));
-      sphereHaloMat.uniforms.uBeat.value = b.beat * ar;
-      sphereHaloMat.uniforms.uTint.value.copy(tint);
-      // Position + scale the group
-      sphereGroup.position.copy(sphState.pos);
-      sphereGroup.scale.setScalar(beatPulse);
-      sphereLight.position.copy(sphState.pos);
+
+      sphGlassMat.uniforms.uTime.value = time;
+      sphGlassMat.uniforms.uBeat.value = b.beat * ar;
+      sphGlassMat.uniforms.uRMS.value  = b.rms  * ar;
+      sphGlassMat.uniforms.uBass.value = b.bass * ar;
+      sphGlassMat.uniforms.uMid.value  = b.mid  * ar;
+      sphGlassMat.uniforms.uAir.value  = b.air  * ar;
+      sphGlassMat.uniforms.uSub.value  = b.subBass * ar;
+      sphGlassMat.uniforms.uTint.value.copy(tint);
+      // Sync debug sphere params
+      sphGlassMat.uniforms.uRefraction.value       = live.sphRefraction;
+      sphGlassMat.uniforms.uFractalSpeed.value      = live.sphFractalSpeed;
+      sphGlassMat.uniforms.uFractalIter.value       = live.sphFractalIter;
+      sphGlassMat.uniforms.uFractalIntensity.value  = live.sphFractalIntensity;
+      sphGlassMat.uniforms.uFractalScale.value      = live.sphFractalScale;
+      sphGlassMat.uniforms.uPalette.value           = live.sphPalette;
+      sphGroup.position.copy(sphWorldPos);
+      sphGroup.scale.setScalar(beatPulse);
+      sphereLight.position.copy(sphWorldPos);
       sphereLight.color.copy(tint);
-      sphereLight.intensity = 0.5 + b.rms * ar * 1.5;
+      sphereLight.intensity = 0.6 + b.rms * ar * 1.4;
 
       // Portal
       const pv=portalRef.current;
@@ -1363,15 +1575,30 @@ export default function LoginPage() {
         pMesh.position.copy(ppos);pMesh.lookAt(ppos.clone().add(ptan));
       } else pMat.opacity=0;
 
-      // Render tunnel through post-processing composer
+      // ── Pass 1: capture tunnel to bgRT (no bloom — pure colours for refraction)
+      renderer.setRenderTarget(bgRT);
+      renderer.clear();
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(null);
+
+      // ── Pass 2: run EffectComposer — bloom + RGB shift → writes to canvas
       composer.render();
 
-      // Sphere light still illuminates the tunnel (no visual sphere mesh needed)
-      sphereLight.position.copy(sphState.pos);
+      // ── Pass 3: sphere on top — depth cleared so nothing can occlude it
+      renderer.autoClear = false;
+      renderer.clearDepth();
+      renderer.render(sphereScene, camera);
+      renderer.autoClear = true;
     }
 
     portalRef.current.nextShow=6+Math.random()*10;
-    const onResize=()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);composer.setSize(window.innerWidth,window.innerHeight);};
+    const onResize=()=>{
+      const w=window.innerWidth,h=window.innerHeight;
+      camera.aspect=w/h; camera.updateProjectionMatrix();
+      renderer.setSize(w,h); composer.setSize(w,h);
+      bgRT.setSize(w*renderer.getPixelRatio(), h*renderer.getPixelRatio());
+      sphGlassMat.uniforms.uRes.value.set(w*renderer.getPixelRatio(), h*renderer.getPixelRatio());
+    };
     window.addEventListener('resize',onResize);
     animate();
 
@@ -1380,7 +1607,7 @@ export default function LoginPage() {
       window.removeEventListener('resize',onResize);window.removeEventListener('mousemove',onMouse);window.removeEventListener('click',onClick);
       if(mount.contains(renderer.domElement))mount.removeChild(renderer.domElement);
       renderer.dispose();tubeMat.dispose();tubeGeo.dispose();pGeo.dispose();pMat.dispose();pTex.dispose();matTex.dispose();
-      sphereGeo.dispose();haloGeo.dispose();sphereRimMat.dispose();sphereSilMat.dispose();sphereHaloMat.dispose();
+      sphGeo.dispose();haloGeo.dispose();sphGlassMat.dispose();bgRT.dispose();
     };
   },[]);
 
@@ -1487,12 +1714,13 @@ export default function LoginPage() {
       {/* EQ + Sampler badges */}
       <EQBadge eq={eqState} samplerState={samplerState}/>
 
-      {/* Glass cursor — CSS spring physics, always visible */}
+      {/* Glass cursor — CSS spring physics — DISABLED (Three.js sphere active)
       <GlassCursor
         mousePixelRef={mousePixelRef}
         bandsRef={bandsRef}
         audioPlaying={audioPlaying}
       />
+      */}
     </div>
   );
 }
