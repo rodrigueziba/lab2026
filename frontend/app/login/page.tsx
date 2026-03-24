@@ -542,7 +542,7 @@ function GlassCursor({
   const glowRef = useRef<HTMLDivElement>(null);
   const pos = useRef({ x: -200, y: -200 });
   const vel = useRef({ x: 0, y: 0 });
-  const rafRef = useRef<number>();
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Init position offscreen until first mouse move
@@ -604,7 +604,7 @@ function GlassCursor({
       glow.style.background = `radial-gradient(circle, rgba(${r},${g},${bv},0.6) 0%, transparent 70%)`;
     }
     tick();
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    return () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); };
   }, [mousePixelRef, bandsRef, audioPlaying]);
 
   return (
@@ -659,7 +659,7 @@ export default function LoginPage() {
   const audioRef = useRef<HTMLAudioElement|null>(null);
   const audioCtxRef = useRef<AudioContext|null>(null);
   const analyserRef = useRef<AnalyserNode|null>(null);
-  const freqRef = useRef<Uint8Array|null>(null);
+  const freqRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const bandsRef = useRef<AudioBands>(zeroBands());
   const beatRef = useRef({prev:0,lastBeat:0});
   const portalRef = useRef({active:false,opacity:0,nextShow:0,hold:0});
@@ -948,7 +948,7 @@ export default function LoginPage() {
         const analyser=ctx.createAnalyser();
         analyser.fftSize=2048; analyser.smoothingTimeConstant=0.8;
         analyserRef.current=analyser;
-        freqRef.current=new Uint8Array(analyser.frequencyBinCount);
+        freqRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
         const src=ctx.createMediaElementSource(audio);
         src.connect(analyser);
         analyser.connect(ctx.destination);
@@ -1308,14 +1308,15 @@ export default function LoginPage() {
       },
       side: THREE.FrontSide,
       blending: THREE.NormalBlending,
-      renderOrder: 1,
     });
 
     // No halo — keeps the sphere clean without the ring artefact
     const sphHaloMat = null; // kept as null so dispose code still compiles
 
     const sphGroup = new THREE.Group();
-    sphGroup.add(new THREE.Mesh(sphGeo, sphGlassMat)); // single mesh, single material
+    const sphGlassMesh = new THREE.Mesh(sphGeo, sphGlassMat);
+    sphGlassMesh.renderOrder = 1;
+    sphGroup.add(sphGlassMesh); // single mesh, single material
     sphereScene.add(sphGroup);
 
     // Spring state — X/Y camera-local, Z always fixed at SPHERE_DIST
