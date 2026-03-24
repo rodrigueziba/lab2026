@@ -89,7 +89,7 @@ const DEFAULT_DEBUG: DebugParams = {
   sphRefraction:0.71,
   sphFractalSpeed:1.49,
   sphFractalIter:61,
-  sphFractalIntensity:0.56,
+  sphFractalIntensity:0.47,
   sphFractalScale:1.47,
   sphPalette:0,
 };
