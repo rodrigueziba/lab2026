@@ -1,10 +1,25 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Text, Html, Environment, Sparkles, ScrollControls, useScroll, PresentationControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { X, MapPin, Film, Clapperboard, Calendar } from 'lucide-react';
+
+interface MockProyecto {
+  id: number;
+  titulo: string;
+  tipo: string;
+  ciudad: string;
+  año: number;
+  descripcion: string;
+  foto?: string;
+}
+
+type FilmSelectedNode = MockProyecto & {
+  pos: THREE.Vector3;
+  rotation: THREE.Euler;
+};
 
 // --- CONFIGURACIÓN DE ESTILOS Y DATOS MOCK ---
 const COLORS = {
@@ -18,7 +33,7 @@ const COLORS = {
   border: 'rgba(255, 255, 255, 0.08)'
 };
 
-const MOCK_PROYECTOS = [
+const MOCK_PROYECTOS: MockProyecto[] = [
   { id: 1, titulo: 'Ecos del Beagle', tipo: 'Largometraje', ciudad: 'Ushuaia', año: 2024, descripcion: 'Thriller ambientado en el canal. Una desaparición misteriosa une a un pescador local y a una bióloga marina en una búsqueda desesperada.' },
   { id: 2, titulo: 'La Bahía Silenciosa', tipo: 'Cortometraje', ciudad: 'Ushuaia', año: 2023, descripcion: 'Drama poético sobre la soledad y la conexión en los paisajes helados del Fin del Mundo. Ganador del festival TDF Cine.' },
   { id: 3, titulo: 'Oro Fueguino', tipo: 'Documental', ciudad: 'Río Grande', año: 2024, descripcion: 'La historia no contada de los buscadores de oro en el norte de la isla y el impacto ambiental y social que dejaron.' },
@@ -32,7 +47,16 @@ const MOCK_PROYECTOS = [
    COMPONENTE: FOTOGRAMA DE PELÍCULA (Procedimental)
    Renderiza un marco de celuloide con orificios geométricos.
 ═══════════════════════════════════════════════════════════════ */
-function FilmFrame({ proyecto, position, rotation, onSelect, active, index }) {
+interface FilmFrameProps {
+  proyecto: MockProyecto;
+  position: THREE.Vector3;
+  rotation: [number, number, number];
+  onSelect: () => void;
+  active: boolean;
+  index: number;
+}
+
+function FilmFrame({ proyecto, position, rotation, onSelect, active, index }: FilmFrameProps) {
   const [hovered, setHover] = useState(false);
   
   // Geometría del marco principal (Proporción 3:2 tipo póster)
@@ -85,9 +109,9 @@ function FilmFrame({ proyecto, position, rotation, onSelect, active, index }) {
       
       {/* Icono si no hay foto */}
       {!proyecto.foto && (
-         <mesh position={[0, 0, 0.02]} rotation={[0,0,Math.PI/2]}>
-           <Text fontSize={0.8} color="#444444">FILM TDF</Text>
-         </mesh>
+        <Text position={[0, 0, 0.02]} rotation={[0, 0, Math.PI / 2]} fontSize={0.8} color="#444444">
+          FILM TDF
+        </Text>
       )}
 
       {/* 3. Orificios procedimentales */}
@@ -109,10 +133,9 @@ function FilmFrame({ proyecto, position, rotation, onSelect, active, index }) {
       <Text
         position={[frameWidth / 2 - borderSize / 2, -frameHeight / 2 + borderSize / 2, 0.02]}
         fontSize={0.12}
-        color={COLORS.text}
-        opacity={0.5}
+        color="rgba(241, 245, 249, 0.5)"
       >
-        TDF / {index + 1}
+        {`TDF / ${index + 1}`}
       </Text>
     </group>
   );
@@ -122,7 +145,12 @@ function FilmFrame({ proyecto, position, rotation, onSelect, active, index }) {
    COMPONENTE: ESCENA DE LA CINTA DE CELULOIDE
    Maneja el layout curvo, el scroll y el zoom de cámara.
 ═══════════════════════════════════════════════════════════════ */
-function FilmStripScene({ setStats, onSelectedNode }) {
+interface FilmStripSceneProps {
+  setStats: (s: { total: number; años: number }) => void;
+  onSelectedNode: (node: FilmSelectedNode | null) => void;
+}
+
+function FilmStripScene({ setStats, onSelectedNode }: FilmStripSceneProps) {
   const scroll = useScroll();
   const { camera } = useThree();
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -209,14 +237,24 @@ function FilmStripScene({ setStats, onSelectedNode }) {
     camera.position.x += Math.cos(time * 0.3) * 0.05;
   });
 
-  const handleSelect = (id) => {
+  const handleSelect = (id: number) => {
     if (activeId === id) {
       setActiveId(null);
       onSelectedNode(null);
     } else {
       setActiveId(id);
-      const proyecto = MOCK_PROYECTOS.find(p => p.id === id);
-      onSelectedNode(proyecto || null);
+      const idx = MOCK_PROYECTOS.findIndex((p) => p.id === id);
+      const proyecto = idx >= 0 ? MOCK_PROYECTOS[idx] : null;
+      if (proyecto) {
+        const { pos, rotation } = framePositions[idx];
+        onSelectedNode({
+          ...proyecto,
+          pos: pos.clone(),
+          rotation: rotation.clone(),
+        });
+      } else {
+        onSelectedNode(null);
+      }
     }
   };
 
@@ -250,7 +288,7 @@ function FilmStripScene({ setStats, onSelectedNode }) {
    UI PANELS (HTML/Tailwind)
    Glassmorphism overlay panels.
 ═══════════════════════════════════════════════════════════════ */
-function GlassPanel({ children, className = '' }) {
+function GlassPanel({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <div className={`backdrop-blur-xl rounded-3xl border border-white/5 shadow-2xl p-6 ${className}`} style={{ background: COLORS.glass }}>
       {children}
@@ -258,7 +296,7 @@ function GlassPanel({ children, className = '' }) {
   );
 }
 
-function NodeDetailsPanel({ node, onClose }) {
+function NodeDetailsPanel({ node, onClose }: { node: MockProyecto; onClose: () => void }) {
   if (!node) return null;
   return (
     <Html transform occlude>
@@ -309,7 +347,7 @@ function NodeDetailsPanel({ node, onClose }) {
 export default function ProyectosPeliculaPage() {
   const [loading, setLoading] = useState(true); // Simulamos carga
   const [stats, setStats] = useState({ total: 0, años: 0 });
-  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [selectedNode, setSelectedNode] = useState<FilmSelectedNode | null>(null);
 
   useEffect(() => {
     // Simular carga para animación inicial

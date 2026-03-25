@@ -6,8 +6,25 @@ import { Text, Html, Environment, ContactShadows, PresentationControls } from '@
 import * as THREE from 'three';
 import { X, PlayCircle, MapPin } from 'lucide-react';
 
+interface VhsProyecto {
+  id: number;
+  titulo: string;
+  tipo?: string;
+  descripcion?: string;
+  ciudad?: string;
+  foto?: string;
+}
+
+interface VHSTapeProps {
+  proyecto: VhsProyecto;
+  position: [number, number, number];
+  isActive: boolean;
+  onSelect: () => void;
+  onClose: () => void;
+}
+
 // --- COMPONENTE CINTA VHS ---
-function VHSTape({ proyecto, position, isActive, onSelect, onClose }) {
+function VHSTape({ proyecto, position, isActive, onSelect, onClose }: VHSTapeProps) {
   const meshRef = useRef<THREE.Group>(null);
   const [hovered, setHover] = useState(false);
 
@@ -115,7 +132,7 @@ function Shelf() {
 
 // --- ESCENA PRINCIPAL ---
 export default function Proyectos3DPage() {
-  const [proyectos, setProyectos] = useState([]);
+  const [proyectos, setProyectos] = useState<VhsProyecto[]>([]);
   const [activeProject, setActiveProject] = useState<number | null>(null);
 
   // Cargar proyectos (Simulado aquí, debes reemplazar con tu fetch real)
@@ -124,7 +141,7 @@ export default function Proyectos3DPage() {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/proyecto`);
         const data = await res.json();
-        setProyectos(Array.isArray(data) ? data : []);
+        setProyectos(Array.isArray(data) ? (data as VhsProyecto[]) : []);
       } catch (error) {
         console.error("Error cargando proyectos:", error);
       }
@@ -156,19 +173,17 @@ export default function Proyectos3DPage() {
         <pointLight position={[-10, -10, -10]} intensity={0.5} color="blue" />
 
         {/* Permite mover la cámara un poco con el ratón cuando no hay proyecto abierto */}
-        <PresentationControls 
-          enabled={activeProject === null} 
-          global 
-          rotation={[0, 0, 0]} 
-          polar={[-0.1, 0.1]} 
-          azimuth={[-0.5, 0.5]} 
-          config={{ mass: 2, tension: 400 }} 
-          snap={{ mass: 4, tension: 400 }}
+        <PresentationControls
+          enabled={activeProject === null}
+          global
+          rotation={[0, 0, 0]}
+          polar={[-0.1, 0.1]}
+          azimuth={[-0.5, 0.5]}
         >
           <group position={[0, 0, -2]}>
             <Shelf />
             {/* Generación de Cintas en la estantería */}
-            {proyectos.map((proyecto: any, index) => {
+            {proyectos.map((proyecto, index) => {
               // Calcular posición en el estante (espaciado horizontal)
               const startX = -((proyectos.length - 1) * 0.6) / 2; 
               const xPos = startX + (index * 0.6);
