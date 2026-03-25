@@ -1945,7 +1945,7 @@ export default function LoginPage() {
       const elapsed=(performance.now()-ramp.audioStartTime)/1000;
       if(elapsed<120||elapsed>140) return;
       setDebugParams(p=>{
-        const f=1.0018;
+        const f=1.0008;
         return {
           ...p,
           bloomStrength:    parseFloat(Math.min(3,   p.bloomStrength*f).toFixed(4)),
