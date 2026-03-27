@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { PointerLockControls, Edges, Environment, Stars } from "@react-three/drei";
+import { PointerLockControls, Edges, Environment, Stars,SpotLight } from "@react-three/drei";
 import * as THREE from "three";
 
 const RayosArcoiris = () => {
@@ -53,29 +53,29 @@ const RayosArcoiris = () => {
     return (
       // Posición exacta del Prisma abajo
       <group position={[0, 1.6, 0]} rotation={[0, Math.PI / 2, 0]}>
-        {colores.map((color, i) => (
-          // Rotación en abanico
-          <group key={color} rotation={[0, (i - 2.5) * 0.06, 0]}>
-            <mesh 
-              ref={(el) => (meshRefs.current[i] = el)} 
-              position={[0, 0, -10]} // Desplazado porque el origen del cilindro está en el centro
-              rotation={[Math.PI / 2, 0, 0]} 
-              scale={[1, 1, 0]} // Arranca con longitud 0 (Shooting effect)
-            >
-              {/* Cilindro muy largo y finito, el cono daría demasiado spread */}
-              <cylinderGeometry args={[0.005, 0.2, 20, 12]} />
-              
-              <meshBasicMaterial 
-                ref={(el) => (materialsRef.current[i] = el)}
-                color={color} 
-                transparent={true}
-                opacity={0} // Arrancan invisibles
-                depthWrite={false} // Evita bugs visuales
-                blending={THREE.AdditiveBlending} // THE LÁSER SECRET
-              />
-            </mesh>
-          </group>
-        ))}
+       {colores.map((color, i) => (
+        // Aumenté el multiplicador de 0.06 a 0.15 para que se abran mucho más en la pared
+        <group key={color} rotation={[0, (i - 2.5) * 0.15, 0]}>
+          <mesh 
+            ref={(el) => (meshRefs.current[i] = el)} 
+            position={[0, 0, -10]} 
+            rotation={[Math.PI / 2, 0, 0]} 
+            scale={[1, 1, 0]} 
+          >
+            {/* Los hice un pelín más gruesos (0.015) */}
+            <cylinderGeometry args={[0.015, 0.2, 20, 12]} />
+            
+            <meshBasicMaterial 
+              ref={(el) => (materialsRef.current[i] = el)}
+              color={color} 
+              transparent={true}
+              opacity={0} 
+              depthWrite={false} 
+              blending={THREE.AdditiveBlending} 
+            />
+          </mesh>
+        </group>
+      ))}
       </group>
     );
   };
@@ -144,21 +144,27 @@ const RayosArcoiris = () => {
 
 const sillasPos = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5];
 
+
+
 const Escenario = () => {
   return (
     <group>
-      <spotLight
-        position={[8, 10, 8]}
+      {/* Luz volumétrica cinematográfica */}
+      <SpotLight
+        position={[8, 15, 8]} // Bien arriba y en diagonal
         color="#ffffff"
-        intensity={2250}
-        angle={0.3}
+        intensity={2000} // Mucha fuerza para vencer la oscuridad del espacio
+        distance={40}
+        angle={0.4}
         penumbra={0.8}
-        distance={20}
+        attenuation={5}
+        anglePower={4} // Esto crea el efecto de "polvo flotando" en el haz
         castShadow
       />
 
+      {/* Las 6 sillas (Placeholders) */}
       {sillasPos.map((x, index) => (
-        <mesh key={index} position={[x, 0.25, -5]} castShadow>
+        <mesh key={index} position={[x, 0.25, -2]} castShadow>
           <boxGeometry args={[0.5, 0.5, 0.5]} />
           <meshStandardMaterial color="#2a2a2a" roughness={0.9} />
         </mesh>
@@ -166,7 +172,6 @@ const Escenario = () => {
     </group>
   );
 };
-
 
 
 interface Keys {
