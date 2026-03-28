@@ -79,6 +79,16 @@ interface DebugParams {
   sphFractalIntensity: number;// 0–1  fractal vs plain refraction
   sphFractalScale: number;    // 0.1–2 fractal window size (zoom out/in)
   sphPalette: number;         // 0–4  color palette index
+  // Layer visibility (1=on, 0=off)
+  layerLines:      number;
+  layerDots:       number;
+  layerMatrix:     number;
+  layerRings:      number;
+  layerReflection: number;
+  layerGhost:      number;
+  layerCeiling:    number;
+  layerBloom:      number;
+  layerSphere:     number;
 }
 const DEFAULT_DEBUG: DebugParams = {
   topColor:'#0a198c', bottomColor:'#11133b',
@@ -94,6 +104,8 @@ const DEFAULT_DEBUG: DebugParams = {
   sphFractalIntensity:0.56,
   sphFractalScale:1.47,
   sphPalette:0,
+  layerLines:1, layerDots:1, layerMatrix:1, layerRings:1,
+  layerReflection:1, layerGhost:1, layerCeiling:1, layerBloom:1, layerSphere:1,
 };
 
 // ─── Login Form ───────────────────────────────────────────────────────────────
@@ -658,6 +670,44 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
           </div>
         </div>
 
+        {/* ── Layer visibility ─────────────────────────────────────────── */}
+        <div className="rounded-xl border border-white/8 bg-white/[0.015] overflow-hidden">
+          <div className="px-3 py-2 border-b border-white/5 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-purple-400/70"/>
+            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Capas visibles</span>
+          </div>
+          <div className="p-3">
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                {key:'layerLines'     as const, label:'Líneas',    icon:'〰️'},
+                {key:'layerDots'      as const, label:'Puntos',    icon:'·'},
+                {key:'layerMatrix'    as const, label:'Matrix',    icon:'▦'},
+                {key:'layerRings'     as const, label:'Anillos',   icon:'○'},
+                {key:'layerReflection'as const, label:'Reflexión', icon:'◈'},
+                {key:'layerGhost'     as const, label:'Ghost',     icon:'◻'},
+                {key:'layerCeiling'   as const, label:'Techo',     icon:'▔'},
+                {key:'layerBloom'     as const, label:'Bloom',     icon:'✦'},
+                {key:'layerSphere'    as const, label:'Esfera',    icon:'◉'},
+              ] as const).map(({key,label,icon})=>{
+                const on = (params[key] as number) > 0.5;
+                return (
+                  <button key={key}
+                    onClick={()=>onChange(key, on ? 0 : 1)}
+                    className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-lg border transition-all ${
+                      on
+                        ? 'border-white/15 bg-white/[0.06] text-slate-200'
+                        : 'border-white/5  bg-transparent text-slate-600'
+                    }`}>
+                    <span className="text-xs leading-none">{icon}</span>
+                    <span className="text-[8px] font-bold leading-none mt-0.5">{label}</span>
+                    <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${on ? 'bg-purple-400' : 'bg-slate-700'}`}/>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         <div className="rounded-xl border border-white/5 bg-black/20 p-2.5 space-y-1">
           <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">Atajos</p>
           {[['SPACE','Play / Pausa'],['← →','Mover filtro EQ'],['↑ ↓','Ganancia EQ'],['I','Grabar sample'],['O','Stop + loop'],['A→L','12 semitonos del sample'],['SHIFT','Debug'],['SCROLL','Velocidad + tamaño esfera'],['CLICK','Paleta']].map(([k,v])=>(
@@ -896,6 +946,18 @@ export default function LoginPage() {
   const lastGyroInputRef = useRef(0);
   const loginShellRef = useRef<HTMLDivElement | null>(null);
 
+  /**
+   * Mobile-only: sphere lateral position → progressive RGB shift + EQ sweep.
+   * All fields mutated directly every frame — no React re-renders.
+   */
+  const mobileFxRef = useRef({
+    sideTime:    0,            // seconds sphere has been on this side past threshold
+    side:        0 as -1|0|1, // -1 left, 0 centre, 1 right
+    currentFreq: 20000,        // smoothed filter cutoff
+    targetFreq:  20000,
+    filterMode:  null as 'lp'|'hp'|null,
+  });
+
   // ── Audio source ─────────────────────────────────────────────────────────
   type AudioSourceMode = 'file' | 'mic' | 'system' | 'mix';
   const [audioSourceMode, setAudioSourceMode] = useState<AudioSourceMode>('file');
@@ -1129,15 +1191,23 @@ export default function LoginPage() {
           setAudioSourceStatus('Tu navegador no soporta captura de audio del sistema');
           return;
         }
-        // Prompt the user to share a tab/window/screen — they must tick "share audio"
-        const displayStream = await (navigator.mediaDevices as any).getDisplayMedia({
-          video: false,   // we only want audio; some browsers still require video:true
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            sampleRate: 44100,
-          },
-        });
+        // Most browsers require video:true to open the share dialog even when we only want audio.
+        // We immediately stop the video track and keep only the audio track.
+        let displayStream: MediaStream;
+        try {
+          displayStream = await (navigator.mediaDevices as any).getDisplayMedia({
+            video: true,
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            },
+          });
+        } catch (e: any) {
+          throw e; // caught by outer catch
+        }
+        // Stop video immediately — we don't need it
+        displayStream.getVideoTracks().forEach((t: MediaStreamTrack) => t.stop());
         // If the browser only returned video tracks (user didn't tick "share audio") warn them
         const audioTracks = displayStream.getAudioTracks();
         if (audioTracks.length === 0) {
@@ -1882,6 +1952,7 @@ export default function LoginPage() {
     uniform float uAngle,uIntensity,uDepth,uRefStr,uShowRings,uRingCount,uGhost,uMatrix;
     uniform sampler2D uMatTex;
     uniform float uSub,uBass,uLM,uMid,uHM,uPres,uBril,uAir,uBeat,uRMS;
+    uniform float uLayerLines,uLayerDots,uLayerMatrix,uLayerRings,uLayerReflection,uLayerGhost,uLayerCeiling;
     varying vec2 vUv;varying vec3 vWP,vWN;
     float rand(float n){return fract(sin(n)*43758.5453123);}
     vec3 line(vec3 col,float uvP,float tgt,float w,float uvS,float id,float t,float spd,bool ring){
@@ -1926,8 +1997,8 @@ export default function LoginPage() {
       c+=line(vec3(1.,.4,0.)*hB,hw,-.18,80.,uvX*100.,16.,t,sH,false);c+=line(vec3(1.,.1,.1)*hB,hw,-.28,400.,uvX*100.,17.,t,sH,false);
       float bf=.5+uBeat*2.;c+=line(vec3(1.),hw,.28,450.,uvX*100.,18.,t,2.5+uBeat*5.,false)*bf;c+=line(vec3(1.),hw,.10,800.,uvX*100.,19.,t,2.5+uBeat*5.,false)*bf;
       c+=line(vec3(.8,.9,1.)*(1.+uAir*3.),hw,.40,2000.,uvX*100.,50.,t,1.+uAir*8.,false)*uAir;c+=line(vec3(.6,1.,.8)*(1.+uAir*3.),hw,-.35,1500.,uvX*100.,51.,t,1.+uAir*6.,false)*uAir;
-      c+=dot3(vec3(1.,.5,1.)*mB,hw,.30,400.,uvX*100.,80.,t,1.5+uMid*2.);c+=dot3(vec3(.5,1.,1.)*hB,hw,.15,350.,uvX*100.,81.,t,2.5+uHM*3.);c+=dot3(vec3(1.,1.,.5)*mB,hw,-.05,450.,uvX*100.,82.,t,2.+uLM*2.);c+=dot3(vec3(1.,.2,.2)*bB,hw,-.20,300.,uvX*100.,83.,t,3.+uBass*4.);
-      c+=ghost(hw,uvX,t,112.3);return c;
+      c+=dot3(vec3(1.,.5,1.)*mB,hw,.30,400.,uvX*100.,80.,t,1.5+uMid*2.)*uLayerDots;c+=dot3(vec3(.5,1.,1.)*hB,hw,.15,350.,uvX*100.,81.,t,2.5+uHM*3.)*uLayerDots;c+=dot3(vec3(1.,1.,.5)*mB,hw,-.05,450.,uvX*100.,82.,t,2.+uLM*2.)*uLayerDots;c+=dot3(vec3(1.,.2,.2)*bB,hw,-.20,300.,uvX*100.,83.,t,3.+uBass*4.)*uLayerDots;
+      c+=ghost(hw,uvX,t,112.3)*uLayerGhost;return c;
     }
     vec3 leftSide(float h,float uvX,float t){
       vec3 c=vec3(0.);float hw=h+sin(uvX*120.+1.)*.003;
@@ -1936,8 +2007,8 @@ export default function LoginPage() {
       c+=line(vec3(1.,.4,0.)*bB,hw,.32,70.,uvX*100.,20.,t,sB,false);c+=line(vec3(1.,.1,.5)*bB,hw,.25,350.,uvX*100.,21.,t,sB,false);c+=line(vec3(.1,.6,1.)*mB,hw,.15,120.,uvX*100.,22.,t,sM,false);c+=line(vec3(.2,.9,.4)*mB,hw,.05,50.,uvX*100.,23.,t,sM,false);c+=line(vec3(1.,.8,0.)*mB,hw,-.05,450.,uvX*100.,24.,t,sM,false);c+=line(vec3(1.,.2,.1)*hB,hw,-.15,150.,uvX*100.,25.,t,sH,false);c+=line(vec3(.6,.1,1.)*hB,hw,-.25,60.,uvX*100.,26.,t,sH,false);
       float bf=.5+uBeat*2.;c+=line(vec3(1.),hw,.15,600.,uvX*100.,27.,t,2.5+uBeat*5.,false)*bf;c+=line(vec3(1.),hw,-.05,900.,uvX*100.,28.,t,2.5+uBeat*5.,false)*bf;
       c+=line(vec3(.9,.8,1.)*(1.+uAir*3.),hw,.38,2000.,uvX*100.,52.,t,1.+uAir*8.,false)*uAir;
-      c+=dot3(vec3(1.,.8,.2)*mB,hw,.28,350.,uvX*100.,90.,t,1.8+uMid*2.);c+=dot3(vec3(.2,.8,1.)*hB,hw,.10,400.,uvX*100.,91.,t,2.2+uHM*3.);c+=dot3(vec3(.5,1.,.5)*mB,hw,-.10,300.,uvX*100.,92.,t,1.5+uLM*2.);c+=dot3(vec3(1.,.4,.8)*bB,hw,-.20,450.,uvX*100.,93.,t,2.7+uBass*4.);
-      c+=ghost(hw,uvX,t,442.1);return c;
+      c+=dot3(vec3(1.,.8,.2)*mB,hw,.28,350.,uvX*100.,90.,t,1.8+uMid*2.)*uLayerDots;c+=dot3(vec3(.2,.8,1.)*hB,hw,.10,400.,uvX*100.,91.,t,2.2+uHM*3.)*uLayerDots;c+=dot3(vec3(.5,1.,.5)*mB,hw,-.10,300.,uvX*100.,92.,t,1.5+uLM*2.)*uLayerDots;c+=dot3(vec3(1.,.4,.8)*bB,hw,-.20,450.,uvX*100.,93.,t,2.7+uBass*4.)*uLayerDots;
+      c+=ghost(hw,uvX,t,442.1)*uLayerGhost;return c;
     }
     vec3 rings(float uvX,float uvY,float t){
       vec3 c=vec3(0.);float lx=fract(uvX*uRingCount),cid=floor(uvX*uRingCount),rt=fract(rand(cid)*10.);
@@ -1949,14 +2020,16 @@ export default function LoginPage() {
     void main(){
       float y=fract(vUv.y+uAngle),cy=sin(y*6.2831853),cx=cos(y*6.2831853);
       vec3 bg=mix(uBot,uTop,smoothstep(-.2,.5,cy))*(1.+uSub*.5+uBeat*.3);
+      // Lines layer
       vec3 st=cx>0.?rightSide(cy,vUv.x,uTime):leftSide(cy,vUv.x,uTime);
+      // Ceiling lines
       vec3 ceil=vec3(0.);
-      if(cy>.4){float hc=cy+sin(vUv.x*80.)*.005;float cs=.5+uMid*2.;ceil+=line(vec3(.6,.8,1.),hc,.70,500.,vUv.x*100.,30.,uTime,cs,false)*.5;ceil+=line(vec3(.8,.9,1.)*(1.+uHM),hc,.82,800.,vUv.x*100.,31.,uTime,cs,false)*.7;ceil+=line(vec3(.9,.95,1.)*(1.+uPres),hc,.92,1000.,vUv.x*100.,32.,uTime,cs*1.2,false)*.9;ceil+=line(vec3(1.)*(1.+uBeat*2.),hc,.76,600.,vUv.x*100.,40.,uTime,3.+uBeat*5.,false)*.7;}
+      if(uLayerCeiling>.5&&cy>.4){float hc=cy+sin(vUv.x*80.)*.005;float cs=.5+uMid*2.;ceil+=line(vec3(.6,.8,1.),hc,.70,500.,vUv.x*100.,30.,uTime,cs,false)*.5;ceil+=line(vec3(.8,.9,1.)*(1.+uHM),hc,.82,800.,vUv.x*100.,31.,uTime,cs,false)*.7;ceil+=line(vec3(.9,.95,1.)*(1.+uPres),hc,.92,1000.,vUv.x*100.,32.,uTime,cs*1.2,false)*.9;ceil+=line(vec3(1.)*(1.+uBeat*2.),hc,.76,600.,vUv.x*100.,40.,uTime,3.+uBeat*5.,false)*.7;}
       float sm=smoothstep(.7,.1,abs(cy));
-      vec3 fc=bg+(st*uIntensity*sm)+(ceil*uIntensity);
-      if(uShowRings>.5)fc+=rings(vUv.x,y,uTime)*uIntensity*smoothstep(-.8,-.4,cy);
-      if(uMatrix>0.){vec2 tu=vec2(vUv.x*250.,y*14.);float tv=texture2D(uMatTex,tu).r,sid=floor(tu.y);float sp=.5+rand(sid*1.5)*1.5+uBril*3.,dir=rand(sid*3.3)>.5?1.:-1.;float tp=fract(vUv.x*8.+uTime*sp*dir+rand(sid*7.1)*10.);float trM=smoothstep(0.,.8,tp)*smoothstep(1.,.95,tp),hM=smoothstep(.95,1.,tp);float fl=sin(uTime*15.+rand(floor(tu.x)+sid*100.)*20.)*.5+.5;vec3 mc2=mix(vec3(0.,.9,.3),vec3(.6,1.,.8),hM);fc+=mc2*tv*(trM*.6+hM*2.)*(0.3+0.7*fl)*(uMatrix+uAir*.5)*smoothstep(.8,.2,abs(cy))*uIntensity;}
-      if(cy<-.2&&uRefStr>0.){float rip=sin(vUv.x*300.-uTime*5.)*(0.03+uSub*.05)+sin(vUv.x*1000.)*.01;float rcx=cx+rip;vec3 ref=rcx>0.?rightSide(abs(cy),vUv.x,uTime):leftSide(abs(cy),vUv.x,uTime);fc+=ref*uRefStr*smoothstep(-.2,-.8,cy)*smoothstep(-1.,-.9,cy);}
+      vec3 fc=bg+(st*uIntensity*sm*uLayerLines)+(ceil*uIntensity);
+      if(uShowRings>.5&&uLayerRings>.5)fc+=rings(vUv.x,y,uTime)*uIntensity*smoothstep(-.8,-.4,cy);
+      if(uLayerMatrix>.5&&uMatrix>0.){vec2 tu=vec2(vUv.x*250.,y*14.);float tv=texture2D(uMatTex,tu).r,sid=floor(tu.y);float sp=.5+rand(sid*1.5)*1.5+uBril*3.,dir=rand(sid*3.3)>.5?1.:-1.;float tp=fract(vUv.x*8.+uTime*sp*dir+rand(sid*7.1)*10.);float trM=smoothstep(0.,.8,tp)*smoothstep(1.,.95,tp),hM=smoothstep(.95,1.,tp);float fl=sin(uTime*15.+rand(floor(tu.x)+sid*100.)*20.)*.5+.5;vec3 mc2=mix(vec3(0.,.9,.3),vec3(.6,1.,.8),hM);fc+=mc2*tv*(trM*.6+hM*2.)*(0.3+0.7*fl)*(uMatrix+uAir*.5)*smoothstep(.8,.2,abs(cy))*uIntensity;}
+      if(uLayerReflection>.5&&cy<-.2&&uRefStr>0.){float rip=sin(vUv.x*300.-uTime*5.)*(0.03+uSub*.05)+sin(vUv.x*1000.)*.01;float rcx=cx+rip;vec3 ref=rcx>0.?rightSide(abs(cy),vUv.x,uTime):leftSide(abs(cy),vUv.x,uTime);fc+=ref*uRefStr*smoothstep(-.2,-.8,cy)*smoothstep(-1.,-.9,cy);}
       float ff=exp(-length(cameraPosition-vWP)*uDepth);float fr=max(0.,dot(-vWN,normalize(cameraPosition-vWP)));fc*=mix(.5,1.,smoothstep(0.,.8,fr));fc=mix(uBot,fc,ff);
       gl_FragColor=vec4(fc,1.);
     }`;
@@ -1967,6 +2040,10 @@ export default function LoginPage() {
       uShowRings:{value:1.},uRingCount:{value:10.},uGhost:{value:1.},
       uMatTex:{value:matTex},uMatrix:{value:.25},
       uSub:{value:0},uBass:{value:0},uLM:{value:0},uMid:{value:0},uHM:{value:0},uPres:{value:0},uBril:{value:0},uAir:{value:0},uBeat:{value:0},uRMS:{value:0},
+      // Layer visibility
+      uLayerLines:{value:1.},uLayerDots:{value:1.},uLayerMatrix:{value:1.},
+      uLayerRings:{value:1.},uLayerReflection:{value:1.},uLayerGhost:{value:1.},
+      uLayerCeiling:{value:1.},
     };
     const tubeMat=new THREE.ShaderMaterial({vertexShader:vert,fragmentShader:frag,uniforms:U,side:THREE.BackSide});
     scene.add(new THREE.Mesh(tubeGeo,tubeMat));
@@ -2014,11 +2091,27 @@ export default function LoginPage() {
       U.uIntensity.value=live.lightIntensity+b.rms*ar*.8;U.uGhost.value=live.ghostIntensity;
       U.uMatrix.value=live.matrixIntensity;
       U.uRefStr.value=live.reflectionStrength;
+      // Layer visibility
+      U.uLayerLines.value      = live.layerLines;
+      U.uLayerDots.value       = live.layerDots;
+      U.uLayerMatrix.value     = live.layerMatrix;
+      U.uLayerRings.value      = live.layerRings;
+      U.uLayerReflection.value = live.layerReflection;
+      U.uLayerGhost.value      = live.layerGhost;
+      U.uLayerCeiling.value    = live.layerCeiling;
+      // Bloom layer: set strength to near-zero when off
+      bloomPass.strength = live.layerBloom > 0.5
+        ? THREE.MathUtils.lerp(bloomPass.strength, live.bloomStrength+b.bass*1.5*ar+b.beat*.8*ar, dt*3.)
+        : THREE.MathUtils.lerp(bloomPass.strength, 0, dt*4.);
+      // Sphere layer: hide by scaling to zero
+      sphGroup.visible = live.layerSphere > 0.5;
       if(scene.fog)(scene.fog as THREE.FogExp2).color.set(live.topColor);
       curSpd=THREE.MathUtils.lerp(curSpd,live.speed+b.beat*.12*ar,dt*2.);
       camera.fov=THREE.MathUtils.lerp(camera.fov,85+b.bass*10*ar,dt*3.);camera.updateProjectionMatrix();
-      rgbPass.uniforms['amount'].value=THREE.MathUtils.lerp(rgbPass.uniforms['amount'].value,live.rgbShiftAmount+b.brilliance*.006*ar+b.beat*.003*ar,dt*3.);
-      bloomPass.strength=THREE.MathUtils.lerp(bloomPass.strength,live.bloomStrength+b.bass*1.5*ar+b.beat*.8*ar,dt*3.);
+      // Base RGB shift (skip on mobile — handled below with lateral boost)
+      if (!mobileActiveRef.current) {
+        rgbPass.uniforms['amount'].value=THREE.MathUtils.lerp(rgbPass.uniforms['amount'].value,live.rgbShiftAmount+b.brilliance*.006*ar+b.beat*.003*ar,dt*3.);
+      }
       prog=(prog+curSpd*dt*.1)%1.;
       const cp=getPos(prog,3.),la=curve.getPointAt((prog+.012)%1.);
       camera.position.copy(cp);camera.lookAt(la);
@@ -2082,6 +2175,70 @@ export default function LoginPage() {
       sphereLight.position.copy(sphWorldPos);
       sphereLight.color.copy(tint);
       sphereLight.intensity = 0.6 + b.rms * ar * 1.4;
+
+      // ── Mobile-only: sphere X → dynamic RGB shift + progressive EQ sweep ──
+      if (mobileActiveRef.current) {
+        const MAX_LAT_N = 3.0;
+        // 1. RGB shift: quadratic boost toward extremes, calm at centre
+        const latNorm  = Math.abs(sphSpring.x) / MAX_LAT_N;
+        const rgbBoost = latNorm * latNorm * 0.018;
+        const baseRgb  = live.rgbShiftAmount + b.brilliance*.006*ar + b.beat*.003*ar;
+        rgbPass.uniforms['amount'].value = THREE.MathUtils.lerp(
+          rgbPass.uniforms['amount'].value, baseRgb + rgbBoost, dt * 5.0);
+
+        // 2. EQ sweep: accumulate time while on one side
+        const FREQ_LADDER = [20000,16000,12000,8000,4000,2000,1000,500,250,150,80,40,20];
+        const SIDE_THRESH = 0.35, ACTIVATION = 1.5, FULL_SWEEP = 10.0, FREQ_SMOOTH = dt * 1.8;
+        const fx        = mobileFxRef.current;
+        const sideRatio = sphSpring.x / MAX_LAT_N;
+        const onLeft    = sideRatio < -SIDE_THRESH;
+        const onRight   = sideRatio >  SIDE_THRESH;
+        const newSide   = onLeft ? -1 : onRight ? 1 : 0;
+
+        if (newSide !== 0) {
+          fx.sideTime = (Math.sign(newSide) === Math.sign(fx.side) || fx.side === 0)
+            ? fx.sideTime + dt : 0;
+          fx.side = newSide as -1|0|1;
+          if (fx.sideTime >= ACTIVATION) {
+            const sweepP  = Math.min(1, (fx.sideTime - ACTIVATION) / (FULL_SWEEP - ACTIVATION));
+            const intens  = Math.min(1, (Math.abs(sideRatio) - SIDE_THRESH) / (1 - SIDE_THRESH));
+            const idx     = Math.round(sweepP * intens * (FREQ_LADDER.length - 1));
+            fx.filterMode = onLeft ? 'lp' : 'hp';
+            fx.targetFreq = onLeft ? FREQ_LADDER[idx] : FREQ_LADDER[FREQ_LADDER.length - 1 - idx];
+          }
+        } else {
+          fx.sideTime = Math.max(0, fx.sideTime - dt * 2.0);
+          fx.side = 0;
+          if (fx.sideTime <= 0 && fx.filterMode !== null) {
+            fx.filterMode = null; fx.targetFreq = 20000;
+            rewireChain(null, 20000, 0.8);
+            const cleared = {...eqStateRef.current, mode: null as null, firstKey: null as null};
+            eqStateRef.current = cleared; setEqState(cleared);
+          } else {
+            if (fx.filterMode === 'lp') fx.targetFreq = Math.min(20000, fx.targetFreq * (1 + dt * 0.8));
+            if (fx.filterMode === 'hp') fx.targetFreq = Math.max(20,    fx.targetFreq * (1 - dt * 0.8));
+          }
+        }
+
+        if (fx.filterMode !== null) {
+          const logC = Math.log10(Math.max(20, fx.currentFreq));
+          const logT = Math.log10(Math.max(20, fx.targetFreq));
+          fx.currentFreq = Math.pow(10, logC + (logT - logC) * Math.min(1, FREQ_SMOOTH * 60));
+          const eq = eqStateRef.current;
+          if (eq.mode !== fx.filterMode) {
+            rewireChain(fx.filterMode, fx.currentFreq, 0.8);
+            const next = {...eq, mode: fx.filterMode, freq: fx.currentFreq,
+              firstKey: fx.filterMode==='lp' ? 'left' as const : 'right' as const,
+              lastKeyTime: performance.now()};
+            eqStateRef.current = next; setEqState(next);
+          } else if (eqFilterRef.current && audioCtxRef.current) {
+            eqFilterRef.current.frequency.setTargetAtTime(
+              fx.currentFreq, audioCtxRef.current.currentTime, 0.05);
+            const next = {...eqStateRef.current, freq: fx.currentFreq};
+            eqStateRef.current = next; setEqState(next);
+          }
+        }
+      } // end mobile FX
 
       const pv=portalRef.current;
       if(!pv.active&&time>pv.nextShow){pv.active=true;pv.opacity=0;pv.hold=time+4+Math.random()*5;pv.nextShow=pv.hold+15+Math.random()*25;}
