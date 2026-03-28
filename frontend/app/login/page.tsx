@@ -374,7 +374,7 @@ function LoginMobileScrollRail({ scrollRef }: { scrollRef: React.RefObject<HTMLD
 }
 
 // ─── Debug Panel ──────────────────────────────────────────────────────────────
-function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hideCard, onToggleCard, trackName, onSkip, eqState, isMobile, mobileImmersive, onTogglePlay }: {
+function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hideCard, onToggleCard, trackName, onSkip, eqState, isMobile, mobileImmersive, onTogglePlay, audioSourceMode, audioSourceStatus, onSwitchAudioSource }: {
   params: DebugParams;
   onChange: (k: keyof DebugParams, v: number|string) => void;
   onClose: ()=>void; onReset: ()=>void;
@@ -388,6 +388,9 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
   isMobile?: boolean;
   mobileImmersive?: boolean;
   onTogglePlay?: () => void | Promise<void>;
+  audioSourceMode: 'file'|'mic'|'system'|'mix';
+  audioSourceStatus: string;
+  onSwitchAudioSource: (m: 'file'|'mic'|'system'|'mix') => void;
 }) {
   const [live, setLive] = useState(params);
   const rafRef = useRef<number|null>(null);
@@ -585,6 +588,73 @@ function DebugPanel({ params, onChange, onClose, onReset, bandsRef, playing, hid
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* ── Audio Source ─────────────────────────────────────────────── */}
+        <div className="rounded-xl border border-white/8 bg-white/[0.015] overflow-hidden">
+          <div className="px-3 py-2 border-b border-white/5 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-orange-400/70"/>
+            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Fuente de audio</span>
+          </div>
+          <div className="p-3 space-y-2">
+            {/* Source selector buttons */}
+            <div className="grid grid-cols-2 gap-1.5">
+              {([
+                {id:'file'   as const, label:'Archivo MP3', icon:'🎵', desc:'reproducción local'},
+                {id:'mic'    as const, label:'Micrófono',   icon:'🎤', desc:'entrada de micrófono'},
+                {id:'system' as const, label:'Sistema',     icon:'🖥️', desc:'audio del dispositivo'},
+                {id:'mix'    as const, label:'Combinado',   icon:'🎛️', desc:'mic + sistema'},
+              ]).map(({id,label,icon,desc})=>{
+                const active = audioSourceMode === id;
+                return (
+                  <button key={id} onClick={()=>onSwitchAudioSource(id)}
+                    className={`flex flex-col items-start px-2.5 py-2 rounded-xl border text-left transition-all ${
+                      active
+                        ? 'border-orange-500/60 bg-orange-500/10'
+                        : 'border-white/8 bg-white/[0.02] hover:border-white/20'
+                    }`}>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="text-sm leading-none">{icon}</span>
+                      <span className={`text-[10px] font-black ${active?'text-orange-400':'text-slate-400'}`}>{label}</span>
+                      {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse"/>}
+                    </div>
+                    <span className="text-[8px] text-slate-600">{desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Status / feedback */}
+            {audioSourceStatus && (
+              <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[9px] font-mono ${
+                audioSourceStatus.startsWith('Error')||audioSourceStatus.includes('denegado')||audioSourceStatus.includes('soporta')
+                  ? 'bg-red-500/10 border border-red-500/20 text-red-400'
+                  : audioSourceStatus === 'Configurando…'
+                  ? 'bg-slate-800/60 border border-white/5 text-slate-500'
+                  : 'bg-green-500/10 border border-green-500/20 text-green-400'
+              }`}>
+                <span className="flex-shrink-0">
+                  {audioSourceStatus.startsWith('Error')||audioSourceStatus.includes('denegado') ? '⚠' :
+                   audioSourceStatus === 'Configurando…' ? '⋯' : '✓'}
+                </span>
+                <span className="truncate">{audioSourceStatus}</span>
+              </div>
+            )}
+
+            {/* System audio note */}
+            {(audioSourceMode==='system'||audioSourceMode==='mix') && (
+              <p className="text-[8px] text-slate-600 leading-relaxed">
+                Al solicitar audio del sistema, el navegador pedirá que compartas una pestaña/ventana. Asegurate de activar
+                {' '}<strong className="text-slate-500">"Compartir audio"</strong> en el diálogo.
+                Chrome/Edge en escritorio. En Firefox y Safari no está soportado.
+              </p>
+            )}
+            {(audioSourceMode==='mic'||audioSourceMode==='mix') && (
+              <p className="text-[8px] text-slate-600 leading-relaxed">
+                El micrófono se combina con el archivo MP3 para el análisis de audio.
+              </p>
+            )}
           </div>
         </div>
 
@@ -826,23 +896,19 @@ export default function LoginPage() {
   const lastGyroInputRef = useRef(0);
   const loginShellRef = useRef<HTMLDivElement | null>(null);
 
-  /**
-   * Mobile-only: state for sphere-position-driven RGB shift + EQ filter.
-   * Lives in a ref so the Three.js animate loop can read/write it every frame
-   * without causing React re-renders.
-   *
-   * sideTime: how long (seconds) the sphere has been continuously on the left (<0)
-   *           or right (>0) side past the threshold.
-   * currentFreq: the currently applied filter cutoff (smoothed target).
-   * filterMode: which filter is active ('lp' | 'hp' | null).
-   */
-  const mobileFxRef = useRef({
-    sideTime: 0,          // accumulates while |sphX| > SIDE_THRESHOLD
-    side: 0 as -1|0|1,   // -1=left, 0=centre, 1=right
-    currentFreq: 20000,   // current LP cutoff  (high = inactive)
-    targetFreq:  20000,
-    filterMode: null as 'lp'|'hp'|null,
-  });
+  // ── Audio source ─────────────────────────────────────────────────────────
+  type AudioSourceMode = 'file' | 'mic' | 'system' | 'mix';
+  const [audioSourceMode, setAudioSourceMode] = useState<AudioSourceMode>('file');
+  const audioSourceModeRef = useRef<AudioSourceMode>('file');
+  // Nodes for extra inputs (mic / system audio)
+  const micStreamRef    = useRef<MediaStream|null>(null);
+  const sysStreamRef    = useRef<MediaStream|null>(null);
+  const micSrcNodeRef   = useRef<MediaStreamAudioSourceNode|null>(null);
+  const sysSrcNodeRef   = useRef<MediaStreamAudioSourceNode|null>(null);
+  // Gain nodes to mix mp3 + extra sources into analyser
+  const fileGainRef     = useRef<GainNode|null>(null);
+  const extGainRef      = useRef<GainNode|null>(null);
+  const [audioSourceStatus, setAudioSourceStatus] = useState<string>(''); // feedback msg
 
   useEffect(()=>{ debugRef.current={...debugParams}; },[debugParams]);
 
@@ -853,6 +919,9 @@ export default function LoginPage() {
       if (a?.parentNode === document.body) {
         try { document.body.removeChild(a); } catch (_) {}
       }
+      // Clean up extra audio streams on unmount
+      micStreamRef.current?.getTracks().forEach(t => t.stop());
+      sysStreamRef.current?.getTracks().forEach(t => t.stop());
     };
   },[]);
 
@@ -993,6 +1062,115 @@ export default function LoginPage() {
       if(dest) src.connect(dest);
       else src.connect(ctx.destination);
     }catch(_){}
+  }
+
+  // ── Audio source switching ─────────────────────────────────────────────────
+  // Connects or disconnects mic / system audio streams to the analyser.
+  // The MP3 file source always stays connected (the file element was already
+  // wired to the analyser when SPACE was pressed).
+  // We insert a GainNode per source so we can mute/unmute cleanly.
+  async function switchAudioSource(mode: AudioSourceMode) {
+    const ctx = audioCtxRef.current;
+    const analyser = analyserRef.current;
+    if (!ctx || !analyser) {
+      setAudioSourceStatus('Iniciá la música primero (SPACE)');
+      return;
+    }
+
+    audioSourceModeRef.current = mode;
+    setAudioSourceMode(mode);
+    setAudioSourceStatus('Configurando…');
+
+    // --- tear down any existing external streams ---
+    if (micSrcNodeRef.current)  { try { micSrcNodeRef.current.disconnect();  } catch (_) {} micSrcNodeRef.current  = null; }
+    if (sysSrcNodeRef.current)  { try { sysSrcNodeRef.current.disconnect();  } catch (_) {} sysSrcNodeRef.current  = null; }
+    if (micStreamRef.current)   { micStreamRef.current.getTracks().forEach(t => t.stop()); micStreamRef.current  = null; }
+    if (sysStreamRef.current)   { sysStreamRef.current.getTracks().forEach(t => t.stop()); sysStreamRef.current  = null; }
+
+    // Ensure file gain node exists and is connected
+    if (!fileGainRef.current) {
+      const fg = ctx.createGain();
+      fg.gain.value = 1;
+      fileGainRef.current = fg;
+      // Re-route: mp3 element → fileGain → analyser
+      // (The original direct connection still works; adding gain is additive here
+      //  so we just create the ext gain and connect it to the same analyser)
+    }
+
+    // Ensure ext gain node exists
+    if (!extGainRef.current) {
+      const eg = ctx.createGain();
+      eg.gain.value = 0; // start silent; enabled below
+      extGainRef.current = eg;
+      eg.connect(analyser);
+    }
+
+    const dest = eqFilterRef.current || analyser;
+    const needsMic    = mode === 'mic'    || mode === 'mix';
+    const needsSystem = mode === 'system' || mode === 'mix';
+
+    // Mute the extra gain when going back to file-only
+    extGainRef.current.gain.setTargetAtTime(needsMic || needsSystem ? 1 : 0, ctx.currentTime, 0.05);
+
+    try {
+      // ── Microphone ────────────────────────────────────────────────────────
+      if (needsMic) {
+        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        micStreamRef.current = micStream;
+        const micNode = ctx.createMediaStreamSource(micStream);
+        micSrcNodeRef.current = micNode;
+        micNode.connect(dest);
+        setAudioSourceStatus(needsSystem ? 'Mic activo — solicitando audio del sistema…' : 'Micrófono activo');
+      }
+
+      // ── System / tab audio (desktop Chrome/Edge) ──────────────────────────
+      if (needsSystem) {
+        if (!navigator.mediaDevices.getDisplayMedia) {
+          setAudioSourceStatus('Tu navegador no soporta captura de audio del sistema');
+          return;
+        }
+        // Prompt the user to share a tab/window/screen — they must tick "share audio"
+        const displayStream = await (navigator.mediaDevices as any).getDisplayMedia({
+          video: false,   // we only want audio; some browsers still require video:true
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            sampleRate: 44100,
+          },
+        });
+        // If the browser only returned video tracks (user didn't tick "share audio") warn them
+        const audioTracks = displayStream.getAudioTracks();
+        if (audioTracks.length === 0) {
+          setAudioSourceStatus('No se detectó audio. Activá "Compartir audio del sistema" al seleccionar la fuente.');
+          displayStream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+          return;
+        }
+        sysStreamRef.current = displayStream;
+        const sysNode = ctx.createMediaStreamSource(displayStream);
+        sysSrcNodeRef.current = sysNode;
+        sysNode.connect(dest);
+        // Auto-clean if the user stops sharing
+        displayStream.getVideoTracks()[0]?.addEventListener('ended', () => {
+          switchAudioSource('file');
+        });
+        setAudioSourceStatus(needsMic ? 'Mic + Audio del sistema activos' : 'Audio del sistema activo');
+      }
+
+      if (!needsMic && !needsSystem) {
+        setAudioSourceStatus('Usando archivo MP3');
+      }
+    } catch (err: any) {
+      const msg = err?.name === 'NotAllowedError'
+        ? 'Permiso denegado'
+        : err?.name === 'NotFoundError'
+        ? 'No se encontró dispositivo de audio'
+        : `Error: ${err?.message ?? 'desconocido'}`;
+      setAudioSourceStatus(msg);
+      // Revert to file
+      audioSourceModeRef.current = 'file';
+      setAudioSourceMode('file');
+      if (extGainRef.current) extGainRef.current.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
+    }
   }
 
   useEffect(()=>{
@@ -1839,15 +2017,7 @@ export default function LoginPage() {
       if(scene.fog)(scene.fog as THREE.FogExp2).color.set(live.topColor);
       curSpd=THREE.MathUtils.lerp(curSpd,live.speed+b.beat*.12*ar,dt*2.);
       camera.fov=THREE.MathUtils.lerp(camera.fov,85+b.bass*10*ar,dt*3.);camera.updateProjectionMatrix();
-      // Base RGB shift (non-mobile). On mobile, the sphere FX block below
-      // handles this with the lateral-position boost included.
-      if (!mobileActiveRef.current) {
-        rgbPass.uniforms['amount'].value=THREE.MathUtils.lerp(
-          rgbPass.uniforms['amount'].value,
-          live.rgbShiftAmount + b.brilliance*.006*ar + b.beat*.003*ar,
-          dt*3.
-        );
-      }
+      rgbPass.uniforms['amount'].value=THREE.MathUtils.lerp(rgbPass.uniforms['amount'].value,live.rgbShiftAmount+b.brilliance*.006*ar+b.beat*.003*ar,dt*3.);
       bloomPass.strength=THREE.MathUtils.lerp(bloomPass.strength,live.bloomStrength+b.bass*1.5*ar+b.beat*.8*ar,dt*3.);
       prog=(prog+curSpd*dt*.1)%1.;
       const cp=getPos(prog,3.),la=curve.getPointAt((prog+.012)%1.);
@@ -1912,129 +2082,6 @@ export default function LoginPage() {
       sphereLight.position.copy(sphWorldPos);
       sphereLight.color.copy(tint);
       sphereLight.intensity = 0.6 + b.rms * ar * 1.4;
-
-      // ── Mobile-only: sphere lateral position → RGB shift + EQ sweep ────────
-      if (mobileActiveRef.current) {
-        // ── 1. RGB Shift: |x/MAX_LAT| → up to MAX_MOBILE_RGB extra shift ────
-        const MAX_MOBILE_RGB = 0.018; // maximum extra shift at extreme left/right
-        const latNorm = Math.abs(sphSpring.x) / MAX_LAT; // 0..1
-        // Quadratic so it ramps up only near the edges, stays subtle at centre
-        const rgbBoost = latNorm * latNorm * MAX_MOBILE_RGB;
-        // Blend into the existing rgbPass value (lerp toward new target this frame)
-        const baseRgb = live.rgbShiftAmount + b.brilliance*.006*ar + b.beat*.003*ar;
-        rgbPass.uniforms['amount'].value = THREE.MathUtils.lerp(
-          rgbPass.uniforms['amount'].value,
-          baseRgb + rgbBoost,
-          dt * 5.0  // faster lerp than the base so it tracks the sphere
-        );
-
-        // ── 2. EQ sweep: time-integrated lateral position ───────────────────
-        //
-        // Frequency ladder for the filter sweep (same as keyboard EQ steps):
-        // LP: starts at high freqs (20kHz) and sweeps DOWN as time increases
-        //     → the longer on the left, the lower the cutoff
-        // HP: starts at low freqs (20Hz) and sweeps UP as time increases
-        //     → the longer on the right, the higher the cutoff
-        //
-        // Timeline: 0–1.5s → no filter; 1.5–10s → filter sweeps 20kHz→20Hz (LP)
-        //           i.e. full sweep in 8.5s
-        //
-        const FREQ_LADDER = [20000,16000,12000,8000,4000,2000,1000,500,250,150,80,40,20];
-        const SIDE_THRESH  = 0.35;  // |sphSpring.x / MAX_LAT| > this → "side"
-        const ACTIVATION   = 1.5;   // seconds before filter kicks in
-        const FULL_SWEEP   = 10.0;  // seconds for full frequency sweep
-        const FREQ_SMOOTH  = dt * 1.8; // lerp speed for frequency (smooth, not jumpy)
-        const GAIN_SMOOTH  = dt * 2.0;
-
-        const fx = mobileFxRef.current;
-        const sideRatio = sphSpring.x / MAX_LAT; // -1..1
-        const onLeft    = sideRatio < -SIDE_THRESH;
-        const onRight   = sideRatio >  SIDE_THRESH;
-        const newSide   = onLeft ? -1 : onRight ? 1 : 0;
-
-        if (newSide !== 0) {
-          // Same side: accumulate time
-          if (Math.sign(newSide) === Math.sign(fx.side) || fx.side === 0) {
-            fx.sideTime += dt;
-          } else {
-            // Switched sides: reset accumulator
-            fx.sideTime = 0;
-          }
-          fx.side = newSide;
-
-          if (fx.sideTime >= ACTIVATION) {
-            // Progress 0..1 across the full sweep window (after activation)
-            const sweepProgress = Math.min(1, (fx.sideTime - ACTIVATION) / (FULL_SWEEP - ACTIVATION));
-            // Also modulate by how far from centre we are (closer to edge = more extreme)
-            const intensity = Math.min(1, (Math.abs(sideRatio) - SIDE_THRESH) / (1 - SIDE_THRESH));
-            const effectiveProgress = sweepProgress * intensity;
-
-            if (onLeft) {
-              // LP: freq goes from 20000 down to 20 as effectiveProgress → 1
-              const freqIdx = Math.round(effectiveProgress * (FREQ_LADDER.length - 1));
-              fx.targetFreq  = FREQ_LADDER[freqIdx];
-              fx.filterMode  = 'lp';
-            } else {
-              // HP: freq goes from 20 up to 20000 as effectiveProgress → 1
-              const freqIdx = Math.round(effectiveProgress * (FREQ_LADDER.length - 1));
-              fx.targetFreq  = FREQ_LADDER[FREQ_LADDER.length - 1 - freqIdx];
-              fx.filterMode  = 'hp';
-            }
-          }
-        } else {
-          // Sphere is near centre: decay sideTime and release filter
-          fx.sideTime = Math.max(0, fx.sideTime - dt * 2.0); // decay 2× faster than build
-          fx.side     = 0;
-          if (fx.sideTime <= 0) {
-            // Fully back to centre → clear filter
-            if (fx.filterMode !== null) {
-              fx.filterMode = null;
-              // Use existing rewireChain to disconnect the filter
-              rewireChain(null, fx.targetFreq, 0.8);
-              // Sync React EQ state so the UI reflects the change
-              const cleared = {...eqStateRef.current, mode: null as null, firstKey: null as null};
-              eqStateRef.current = cleared;
-              setEqState(cleared);
-            }
-            fx.targetFreq = onLeft ? 20000 : 20; // reset starting freq
-          } else {
-            // Fading: push target freq back toward the "off" end
-            if (fx.filterMode === 'lp') fx.targetFreq = Math.min(20000, fx.targetFreq * (1 + dt * 0.8));
-            if (fx.filterMode === 'hp') fx.targetFreq = Math.max(20,    fx.targetFreq * (1 - dt * 0.8));
-          }
-        }
-
-        // Smooth the actual cutoff frequency and apply to the filter
-        if (fx.filterMode !== null) {
-          // Log-space interpolation for frequency (sounds smoother than linear)
-          const logCurrent = Math.log10(Math.max(20, fx.currentFreq));
-          const logTarget  = Math.log10(Math.max(20, fx.targetFreq));
-          const logNext    = logCurrent + (logTarget - logCurrent) * Math.min(1, FREQ_SMOOTH * 60);
-          fx.currentFreq   = Math.pow(10, logNext);
-
-          // Apply to Web Audio — rewire only when mode changes or no filter exists
-          const eq = eqStateRef.current;
-          if (eq.mode !== fx.filterMode) {
-            rewireChain(fx.filterMode, fx.currentFreq, 0.8);
-            const next = {...eq, mode: fx.filterMode, freq: fx.currentFreq,
-                          firstKey: fx.filterMode === 'lp' ? 'left' as const : 'right' as const,
-                          lastKeyTime: performance.now()};
-            eqStateRef.current = next;
-            setEqState(next);
-          } else if (eqFilterRef.current) {
-            // Already wired — just update the frequency parameter directly (no rewire needed)
-            eqFilterRef.current.frequency.setTargetAtTime(
-              fx.currentFreq,
-              audioCtxRef.current?.currentTime ?? 0,
-              0.05  // 50ms time constant → smooth
-            );
-            // Keep React state freq in sync (for the spectrum display)
-            const next = {...eqStateRef.current, freq: fx.currentFreq};
-            eqStateRef.current = next;
-            setEqState(next);
-          }
-        }
-      } // end mobileActiveRef
 
       const pv=portalRef.current;
       if(!pv.active&&time>pv.nextShow){pv.active=true;pv.opacity=0;pv.hold=time+4+Math.random()*5;pv.nextShow=pv.hold+15+Math.random()*25;}
@@ -2146,6 +2193,9 @@ export default function LoginPage() {
               isMobile={mobileActive || viewportNarrow}
               mobileImmersive={mobileActive}
               onTogglePlay={toggleAudioPlayPause}
+              audioSourceMode={audioSourceMode}
+              audioSourceStatus={audioSourceStatus}
+              onSwitchAudioSource={switchAudioSource}
             />
           )}
         </>
