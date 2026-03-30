@@ -4,19 +4,16 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
-  MapPin, Search, Filter, Briefcase, Users, Clapperboard, GraduationCap, 
-  ChevronLeft, ChevronRight, ArrowRight, LayoutGrid, Plus, Dice5, HelpCircle 
+  Search, Filter, Briefcase, Users, Clapperboard, GraduationCap, 
+  ChevronLeft, ChevronRight, LayoutGrid, Plus, Dice5, HelpCircle 
 } from 'lucide-react';
-import DepthAwareImage from '@/components/DepthAwareImage';
 import TdfFilmLoader from '@/components/TdfFilmLoader';
+import { LiquidBlobs } from '@/components/liquid-glass/LiquidBlobs';
+import { GuiaLiquidCard } from '@/components/liquid-glass/GuiaLiquidCard';
 import { getSectionCache, setSectionCache, SECTION_KEYS } from '@/lib/sectionCache';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const AnycolourBackground = dynamic(() => import('@/components/anycolour'), { ssr: false });
-
-const getInitials = (name: string) => {
-  return name ? name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() : 'NN';
-};
 
 const TIPOS_PERFIL_KEYS = [
   { labelKey: 'guia.todos', value: 'Todos', icon: LayoutGrid },
@@ -222,6 +219,7 @@ export default function GuiaPage() {
       {/* Fondo Anycolour (móvil y escritorio): velocidad según scroll (abajo más rápido, arriba más lento) */}
       <div className="fixed inset-0 z-0">
         <AnycolourBackground backgroundOnly speedMultiplier={particleSpeedMultiplier} particleCount={1688} />
+        <LiquidBlobs />
       </div>
 
       {/* Contenido de la guía y tarjetas encima (z-10); opacidad baja para ver más el fondo animado; pointer-events-none para clics en el fondo */}
@@ -363,13 +361,10 @@ export default function GuiaPage() {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-[800px]:gap-4 md:gap-6 lg:gap-8"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-stretch gap-4 max-[800px]:gap-4 md:gap-6 lg:gap-8"
           >
             <AnimatePresence mode='popLayout'>
-              {prestadoresMostrados.map((p) => {
-                const tema = p.colorTema || '#ea580c';
-                
-                return (
+              {prestadoresMostrados.map((p) => (
                   <motion.div
                     layout
                     key={p.id}
@@ -377,78 +372,13 @@ export default function GuiaPage() {
                     initial="hidden"
                     animate="visible"
                     exit="exit"
-                    whileHover={{ y: -8, transition: { duration: 0.3 } }}
-                    className="group h-full"
+                    className="group relative flex h-full min-h-0 flex-col overflow-visible transition-transform duration-300 hover:-translate-y-1"
                   >
-                    <Link href={`/prestador/${p.id}`} className="block h-full relative">
-                      
-                      {/* EFECTO GLOW */}
-                      <div 
-                        className="absolute -inset-0.5 rounded-3xl opacity-0 group-hover:opacity-40 transition-opacity duration-500 blur-xl"
-                        style={{ backgroundColor: tema }}
-                      ></div>
-
-                      <div className="relative bg-slate-900 border border-slate-800 rounded-2xl max-[800px]:rounded-xl md:rounded-3xl overflow-hidden h-full flex flex-col items-center transition-all duration-300 group-hover:border-[var(--border-color)] group-hover:shadow-2xl pt-5 max-[800px]:pt-4 pb-4 max-[800px]:pb-3 px-4 max-[800px]:px-3 md:pt-8 md:pb-6 md:px-6"
-                           style={{ ['--border-color' as never]: tema }}>
-                        
-                        <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: tema }}></div>
-
-                        {/* FOTO */}
-                        <div className="relative mb-3 max-[800px]:mb-2 md:mb-6">
-                            <div 
-                              className="w-24 h-24 max-[800px]:w-20 max-[800px]:h-20 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full border-2 max-[800px]:border-2 md:border-4 p-1 bg-slate-950 flex items-center justify-center text-xl max-[800px]:text-lg md:text-2xl lg:text-3xl font-bold overflow-hidden shadow-2xl group-hover:scale-105 transition-transform duration-500"
-                              style={{ borderColor: tema, color: tema }}
-                            >
-                              {p.foto ? (
-                                <DepthAwareImage
-                                  imageUrl={p.foto}
-                                  depthUrl={p.fotoProfundidad}
-                                  alt={p.nombre}
-                                  className="w-full h-full rounded-full object-cover"
-                                  containerClassName="w-full h-full rounded-full overflow-hidden"
-                                  force2D={disable3D}
-                                />
-                              ) : (
-                                <span>{getInitials(p.nombre)}</span>
-                              )}
-                            </div>
-                            <span className="absolute -bottom-2 max-[800px]:-bottom-1.5 left-1/2 -translate-x-1/2 text-[8px] max-[800px]:text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 max-[800px]:px-2 md:px-3 py-0.5 max-[800px]:py-0.5 md:py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shadow-md whitespace-nowrap">
-                                {p.tipoPerfil}
-                            </span>
-                        </div>
-
-                        {/* INFO */}
-                        <div className="text-center w-full flex-1 flex flex-col items-center mt-1 max-[800px]:mt-0 md:mt-2">
-                            <h3 className="text-base max-[800px]:text-sm md:text-lg lg:text-xl font-bold text-white leading-tight mb-1 max-[800px]:mb-1 md:mb-2 group-hover:text-[var(--text-color)] transition-colors"
-                                style={{ ['--text-color' as never]: tema }}>
-                                {p.nombre}
-                            </h3>
-
-                            <div className="text-[9px] max-[800px]:text-[9px] md:text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1 mb-2 max-[800px]:mb-2 md:mb-4">
-                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tema }}></div>
-                                {p.rubro}
-                            </div>
-
-                            <p className="text-slate-400 text-xs max-[800px]:text-[11px] md:text-sm mb-3 max-[800px]:mb-3 md:mb-6 line-clamp-2 font-light leading-relaxed max-w-[220px] max-[800px]:max-w-[180px] md:max-w-[250px]">
-                                {p.descripcion || "Sin descripción disponible."}
-                            </p>
-
-                            <div className="mt-auto w-full border-t border-slate-800/50 pt-2 max-[800px]:pt-2 md:pt-4 flex justify-between items-center text-[10px] max-[800px]:text-[10px] md:text-xs">
-                                <div className="flex items-center gap-1 text-slate-500">
-                                    <MapPin size={12} className="text-orange-500"/>
-                                    <span>{p.ciudad || "TDF"}</span>
-                                </div>
-                                <span className="font-bold uppercase tracking-wider flex items-center gap-1 group-hover:gap-2 transition-all duration-300" style={{ color: tema }}>
-                                    {t('guia.ver_perfil')} <ArrowRight size={12}/>
-                                </span>
-                            </div>
-                        </div>
-
-                      </div>
+                    <Link href={`/prestador/${p.id}`} className="block h-full min-h-0">
+                      <GuiaLiquidCard p={p} disable3D={disable3D} verPerfilLabel={t('guia.ver_perfil')} />
                     </Link>
                   </motion.div>
-                );
-              })}
+                ))}
             </AnimatePresence>
           </motion.div>
         )}

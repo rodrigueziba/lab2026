@@ -4,12 +4,13 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
-  Film, DollarSign, GraduationCap, Users, Calendar, 
-  PlayCircle, X, MapPin, Search, Clapperboard, 
-  ChevronLeft, ChevronRight, Plus, Dice5, Eye, Filter 
+  DollarSign, GraduationCap, Calendar, 
+  X, MapPin, Search, Clapperboard, 
+  ChevronLeft, ChevronRight, Plus, Dice5, Filter 
 } from 'lucide-react';
-import DepthAwareImage from '@/components/DepthAwareImage';
 import TdfFilmLoader from '@/components/TdfFilmLoader';
+import { LiquidBlobs } from '@/components/liquid-glass/LiquidBlobs';
+import { ProyectoLiquidCard } from '@/components/liquid-glass/ProyectoLiquidCard';
 import { getSectionCache, setSectionCache, SECTION_KEYS } from '@/lib/sectionCache';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -251,6 +252,7 @@ export default function CarteleraProyectosPage() {
       {/* Fondo Anycolour solo escritorio: misma lógica que /guia; velocidad según scroll; clics para puntos de gravedad */}
       <div className="fixed inset-0 z-0">
         <AnycolourBackground backgroundOnly speedMultiplier={particleSpeedMultiplier} particleCount={1688} />
+        <LiquidBlobs />
       </div>
 
       {/* Contenido encima (z-10); opacidad baja para ver fondo animado; pointer-events-none para clics en el fondo */}
@@ -436,7 +438,7 @@ export default function CarteleraProyectosPage() {
             layout 
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-[800px]:gap-4 pb-20 max-[800px]:pb-12"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-stretch gap-4 max-[800px]:gap-4 pb-20 max-[800px]:pb-12"
           >
             <AnimatePresence mode='popLayout'>
               {proyectosMostrados.map((p, index) => {
@@ -455,115 +457,15 @@ export default function CarteleraProyectosPage() {
                     key={p.id}
                     onMouseEnter={() => handleMouseEnter(p.id)}
                     onMouseLeave={handleMouseLeave}
-                    className="group relative bg-slate-900 rounded-xl max-[800px]:rounded-2xl md:rounded-[2rem] border border-slate-800 hover:border-orange-500/30 transition-all hover:shadow-[0_0_30px_rgba(234,88,12,0.15)] h-full flex flex-col overflow-hidden hover:-translate-y-1 duration-300"
+                    className="group relative h-full flex flex-col overflow-visible transition-transform duration-300 hover:-translate-y-1"
                   >
-                    <Link href={`/proyectos/${p.id}`} className="flex flex-col h-full">
-                      
-                      {/* MEDIA AREA */}
-                      <div className="relative h-40 max-[800px]:h-36 md:h-56 lg:h-64 bg-black overflow-hidden">
-                        
-                        {/* Video Overlay on Hover */}
-                        {isHovered && youtubeId ? (
-                            <motion.div 
-                                initial={{ opacity: 0 }} 
-                                animate={{ opacity: 1 }} 
-                                className="absolute inset-0 z-20 bg-black"
-                            >
-                                <iframe 
-                                    src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${youtubeId}`}
-                                    className="w-full h-full object-cover pointer-events-none scale-125"
-                                    allow="autoplay"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-80 pointer-events-none"></div>
-                            </motion.div>
-                        ) : (
-                            <>
-                                {(p.foto || p.galeria?.[0]) ? (
-                                    <DepthAwareImage
-                                      imageUrl={p.foto || p.galeria?.[0]!}
-                                      depthUrl={p.fotoProfundidad}
-                                      alt={p.titulo}
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                      containerClassName="w-full h-full overflow-hidden"
-                                      force2D={disable3D}
-                                    />
-                                ) : (
-                                    <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-600"><Film size={40}/></div>
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-85"></div>
-                            </>
-                        )}
-
-                        {/* TIPO + CIUDAD (Badge Flotante) */}
-                        <div className="absolute top-4 left-4 z-30">
-                            <span className="text-[9px] font-black uppercase text-white bg-orange-600 px-3 py-1 rounded-full shadow-lg">
-                                {p.tipo}
-                            </span>
-                        </div>
-
-                        {/* BADGES ESTADO (Top Right) */}
-                        <div className="absolute top-4 right-4 z-30 flex flex-col gap-2 items-end">
-                            {p.esRemunerado && (
-                                <span className="bg-emerald-500 text-white text-[9px] font-bold p-1.5 rounded-full shadow-lg" title="Remunerado">
-                                    <DollarSign size={12} strokeWidth={3}/>
-                                </span>
-                            )}
-                            {p.esEstudiante && (
-                                <span className="bg-blue-600 text-white text-[9px] font-bold p-1.5 rounded-full shadow-lg" title="Estudiantil">
-                                    <GraduationCap size={12}/>
-                                </span>
-                            )}
-                        </div>
-
-                      </div>
-
-                      {/* CONTENIDO */}
-                      <div className="p-5 max-[800px]:p-4 md:p-6 lg:p-8 flex-1 flex flex-col bg-slate-900 relative z-10 -mt-8 max-[800px]:-mt-6 md:-mt-10 lg:-mt-12 rounded-t-xl max-[800px]:rounded-t-2xl md:rounded-t-[2rem]">
-                        
-                        {/* Título Grande — centrado */}
-                        <h3 className="text-base max-[800px]:text-sm md:text-xl lg:text-2xl font-black text-white mb-3 max-[800px]:mb-3 md:mb-4 leading-tight group-hover:text-orange-500 transition-colors tracking-tight text-center">
-                            {p.titulo}
-                        </h3>
-
-                        {/* Ubicación e Inicio — centrado */}
-                        <div className="flex items-center justify-center gap-2 max-[800px]:gap-2 md:gap-4 text-[10px] max-[800px]:text-[10px] md:text-xs text-slate-400 mb-3 max-[800px]:mb-3 md:mb-5 font-medium text-center">
-                            <span className="flex items-center gap-1"><MapPin size={11} className="text-orange-500"/> {p.ciudad}</span>
-                            {p.fechaInicio && <span className="flex items-center gap-1"><Calendar size={11}/> {new Date(p.fechaInicio).toLocaleDateString()}</span>}
-                        </div>
-
-                        <p className="text-slate-400 text-[11px] max-[800px]:text-[11px] md:text-xs line-clamp-2 max-[800px]:line-clamp-2 md:line-clamp-3 mb-4 max-[800px]:mb-4 md:mb-6 font-light leading-relaxed text-justify">
-                            {p.descripcion}
-                        </p>
-
-                        {/* Roles */}
-                        <div className="mt-auto pt-3 max-[800px]:pt-3 md:pt-5 border-t border-slate-800">
-                            <div className="flex flex-wrap gap-1.5 max-[800px]:gap-1.5 md:gap-2 mb-3 max-[800px]:mb-3 md:mb-4">
-                                {p.puestos && p.puestos.length > 0 ? (
-                                    p.puestos.slice(0, 3).map((puesto: Puesto) => (
-                                        <span key={puesto.id} className="text-[9px] font-bold uppercase bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                                            {puesto.nombre}
-                                        </span>
-                                    ))
-                                ) : <span className="text-[11px] text-slate-600 italic">Equipo completo</span>}
-                                {p.puestos && p.puestos.length > 3 && <span className="text-[9px] text-slate-500 px-1">+{p.puestos.length - 3}</span>}
-                            </div>
-
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[9px] font-bold text-slate-400 border border-slate-700">
-                                        {p.user?.nombre?.[0] || 'U'}
-                                    </div>
-                                    <span className="text-[9px] text-slate-500 uppercase tracking-widest truncate max-w-[72px]">
-                                        {p.user?.nombre || 'Productor'}
-                                    </span>
-                                </div>
-                                <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-orange-500 group-hover:gap-2 transition-all">
-                                    Ver Ficha <Eye size={11}/>
-                                </span>
-                            </div>
-                        </div>
-
-                      </div>
+                    <Link href={`/proyectos/${p.id}`} className="block h-full">
+                      <ProyectoLiquidCard
+                        p={p}
+                        disable3D={disable3D}
+                        youtubeId={youtubeId}
+                        isHovered={isHovered}
+                      />
                     </Link>
                   </motion.div>
                 );
