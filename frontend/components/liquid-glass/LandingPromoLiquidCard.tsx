@@ -123,17 +123,17 @@ export function LandingPromoLiquidCard({
           </div>
         </div>
 
-        {/* Columna derecha: título, texto, CTA compacto */}
+        {/* Columna derecha: título, texto, CTA compacto (móvil: texto completo + más padding; desktop: line-clamp) */}
         <div
-          className="flex min-w-0 flex-1 flex-col justify-center py-3 pl-3 pr-3.5 sm:py-3.5 sm:pl-5 sm:pr-6"
+          className="flex min-w-0 flex-1 flex-col justify-center py-4 pl-3.5 pr-3.5 max-md:min-h-[min(18rem,55svh)] max-md:justify-start max-md:pt-5 max-md:pb-6 sm:py-3.5 sm:pl-5 sm:pr-6 md:justify-center"
           style={{
             background: `linear-gradient(180deg, rgba(${meta.rgb},0.03) 0%, rgba(0,0,0,0.06) 100%)`,
           }}
         >
           <h2
-            className="text-lg font-black leading-tight tracking-tight text-white sm:text-xl md:text-2xl"
+            className="text-lg font-black leading-tight tracking-tight text-white sm:text-xl md:text-2xl shrink-0"
             style={{
-              margin: '0 0 6px',
+              margin: '0 0 8px',
               textShadow: `0 0 20px rgba(${meta.rgb},0.3)`,
             }}
           >
@@ -141,21 +141,12 @@ export function LandingPromoLiquidCard({
           </h2>
 
           <p
-            className="text-[13px] leading-snug text-white/55 sm:text-sm"
-            style={{
-              margin: 0,
-              marginBottom: 8,
-              textAlign: 'left',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}
+            className="text-[13px] leading-[1.65] text-white/70 sm:text-sm text-left md:line-clamp-2 md:text-white/55 max-md:pb-2"
           >
             {subtitle}
           </p>
 
-          <div className="flex justify-end pt-0.5">
+          <div className="flex justify-end pt-2 max-md:pt-3">
             <span
               className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-all group-hover:gap-2 sm:text-[11px]"
               style={{ color: meta.color }}
