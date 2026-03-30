@@ -103,9 +103,9 @@ const Prisma = () => {
           transparent={true}
           transmission={1}          // 100% de transmisión (es cristal puro)
           opacity={1}               // Debe estar en 1 para que el transmission funcione
-          roughness={0.95}          // Casi pulido perfecto, con un micro-desgaste
+          roughness={0.2}          // Casi pulido perfecto, con un micro-desgaste
           ior={1.50}                // Índice de refracción muy alto (Cristal de Zafiro / Líquido denso)
-          thickness={5}             // Grosor masivo para que distorsione fuertemente el fondo
+          thickness={4}             // Grosor masivo para que distorsione fuertemente el fondo
           clearcoat={1}             // Barniz exterior (como si estuviera mojado)
           clearcoatRoughness={0}    // El barniz es un espejo perfecto
           attenuationColor="#ffffff"// El color que toma la luz al viajar por dentro

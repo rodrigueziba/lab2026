@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { SplatMesh, SparkRenderer } from '@sparkjsdev/spark';
 import Link from 'next/link';
 import { MapPin, Users, Clapperboard } from 'lucide-react';
+import { LandingPromoLiquidCard } from '@/components/liquid-glass/LandingPromoLiquidCard';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN
@@ -142,7 +143,8 @@ const CARDS: {
   subtitle: string;
   href: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
-  hoverGlow: string; // Tailwind drop-shadow / ring color class
+  /** Color de acento (liquid glass / bordes / CTA) */
+  themeHex: string;
 }[] = [
   {
     key: 'locaciones',
@@ -150,7 +152,7 @@ const CARDS: {
     subtitle: 'Glaciares, bosques y costa patagónica al alcance de tu producción.',
     href: '/locaciones',
     icon: MapPin,
-    hoverGlow: 'group-hover:drop-shadow-[0_0_12px_rgba(34,197,94,0.8)] group-hover:text-emerald-400',
+    themeHex: '#22c55e',
   },
   {
     key: 'guia',
@@ -158,7 +160,7 @@ const CARDS: {
     subtitle: 'Todo lo que necesitás para filmar en el fin del mundo.',
     href: '/guia',
     icon: Users,
-    hoverGlow: 'group-hover:drop-shadow-[0_0_12px_rgba(249,115,22,0.9)] group-hover:text-orange-400',
+    themeHex: '#ea580c',
   },
   {
     key: 'proyectos',
@@ -166,7 +168,7 @@ const CARDS: {
     subtitle: 'Gestión y busqueda de producciones audiovisuales en Tierra del Fuego.',
     href: '/proyectos',
     icon: Clapperboard,
-    hoverGlow: 'group-hover:drop-shadow-[0_0_12px_rgba(139,92,246,0.9)] group-hover:text-violet-400',
+    themeHex: '#8b5cf6',
   },
 ];
 
@@ -665,6 +667,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   const [debugHideVignette, setDebugHideVignette] = useState(false);
   const [debugHideCards, setDebugHideCards] = useState(false);
   const [debugHideHero, setDebugHideHero] = useState(false);
+  const [disable3DLandingCards, setDisable3DLandingCards] = useState(false);
   const freeRoamRef = useRef(false);
   const flySpeedRef = useRef(0.3);
   const isDragging = useRef(false);
@@ -684,6 +687,10 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
+  }, []);
+
+  useEffect(() => {
+    setDisable3DLandingCards(typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent));
   }, []);
 
   useEffect(() => {
@@ -1440,12 +1447,11 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
           const slotStart = (i + 1) * cardSlot;
           const slotEnd = (i + 2) * cardSlot;
           const inSlot = scrollProgress >= slotStart && scrollProgress < slotEnd;
-          const Icon = card.icon;
 
           return (
             <div
               key={card.key}
-              className={`absolute inset-0 z-20 flex items-end sm:items-center justify-center sm:justify-start px-5 sm:px-12 md:px-16 pb-20 sm:pb-0 ${inSlot ? 'pointer-events-auto' : 'pointer-events-none'} group`}
+              className={`absolute inset-0 z-20 flex items-end sm:items-center justify-center sm:justify-start px-5 sm:px-12 md:px-16 pb-20 sm:pb-0 ${inSlot ? 'pointer-events-auto' : 'pointer-events-none'}`}
               style={{
                 opacity: inSlot ? 1 : 0,
                 transform: inSlot ? 'translateY(0)' : 'translateY(28px)',
@@ -1454,37 +1460,17 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
             >
               <Link
                 href={card.href}
-                className="w-full max-w-xs sm:max-w-sm mx-auto sm:mx-0 md:absolute md:inset-0 md:max-w-none md:mx-0 flex items-end sm:items-center justify-center sm:justify-start px-5 sm:px-12 md:px-16 pb-20 sm:pb-0 focus:outline-none"
+                className="group focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06060f] rounded-[28px] mx-auto flex w-full items-end justify-center px-3 pb-20 sm:items-center sm:pb-0 md:absolute md:inset-0 md:items-center md:justify-center md:px-6 md:pb-0 transition-transform duration-300 hover:-translate-y-1"
               >
                 <span className="sr-only">{card.title}</span>
-                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_10px_30px_rgba(0,0,0,0.3)] transition-all duration-500 group-hover:border-orange-500/40 group-hover:bg-slate-900/80 group-hover:scale-[1.02] group-hover:-translate-y-1 group-hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.15),_0_0_40px_rgba(249,115,22,0.2),_0_20px_40px_rgba(0,0,0,0.4)] group-focus-visible:ring-2 group-focus-visible:ring-orange-500 w-full max-w-xs sm:max-w-sm md:max-w-lg mx-auto sm:mx-0">
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-                  <div className="h-px w-full bg-gradient-to-r from-transparent via-orange-500/30 to-transparent transition-all duration-300 group-hover:via-orange-400/70" />
-                  <div className="relative z-10 p-6 sm:p-8">
-                    <div className={`card-icon-glow-pulse mb-4 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center text-slate-400 transition-all duration-500 group-hover:scale-110 ${card.hoverGlow}`}>
-                      <Icon size={26} className="sm:w-7 sm:h-7" />
-                    </div>
-                    <h2 className="text-3xl sm:text-4xl font-bold leading-tight tracking-tight text-white">
-                      {card.title}
-                    </h2>
-                    <p className="mt-2.5 text-sm sm:text-base text-white/70 leading-relaxed text-justify">
-                      {card.subtitle}
-                    </p>
-                    <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-orange-400 group-hover:text-orange-300 transition-colors group-hover:drop-shadow-[0_0_8px_rgba(249,115,22,0.4)]">
-                      Ver más
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        className="transition-transform duration-200 group-hover:translate-x-0.5"
-                      >
-                        <path d="M2 6h8M6 2l4 4-4 4" />
-                      </svg>
-                    </div>
-                  </div>
+                <div className="w-full max-w-[min(75vw,1200px)] shrink-0">
+                  <LandingPromoLiquidCard
+                    title={card.title}
+                    subtitle={card.subtitle}
+                    colorHex={card.themeHex}
+                    icon={card.icon}
+                    disable3D={disable3DLandingCards}
+                  />
                 </div>
               </Link>
             </div>
