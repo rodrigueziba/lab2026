@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 const DEFAULT_CONFIG = {
   LINES: 18,
-  STEPS: 140,
+  STEPS: 180,
   BASE_SPEED: 0.855,
   WAVE_AMP: 35,
   MOUSE_RADIUS: 160,
