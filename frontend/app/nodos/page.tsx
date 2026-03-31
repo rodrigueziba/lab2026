@@ -29,21 +29,49 @@ const ORBIT_SPEED_3D  = { locacion: 0.009, proyecto: 0.006, prestador: 0.003 };
 const ORBIT_RADIUS_2D = { locacion: 48,  proyecto: 82,  prestador: 118 };
 const ORBIT_SPEED_2D  = { locacion: 0.012, proyecto: 0.007, prestador: 0.004 };
 
-// Optimización 3D: más agresiva para PCs de bajos recursos
-const MAX_PIXEL_RATIO_3D = 1.0;
-const INITIAL_PIXEL_RATIO_3D = 0.65;    // Empezar bajo; subir si hay FPS de sobra
-const FPS_LOW_3D = 28;
-const FPS_VERY_LOW_3D = 14;
-const FPS_HIGH_3D = 50;
-const FPS_SAMPLES_3D = 60;
-const PIXEL_RATIO_DROP_LOW_3D = 0.5;
-const PIXEL_RATIO_DROP_VERY_LOW_3D = 0.35;
-const SLOW_LOAD_FRAMES_3D = 60;         // Evaluar antes
-const SLOW_LOAD_FPS_THRESHOLD_3D = 22;
-const MIN_PIXEL_RATIO_3D = 0.35;
-// Timeout: si a los 10s no cargó fondo + esferas, pasar a versión 2D
-const FALLBACK_2D_TIMEOUT_MS = 10000;
-const SCENE_READY_MIN_FRAMES = 25;
+// ─── Performance state machine 3D ───────────────────────────────────────────
+// Arrancar a calidad MÁXIMA — calibrar hacia abajo si hace falta.
+// stable_high: dispositivo potente, calidad bloqueada forever.
+const MAX_PIXEL_RATIO_3D      = 1.0;
+const INITIAL_PIXEL_RATIO_3D  = MAX_PIXEL_RATIO_3D;  // sin degradación inicial
+
+const MIN_PIXEL_RATIO_3D      = 0.35;
+const QUALITY_DROP_STEP_3D    = 0.75; // baja 25 % por escalón
+
+const CALIBRATION_MS_3D       = 3000;  // duración de la fase de calibración
+const CALIBRATION_EARLY_MS_3D = 1200;  // reacción anticipada si FPS muy bajo desde el inicio
+const FPS_STABLE_HIGH_3D      = 50;    // por encima de esto = dispositivo potente → lock forever
+const FPS_STABLE_LOW_3D       = 28;    // mínimo aceptable al fin de calibración
+const FPS_EMERGENCY_3D        = 18;    // umbral de emergencia para stable_high (rarísimo)
+const FPS_DROP_TRIGGER_3D     = 22;    // en stable: arrancar cuenta regresiva para degradar
+const FPS_DROP_SUSTAIN_MS_3D  = 900;   // ms sostenidos por debajo de FPS_DROP_TRIGGER antes de degradar
+const RECOVERY_IDLE_MS_3D     = 60_000; // intentar re-calibrar tras 60 s sin interacción
+
+// EMA de FPS (reemplaza sliding window)
+const FPS_EMA_ALPHA_3D = 0.07;
+
+// Timeout: si a los 10 s no se completó la calibración, pasar a versión 2D
+const FALLBACK_2D_TIMEOUT_MS  = 10_000;
+
+// Órbita idle: pausar rotación tras N ms sin interacción
+const ORBIT_IDLE_MS = 3000;
+
+// Geometría reducida
+const SPHERE_SEGMENTS_LOW = 8;
+const HALO_SEGMENTS_LOW   = 6;
+
+// Optimización 2D
+const MAX_PIXEL_RATIO_2D = 1.0;
+const ZOOM_OUT_2D_FALLBACK = 1.45;
+const PARTICLE_COUNT_2D = 48;
+const PARTICLE_SPEED_2D = 0.4;
+const BASE_SCALE_2D = 420;
+
+type PerfState3D = 'calibrating' | 'stable_high' | 'stable' | 'degraded';
+
+/* ═══════════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════════ */
 
 function normalizarCiudad(ciudad?: string): string {
   if (!ciudad) return 'Ushuaia';
@@ -180,13 +208,8 @@ const NODE_HEX: Record<string, string> = {
   estudiante:              '#10b981',
 };
 
-// Geometría reducida para bajo recursos (8 segmentos en lugar de 20)
-const SPHERE_SEGMENTS_LOW = 8;
-const HALO_SEGMENTS_LOW = 6;
-
 function makeNodeObject(node: any): THREE.Object3D {
   const group = new THREE.Group();
-
   if (node.type === 'ciudad') return group;
 
   const type   = node.type === 'prestador' ? (node.subTipo?.toLowerCase() || 'profesional') : node.type;
@@ -194,14 +217,10 @@ function makeNodeObject(node: any): THREE.Object3D {
   const color  = new THREE.Color(hex);
   const radius = node.type === 'proyecto' ? 7 : node.type === 'locacion' ? 5 : 4;
 
-  // Núcleo emissive (menos polígonos)
   group.add(new THREE.Mesh(
     new THREE.SphereGeometry(radius, SPHERE_SEGMENTS_LOW, SPHERE_SEGMENTS_LOW),
-    new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.95,
-    })
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 })
   ));
-  // Halo más ligero
   group.add(new THREE.Mesh(
     new THREE.SphereGeometry(radius * 2.2, HALO_SEGMENTS_LOW, HALO_SEGMENTS_LOW),
     new THREE.MeshBasicMaterial({
@@ -263,13 +282,6 @@ interface Node2D {
   ciudad: string; name?: string;
   _angle: number; _tilt: number;
 }
-
-const BASE_SCALE_2D = 420;
-const ZOOM_OUT_2D_FALLBACK = 1.45;
-
-/* Fondo liviano de partículas/estrellas para la vista 2D (pocos recursos) */
-const PARTICLE_COUNT_2D = 48;
-const PARTICLE_SPEED_2D = 0.4;
 
 function ParticlesBackground2D() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -343,7 +355,25 @@ function NeuralCanvas2D({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
   const nodesRef  = useRef(nodes);
+  // 2D idle tracking (compartido con el canvas)
+  const lastInteraction2DRef = useRef(performance.now());
+
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+
+  // Trackear interacción en la vista 2D
+  useEffect(() => {
+    const mark = () => { lastInteraction2DRef.current = performance.now(); };
+    window.addEventListener('mousemove', mark, { passive: true });
+    window.addEventListener('touchstart', mark, { passive: true });
+    window.addEventListener('keydown', mark, { passive: true });
+    window.addEventListener('click', mark, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', mark);
+      window.removeEventListener('touchstart', mark);
+      window.removeEventListener('keydown', mark);
+      window.removeEventListener('click', mark);
+    };
+  }, []);
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onNodeClick) return;
@@ -375,6 +405,8 @@ function NeuralCanvas2D({
     const zoom = zoomOut;
 
     const loop = () => {
+      const now = performance.now();
+      const idle2D = now - lastInteraction2DRef.current > ORBIT_IDLE_MS;
       const W = canvas.width; const H = canvas.height; const cx = W / 2;
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = 'rgba(0,0,16,0.62)'; ctx.fillRect(0, 0, W, H);
@@ -386,7 +418,6 @@ function NeuralCanvas2D({
         const cityColor = CIUDAD_CONFIG[ciudad]?.color ?? '#ffffff';
         const rC = Math.min(W, H) * 0.055;
 
-        // Anillos guía
         const tipos: Array<keyof typeof ORBIT_RADIUS_2D> = ['locacion', 'proyecto', 'prestador'];
         tipos.forEach(tipo => {
           const ro = ORBIT_RADIUS_2D[tipo] * scale;
@@ -394,23 +425,19 @@ function NeuralCanvas2D({
           ctx.strokeStyle = '#ffffff0a'; ctx.lineWidth = 0.5; ctx.stroke();
         });
 
-        // Halo ciudad
         const grad = ctx.createRadialGradient(cx, cy, rC * 0.2, cx, cy, rC * 2.5);
         grad.addColorStop(0, cityColor + '30'); grad.addColorStop(1, 'transparent');
         ctx.beginPath(); ctx.arc(cx, cy, rC * 2.5, 0, Math.PI * 2);
         ctx.fillStyle = grad; ctx.fill();
 
-        // Esfera ciudad visible
         ctx.beginPath(); ctx.arc(cx, cy, rC, 0, Math.PI * 2);
         ctx.strokeStyle = cityColor + 'bb'; ctx.lineWidth = 1.5; ctx.stroke();
         ctx.fillStyle   = cityColor + '15'; ctx.fill();
 
-        // Label ciudad
         ctx.font = `bold ${Math.round(rC * 0.6)}px system-ui,sans-serif`;
         ctx.fillStyle = cityColor + 'cc'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(ciudad.toUpperCase(), cx, cy);
 
-        // Nodos orbitando
         nodesRef.current
           .filter(n => {
             const nc = normalizarCiudad(n.ciudad);
@@ -418,7 +445,8 @@ function NeuralCanvas2D({
           })
           .forEach(n => {
             const tipo = n.type as keyof typeof ORBIT_RADIUS_2D;
-            n._angle += ORBIT_SPEED_2D[tipo] ?? 0.005;
+            // Solo avanzar ángulo si hay interacción reciente
+            if (!idle2D) n._angle += ORBIT_SPEED_2D[tipo] ?? 0.005;
             const ro = ORBIT_RADIUS_2D[tipo] ?? 80;
             const nx = cx + Math.cos(n._angle) * ro * scale;
             const ny = cy + Math.sin(n._angle) * ro * scale * 0.35;
@@ -426,13 +454,11 @@ function NeuralCanvas2D({
             const nodeColor = NODE_COLOR_2D[subTipo] ?? '#ffffff';
             const nr = (n.type === 'proyecto' ? 5 : n.type === 'locacion' ? 3.5 : 3) * scale;
 
-            // Halo nodo
             const gn = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr * 3.5);
             gn.addColorStop(0, nodeColor + '60'); gn.addColorStop(1, 'transparent');
             ctx.beginPath(); ctx.arc(nx, ny, nr * 3.5, 0, Math.PI * 2);
             ctx.fillStyle = gn; ctx.fill();
 
-            // Punto
             ctx.beginPath(); ctx.arc(nx, ny, nr, 0, Math.PI * 2);
             ctx.fillStyle = nodeColor; ctx.fill();
           });
@@ -456,7 +482,7 @@ function NeuralCanvas2D({
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   PANEL IZQUIERDO — compartido entre 3D y 2D
+   PANEL IZQUIERDO
 ═══════════════════════════════════════════════════════════════ */
 function LeftPanel({
   loading, stats, visibleLayers, toggleLayer, resetCamera, isMobile,
@@ -475,7 +501,6 @@ function LeftPanel({
     <div className={`z-50 pointer-events-none select-none ${isMobile && mobileExpanded ? 'fixed inset-0 flex items-center justify-center p-4' : `absolute left-3 ${isMobile ? 'top-3 w-[calc(100vw-24px)] max-w-xs' : 'top-1/2 -translate-y-1/2'}`}`}>
       <div className="bg-slate-950/80 backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.8)] pointer-events-auto overflow-hidden flex flex-col w-72 max-w-[calc(100vw-2rem)] relative">
 
-        {/* Header */}
         <div className="p-4 border-b border-white/5 bg-gradient-to-r from-slate-900/90 to-transparent flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-black text-white flex items-center gap-3 tracking-tight">
@@ -504,7 +529,6 @@ function LeftPanel({
           )}
         </div>
 
-        {/* Stats */}
         {!loading && (
           <div className="px-4 py-3 grid grid-cols-3 gap-2 border-b border-white/5 bg-black/20">
             <div className="text-center">
@@ -523,8 +547,6 @@ function LeftPanel({
         )}
 
         <div className="p-4 space-y-3">
-
-          {/* Capa prestadores */}
           <div
             onClick={() => toggleLayer('prestador')}
             className={`cursor-pointer transition-all duration-300 p-3 rounded-xl border border-white/5 ${visibleLayers.prestador ? 'bg-white/5 opacity-100' : 'bg-white/5 opacity-40 grayscale'}`}
@@ -547,7 +569,6 @@ function LeftPanel({
             </div>
           </div>
 
-          {/* Capa proyectos */}
           <div
             onClick={() => toggleLayer('proyecto')}
             className={`flex items-center justify-between p-3 rounded-xl border border-white/5 cursor-pointer transition-all duration-300 ${visibleLayers.proyecto ? 'bg-white/5 opacity-100' : 'bg-white/5 opacity-40 grayscale'}`}
@@ -562,7 +583,6 @@ function LeftPanel({
             </div>
           </div>
 
-          {/* Capa locaciones */}
           <div
             onClick={() => toggleLayer('locacion')}
             className={`flex items-center justify-between p-3 rounded-xl border border-white/5 cursor-pointer transition-all duration-300 ${visibleLayers.locacion ? 'bg-white/5 opacity-100' : 'bg-white/5 opacity-40 grayscale'}`}
@@ -576,7 +596,6 @@ function LeftPanel({
               <span className="text-[9px] text-slate-600">{visibleLayers.locacion?'ON':'OFF'}</span>
             </div>
           </div>
-
         </div>
 
         <div className="p-4 bg-slate-900/80 border-t border-white/5">
@@ -592,7 +611,7 @@ function LeftPanel({
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   MARCAS DE AGUA CIUDAD (lado derecho)
+   MARCAS DE AGUA CIUDAD
 ═══════════════════════════════════════════════════════════════ */
 const CityWatermarks = () => (
   <div className="absolute right-10 top-1/2 -translate-y-1/2 flex flex-col justify-between h-[65%] pointer-events-none select-none text-right z-20 opacity-70">
@@ -627,20 +646,27 @@ function MobileTooltip({ node, onClose }: { node: TooltipData | null; onClose: (
 ═══════════════════════════════════════════════════════════════ */
 export default function AdminDashboardPage() {
   const { t } = useLanguage();
-  const graphRef        = useRef<any>(null);
-  const iframeRef       = useRef<HTMLIFrameElement>(null);
-  const waveCounterRef  = useRef(0);
-  const speedRef        = useRef(1.0);
-  const distortionRef   = useRef(0.0);
-  const boostRef        = useRef(0);
-  const renderer3DRef   = useRef<THREE.WebGLRenderer | null>(null);
-  const frameTime3DRef  = useRef<number[]>([]);
-  const pixelRatio3DRef = useRef(INITIAL_PIXEL_RATIO_3D);
-  const lowFps3DRef     = useRef(0);
-  const highFps3DRef    = useRef(0);
-  const slowLoadDoneRef = useRef(false);
-  const frameCount3DRef = useRef(0);
-  const sceneReadyRef   = useRef(false);
+  const graphRef       = useRef<any>(null);
+  const iframeRef      = useRef<HTMLIFrameElement>(null);
+  const waveCounterRef = useRef(0);
+  const speedRef       = useRef(1.0);
+  const distortionRef  = useRef(0.0);
+  const boostRef       = useRef(0);
+
+  // ─── Performance state machine 3D ───────────────────────────
+  const renderer3DRef      = useRef<THREE.WebGLRenderer | null>(null);
+  const perfState3DRef     = useRef<PerfState3D>('calibrating');
+  const calibStart3DRef    = useRef(0);
+  const fpsEMA3DRef        = useRef(60);
+  const lastFrame3DRef     = useRef(performance.now());
+  const lowFpsStart3DRef   = useRef(0);
+  const degraded3DSinceRef = useRef(0);
+  const pixelRatio3DRef    = useRef(INITIAL_PIXEL_RATIO_3D);
+  const sceneReadyRef      = useRef(false); // para el fallback 2D timeout
+  // ────────────────────────────────────────────────────────────
+
+  // Órbita idle: timestamp de la última interacción del usuario
+  const lastInteractionRef = useRef(performance.now());
 
   const [loading, setLoading]             = useState(true);
   const [graphData, setGraphData]         = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
@@ -654,16 +680,16 @@ export default function AdminDashboardPage() {
   const [stats, setStats]                 = useState({ locaciones: 0, proyectos: 0, prestadores: 0 });
   const [isMobile, setIsMobile]           = useState(false);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
-  const [force2D, setForce2D]             = useState(false); // Fallback si tarda >10s en cargar 3D
+  const [force2D, setForce2D]             = useState(false);
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
-  // Si en desktop la escena 3D no está lista en 10s, cambiar a versión 2D (bajo recursos)
+  // ── Fallback 2D si la escena 3D no llega a stable en 10 s ──
   useEffect(() => {
     if (isMobile || loading || force2D) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       if (!sceneReadyRef.current) setForce2D(true);
     }, FALLBACK_2D_TIMEOUT_MS);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [isMobile, loading, force2D]);
 
   // ── Detector mobile ────────────────────────────────────────
@@ -674,21 +700,44 @@ export default function AdminDashboardPage() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // ── 3D: limitar pixel ratio y preparar resolución dinámica (cuando el grafo está listo)
+  // ── Trackear interacción (para idle orbit y recovery) ──────
+  useEffect(() => {
+    const mark = () => { lastInteractionRef.current = performance.now(); };
+    window.addEventListener('mousemove',  mark, { passive: true });
+    window.addEventListener('touchstart', mark, { passive: true });
+    window.addEventListener('keydown',    mark, { passive: true });
+    window.addEventListener('click',      mark, { passive: true });
+    window.addEventListener('wheel',      mark, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove',  mark);
+      window.removeEventListener('touchstart', mark);
+      window.removeEventListener('keydown',    mark);
+      window.removeEventListener('click',      mark);
+      window.removeEventListener('wheel',      mark);
+    };
+  }, []);
+
+  // ── 3D: obtener renderer al estar listo (respaldo del lazy init en tick) ──
   useEffect(() => {
     if (loading || isMobile) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       const g = graphRef.current;
       const renderer = typeof g?.renderer === 'function' ? g.renderer() : null;
       if (renderer && renderer.setPixelRatio) {
         renderer3DRef.current = renderer;
         const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
-        const initial = Math.min(dpr, INITIAL_PIXEL_RATIO_3D);
-        pixelRatio3DRef.current = initial;
-        renderer.setPixelRatio(initial);
+        pixelRatio3DRef.current = Math.min(dpr, INITIAL_PIXEL_RATIO_3D);
+        renderer.setPixelRatio(pixelRatio3DRef.current);
+        // Resetear state machine al (re)obtener renderer
+        perfState3DRef.current = 'calibrating';
+        calibStart3DRef.current = 0;
+        fpsEMA3DRef.current = 60;
+        lastFrame3DRef.current = performance.now();
+        lowFpsStart3DRef.current = 0;
+        degraded3DSinceRef.current = 0;
       }
     }, 500);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [loading, isMobile]);
 
   // ── Carga de datos ─────────────────────────────────────────
@@ -703,13 +752,11 @@ export default function AdminDashboardPage() {
         const nodes: any[] = [];
         const links: any[] = [];
 
-        // Anclas ciudad (invisibles en 3D)
         ['Río Grande', 'Tolhuin', 'Ushuaia'].forEach(ciudad => {
           const cfg = CIUDAD_CONFIG[ciudad]!;
           nodes.push({ id:`ciudad_${ciudad}`, name:cfg.label, type:'ciudad', ciudad, fx:0, fy:cfg.y, fz:0, val:1 });
         });
 
-        // Locaciones
         resLoc.forEach((loc: any) => {
           const ciudad = normalizarCiudad(loc.ciudad);
           const cfg    = CIUDAD_CONFIG[ciudad] ?? CIUDAD_CONFIG['Ushuaia'];
@@ -721,7 +768,6 @@ export default function AdminDashboardPage() {
           });
         });
 
-        // Proyectos
         resProj.forEach((proj: any) => {
           const ciudad = normalizarCiudad(proj.ciudad);
           const cfg    = CIUDAD_CONFIG[ciudad] ?? CIUDAD_CONFIG['Ushuaia'];
@@ -735,7 +781,6 @@ export default function AdminDashboardPage() {
           if (loc) links.push({ source:`proj_${proj.id}`, target:loc.id });
         });
 
-        // Prestadores
         resPrest.forEach((prest: any) => {
           const ciudad  = normalizarCiudad(prest.ciudad);
           const cfg     = CIUDAD_CONFIG[ciudad] ?? CIUDAD_CONFIG['Ushuaia'];
@@ -809,7 +854,7 @@ export default function AdminDashboardPage() {
     buildGraph();
   }, []);
 
-  // ── Filtro capas (ciudad siempre presente) ──────────────────
+  // ── Filtro capas ────────────────────────────────────────────
   const filteredGraphData = useMemo(() => {
     const an = graphData.nodes.filter((n: any) =>
       n.type === 'ciudad' || visibleLayers[n.type as keyof typeof visibleLayers]
@@ -823,7 +868,6 @@ export default function AdminDashboardPage() {
     return { nodes: an, links: al };
   }, [graphData, visibleLayers]);
 
-  // Nodos 2D (sin anclas)
   const nodes2D = useMemo(
     () => filteredGraphData.nodes.filter(n => n.type !== 'ciudad') as Node2D[],
     [filteredGraphData]
@@ -853,6 +897,7 @@ export default function AdminDashboardPage() {
   const resetCamera = useCallback(() => {
     graphRef.current?.cameraPosition({ x:0, y:0, z:1500 }, { x:0, y:0, z:0 }, 1800);
     boostRef.current = performance.now() + 2000;
+    lastInteractionRef.current = performance.now(); // marcar como activo durante boost
     const id = ++waveCounterRef.current;
     setWaves(prev => [...prev.slice(-8), { id, color:WAVE_COLORS[id%WAVE_COLORS.length], startTime:performance.now() }]);
   }, []);
@@ -873,12 +918,15 @@ export default function AdminDashboardPage() {
     setHoveredNode({ name:node.name, type:node.type, subTipo:node.subTipo, ciudad:node.ciudad, categoria:node.categoria, tipo:node.tipo });
   }, []);
 
-  // ── onEngineTick: órbita + optimización resolución dinámica por FPS ──────────
+  // ── onEngineTick: performance state machine + órbita idle ──
   const handleEngineTick = useCallback(() => {
     const now = performance.now();
     const boosting = now < boostRef.current;
 
-    // Obtener renderer 3D una vez (por si no estaba listo en el useEffect)
+    // Órbita idle: no girar si no hay interacción reciente ni boost activo
+    const orbitIdle = !boosting && (now - lastInteractionRef.current > ORBIT_IDLE_MS);
+
+    // ── Obtener renderer (lazy, por si no estaba listo en el useEffect) ──
     let renderer = renderer3DRef.current;
     if (!renderer && graphRef.current) {
       const g = graphRef.current;
@@ -886,74 +934,121 @@ export default function AdminDashboardPage() {
       if (renderer) {
         renderer3DRef.current = renderer;
         const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
-        const initial = Math.min(dpr, INITIAL_PIXEL_RATIO_3D);
-        pixelRatio3DRef.current = initial;
-        renderer.setPixelRatio(initial);
+        pixelRatio3DRef.current = Math.min(dpr, INITIAL_PIXEL_RATIO_3D);
+        renderer.setPixelRatio(pixelRatio3DRef.current);
+        perfState3DRef.current = 'calibrating';
+        calibStart3DRef.current = 0;
+        fpsEMA3DRef.current = 60;
+        lastFrame3DRef.current = now;
+        lowFpsStart3DRef.current = 0;
+        degraded3DSinceRef.current = 0;
       }
     }
+
     if (renderer) {
-      const ft = frameTime3DRef.current;
-      ft.push(now);
-      if (ft.length > FPS_SAMPLES_3D) ft.shift();
-      frameCount3DRef.current++;
-      if (frameCount3DRef.current >= SCENE_READY_MIN_FRAMES) sceneReadyRef.current = true;
-      const fps = ft.length >= 10 ? 1000 / ((ft[ft.length - 1] - ft[0]) / (ft.length - 1)) : 60;
-      const maxRatio = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, MAX_PIXEL_RATIO_3D);
+      // ── FPS via EMA ─────────────────────────────────────────
+      const rawDt = now - lastFrame3DRef.current;
+      lastFrame3DRef.current = now;
+      const instantFPS = rawDt > 0 ? 1000 / rawDt : 60;
+      fpsEMA3DRef.current =
+        FPS_EMA_ALPHA_3D * Math.min(instantFPS, 120) +
+        (1 - FPS_EMA_ALPHA_3D) * fpsEMA3DRef.current;
+      const fps = fpsEMA3DRef.current;
 
-      // Carga lenta: si en los primeros frames el FPS es bajo, bajar ratio de golpe
-      if (!slowLoadDoneRef.current && frameCount3DRef.current >= SLOW_LOAD_FRAMES_3D) {
-        slowLoadDoneRef.current = true;
-        if (fps < SLOW_LOAD_FPS_THRESHOLD_3D && pixelRatio3DRef.current > 0.65) {
-          pixelRatio3DRef.current = Math.max(MIN_PIXEL_RATIO_3D, Math.min(0.65, pixelRatio3DRef.current * 0.6));
-          renderer.setPixelRatio(pixelRatio3DRef.current);
-          const size = new THREE.Vector2();
-          renderer.getSize(size);
-          if (size.x && size.y) renderer.setSize(size.x, size.y);
+      const maxRatioCap = Math.min(
+        typeof window !== 'undefined' ? window.devicePixelRatio : 1,
+        MAX_PIXEL_RATIO_3D
+      );
+
+      const applyRatio = () => {
+        renderer!.setPixelRatio(pixelRatio3DRef.current);
+        const size = new THREE.Vector2();
+        renderer!.getSize(size);
+        if (size.x && size.y) renderer!.setSize(size.x, size.y);
+      };
+
+      // ── State machine de performance ─────────────────────────
+      const perfState = perfState3DRef.current;
+
+      if (perfState === 'calibrating') {
+        if (calibStart3DRef.current === 0) {
+          calibStart3DRef.current = now;
+          fpsEMA3DRef.current = 60;
+        }
+        const elapsed = now - calibStart3DRef.current;
+        const earlyBad  = fps < FPS_STABLE_LOW_3D && elapsed > CALIBRATION_EARLY_MS_3D;
+        const calibDone = elapsed >= CALIBRATION_MS_3D;
+
+        if (calibDone || earlyBad) {
+          if (fps >= FPS_STABLE_HIGH_3D) {
+            // Dispositivo potente: calidad máxima bloqueada forever
+            pixelRatio3DRef.current = maxRatioCap;
+            applyRatio();
+            perfState3DRef.current = 'stable_high';
+            sceneReadyRef.current = true;
+          } else if (fps >= FPS_STABLE_LOW_3D) {
+            perfState3DRef.current = 'stable';
+            sceneReadyRef.current = true;
+          } else {
+            // FPS bajo: bajar un escalón y re-calibrar
+            pixelRatio3DRef.current = Math.max(MIN_PIXEL_RATIO_3D, pixelRatio3DRef.current * QUALITY_DROP_STEP_3D);
+            applyRatio();
+            calibStart3DRef.current = 0;
+            fpsEMA3DRef.current = 60;
+            if (pixelRatio3DRef.current <= MIN_PIXEL_RATIO_3D) {
+              perfState3DRef.current = 'degraded';
+              degraded3DSinceRef.current = now;
+              sceneReadyRef.current = true;
+            }
+          }
+        }
+
+      } else if (perfState === 'stable') {
+        if (fps < FPS_DROP_TRIGGER_3D) {
+          if (lowFpsStart3DRef.current === 0) lowFpsStart3DRef.current = now;
+          else if (now - lowFpsStart3DRef.current > FPS_DROP_SUSTAIN_MS_3D) {
+            pixelRatio3DRef.current = Math.max(MIN_PIXEL_RATIO_3D, pixelRatio3DRef.current * QUALITY_DROP_STEP_3D);
+            applyRatio();
+            lowFpsStart3DRef.current = 0;
+            perfState3DRef.current = 'degraded';
+            degraded3DSinceRef.current = now;
+          }
+        } else {
+          lowFpsStart3DRef.current = 0;
+        }
+
+      } else if (perfState === 'stable_high') {
+        // No tocar nada. Solo emergencia absoluta < FPS_EMERGENCY_3D durante > 2 s
+        if (fps < FPS_EMERGENCY_3D) {
+          if (lowFpsStart3DRef.current === 0) lowFpsStart3DRef.current = now;
+          else if (now - lowFpsStart3DRef.current > 2000) {
+            perfState3DRef.current = 'stable';
+            lowFpsStart3DRef.current = 0;
+          }
+        } else {
+          lowFpsStart3DRef.current = 0;
+        }
+
+      } else if (perfState === 'degraded') {
+        // Re-calibrar tras RECOVERY_IDLE_MS sin interacción
+        const idleEnough = now - lastInteractionRef.current > RECOVERY_IDLE_MS_3D;
+        if (idleEnough && degraded3DSinceRef.current > 0) {
+          perfState3DRef.current = 'calibrating';
+          calibStart3DRef.current = 0;
+          fpsEMA3DRef.current = 60;
+          degraded3DSinceRef.current = 0;
         }
       }
-
-      if (fps < FPS_VERY_LOW_3D) {
-        lowFps3DRef.current++;
-        highFps3DRef.current = 0;
-        if (lowFps3DRef.current >= 25 && pixelRatio3DRef.current > MIN_PIXEL_RATIO_3D) {
-          pixelRatio3DRef.current = Math.max(MIN_PIXEL_RATIO_3D, pixelRatio3DRef.current * PIXEL_RATIO_DROP_VERY_LOW_3D);
-          renderer.setPixelRatio(pixelRatio3DRef.current);
-          const size = new THREE.Vector2();
-          renderer.getSize(size);
-          if (size.x && size.y) renderer.setSize(size.x, size.y);
-        }
-      } else if (fps < FPS_LOW_3D) {
-        lowFps3DRef.current++;
-        highFps3DRef.current = 0;
-        if (lowFps3DRef.current >= 40 && pixelRatio3DRef.current > MIN_PIXEL_RATIO_3D) {
-          pixelRatio3DRef.current = Math.max(MIN_PIXEL_RATIO_3D, pixelRatio3DRef.current * PIXEL_RATIO_DROP_LOW_3D);
-          renderer.setPixelRatio(pixelRatio3DRef.current);
-          const size = new THREE.Vector2();
-          renderer.getSize(size);
-          if (size.x && size.y) renderer.setSize(size.x, size.y);
-        }
-      } else if (fps > FPS_HIGH_3D) {
-        highFps3DRef.current++;
-        lowFps3DRef.current = 0;
-        if (highFps3DRef.current >= FPS_SAMPLES_3D * 2 && pixelRatio3DRef.current < maxRatio) {
-          pixelRatio3DRef.current = Math.min(maxRatio, pixelRatio3DRef.current * 1.2);
-          renderer.setPixelRatio(pixelRatio3DRef.current);
-          const size = new THREE.Vector2();
-          renderer.getSize(size);
-          if (size.x && size.y) renderer.setSize(size.x, size.y);
-        }
-      } else {
-        lowFps3DRef.current = 0;
-        highFps3DRef.current = 0;
-      }
+      // ── Fin state machine ─────────────────────────────────────
     }
 
-    // Mapa de posiciones de anclas
+    // ── Mapa de anclas ciudad ────────────────────────────────
     const anclas: Record<string, { x:number; y:number; z:number }> = {};
     filteredGraphData.nodes.forEach((d: any) => {
       if (d.type === 'ciudad') anclas[d.ciudad] = { x:d.x??0, y:d.y??0, z:d.z??0 };
     });
 
+    // ── Órbita de nodos ──────────────────────────────────────
     filteredGraphData.nodes.forEach((d: any) => {
       if (d.type === 'ciudad') return;
 
@@ -975,10 +1070,15 @@ export default function AdminDashboardPage() {
         d.vx = ((d.vx??0) + dx * 0.22) * 0.78;
         d.vy = ((d.vy??0) + dy * 0.22) * 0.78;
         d.vz = ((d.vz??0) + dz * 0.22) * 0.78;
-        // Actualizar ángulo para que la órbita retome bien
         d._angle = Math.atan2(d.z??0, d.x??0);
+      } else if (orbitIdle) {
+        // Idle: desacelerar suavemente hasta quedar estático en posición orbital actual
+        d.vx = (d.vx??0) * 0.85;
+        d.vy = (d.vy??0) * 0.85;
+        d.vz = (d.vz??0) * 0.85;
+        // No avanzar ángulo → las esferas se detienen donde están
       } else {
-        // Órbita estable alrededor del ancla
+        // Órbita activa
         d._angle += spd;
         const tx = ancla.x + Math.cos(d._angle) * R;
         const ty = ancla.y + Math.sin(d._angle) * R * d._tilt;
@@ -989,21 +1089,21 @@ export default function AdminDashboardPage() {
       }
 
       const maxV = boosting ? 10 : 5;
-      if (Math.abs(d.vx)>maxV) d.vx=Math.sign(d.vx)*maxV;
-      if (Math.abs(d.vy)>maxV) d.vy=Math.sign(d.vy)*maxV;
-      if (Math.abs(d.vz)>maxV) d.vz=Math.sign(d.vz)*maxV;
+      if (Math.abs(d.vx??0)>maxV) d.vx=Math.sign(d.vx)*maxV;
+      if (Math.abs(d.vy??0)>maxV) d.vy=Math.sign(d.vy)*maxV;
+      if (Math.abs(d.vz??0)>maxV) d.vz=Math.sign(d.vz)*maxV;
     });
   }, [filteredGraphData]);
 
-  /* ───────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────
      RENDER
-  ─────────────────────────────────────────────────────────── */
+  ───────────────────────────────────────────────────────── */
   return (
     <div
       className="h-screen w-full relative overflow-hidden bg-slate-950"
       onMouseMove={e => setTooltipPos({ x:e.clientX+16, y:e.clientY-8 })}
     >
-      {/* 1. SHADER DE FONDO (solo en cliente para evitar hydration mismatch) */}
+      {/* 1. SHADER DE FONDO */}
       {mounted ? (
         <iframe
           ref={iframeRef}
@@ -1014,11 +1114,7 @@ export default function AdminDashboardPage() {
           sandbox="allow-scripts"
         />
       ) : (
-        <div
-          className="absolute inset-0 w-full h-full bg-black"
-          style={{ zIndex:0 }}
-          aria-hidden
-        />
+        <div className="absolute inset-0 w-full h-full bg-black" style={{ zIndex:0 }} aria-hidden />
       )}
 
       {/* 2. ONDAS */}
@@ -1027,7 +1123,7 @@ export default function AdminDashboardPage() {
       {/* 3. FILTRO TV */}
       <TVOverlay/>
 
-      {/* 4. PANEL — móvil o fallback 2D: menú con botón; escritorio 3D: panel fijo */}
+      {/* 4. PANEL */}
       {(isMobile || force2D) ? (
         <>
           {mobilePanelOpen && (
@@ -1073,23 +1169,24 @@ export default function AdminDashboardPage() {
         />
       )}
 
-      {/* 5. HUD SHADER (solo desktop 3D) */}
+      {/* 5. HUD SHADER */}
       {!isMobile && !force2D && <ShaderHUD speed={speed} distortion={distortion}/>}
-      {/* Modo rendimiento: aviso cuando se pasó a 2D por timeout */}
+
+      {/* Aviso modo rendimiento */}
       {force2D && !isMobile && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs font-bold tracking-wide">
           {t('nodos.modo_rendimiento')}
         </div>
       )}
 
-      {/* 6. TOOLTIP HOVER (solo desktop) */}
+      {/* 6. TOOLTIP HOVER */}
       {!isMobile && hoveredNode && (
         <div className="fixed z-50 pointer-events-none" style={{ left:tooltipPos.x, top:tooltipPos.y }}>
           <NodeTooltip node={hoveredNode}/>
         </div>
       )}
 
-      {/* 7A. GRAFO 3D — Desktop (salvo fallback 2D) */}
+      {/* 7A. GRAFO 3D */}
       {!isMobile && !force2D && (
         <div className="absolute inset-0 cursor-move z-20">
           {!loading && (
@@ -1137,7 +1234,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* 7B. CANVAS 2D — Mobile o fallback por timeout (bajo recursos); en fallback cámara más lejos */}
+      {/* 7B. CANVAS 2D */}
       {(isMobile || force2D) && !loading && (
         <div className="absolute inset-0 z-20">
           <div className="absolute inset-0 bg-[#000010]" aria-hidden />
@@ -1162,10 +1259,10 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* 8. MARCAS DE AGUA (solo desktop 3D) */}
+      {/* 8. MARCAS DE AGUA */}
       {!isMobile && !force2D && <CityWatermarks/>}
 
-      {/* 9. BOTONES INFERIORES (solo desktop 3D) */}
+      {/* 9. BOTONES INFERIORES */}
       {!isMobile && !force2D && (
         <div className="absolute bottom-8 right-8 z-50 flex gap-2">
           <button
@@ -1180,7 +1277,6 @@ export default function AdminDashboardPage() {
           ><RefreshCw size={20}/></button>
         </div>
       )}
-
     </div>
   );
 }
