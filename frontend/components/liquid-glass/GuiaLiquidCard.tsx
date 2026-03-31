@@ -190,7 +190,7 @@ export function GuiaLiquidCard({ p, disable3D, verPerfilLabel }: GuiaLiquidCardP
         <div
           style={{
             /* ~15% menos padding lateral que antes (22px) → texto más ancho y más centrado en la tarjeta */
-            padding: '20px calc(22px * 0.85) 18px',
+            padding: '20px calc(22px * 1.35) 18px',
             background: `linear-gradient(180deg, rgba(${meta.rgb},0.04) 0%, rgba(0,0,0,0.08) 100%)`,
             flex: 1,
             display: 'flex',
