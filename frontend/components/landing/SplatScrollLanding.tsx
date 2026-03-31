@@ -102,7 +102,7 @@ const CAM_CONFIG: {
 const SPLAT_URL = '/splats/10.spz';
 
 // Cache del splat en memoria (blob URL) para no recargar en 10 minutos
-const SPLAT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
+const SPLAT_CACHE_TTL_MS = 10 * 60 * 1000;
 let splatCache: { url: string; timestamp: number } | null = null;
 
 // Más bajo = más suave / más lento
@@ -110,30 +110,43 @@ const SCROLL_RESPONSE = 1.6;
 const CAMERA_RESPONSE = 1.4;
 const SPLAT_RESPONSE = 1.2;
 
-// Límite de pixel ratio (móvil más bajo para mejor rendimiento)
+// Límite de pixel ratio por dispositivo
 const MOBILE_BREAKPOINT = 768;
 const MAX_PIXEL_RATIO_DESKTOP = 1.5;
 const MAX_PIXEL_RATIO_MOBILE = 1.25;
-// Inicio muy agresivo: arrancar con resolución y pixel ratio bajos para asegurar ~30 fps
-const INITIAL_PIXEL_RATIO_DESKTOP = 0.35;
-const INITIAL_PIXEL_RATIO_MOBILE = 0.4;
-// Escala de resolución inicial (renderizar a % del tamaño; 1 = 100%)
-const INITIAL_RES_SCALE_DESKTOP = 0.7;
-const INITIAL_RES_SCALE_MOBILE = 0.55;
-// Resolución dinámica: si FPS < 30, bajar ratio y aplicar escala de resolución
-const FPS_LOW_THRESHOLD = 30;
-const FPS_HIGH_THRESHOLD = 55;
-const FPS_SAMPLES = 60;
-const FPS_SAMPLES_BEFORE_DROP = 25; // reaccionar antes cuando FPS bajo
-const PIXEL_RATIO_DROP_FACTOR = 0.5;
-const MIN_PIXEL_RATIO = 0.35;
-// Cuando FPS < 30: además de bajar ratio, renderizar a % del tamaño (muy agresivo)
-const RES_SCALE_WHEN_LOW_FPS = 0.6;
-// Tras aplicar optimizaciones: mantener calidad baja al menos 30 s después del primer scroll antes de volver a subir
-const LOCK_QUALITY_AFTER_FIRST_SCROLL_MS = 30000;
+
+// Arrancar a calidad MÁXIMA — el state machine calibra hacia abajo si hace falta.
+// Los dispositivos potentes nunca vuelven a tocar la calidad tras la calibración.
+const INITIAL_PIXEL_RATIO_DESKTOP = MAX_PIXEL_RATIO_DESKTOP;
+const INITIAL_PIXEL_RATIO_MOBILE  = MAX_PIXEL_RATIO_MOBILE;
+const INITIAL_RES_SCALE_DESKTOP   = 1.0;
+const INITIAL_RES_SCALE_MOBILE    = 1.0;
+
+const MIN_PIXEL_RATIO   = 0.4;
+const MIN_RES_SCALE     = 0.55;
+const QUALITY_DROP_STEP = 0.75; // baja 25 % por escalón (suave, no 50 %)
+
+// ─── State machine de performance ───────────────────────────────────────────
+// Estados: calibrating → stable_high | stable → degraded
+//   stable_high: dispositivo potente, calidad bloqueada forever (sin más ajustes)
+//   stable:      calidad OK, vigilar caídas sostenidas
+//   degraded:    bajó calidad; intenta recovery tras RECOVERY_IDLE_MS sin scroll
+const CALIBRATION_MS       = 3000;  // duración de la fase de calibración
+const CALIBRATION_EARLY_MS = 1200;  // reacción anticipada si FPS muy bajo desde el inicio
+const FPS_STABLE_HIGH      = 55;    // dispositivo potente → lock forever
+const FPS_STABLE_LOW       = 30;    // mínimo aceptable al fin de calibración
+const FPS_EMERGENCY        = 22;    // umbral de emergencia para stable_high (rarísimo)
+const FPS_DROP_TRIGGER     = 25;    // en stable: arrancar cuenta regresiva para degradar
+const FPS_DROP_SUSTAIN_MS  = 900;   // ms sostenidos por debajo de FPS_DROP_TRIGGER antes de degradar
+const RECOVERY_IDLE_MS     = 60_000; // intentar re-calibrar tras 60 s sin scroll
+
+// EMA de FPS — reemplaza el sliding window.
+// α pequeño = muy estable, inmune a spikes de un frame.
+const FPS_EMA_ALPHA = 0.07;
+
 const IDLE_MS = 400;
 const IDLE_RENDER_INTERVAL = 20;
-const IDLE_RENDER_INTERVAL_MOBILE = 30; // en móvil render menos cuando idle
+const IDLE_RENDER_INTERVAL_MOBILE = 30;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -143,7 +156,6 @@ const CARDS: {
   subtitle: string;
   href: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
-  /** Color de acento (liquid glass / bordes / CTA) */
   themeHex: string;
 }[] = [
   {
@@ -191,9 +203,6 @@ function expAlpha(response: number, dt: number) {
   return 1 - Math.exp(-response * dt);
 }
 
-// IMPORTANTE:
-// usar una cámara real para calcular el quaternion.
-// Con Object3D puede quedar invertido para cámara.
 function quatFromPosLookAt(pos: V3, lookAt: V3) {
   const cam = new THREE.PerspectiveCamera();
   cam.position.copy(v3(pos));
@@ -202,14 +211,15 @@ function quatFromPosLookAt(pos: V3, lookAt: V3) {
 }
 
 const HERO_TEXT = 'FILMÁ EN TIERRA DEL FUEGO';
-const HERO_LINE1_END = 'FILMÁ EN '.length; // En móvil: primera fila "FILMA EN", segunda "TIERRA DEL FUEGO"
-const HERO_FILMA_END = 5; // "FILMA" = índices 0-4 → color naranja como navbar FILM
+const HERO_LINE1_END = 'FILMÁ EN '.length;
+const HERO_FILMA_END = 5;
 const HERO_OUTLINE = '0.5px 0.5px 0 rgba(0,0,0,0.45), -0.5px -0.5px 0 rgba(0,0,0,0.45), 0.5px -0.5px 0 rgba(0,0,0,0.45), -0.5px 0.5px 0 rgba(0,0,0,0.45), 0.5px 0 0 rgba(0,0,0,0.45), -0.5px 0 0 rgba(0,0,0,0.45), 0 0.5px 0 rgba(0,0,0,0.45), 0 -0.5px 0 rgba(0,0,0,0.45)';
-const HERO_GLASS_HIGHLIGHT = '0 1px 0 rgba(255,255,255,0.15), -1px -1px 0 rgba(255,255,255,0.06)'; // brillo sutil tipo cristal
+const HERO_GLASS_HIGHLIGHT = '0 1px 0 rgba(255,255,255,0.15), -1px -1px 0 rgba(255,255,255,0.06)';
 const N_SECTIONS = CARDS.length + 1;
 
 type LogEntry = { time: string; level: 'info' | 'ok' | 'warn' | 'error'; msg: string };
 type RuntimeConfig = typeof CAM_CONFIG;
+type PerfState = 'calibrating' | 'stable_high' | 'stable' | 'degraded';
 
 // ─── Vec3Field ────────────────────────────────────────────────────────────────
 function Vec3Field({
@@ -642,13 +652,18 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   const scrollProgressRef = useRef(0);
   const smoothScrollRef = useRef(0);
   const lastScrollTimeRef = useRef(0);
-  const frameTimeRef = useRef<number[]>([]);
+
+  // ─── Performance state machine refs ─────────────────────────────────────────
+  const perfStateRef        = useRef<PerfState>('calibrating');
+  const calibrationStartRef = useRef(0);        // timestamp de inicio de la fase de calibración
+  const fpsEMARef           = useRef(60);       // exponential moving average de FPS
+  const lastFrameTimeRef    = useRef(performance.now());
+  const lowFpsStartRef      = useRef(0);        // cuándo empezó la racha de FPS bajo (en stable)
+  const degradedSinceRef    = useRef(0);        // para el recovery automático en degraded
+  // ────────────────────────────────────────────────────────────────────────────
+
   const pixelRatioRef = useRef(MAX_PIXEL_RATIO_DESKTOP);
-  const resScaleRef = useRef(1); // 1 = tamaño completo; < 1 cuando FPS < 30 (buffer más chico)
-  const firstScrollTimeRef = useRef(0); // 0 = aún no hubo scroll
-  const lockQualityUntilRef = useRef(0); // timestamp hasta el cual no subir calidad (tras primer scroll + optimizaciones)
-  const lowFpsFramesRef = useRef(0);
-  const highFpsFramesRef = useRef(0);
+  const resScaleRef   = useRef(1.0);
   const idleFrameCountRef = useRef(0);
 
   const [debugOpen, setDebugOpen] = useState(false);
@@ -722,12 +737,11 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       minute: '2-digit',
       second: '2-digit',
     });
-
     console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'](`[SplatLanding] ${msg}`);
     setLogs(prev => [...prev.slice(-99), { time, level, msg }]);
   }, []);
 
-  // ── Init Three.js (escritorio y móvil; optimizado por dispositivo) ───────────
+  // ── Init Three.js ──────────────────────────────────────────────────────────
   useEffect(() => {
     const wrap = canvasWrapRef.current;
     if (!wrap) return;
@@ -750,6 +764,14 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     mountIdRef.current++;
     const thisMountId = mountIdRef.current;
     log(`Init Three.js (mount #${thisMountId})`);
+
+    // Resetear state machine al montar
+    perfStateRef.current = 'calibrating';
+    calibrationStartRef.current = 0;
+    fpsEMARef.current = 60;
+    lastFrameTimeRef.current = performance.now();
+    lowFpsStartRef.current = 0;
+    degradedSinceRef.current = 0;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#06060f');
@@ -782,8 +804,6 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     const drawW = Math.max(1, Math.round(wrap.clientWidth * initialResScale));
     const drawH = Math.max(1, Math.round(wrap.clientHeight * initialResScale));
     renderer.setSize(drawW, drawH);
-    renderer.domElement.style.width = '100%';
-    renderer.domElement.style.height = '100%';
     renderer.domElement.style.cssText =
       'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
     wrap.appendChild(renderer.domElement);
@@ -806,9 +826,9 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       const w = wrap.clientWidth;
       const h = wrap.clientHeight;
       const scale = resScaleRef.current;
-      const drawW = Math.max(1, Math.round(w * scale));
-      const drawH = Math.max(1, Math.round(h * scale));
-      renderer.setSize(drawW, drawH);
+      const dW = Math.max(1, Math.round(w * scale));
+      const dH = Math.max(1, Math.round(h * scale));
+      renderer.setSize(dW, dH);
       renderer.setPixelRatio(pixelRatioRef.current);
       if (scale < 1) {
         renderer.domElement.style.width = '100%';
@@ -841,53 +861,105 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       const cfg = rtConfigRef.current;
       const wps = cfg.waypoints;
 
-      // FPS para resolución dinámica: muy agresivo cuando < 30 fps (ratio + escala de resolución)
-      const ft = frameTimeRef.current;
-      ft.push(now);
-      if (ft.length > FPS_SAMPLES) ft.shift();
-      const fps = ft.length >= 10 ? 1000 / ((ft[ft.length - 1] - ft[0]) / (ft.length - 1)) : 60;
-      if (fps < FPS_LOW_THRESHOLD) {
-        lowFpsFramesRef.current++;
-        highFpsFramesRef.current = 0;
-        if (lowFpsFramesRef.current >= FPS_SAMPLES_BEFORE_DROP) {
-          let changed = false;
-          if (pixelRatioRef.current > MIN_PIXEL_RATIO) {
-            pixelRatioRef.current = Math.max(MIN_PIXEL_RATIO, pixelRatioRef.current * PIXEL_RATIO_DROP_FACTOR);
-            changed = true;
-          }
-          if (resScaleRef.current > RES_SCALE_WHEN_LOW_FPS) {
-            resScaleRef.current = RES_SCALE_WHEN_LOW_FPS;
-            changed = true;
-          }
-          if (changed) {
-            if (firstScrollTimeRef.current > 0) {
-              lockQualityUntilRef.current = now + LOCK_QUALITY_AFTER_FIRST_SCROLL_MS;
-            }
-            applyRendererSize();
-          }
+      // ── FPS via EMA ──────────────────────────────────────────────────────
+      // Reemplaza el sliding window. α pequeño = suave, inmune a spikes de un frame.
+      const rawDt = now - lastFrameTimeRef.current;
+      lastFrameTimeRef.current = now;
+      const instantFPS = rawDt > 0 ? 1000 / rawDt : 60;
+      fpsEMARef.current =
+        FPS_EMA_ALPHA * Math.min(instantFPS, 120) +
+        (1 - FPS_EMA_ALPHA) * fpsEMARef.current;
+      const fps = fpsEMARef.current;
+
+      // ── State machine de performance ─────────────────────────────────────
+      const perfState = perfStateRef.current;
+
+      if (perfState === 'calibrating') {
+        if (calibrationStartRef.current === 0) {
+          calibrationStartRef.current = now;
+          fpsEMARef.current = 60; // reset EMA al entrar en calibración
         }
-      } else if (fps > FPS_HIGH_THRESHOLD) {
-        highFpsFramesRef.current++;
-        lowFpsFramesRef.current = 0;
-        const lockUntil = lockQualityUntilRef.current;
-        const allowRaise = !lockUntil || now >= lockUntil;
-        if (lockUntil && now >= lockUntil) lockQualityUntilRef.current = 0;
-        if (allowRaise && highFpsFramesRef.current >= FPS_SAMPLES * 2) {
-          let changed = false;
-          if (resScaleRef.current < 1) {
+        const elapsed = now - calibrationStartRef.current;
+
+        // Reacción anticipada: si a los CALIBRATION_EARLY_MS el FPS ya es muy bajo
+        const earlyBad = fps < FPS_STABLE_LOW && elapsed > CALIBRATION_EARLY_MS;
+        const calibDone = elapsed >= CALIBRATION_MS;
+
+        if (calibDone || earlyBad) {
+          if (fps >= FPS_STABLE_HIGH) {
+            // Dispositivo potente → calidad máxima bloqueada FOREVER
+            pixelRatioRef.current = maxRatioCap;
             resScaleRef.current = 1;
-            changed = true;
+            applyRendererSize();
+            perfStateRef.current = 'stable_high';
+            log(`Perf: stable_high @ ${fps.toFixed(0)} fps — calidad bloqueada forever`, 'ok');
+          } else if (fps >= FPS_STABLE_LOW) {
+            // Rango aceptable: mantener calidad actual y vigilar
+            perfStateRef.current = 'stable';
+            log(`Perf: stable @ ${fps.toFixed(0)} fps`, 'ok');
+          } else {
+            // FPS bajo → bajar un escalón (25 %) y re-calibrar
+            pixelRatioRef.current = Math.max(MIN_PIXEL_RATIO, pixelRatioRef.current * QUALITY_DROP_STEP);
+            resScaleRef.current   = Math.max(MIN_RES_SCALE,   resScaleRef.current   * QUALITY_DROP_STEP);
+            applyRendererSize();
+            calibrationStartRef.current = 0; // reiniciar fase
+            fpsEMARef.current = 60;
+            log(
+              `Perf: bajando calidad (${fps.toFixed(0)} fps) → ratio ${pixelRatioRef.current.toFixed(2)} / scale ${resScaleRef.current.toFixed(2)}`,
+              'warn'
+            );
+            // Si ya estamos en el mínimo absoluto, pasar directo a degraded
+            if (pixelRatioRef.current <= MIN_PIXEL_RATIO && resScaleRef.current <= MIN_RES_SCALE) {
+              perfStateRef.current = 'degraded';
+              degradedSinceRef.current = now;
+              log('Perf: degraded (mínimo alcanzado)', 'warn');
+            }
           }
-          if (pixelRatioRef.current < maxRatioCap) {
-            pixelRatioRef.current = Math.min(maxRatioCap, pixelRatioRef.current * 1.25);
-            changed = true;
-          }
-          if (changed) applyRendererSize();
         }
-      } else {
-        lowFpsFramesRef.current = 0;
-        highFpsFramesRef.current = 0;
+
+      } else if (perfState === 'stable') {
+        // Vigilar caídas sostenidas — no reaccionar a spikes aislados
+        if (fps < FPS_DROP_TRIGGER) {
+          if (lowFpsStartRef.current === 0) lowFpsStartRef.current = now;
+          else if (now - lowFpsStartRef.current > FPS_DROP_SUSTAIN_MS) {
+            pixelRatioRef.current = Math.max(MIN_PIXEL_RATIO, pixelRatioRef.current * QUALITY_DROP_STEP);
+            resScaleRef.current   = Math.max(MIN_RES_SCALE,   resScaleRef.current   * QUALITY_DROP_STEP);
+            applyRendererSize();
+            lowFpsStartRef.current = 0;
+            perfStateRef.current = 'degraded';
+            degradedSinceRef.current = now;
+            log(`Perf: stable → degraded (${fps.toFixed(0)} fps sostenido > ${FPS_DROP_SUSTAIN_MS} ms)`, 'warn');
+          }
+        } else {
+          lowFpsStartRef.current = 0; // el FPS volvió, cancelar cuenta regresiva
+        }
+
+      } else if (perfState === 'stable_high') {
+        // Dispositivo potente: no tocar nada.
+        // Única excepción: emergencia absoluta (< FPS_EMERGENCY durante > 2 s).
+        if (fps < FPS_EMERGENCY) {
+          if (lowFpsStartRef.current === 0) lowFpsStartRef.current = now;
+          else if (now - lowFpsStartRef.current > 2000) {
+            log(`Perf: stable_high emergencia (${fps.toFixed(0)} fps) → stable`, 'warn');
+            perfStateRef.current = 'stable';
+            lowFpsStartRef.current = 0;
+          }
+        } else {
+          lowFpsStartRef.current = 0;
+        }
+
+      } else if (perfState === 'degraded') {
+        // Intentar re-calibrar después de RECOVERY_IDLE_MS sin interacción de scroll
+        const idleEnough = now - lastScrollTimeRef.current > RECOVERY_IDLE_MS;
+        if (idleEnough && degradedSinceRef.current > 0) {
+          perfStateRef.current = 'calibrating';
+          calibrationStartRef.current = 0;
+          fpsEMARef.current = 60;
+          degradedSinceRef.current = 0;
+          log('Perf: intentando recovery desde degraded…');
+        }
       }
+      // ── Fin state machine ─────────────────────────────────────────────────
 
       const idle = !freeRoamRef.current && (now - lastScrollTimeRef.current > IDLE_MS);
       if (idle) idleFrameCountRef.current++;
@@ -897,7 +969,6 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
         const spd = flySpeedRef.current;
         const fwd = new THREE.Vector3();
         camera.getWorldDirection(fwd);
-
         const right = new THREE.Vector3().crossVectors(fwd, camera.up).normalize();
 
         if (keys.current['w']) camera.position.addScaledVector(fwd, spd);
@@ -939,7 +1010,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
         const q1 = quatFromPosLookAt(w1.pos, w1.lookAt);
         tmpQuat.copy(q0).slerp(q1, t);
 
-        const camAlpha = expAlpha(CAMERA_RESPONSE, dt);
+        const camAlpha   = expAlpha(CAMERA_RESPONSE, dt);
         const splatAlpha = expAlpha(SPLAT_RESPONSE, dt);
 
         camera.position.lerp(targetPos, camAlpha);
@@ -962,14 +1033,12 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       if (frame % 4 === 0) {
         const p = camera.position;
         setLiveCamPos([fmt(p.x), fmt(p.y), fmt(p.z)]);
-
         const fd = new THREE.Vector3();
         camera.getWorldDirection(fd);
         const lp = p.clone().addScaledVector(fd, 3);
         setLiveLookAt([fmt(lp.x), fmt(lp.y), fmt(lp.z)]);
       }
 
-      // Render cuando interactúa: si idle, solo dibujar cada idleInterval frames para ahorrar GPU
       const shouldRender = !idle || idleFrameCountRef.current % idleInterval === 0;
       if (shouldRender) renderer.render(scene, camera);
     });
@@ -1056,14 +1125,7 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   // ── Scroll ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const onScroll = () => {
-      const now = performance.now();
-      lastScrollTimeRef.current = now;
-      if (firstScrollTimeRef.current === 0) {
-        firstScrollTimeRef.current = now;
-        if (resScaleRef.current < 1 || pixelRatioRef.current <= MIN_PIXEL_RATIO) {
-          lockQualityUntilRef.current = now + LOCK_QUALITY_AFTER_FIRST_SCROLL_MS;
-        }
-      }
+      lastScrollTimeRef.current = performance.now();
       const maxY = document.documentElement.scrollHeight - window.innerHeight;
       const prog = maxY > 0 ? clamp01(window.scrollY / maxY) : 0;
       scrollProgressRef.current = prog;
@@ -1086,21 +1148,15 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       lastMouse.current = { x: e.clientX, y: e.clientY };
     };
 
-    const onUp = () => {
-      isDragging.current = false;
-    };
+    const onUp = () => { isDragging.current = false; };
 
     const onMove = (e: PointerEvent) => {
       if (!isDragging.current) return;
       const dx = e.clientX - lastMouse.current.x;
       const dy = e.clientY - lastMouse.current.y;
       lastMouse.current = { x: e.clientX, y: e.clientY };
-
       lookAngles.current.yaw -= dx * 0.003;
-      lookAngles.current.pitch = Math.max(
-        -1.35,
-        Math.min(1.35, lookAngles.current.pitch - dy * 0.003)
-      );
+      lookAngles.current.pitch = Math.max(-1.35, Math.min(1.35, lookAngles.current.pitch - dy * 0.003));
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1133,10 +1189,8 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     (idx: number) => {
       const cam = cameraRef.current;
       if (!cam) return;
-
       const val: V3 = [fmt(cam.position.x), fmt(cam.position.y), fmt(cam.position.z)];
       log(`WP${idx} pos: [${val.join(', ')}]`, 'ok');
-
       setRtConfig(prev => {
         const n = structuredClone(prev);
         if (n.waypoints[idx]) n.waypoints[idx].pos = val;
@@ -1150,13 +1204,11 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     (idx: number) => {
       const cam = cameraRef.current;
       if (!cam) return;
-
       const fd = new THREE.Vector3();
       cam.getWorldDirection(fd);
       const t = cam.position.clone().addScaledVector(fd, 3);
       const val: V3 = [fmt(t.x), fmt(t.y), fmt(t.z)];
       log(`WP${idx} lookAt: [${val.join(', ')}]`, 'ok');
-
       setRtConfig(prev => {
         const n = structuredClone(prev);
         if (n.waypoints[idx]) n.waypoints[idx].lookAt = val;
@@ -1170,10 +1222,8 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     (idx: number) => {
       const splat = splatRef.current;
       if (!splat) return;
-
       const val: V3 = [fmt(splat.position.x), fmt(splat.position.y), fmt(splat.position.z)];
       log(`WP${idx} splatPos: [${val.join(', ')}]`, 'ok');
-
       setRtConfig(prev => {
         const n = structuredClone(prev);
         if (n.waypoints[idx]) n.waypoints[idx].splatPos = val;
@@ -1187,21 +1237,14 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
     (idx: number) => {
       const cam = cameraRef.current;
       if (!cam) return;
-
       const wp = rtConfigRef.current.waypoints[idx];
       if (!wp) return;
-
       cam.position.copy(v3(wp.pos));
       cam.quaternion.copy(quatFromPosLookAt(wp.pos, wp.lookAt));
-
       const dir = v3(wp.lookAt).sub(v3(wp.pos)).normalize();
       lookAngles.current.yaw = Math.atan2(dir.x, dir.z);
       lookAngles.current.pitch = Math.asin(Math.max(-1, Math.min(1, -dir.y)));
-
-      if (splatRef.current) {
-        splatRef.current.position.copy(v3(wp.splatPos));
-      }
-
+      if (splatRef.current) splatRef.current.position.copy(v3(wp.splatPos));
       log(`Salté a WP${idx}`);
     },
     [log]
@@ -1219,7 +1262,6 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
       smoothMouse.current.ny = lerp(smoothMouse.current.ny, heroMouse.ny, 0.06);
       animFrameRef.current = requestAnimationFrame(tick);
     };
-
     animFrameRef.current = requestAnimationFrame(tick);
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
@@ -1266,7 +1308,6 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="relative text-white bg-slate-950 min-h-[100dvh] md:min-h-0" style={{ height: `${N_SECTIONS * 100}svh` }}>
-      {/* Mensaje al inspeccionar o ver código fuente */}
       <div className="absolute opacity-0 w-0 h-0 overflow-hidden pointer-events-none select-none" aria-hidden>
         Lo sutil domina lo denso
       </div>
@@ -1288,24 +1329,24 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
             animation: card-icon-glow 2s ease-in-out infinite;
           }
         `}</style>
+
         {!debugHideVignette && (
-        <div
-          className="pointer-events-none absolute inset-0 z-10 hero-vignette"
-          style={{
-            background:
-              'radial-gradient(ellipse 68% 68% at 50% 50%, transparent 0%, transparent 26%, rgba(6,6,15,0.58) 48%, rgba(6,6,15,0.92) 64%, rgba(6,6,15,0.99) 78%, #06060f 100%)',
-          }}
-        />
+          <div
+            className="pointer-events-none absolute inset-0 z-10 hero-vignette"
+            style={{
+              background:
+                'radial-gradient(ellipse 68% 68% at 50% 50%, transparent 0%, transparent 26%, rgba(6,6,15,0.58) 48%, rgba(6,6,15,0.92) 64%, rgba(6,6,15,0.99) 78%, #06060f 100%)',
+            }}
+          />
         )}
 
-        {/* Filtro estilo TV (solo escritorio): oscurece un poco el fondo como en /login */}
         {!debugHideTvFilter && (
-        <div
-          className="hidden md:block pointer-events-none absolute inset-0 z-[11] bg-black/50 shadow-[inset_0_0_150px_rgba(0,0,0,0.6)]"
-          style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 4px)',
-          }}
-        />
+          <div
+            className="hidden md:block pointer-events-none absolute inset-0 z-[11] bg-black/50 shadow-[inset_0_0_150px_rgba(0,0,0,0.6)]"
+            style={{
+              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 4px)',
+            }}
+          />
         )}
 
         {(isAdmin || (isDesktop && showDebugByShift)) && (
@@ -1351,40 +1392,20 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
         )}
 
         {!debugHideHero && (
-        <div
-          className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-opacity duration-700 ${
-            isHeroVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-          }`}
-        >
           <div
-            className={isHeroVisible ? 'pointer-events-auto' : 'pointer-events-none'}
-            onMouseEnter={() => setHeroMouse(s => ({ ...s, hover: true }))}
-            onMouseLeave={() => setHeroMouse({ nx: 0.5, ny: 0.5, hover: false })}
-            onMouseMove={onHeroMove}
+            className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-opacity duration-700 ${
+              isHeroVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            }`}
           >
-            <h1 className="select-none text-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-none">
-              {/* En móvil: dos filas "FILMA EN" / "TIERRA DEL FUEGO"; en desktop una sola línea */}
-              <span className="block md:inline">
-                {heroLetters.slice(0, HERO_LINE1_END).map((ch, i) => (
-                  <span
-                    key={`${ch}-${i}`}
-                    className="inline-block"
-                    style={{
-                      ...getLetterStyle(i, heroLetters.length),
-                      color: i < HERO_FILMA_END ? 'rgba(234,88,12,0.92)' : 'rgba(255,255,255,0.88)',
-                      transition: heroMouse.hover
-                        ? 'transform 0.18s cubic-bezier(0.23,1,0.32,1), text-shadow 0.18s ease'
-                        : 'transform 0.6s cubic-bezier(0.23,1,0.32,1), text-shadow 0.6s ease',
-                    }}
-                  >
-                    {ch === ' ' ? '\u00A0' : ch}
-                  </span>
-                ))}
-              </span>
-              <span className="block md:inline">
-                {heroLetters.slice(HERO_LINE1_END).map((ch, j) => {
-                  const i = HERO_LINE1_END + j;
-                  return (
+            <div
+              className={isHeroVisible ? 'pointer-events-auto' : 'pointer-events-none'}
+              onMouseEnter={() => setHeroMouse(s => ({ ...s, hover: true }))}
+              onMouseLeave={() => setHeroMouse({ nx: 0.5, ny: 0.5, hover: false })}
+              onMouseMove={onHeroMove}
+            >
+              <h1 className="select-none text-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-none">
+                <span className="block md:inline">
+                  {heroLetters.slice(0, HERO_LINE1_END).map((ch, i) => (
                     <span
                       key={`${ch}-${i}`}
                       className="inline-block"
@@ -1398,49 +1419,66 @@ export default function SplatScrollLanding({ isAdmin = false }: SplatScrollLandi
                     >
                       {ch === ' ' ? '\u00A0' : ch}
                     </span>
-                  );
-                })}
-              </span>
-            </h1>
+                  ))}
+                </span>
+                <span className="block md:inline">
+                  {heroLetters.slice(HERO_LINE1_END).map((ch, j) => {
+                    const i = HERO_LINE1_END + j;
+                    return (
+                      <span
+                        key={`${ch}-${i}`}
+                        className="inline-block"
+                        style={{
+                          ...getLetterStyle(i, heroLetters.length),
+                          color: i < HERO_FILMA_END ? 'rgba(234,88,12,0.92)' : 'rgba(255,255,255,0.88)',
+                          transition: heroMouse.hover
+                            ? 'transform 0.18s cubic-bezier(0.23,1,0.32,1), text-shadow 0.18s ease'
+                            : 'transform 0.6s cubic-bezier(0.23,1,0.32,1), text-shadow 0.6s ease',
+                        }}
+                      >
+                        {ch === ' ' ? '\u00A0' : ch}
+                      </span>
+                    );
+                  })}
+                </span>
+              </h1>
 
-            <p className="mt-3 sm:mt-4 text-center text-xs sm:text-sm text-white/50 tracking-widest uppercase">
-              <span className="transition-all duration-300 hover:text-orange-400 hover:drop-shadow-[0_0_10px_rgba(249,115,22,0.9)] cursor-default">Patagonia</span>
-              <span className="mx-1.5">·</span>
-              <span className="transition-all duration-300 hover:text-blue-400 hover:drop-shadow-[0_0_10px_rgba(30,64,175,0.9)] cursor-default">Argentina</span>
-            </p>
+              <p className="mt-3 sm:mt-4 text-center text-xs sm:text-sm text-white/50 tracking-widest uppercase">
+                <span className="transition-all duration-300 hover:text-orange-400 hover:drop-shadow-[0_0_10px_rgba(249,115,22,0.9)] cursor-default">Patagonia</span>
+                <span className="mx-1.5">·</span>
+                <span className="transition-all duration-300 hover:text-blue-400 hover:drop-shadow-[0_0_10px_rgba(30,64,175,0.9)] cursor-default">Argentina</span>
+              </p>
 
-            <p
-              className="mt-5 sm:mt-6 text-center text-sm sm:text-base text-white/70 max-w-xs sm:max-w-md mx-auto leading-relaxed px-2"
-              style={{
-                textShadow: '0 2px 12px rgba(0,0,0,0.7), 0 1px 4px rgba(0,0,0,0.5)',
-              }}
-            >
-              Plataforma para impulsar la industria audiovisual en el Fin del Mundo.{' '}
-              <span className="text-white/50">
-                Conectamos talento, locaciones y producciones en Tierra del Fuego.
-              </span>
-            </p>
-
-            <div
-              className="mt-8 sm:mt-12 flex flex-col items-center gap-2"
-              style={{ animation: 'scrollBounce 3s ease-in-out infinite' }}
-            >
-              <style>{`@keyframes scrollBounce{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(8px);opacity:.9}}`}</style>
-              <span className="text-xs text-white/40 uppercase tracking-widest">Scroll</span>
-              <svg
-                width="14"
-                height="22"
-                viewBox="0 0 14 22"
-                className="text-white/40"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
+              <p
+                className="mt-5 sm:mt-6 text-center text-sm sm:text-base text-white/70 max-w-xs sm:max-w-md mx-auto leading-relaxed px-2"
+                style={{ textShadow: '0 2px 12px rgba(0,0,0,0.7), 0 1px 4px rgba(0,0,0,0.5)' }}
               >
-                <path d="M7 3 L7 19 M3 15 L7 19 L11 15" />
-              </svg>
+                Plataforma para impulsar la industria audiovisual en el Fin del Mundo.{' '}
+                <span className="text-white/50">
+                  Conectamos talento, locaciones y producciones en Tierra del Fuego.
+                </span>
+              </p>
+
+              <div
+                className="mt-8 sm:mt-12 flex flex-col items-center gap-2"
+                style={{ animation: 'scrollBounce 3s ease-in-out infinite' }}
+              >
+                <style>{`@keyframes scrollBounce{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(8px);opacity:.9}}`}</style>
+                <span className="text-xs text-white/40 uppercase tracking-widest">Scroll</span>
+                <svg
+                  width="14"
+                  height="22"
+                  viewBox="0 0 14 22"
+                  className="text-white/40"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <path d="M7 3 L7 19 M3 15 L7 19 L11 15" />
+                </svg>
+              </div>
             </div>
           </div>
-        </div>
         )}
 
         {!debugHideCards && CARDS.map((card, i) => {
