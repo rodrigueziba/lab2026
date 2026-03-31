@@ -38,7 +38,9 @@ const H = LIQUID_GLASS_MEDIA_HEIGHT;
 const R = LIQUID_GLASS_RADIUS;
 
 export function GuiaLiquidCard({ p, disable3D, verPerfilLabel }: GuiaLiquidCardProps) {
-  const { cardRef, innerRef, onMove, onLeave } = useLiquidGlassTilt(disable3D);
+  const { cardRef, innerRef, onMove, onLeave } = useLiquidGlassTilt(disable3D, {
+    enableGyroOnAndroidMobile: true,
+  });
   const meta = themeFromHex(p.colorTema);
   const desc = p.descripcion?.trim() || 'Sin descripción disponible.';
 
