@@ -123,9 +123,9 @@ export function LandingPromoLiquidCard({
           </div>
         </div>
 
-        {/* Columna derecha: título, texto, CTA compacto (móvil: texto completo + más padding; desktop: line-clamp) */}
+        {/* Columna derecha: título, texto, CTA compacto (móvil sin alto forzado para evitar espacio vacío abajo) */}
         <div
-          className="flex min-w-0 flex-1 flex-col justify-center py-4 pl-3.5 pr-3.5 max-md:min-h-[min(18rem,55svh)] max-md:justify-start max-md:pt-5 max-md:pb-6 sm:py-3.5 sm:pl-5 sm:pr-6 md:justify-center"
+          className="flex min-w-0 flex-1 flex-col justify-center py-4 pl-3.5 pr-3.5 max-md:justify-start max-md:pt-4 max-md:pb-4 sm:py-3.5 sm:pl-5 sm:pr-6 md:justify-center"
           style={{
             background: `linear-gradient(180deg, rgba(${meta.rgb},0.03) 0%, rgba(0,0,0,0.06) 100%)`,
           }}
@@ -146,7 +146,7 @@ export function LandingPromoLiquidCard({
             {subtitle}
           </p>
 
-          <div className="flex justify-end pt-2 max-md:pt-3">
+          <div className="flex justify-end pt-2 max-md:pt-2">
             <span
               className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-all group-hover:gap-2 sm:text-[11px]"
               style={{ color: meta.color }}

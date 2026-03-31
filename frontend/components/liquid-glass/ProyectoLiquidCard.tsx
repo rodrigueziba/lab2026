@@ -50,7 +50,9 @@ const H = LIQUID_GLASS_MEDIA_HEIGHT;
 const R = LIQUID_GLASS_RADIUS;
 
 export function ProyectoLiquidCard({ p, disable3D, youtubeId, isHovered }: ProyectoLiquidCardProps) {
-  const { cardRef, innerRef, onMove, onLeave } = useLiquidGlassTilt(disable3D);
+  const { cardRef, innerRef, onMove, onLeave } = useLiquidGlassTilt(disable3D, {
+    enableGyroOnAndroidMobile: true,
+  });
   const meta = TIPO_META[p.tipo] || { color: '#f97316', rgb: '249,115,22' };
   const videoRef = p.referencias?.find((r) => r.includes('youtu'));
 
