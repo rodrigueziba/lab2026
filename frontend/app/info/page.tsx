@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { X, Settings2, Activity, CheckCircle, User, Briefcase, ImageIcon, Link2, Egg, Music, Palette, LayoutGrid, Images, LogIn, ArrowUp, CircleDot, Bell, Zap, Mail, Send, Handshake } from "lucide-react";
 import TopologyBackground from "./TopologyBackground";
@@ -85,14 +85,17 @@ const featIconClass = {
   green:  "bg-[#10b981]/10",
 };
 
+/** Referencia de saturación/luminosidad para el gradiente (verde marca). */
+const DEFAULT_GRADIENT_BASE = "#05e690";
+
 const DEFAULT_TOPOLOGY = {
   LINES: 18,
-  STEPS: 140,
+  STEPS: 180,
   BASE_SPEED: 0.855,
   WAVE_AMP: 35,
   MOUSE_RADIUS: 160,
   MOUSE_FORCE: 38,
-  gradientBaseColor: null as string | null,
+  gradientBaseColor: DEFAULT_GRADIENT_BASE,
 };
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -102,7 +105,8 @@ function hexToRgb(hex: string): [number, number, number] {
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0, l = (max + min) / 2;
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
   if (max !== min) {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
@@ -130,11 +134,24 @@ function gradientColorsFromBase(baseHex: string): string[] {
   return out;
 }
 
+/** Mismo S/L que `DEFAULT_GRADIENT_BASE`, matiz (hue) aleatorio — variación en cada carga. */
+function randomGradientBaseColor(): string {
+  const [r, g, b] = hexToRgb(DEFAULT_GRADIENT_BASE);
+  const [, s, l] = rgbToHsl(r, g, b);
+  return hslToHex(Math.random() * 360, s, l);
+}
+
 export default function GuiaPrestadorPage() {
   const musicRef = useRef<HTMLAudioElement | null>(null);
   const [showDebugButton, setShowDebugButton] = useState(false);
   const [debugMenuOpen, setDebugMenuOpen] = useState(false);
   const [topologyParams, setTopologyParams] = useState(DEFAULT_TOPOLOGY);
+
+  // Color base al azar en cada visita: estado inicial fijo (#05e690) para SSR/hidratación; luego matiz aleatorio (misma S/L).
+  useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- único setState pos hidratación; Math.random en render rompería SSR
+    setTopologyParams((p) => ({ ...p, gradientBaseColor: randomGradientBaseColor() }));
+  }, []);
 
   // En escritorio: Shift muestra/oculta el botón Debug
   useEffect(() => {
@@ -176,10 +193,7 @@ export default function GuiaPrestadorPage() {
 
   const topologyProps = {
     ...topologyParams,
-    gradientColors:
-      topologyParams.gradientBaseColor != null
-        ? gradientColorsFromBase(topologyParams.gradientBaseColor)
-        : undefined,
+    gradientColors: gradientColorsFromBase(topologyParams.gradientBaseColor),
   };
 
   return (
@@ -216,29 +230,30 @@ export default function GuiaPrestadorPage() {
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
-                      value={topologyParams.gradientBaseColor ?? "#3b82f6"}
+                      value={topologyParams.gradientBaseColor}
                       onChange={(e) =>
                         setTopologyParams((p) => ({ ...p, gradientBaseColor: e.target.value }))
                       }
                       className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent"
                     />
                     <span className="text-xs font-mono text-slate-500">
-                      {topologyParams.gradientBaseColor ?? "Por defecto"}
+                      {topologyParams.gradientBaseColor}
                     </span>
-                    {topologyParams.gradientBaseColor != null && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setTopologyParams((p) => ({ ...p, gradientBaseColor: null }))
-                        }
-                        className="text-xs text-slate-500 hover:text-white"
-                      >
-                        Quitar
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTopologyParams((p) => ({
+                          ...p,
+                          gradientBaseColor: randomGradientBaseColor(),
+                        }))
+                      }
+                      className="text-xs text-slate-500 hover:text-white"
+                    >
+                      Otro al azar
+                    </button>
                   </div>
                   <p className="text-[10px] text-slate-600 mt-1">
-                    Genera 7 colores (base + 6 por rotación de tono) de izquierda a derecha.
+                    7 colores (base + 6 por rotación de tono). Referencia {DEFAULT_GRADIENT_BASE}; al cargar se elige un matiz al azar con la misma saturación y luminosidad.
                   </p>
                 </div>
                 {[
