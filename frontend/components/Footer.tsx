@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import * as THREE from 'three';
 
@@ -118,7 +118,9 @@ const TextLetters = ({ text, style }: { text: string, style?: React.CSSPropertie
 // ════════════════════════════════════════════════════════════════════════════
 export default function Footer() {
   const { t }  = useLanguage();
-  const router = useRouter();
+  const router   = useRouter();
+  const pathname = usePathname();
+  const allowSpecialAnim = pathname === '/proyectos';
 
   const footerRef      = useRef<HTMLElement>(null);
   const mountRef       = useRef<HTMLDivElement>(null);
@@ -132,12 +134,17 @@ export default function Footer() {
 
   const [spotPos, setSpotPos] = useState({ x: 0.38, y: 0.32, pxX: 0, pxY: 0 });
   const spotPosRef = useRef({ x: 0.38, y: 0.32 });
+  const aRef   = useRef<HTMLDivElement>(null);
+  const attRef = useRef<HTMLDivElement>(null);
+  const [beamBounds, setBeamBounds] = useState({ svgLeft: 0, svgWidth: 200, apexFrac: 0.38 });
+  const [coneAngles, setConeAngles] = useState({ right: 144, left: 220 });
 
   const obsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mouseRef    = useRef({ x: 0, y: 0 });
   const maxLatRef   = useRef(1.2); 
 
   useEffect(() => {
+    if (!allowSpecialAnim) return;
     if (triggered) return;
     const obs = new IntersectionObserver(([e]) => {
       if (e.isIntersecting) {
@@ -147,8 +154,20 @@ export default function Footer() {
       }
     }, { threshold: 0.25 });
     if (footerRef.current) obs.observe(footerRef.current);
-    return () => { obs.disconnect(); if (obsTimerRef.current) clearTimeout(obsTimerRef.current); };
-  }, [triggered]);
+    return () => {
+      obs.disconnect();
+      if (obsTimerRef.current) { clearTimeout(obsTimerRef.current); obsTimerRef.current = null; }
+    };
+  }, [triggered, allowSpecialAnim]);
+
+  useEffect(() => {
+    if (allowSpecialAnim) return;
+    setAnimating(false);
+    setTriggered(false);
+    setStarted(false);
+    setPhase(0);
+    phaseRef.current = 0;
+  }, [allowSpecialAnim]);
 
   useEffect(() => {
     if (!animating) return;
@@ -164,39 +183,58 @@ export default function Footer() {
     return () => ts.forEach(clearTimeout);
   }, [animating]);
 
-  // ── POSICIÓN DINÁMICA DE LA LUZ (Calculada Inmediatamente) ────────────────
   useEffect(() => {
-    // Al alcanzar phase 1 calculamos la posición exact sin delays,
-    // para que la luz ya se inicie desde su ubicación definitiva.
+    if (!animating || !footerRef.current) return;
+    footerRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [animating]);
+
+  // ── POSICIÓN DINÁMICA DE LA LUZ + BEAM BOUNDS ────────────────────────────
+  useEffect(() => {
+    const computeBeam = (fr: DOMRect, pxX: number, pxY: number) => {
+      if (!aRef.current || !attRef.current) return;
+      const ar   = aRef.current.getBoundingClientRect();
+      const attr = attRef.current.getBoundingClientRect();
+      const srcX = pxX - fr.left;
+      const srcY = pxY - fr.top;
+      const svgLeft  = ar.left   - fr.left;
+      const svgRight = attr.right - fr.left;
+      const svgWidth = svgRight - svgLeft;
+      const apexFrac = svgWidth > 0 ? (srcX - svgLeft) / svgWidth : 0.5;
+      const dy = fr.height - srcY;
+      const norm = (a: number) => ((a * 180 / Math.PI) % 360 + 360) % 360;
+      setBeamBounds({ svgLeft, svgWidth, apexFrac: Math.max(0.05, Math.min(0.95, apexFrac)) });
+      setConeAngles({
+        right: Math.round(norm(Math.atan2(svgRight - srcX, -dy))),
+        left:  Math.round(norm(Math.atan2(svgLeft  - srcX, -dy))),
+      });
+    };
+
     if (phase >= 1 && lightForRef.current && footerRef.current) {
       const cr = lightForRef.current.getBoundingClientRect();
       const fr = footerRef.current.getBoundingClientRect();
-      
       const pxX = cr.left + cr.width * 0.85;
       const pxY = cr.bottom - (cr.height * 0.28);
-      
       const xFrac = (pxX - fr.left) / fr.width;
       const yFrac = (pxY - fr.top) / fr.height;
-      
-      const clamped = { 
-        x: Math.max(0.05, Math.min(0.95, xFrac)), 
+      const clamped = {
+        x: Math.max(0.05, Math.min(0.95, xFrac)),
         y: Math.max(0.05, Math.min(0.90, yFrac)),
-        pxX, pxY 
+        pxX, pxY,
       };
       setSpotPos(clamped);
       spotPosRef.current = clamped;
+      computeBeam(fr, pxX, pxY);
     }
-    
+
     const handleResize = () => {
       if (!lightForRef.current || !footerRef.current) return;
-      const cr = lightForRef.current!.getBoundingClientRect();
-      // Reiniciamos caché de colisiones de letras en el resize
-      (window as any).__letterRects = null; 
-      setSpotPos(prev => ({
-        ...prev,
-        pxX: cr.left + cr.width * 0.85,
-        pxY: cr.bottom - (cr.height * 0.28)
-      }));
+      const cr = lightForRef.current.getBoundingClientRect();
+      const fr = footerRef.current.getBoundingClientRect();
+      (window as any).__letterRects = null;
+      const pxX = cr.left + cr.width * 0.85;
+      const pxY = cr.bottom - (cr.height * 0.28);
+      setSpotPos(prev => ({ ...prev, pxX, pxY }));
+      computeBeam(fr, pxX, pxY);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -313,7 +351,7 @@ export default function Footer() {
         spring.y += spring.vy;
         sphMesh.position.set(spring.x, spring.y, 0);
 
-        const coneHalf = 11 * Math.PI / 180; 
+        const coneHalf = 15.4 * Math.PI / 180;
         const coneW = CAMERA_Z * Math.tan(coneHalf);
         const dx = Math.abs(spring.x - spotWX);
         const underLight = dx < coneW + SPHERE_3D_R * 1.2;
@@ -459,15 +497,18 @@ export default function Footer() {
   const spotXpct  = `${(spotPos.x * 100).toFixed(1)}%`;
   const spotYpct  = `${(spotPos.y * 100).toFixed(1)}%`;
 
-  // Máscara cónica para el overlay interno del footer
-  const coneMask = [
-    `conic-gradient(`,
-    `  from 0deg at ${spotXpct} ${spotYpct},`,
-    `  black 0deg, black 168deg,`,
-    `  transparent 173deg, transparent 187deg,`,
-    `  black 192deg, black 360deg`,
-    `)`,
-  ].join('');
+  // Máscara cónica dinámica — ángulos calculados desde A hasta ATT
+  const coneMask = (() => {
+    const { right: cR, left: cL } = coneAngles;
+    return [
+      `conic-gradient(`,
+      `  from 0deg at ${spotXpct} ${spotYpct},`,
+      `  black 0deg, black ${Math.max(0, cR - 6)}deg,`,
+      `  transparent ${cR}deg, transparent ${cL}deg,`,
+      `  black ${Math.min(360, cL + 6)}deg, black 360deg`,
+      `)`,
+    ].join('');
+  })();
 
   return (
     <>
@@ -479,14 +520,14 @@ export default function Footer() {
           style={{
             position: 'fixed', inset: 0,
             zIndex: 9997,
-            background: 'rgba(1,7,18,0.98)',
+            background: 'rgba(1,7,18,0.62)',
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
             opacity: darkAlpha,
-            transition: 'opacity 3.5s ease',
+            transition: 'opacity 8s ease',
             pointerEvents: 'none',
-            maskImage: `radial-gradient(circle at ${spotPos.pxX}px ${spotPos.pxY}px, transparent 0%, transparent 6%, black 50%)`,
-            WebkitMaskImage: `radial-gradient(circle at ${spotPos.pxX}px ${spotPos.pxY}px, transparent 0%, transparent 6%, black 50%)`,
+            maskImage: `radial-gradient(circle at ${spotPos.pxX}px ${spotPos.pxY}px, transparent 0%, transparent 12%, rgba(0,0,0,0.3) 35%, black 65%)`,
+            WebkitMaskImage: `radial-gradient(circle at ${spotPos.pxX}px ${spotPos.pxY}px, transparent 0%, transparent 12%, rgba(0,0,0,0.3) 35%, black 65%)`,
           }}
         />,
         document.body,
@@ -511,6 +552,12 @@ export default function Footer() {
           @import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
           @keyframes fHint  { 0%,100%{opacity:.15} 50%{opacity:.50} }
           @keyframes srcPls { 0%,100%{opacity:.8}  50%{opacity:1}   }
+          @keyframes geminiFlow { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+          @keyframes geminiGlow {
+            0%,100%{filter:drop-shadow(0 0 10px #4285f4) drop-shadow(0 0 22px rgba(155,114,203,0.7))}
+            33%{filter:drop-shadow(0 0 10px #d96570) drop-shadow(0 0 22px rgba(244,180,0,0.7))}
+            66%{filter:drop-shadow(0 0 10px #0f9d58) drop-shadow(0 0 22px rgba(66,133,244,0.7))}
+          }
         `}</style>
 
         <div ref={mountRef} style={{ position:'absolute', inset:0, zIndex:0, pointerEvents:'none' }} />
@@ -535,9 +582,9 @@ export default function Footer() {
           }}
         >
           {/* Altura de A y ATT aumentada para mejor simetría */}
-          <div style={{
+          <div ref={aRef} style={{
             fontSize: 'clamp(3.8rem, 10.6vw, 9.8rem)',
-            lineHeight: 0.85, 
+            lineHeight: 0.85,
             color: '#fff',
             transform: started ? 'translateX(0)' : 'translateX(-160vw)',
             opacity: started ? 1 : 0,
@@ -563,7 +610,7 @@ export default function Footer() {
             <TextLetters text="FOR" />
           </div>
 
-          <div style={{
+          <div ref={attRef} style={{
             fontSize: 'clamp(3.8rem, 10.6vw, 9.8rem)',
             lineHeight: 0.85,
             color: '#fff',
@@ -586,7 +633,7 @@ export default function Footer() {
               opacity: started ? 1 : 0,
               transition: 'transform 2.4s cubic-bezier(.16,1,.3,1) .5s, opacity 1.2s ease .5s',
             }}>
-              <TextLetters text="RACTING" />
+              <TextLetters text="RACTING" style={{ letterSpacing: '0.09em', paddingLeft: '0.04em' }} />
             </div>
             
             <div style={{
@@ -607,9 +654,9 @@ export default function Footer() {
           preserveAspectRatio="none"
           style={{
             position: 'absolute',
-            left:   `calc(${spotXpct} - 70px)`,
+            left:   `${beamBounds.svgLeft}px`,
             top:    `${(spotPos.y * 100).toFixed(1)}%`,
-            width:  '140px',
+            width:  `${Math.max(1, beamBounds.svgWidth)}px`,
             height: `${((1 - spotPos.y) * 100).toFixed(1)}%`,
             zIndex: 2,
             pointerEvents: 'none',
@@ -626,24 +673,32 @@ export default function Footer() {
               <stop offset="65%"  stopColor="rgba(255,238,148,0.30)"/>
               <stop offset="100%" stopColor="rgba(255,235,130,0.00)"/>
             </linearGradient>
-            
             <linearGradient id="cgC" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%"   stopColor="rgba(255,255,220,0.85)"/>
               <stop offset="100%" stopColor="rgba(255,255,200,0.10)"/>
             </linearGradient>
-            <filter id="cb"><feGaussianBlur stdDeviation="2.5"/></filter>
+            <filter id="cb"><feGaussianBlur stdDeviation="1.8"/></filter>
           </defs>
-          
-          <polygon points="50,0 15,400 85,400" fill="url(#cg)" filter="url(#cb)"/>
-          <polygon points="50,0 35,400 65,400" fill="url(#cgC)"/>
-          <ellipse cx="50" cy="1" rx="8" ry="3" fill="rgba(255,255,215,1.0)"/>
+          <polygon
+            points={`${(beamBounds.apexFrac * 100).toFixed(1)},0 0,400 100,400`}
+            fill="url(#cg)" filter="url(#cb)"
+          />
+          <polygon
+            points={`${(beamBounds.apexFrac * 100).toFixed(1)},0 10,400 90,400`}
+            fill="url(#cgC)"
+          />
+          <ellipse
+            cx={`${(beamBounds.apexFrac * 100).toFixed(1)}`}
+            cy="1" rx="4" ry="2"
+            fill="rgba(255,255,215,1.0)"
+          />
         </svg>
 
         {/* ── OVERLAY INTERNO DEL FOOTER ────────────────────────────────────── */}
         <div style={{
           position: 'absolute', inset: 0, zIndex: 3,
-          background: `rgba(1,7,18,0.98)`,
-          transition: 'opacity 3.5s ease',
+          background: `rgba(1,7,18,0.62)`,
+          transition: 'opacity 8s ease',
           opacity: darkAlpha,
           pointerEvents: 'none',
           maskImage: phase >= 1 ? coneMask : 'none',
@@ -653,16 +708,26 @@ export default function Footer() {
         <div style={{
           position:'absolute', bottom:'1rem', left:'50%',
           transform:'translateX(-50%)',
-          color:'rgba(255,255,255,.18)',
-          fontSize:'clamp(.52rem,1vw,.68rem)',
-          letterSpacing:'.32em', textTransform:'uppercase',
-          fontFamily:'"Anton",sans-serif',
           whiteSpace:'nowrap', pointerEvents:'none', zIndex:4,
           opacity: phase >= 5 ? 1 : 0,
-          transition: 'opacity 1.5s ease',
-          animation: phase >= 5 ? 'fHint 3s ease-in-out infinite' : 'none',
+          transition: 'opacity 2s ease',
         }}>
-          toca para entrar
+          <div style={{ animation: phase >= 5 ? 'geminiGlow 4s ease-in-out infinite' : 'none' }}>
+            <span style={{
+              background: 'linear-gradient(90deg,#4285f4,#9b72cb,#d96570,#f4b400,#0f9d58,#4285f4)',
+              backgroundSize: '300% 100%',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              fontSize: 'clamp(.65rem,1.1vw,.85rem)',
+              letterSpacing: '.28em',
+              textTransform: 'uppercase',
+              fontFamily: '"Anton",sans-serif',
+              animation: phase >= 5 ? 'geminiFlow 3s linear infinite' : 'none',
+            }}>
+              toca para entrar
+            </span>
+          </div>
         </div>
       </footer>
     </>
