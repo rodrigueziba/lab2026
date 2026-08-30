@@ -7,6 +7,7 @@ import * as THREE from "three";
 import Chairs from "./Chairs";
 import ExperienceDome from "./ExperienceDome";
 import Audience from "./Audience";
+import Prism from "./Prism";
 
 // Zone vectors — module-level, never re-created
 const ZONA_LUZ    = new THREE.Vector3(0, 1.6, 0);
@@ -73,9 +74,12 @@ function DiagonalSpot() {
 // ── Player movement ───────────────────────────────────────────────────────────
 interface Keys { w: boolean; a: boolean; s: boolean; d: boolean }
 
+const SEAT_CAM_Y = 1.0; // camera height when seated (from 1.6 → 1.0)
+
 function Player() {
   const keys      = useRef<Keys>({ w: false, a: false, s: false, d: false });
   const triggered = useRef(false);
+  const seated    = useRef(false);
   // Pre-allocated vectors — never new'd inside useFrame
   const front = useRef(new THREE.Vector3());
   const side  = useRef(new THREE.Vector3());
@@ -83,6 +87,19 @@ function Player() {
   const { camera } = useThree();
 
   useEffect(() => { camera.position.set(-10, 1.6, -7); }, [camera]);
+
+  useEffect(() => {
+    const onSit = () => { seated.current = true; };
+    window.addEventListener("alight:chose-chairs", onSit);
+    return () => window.removeEventListener("alight:chose-chairs", onSit);
+  }, []);
+
+  // Re-enable WASD once the dome has fully revealed (fired by ExperienceDome)
+  useEffect(() => {
+    const onReveal = () => { seated.current = false; };
+    window.addEventListener("alight:dome-revealed", onReveal);
+    return () => window.removeEventListener("alight:dome-revealed", onReveal);
+  }, []);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -102,6 +119,12 @@ function Player() {
   }, []);
 
   useFrame(({ camera: cam }) => {
+    // When seated: freeze XZ, gently lower the camera and stop WASD
+    if (seated.current) {
+      cam.position.y = THREE.MathUtils.lerp(cam.position.y, SEAT_CAM_Y, 0.04);
+      return;
+    }
+
     cam.getWorldDirection(front.current);
     front.current.y = 0;
     front.current.normalize();
@@ -145,6 +168,7 @@ function Scene() {
       <DiagonalSpot />
       <Chairs />
       <Audience />
+      <Prism />
       <ExperienceDome />
       <Player />
       <PointerLockControls />

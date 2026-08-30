@@ -143,7 +143,9 @@ function StickFigure({ index, faceTexture, activatedRef }: FigureProps) {
     >
       {/* ── Head ──────────────────────────────────────────────────────────── */}
       <group ref={headG} position={[0, 1.48, 0]}>
-        <mesh castShadow>
+        {/* rotation.y = π aligns sphere's +z UV seam with world +z (toward player),
+            counteracting the root's rotation.y = π so the face texture faces forward. */}
+        <mesh castShadow rotation={[0, Math.PI, 0]}>
           <sphereGeometry args={[0.13, 14, 10]} />
           <meshStandardMaterial
             map={faceTexture ?? undefined}
