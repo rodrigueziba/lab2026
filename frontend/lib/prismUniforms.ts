@@ -6,3 +6,5 @@ import * as THREE from "three";
 // each render, so all 60+ shader instances stay in sync without React state.
 export const PRISM_POS_UNIFORM     = { value: new THREE.Vector3(0, 22, 0) };
 export const PRISM_RAINBOW_UNIFORM = { value: 0 };
+// Prism Y rotation — used in shaders to sweep rainbow beams around the dome
+export const PRISM_ROT_UNIFORM     = { value: 0 };

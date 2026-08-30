@@ -3,7 +3,7 @@
 import { useRef, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM } from "@/lib/prismUniforms";
+import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
 
 const PRISM_Y_START = 22;
 const PRISM_Y_END   =  2.5;
@@ -64,6 +64,7 @@ export default function Prism() {
 
     // Update shared uniforms — ExperienceDome reads these every render
     PRISM_POS_UNIFORM.value.set(0, y, 0);
+    PRISM_ROT_UNIFORM.value  = groupRef.current.rotation.y;
     PRISM_RAINBOW_UNIFORM.value = THREE.MathUtils.lerp(
       PRISM_RAINBOW_UNIFORM.value,
       ease,

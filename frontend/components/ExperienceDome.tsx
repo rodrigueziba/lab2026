@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM } from "@/lib/prismUniforms";
+import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
 
 const API_URL    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 const DOME_R     = 28;
@@ -94,10 +94,6 @@ function buildOrbits(urls: string[]): OrbitData[] {
 }
 
 // ── GLSL helpers shared by panel + dome-shell shaders ─────────────────────────
-// hsl2rgb: branch-free conversion via fract/clamp.
-// rotAround: Rodrigues rotation — rotate v around unit axis k by angle a.
-// calcRainbow: 7 ROYGBIV beams fanning out from the prism via Snell dispersion.
-//   scale controls per-surface intensity (panels = 2.5, shell = 1.8).
 const RAINBOW_GLSL = /* glsl */`
   vec3 hsl2rgb(float h, float s, float l) {
     vec3 p = abs(fract(h + vec3(1.0, 2.0/3.0, 1.0/3.0)) * 6.0 - 3.0);
@@ -107,31 +103,11 @@ const RAINBOW_GLSL = /* glsl */`
     float ca = cos(a), sa = sin(a);
     return v * ca + cross(k, v) * sa + k * dot(k, v) * (1.0 - ca);
   }
-  vec3 calcRainbow(vec3 fragPos, vec3 prismPos, float strength, float scale) {
-    if (strength < 0.001) return vec3(0.0);
-    // Direction the spotlight beam travels (source → prism)
-    vec3 inRay  = normalize(prismPos - vec3(9.0, 18.0, 10.0));
-    // Horizontal axis perpendicular to the incoming ray — rainbow fans around it
-    vec3 rawAx  = cross(inRay, vec3(0.0, 1.0, 0.0));
-    vec3 dispAx = length(rawAx) > 0.001 ? normalize(rawAx) : vec3(1.0, 0.0, 0.0);
-    vec3 toFrag = normalize(fragPos - prismPos);
-    float dist  = length(fragPos - prismPos);
-    float dFade = exp(-dist * 0.012);   // gentle distance falloff
-    vec3 out_   = vec3(0.0);
-    for (int i = 0; i < 7; i++) {
-      float t     = float(i) / 6.0;          // 0 = red, 1 = violet
-      float angle = mix(-0.42, 0.42, t);     // ±0.42 rad dispersion fan
-      vec3  beam  = rotAround(inRay, dispAx, angle);
-      float align = dot(toFrag, beam);
-      float bp    = smoothstep(0.9992, 1.0, align);      // tight beam core (~2°)
-      float bg    = pow(max(0.0, align), 48.0) * 0.25;   // soft glow halo
-      out_       += hsl2rgb(t, 1.0, 0.55) * (bp + bg) * dFade;
-    }
-    return out_ * strength * scale;
-  }
 `;
 
-// ── Panel shaders (texture reveal + rainbow) ───────────────────────────────────
+// ── Panel shaders ──────────────────────────────────────────────────────────────
+// Texture is only visible where a rainbow beam illuminates the panel.
+// Dark everywhere else — creating a Pink Floyd-style projector effect.
 const VERT = /* glsl */`
   varying vec2 vUv;
   varying vec3 vWorldPos;
@@ -143,27 +119,63 @@ const VERT = /* glsl */`
   }
 `;
 
-// Default: nearly black.  uReveal [0→1] drives a smooth reveal.
-// A brief bloom pulse fires near full reveal for a "light-ray touched" feel.
-// uRainbow [0→1] sweeps the prismatic rainbow over the panels.
 const FRAG = RAINBOW_GLSL + /* glsl */`
   uniform sampler2D uMap;
   uniform float     uReveal;
   uniform vec3      uPrismPos;
   uniform float     uRainbow;
+  uniform float     uPrismRot;
   varying vec2 vUv;
   varying vec3 vWorldPos;
+
   void main() {
-    vec4  tex   = texture2D(uMap, vUv);
-    float g     = smoothstep(0.0, 0.9, uReveal);
-    float bloom = smoothstep(0.82, 1.0, uReveal) * 0.12;
-    vec3  base  = mix(vec3(0.003, 0.001, 0.006), tex.rgb, g) + bloom;
-    vec3  ray   = calcRainbow(vWorldPos, uPrismPos, uRainbow, 2.5);
-    gl_FragColor = vec4(base + ray, 1.0);
+    float gate = smoothstep(0.0, 0.05, uReveal);
+    vec4  tex  = texture2D(uMap, vUv);
+    vec3  col  = vec3(0.002, 0.001, 0.004);
+
+    if (gate >= 0.01) {
+      if (uRainbow < 0.005) {
+        col = tex.rgb * 0.018 * gate;
+      } else {
+        // ── Outward radial beams ──────────────────────────────────────────────
+        // 7 beams fan outward from the prism horizontally.
+        // uPrismRot rotates the fan's central azimuth → beams sweep around dome.
+        // el = 18° elevation so beams point toward panels at heights 6-14m, r≈25m.
+        float az = uPrismRot;
+        float el = 0.32;  // ~18° elevation
+        vec3  centBeam = vec3(cos(el) * cos(az), sin(el), cos(el) * sin(az));
+
+        vec3  toFrag = normalize(vWorldPos - uPrismPos);
+        float dist   = length(vWorldPos - uPrismPos);
+        float dFade  = exp(-dist * 0.010);
+
+        float totalStr = 0.0;
+        vec3  beamTint = vec3(0.0);
+        for (int i = 0; i < 7; i++) {
+          float t      = float(i) / 6.0;           // 0=red … 1=violet
+          float sweep  = mix(-0.38, 0.38, t);       // ±22° horizontal dispersion
+          vec3  beam   = rotAround(centBeam, vec3(0.0, 1.0, 0.0), sweep);
+          float align  = dot(toFrag, beam);
+          float bOuter = smoothstep(0.984, 0.998, align);
+          float bInner = smoothstep(0.998, 1.000, align);
+          float b      = (bOuter * 0.6 + bInner * 1.4) * dFade;
+          totalStr    += b;
+          beamTint    += hsl2rgb(t, 0.65, 0.65) * b;
+        }
+        totalStr = clamp(totalStr * uRainbow, 0.0, 1.0);
+        beamTint = clamp(beamTint * uRainbow, 0.0, 1.0);
+
+        vec3 lit  = tex.rgb + beamTint * 0.22;
+        vec3 dark = tex.rgb * 0.018;
+        col = mix(dark, lit, totalStr) * gate;
+      }
+    }
+
+    gl_FragColor = vec4(col, 1.0);
   }
 `;
 
-// ── Dome-shell shaders (dark background + rainbow, no panel texture) ───────────
+// ── Dome-shell shaders (rainbow beams on dark background, no texture) ──────────
 const SHELL_VERT = /* glsl */`
   varying vec3 vWorldPos;
   void main() {
@@ -176,18 +188,44 @@ const SHELL_VERT = /* glsl */`
 const SHELL_FRAG = RAINBOW_GLSL + /* glsl */`
   uniform vec3  uPrismPos;
   uniform float uRainbow;
+  uniform float uPrismRot;
   varying vec3  vWorldPos;
+
   void main() {
-    vec3 rainbow = calcRainbow(vWorldPos, uPrismPos, uRainbow, 1.8);
-    gl_FragColor = vec4(vec3(0.004, 0.002, 0.010) + rainbow, 1.0);
+    vec3 bg      = vec3(0.004, 0.002, 0.010);
+    vec3 rainbow = vec3(0.0);
+
+    if (uRainbow >= 0.005) {
+      float az = uPrismRot;
+      float el = 0.32;
+      vec3  centBeam = vec3(cos(el) * cos(az), sin(el), cos(el) * sin(az));
+
+      vec3  toFrag = normalize(vWorldPos - uPrismPos);
+      float dist   = length(vWorldPos - uPrismPos);
+      float dFade  = exp(-dist * 0.010);
+
+      for (int i = 0; i < 7; i++) {
+        float t      = float(i) / 6.0;
+        float sweep  = mix(-0.38, 0.38, t);
+        vec3  beam   = rotAround(centBeam, vec3(0.0, 1.0, 0.0), sweep);
+        float align  = dot(toFrag, beam);
+        float bOuter = smoothstep(0.984, 0.998, align);
+        float bInner = smoothstep(0.998, 1.000, align);
+        float b      = (bOuter * 0.6 + bInner * 1.4) * dFade;
+        rainbow     += hsl2rgb(t, 1.0, 0.55) * b;
+      }
+      rainbow = clamp(rainbow * uRainbow * 1.8, 0.0, 1.0);
+    }
+
+    gl_FragColor = vec4(bg + rainbow, 1.0);
   }
 `;
 
 // Dome shell uniforms — module-level so the reference is stable across renders.
-// Three.js reads .value every frame, so mutations from Prism.tsx propagate automatically.
 const DOME_SHELL_UNIFORMS = {
   uPrismPos: PRISM_POS_UNIFORM,
   uRainbow:  PRISM_RAINBOW_UNIFORM,
+  uPrismRot: PRISM_ROT_UNIFORM,
 };
 
 // ── PanelMesh ─────────────────────────────────────────────────────────────────
@@ -217,6 +255,7 @@ function PanelMesh({ position, url, staggerSec, activatedRef }: PanelProps) {
     uReveal:   { value: 0.0 },
     uPrismPos: PRISM_POS_UNIFORM,
     uRainbow:  PRISM_RAINBOW_UNIFORM,
+    uPrismRot: PRISM_ROT_UNIFORM,
   }), []);
 
   // Async texture load — only touches the uniform, never touches React state
