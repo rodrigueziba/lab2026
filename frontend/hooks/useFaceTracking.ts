@@ -3,56 +3,46 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 
-// ── Status ────────────────────────────────────────────────────────────────────
 export type FaceStatus =
-  | "idle"       // not started
-  | "requesting" // asking for camera permission
-  | "loading"    // camera granted; loading MediaPipe WASM + model
-  | "active"     // MediaPipe running, landmarks detected
-  | "fallback"   // MediaPipe failed; using center-crop of webcam
-  | "denied"     // camera permission rejected
-  | "error";     // unrecoverable
+  | "idle"
+  | "requesting"
+  | "loading"
+  | "detecting"   // camera running, waiting for face
+  | "captured"    // face found → snapshot taken → camera released
+  | "fallback"    // no MediaPipe, used center-crop snapshot
+  | "denied"
+  | "error";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-const CANVAS_SIZE = 256; // output texture resolution (square)
-
-// MediaPipe WASM served from CDN — fetched at runtime, not bundled by webpack.
-// Documented path from mediapipe.dev/solutions/tasks/vision.
+const CANVAS_SIZE         = 256;
+const CAPTURE_TIMEOUT_MS  = 6000;  // give up waiting for face after 6s → use center crop
 const MP_WASM =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.17/wasm";
 const MP_MODEL =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
-// ── Minimal type for the landmarker instance ──────────────────────────────────
-// Avoids tight coupling to @mediapipe/tasks-vision TypeScript types.
 interface LandmarkPoint { x: number; y: number; z: number }
 interface Landmarker {
-  detectForVideo(
-    video: HTMLVideoElement,
-    timestampMs: number,
-  ): { faceLandmarks?: LandmarkPoint[][] };
+  detectForVideo(video: HTMLVideoElement, timestampMs: number): { faceLandmarks?: LandmarkPoint[][] };
   close(): void;
 }
 
-// ── Default crop box — used before first landmark detection ──────────────────
 const DEFAULT_BOX = { x: 0.18, y: 0.05, w: 0.64, h: 0.90 };
 
-// ── Hook ──────────────────────────────────────────────────────────────────────
 export function useFaceTracking() {
-  const [status, setStatus]         = useState<FaceStatus>("idle");
-  const [faceTexture, setFaceTexture] = useState<THREE.CanvasTexture | null>(null);
+  const [status,   setStatus]   = useState<FaceStatus>("idle");
+  // snapshot: stable texture created once on capture; null until then
+  const [snapshot, setSnapshot] = useState<THREE.CanvasTexture | null>(null);
 
-  // All mutable state lives in refs — no re-renders during the hot path
   const videoRef      = useRef<HTMLVideoElement | null>(null);
   const canvasRef     = useRef<HTMLCanvasElement | null>(null);
   const textureRef    = useRef<THREE.CanvasTexture | null>(null);
   const landmarkerRef = useRef<Landmarker | null>(null);
   const lastTimeRef   = useRef(-1);
   const faceBoxRef    = useRef({ ...DEFAULT_BOX });
+  const capturedRef   = useRef(false);
+  const timerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Bootstrap hidden video + canvas + CanvasTexture ──────────────────────
   useEffect(() => {
-    // Hidden video element — opacity:0.01 (not 0) avoids browser paint-skip
     const video = document.createElement("video");
     video.playsInline = true;
     video.muted       = true;
@@ -61,20 +51,18 @@ export function useFaceTracking() {
     document.body.appendChild(video);
     videoRef.current = video;
 
-    // Output canvas — CPU-side face crop (drives the texture)
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = CANVAS_SIZE;
     canvasRef.current = canvas;
 
-    // CanvasTexture — Three.js polls canvas pixels when needsUpdate = true
     const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace   = THREE.SRGBColorSpace;
-    tex.minFilter    = THREE.LinearFilter; // no mipmap generation for live canvas
+    tex.colorSpace      = THREE.SRGBColorSpace;
+    tex.minFilter       = THREE.LinearFilter;
     tex.generateMipmaps = false;
-    textureRef.current = tex;
-    setFaceTexture(tex);
+    textureRef.current  = tex;
 
     return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
       stopStream(video);
       document.body.removeChild(video);
       tex.dispose();
@@ -82,12 +70,43 @@ export function useFaceTracking() {
     };
   }, []);
 
-  // ── start() — call once to request camera + load MediaPipe ───────────────
+  // ── doCapture: draw current frame, stop camera, publish texture ─────────────
+  const doCapture = useCallback((statusAfter: FaceStatus) => {
+    if (capturedRef.current) return;
+    capturedRef.current = true;
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+
+    const video   = videoRef.current;
+    const canvas  = canvasRef.current;
+    const texture = textureRef.current;
+    if (video && canvas && texture && video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const b  = faceBoxRef.current;
+        ctx.save();
+        ctx.translate(CANVAS_SIZE, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, b.x * vw, b.y * vh, b.w * vw, b.h * vh, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        ctx.restore();
+        texture.needsUpdate = true;
+      }
+      setSnapshot(texture);
+    }
+
+    // Release the camera
+    if (video) stopStream(video);
+    landmarkerRef.current?.close();
+    landmarkerRef.current = null;
+    setStatus(statusAfter);
+  }, []);
+
+  // ── start: request camera + load MediaPipe, then begin detecting ────────────
   const start = useCallback(async () => {
     if (status !== "idle") return;
     setStatus("requesting");
 
-    // 1. Camera permission
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -104,110 +123,69 @@ export function useFaceTracking() {
     await video.play().catch(() => {});
     setStatus("loading");
 
-    // 2. MediaPipe FaceLandmarker — dynamic import avoids SSR bundling
     try {
       const { FaceLandmarker, FilesetResolver } = await import("@mediapipe/tasks-vision");
       const resolver = await FilesetResolver.forVisionTasks(MP_WASM);
       landmarkerRef.current = await FaceLandmarker.createFromOptions(resolver, {
-        baseOptions: {
-          modelAssetPath: MP_MODEL,
-          delegate: "CPU", // GPU delegate requires additional COOP/COEP headers
-        },
-        runningMode:           "VIDEO",
-        numFaces:              1,
+        baseOptions: { modelAssetPath: MP_MODEL, delegate: "CPU" },
+        runningMode: "VIDEO",
+        numFaces: 1,
         outputFaceBlendshapes: false,
         outputFacialTransformationMatrixes: false,
       });
-      setStatus("active");
+      setStatus("detecting");
     } catch (err) {
-      console.warn("[useFaceTracking] MediaPipe unavailable — falling back to center-crop.", err);
-      setStatus("fallback");
+      console.warn("[useFaceTracking] MediaPipe unavailable — using center-crop.", err);
+      // Wait briefly for video to stabilise, then snap
+      setTimeout(() => doCapture("fallback"), 800);
+      return;
     }
-  }, [status]);
 
-  // ── tick() — call every frame from useFrame to keep texture current ────────
-  // All logic is ref-based: never triggers React re-renders.
+    // Timeout: if no face detected after CAPTURE_TIMEOUT_MS, snap anyway
+    timerRef.current = setTimeout(() => {
+      if (!capturedRef.current) doCapture("fallback");
+    }, CAPTURE_TIMEOUT_MS);
+  }, [status, doCapture]);
+
+  // ── tick: called every frame from useFrame — no-op after capture ────────────
   const tick = useCallback(() => {
+    if (capturedRef.current) return;
+
     const video   = videoRef.current;
-    const canvas  = canvasRef.current;
-    const texture = textureRef.current;
-    if (!video || !canvas || !texture) return;
+    const lm      = landmarkerRef.current;
+    if (!video || !lm) return;
     if (video.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA) return;
+    if (video.currentTime === lastTimeRef.current) return;
+    lastTimeRef.current = video.currentTime;
 
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    if (!vw || !vh) return;
-
-    // ── Landmark detection (only when a new video frame is available) ──────
-    const lm = landmarkerRef.current;
-    if (lm && video.currentTime !== lastTimeRef.current) {
-      lastTimeRef.current = video.currentTime;
-      try {
-        const result = lm.detectForVideo(video, performance.now());
-        const pts    = result.faceLandmarks?.[0];
-        if (pts && pts.length > 0) {
-          // Bounding box in normalized [0, 1] coords
-          let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
-          for (const p of pts) {
-            if (p.x < x0) x0 = p.x;
-            if (p.x > x1) x1 = p.x;
-            if (p.y < y0) y0 = p.y;
-            if (p.y > y1) y1 = p.y;
-          }
-          // Mirror x-axis: webcam coords are horizontally flipped vs canvas
-          [x0, x1] = [1 - x1, 1 - x0];
-          // Expand 30% to include hair, chin, ears
-          const pw = (x1 - x0) * 0.30;
-          const ph = (y1 - y0) * 0.30;
-          faceBoxRef.current = {
-            x: Math.max(0,    x0 - pw),
-            y: Math.max(0,    y0 - ph),
-            w: Math.min(1, x1 + pw) - Math.max(0, x0 - pw),
-            h: Math.min(1, y1 + ph) - Math.max(0, y0 - ph),
-          };
+    try {
+      const result = lm.detectForVideo(video, performance.now());
+      const pts    = result.faceLandmarks?.[0];
+      if (pts && pts.length > 0) {
+        // Compute tight bounding box from landmarks
+        let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+        for (const p of pts) {
+          if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x;
+          if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y;
         }
-      } catch {
-        // Detection error — keep the last known crop box
+        [x0, x1] = [1 - x1, 1 - x0];  // mirror
+        const pw = (x1 - x0) * 0.32;
+        const ph = (y1 - y0) * 0.32;
+        faceBoxRef.current = {
+          x: Math.max(0, x0 - pw),
+          y: Math.max(0, y0 - ph),
+          w: Math.min(1, x1 + pw) - Math.max(0, x0 - pw),
+          h: Math.min(1, y1 + ph) - Math.max(0, y0 - ph),
+        };
+        // Face clearly detected — capture immediately
+        doCapture("captured");
       }
-    }
+    } catch { /* keep trying */ }
+  }, [doCapture]);
 
-    // ── Draw cropped face into the output canvas ────────────────────────────
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const b   = faceBoxRef.current;
-    const sx  = b.x * vw;
-    const sy  = b.y * vh;
-    const sw  = b.w * vw;
-    const sh  = b.h * vh;
-
-    ctx.save();
-    // Flip horizontally so the face reads as "natural" (left eye on the left
-    // from the viewer's perspective) when applied to a forward-facing 3D mesh.
-    ctx.translate(CANVAS_SIZE, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    ctx.restore();
-
-    // Mark dirty — Three.js will re-upload on next render
-    texture.needsUpdate = true;
-  }, []); // all reads are from stable refs — no dep array needed
-
-  // ── stop() — release camera and reset ────────────────────────────────────
-  const stop = useCallback(() => {
-    const video = videoRef.current;
-    if (video) stopStream(video);
-    landmarkerRef.current?.close();
-    landmarkerRef.current = null;
-    lastTimeRef.current   = -1;
-    faceBoxRef.current    = { ...DEFAULT_BOX };
-    setStatus("idle");
-  }, []);
-
-  return { faceTexture, tick, status, start, stop };
+  return { snapshot, status, tick, start };
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function stopStream(video: HTMLVideoElement) {
   const stream = video.srcObject as MediaStream | null;
   stream?.getTracks().forEach(t => t.stop());
