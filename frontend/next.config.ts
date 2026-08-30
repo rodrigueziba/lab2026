@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   webpack: (config) => {
+    // Enable async WASM for @mediapipe/tasks-vision
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+    };
+
     // Tus watchOptions (los dejo tal cual)
     config.watchOptions = {
       poll: 1000,
