@@ -4,10 +4,15 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
+import DomeVisualizer from "./DomeVisualizer";
+import FloorVisualizer from "./FloorVisualizer";
+import SectorAudioFX from "./SectorAudioFX";
+import { DBG_SILLAS } from "@/lib/debugConfig";
 
 const API_URL    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 const DOME_R     = 28;
 const MAX_PANELS = 60;
+const PANEL_SCALE = 1.5; // G4: multiply panel dimensions by this factor
 const CACHE_KEY  = "alight:media-urls";
 
 // ── Minimal shapes from the project's data layer ──────────────────────────────
@@ -36,44 +41,49 @@ function extractUrls(ps: Proyecto[], pr: Prestador[]): string[] {
 }
 
 // ── Orbital ring layout ────────────────────────────────────────────────────────
-// 6 rings, each with a fixed height band, random tilt, random spin speed/direction.
-// All random values come from Math.random() inside useMemo → different every page
-// load, stable for the session.
+// G5: 9 rings in a 3×3 grid — 3 vertical heights × 3 depth radii.
+// Each ring's tilt, azimuth, and spin speed/direction are randomised inside useMemo
+// → different every page load, stable for the session.
 
 interface OrbitData {
-  centerY: number;                // world-Y center of this ring
-  tiltX:   number;               // inclination around X (rad, constrained so panels stay above floor)
-  tiltZ:   number;               // secondary tilt (rad)
-  azimuth: number;               // initial rotation around Y (rad)
-  speed:   number;               // rotation speed per frame (rad, signed = direction)
+  centerY: number;
+  tiltX:   number;
+  tiltZ:   number;
+  azimuth: number;
+  speed:   number;
   panels:  { pos: THREE.Vector3; url: string; staggerSec: number }[];
 }
 
-// Height bands spread across the room (6–14 m), panel counts sum to MAX_PANELS
-const ORBIT_BANDS = [
-  { count: 10, centerY:  6 },
-  { count: 11, centerY: 10 },
-  { count: 11, centerY: 14 },
-  { count:  9, centerY: 12 },
-  { count: 10, centerY:  8 },
-  { count:  9, centerY: 11 },
-] as const;
+interface OrbitBand { count: number; centerY: number; rFactor: number; }
+
+// 3 heights (7, 10, 13 m) × 3 radii (0.82, 0.89, 0.96 × DOME_R)
+// Panel counts: 7+7+6 per depth level × 3 levels = 60 total
+const ORBIT_BANDS: OrbitBand[] = [
+  { count: 7, centerY:  7, rFactor: 0.82 },
+  { count: 7, centerY: 10, rFactor: 0.82 },
+  { count: 6, centerY: 13, rFactor: 0.82 },
+  { count: 7, centerY:  7, rFactor: 0.89 },
+  { count: 7, centerY: 10, rFactor: 0.89 },
+  { count: 6, centerY: 13, rFactor: 0.89 },
+  { count: 7, centerY:  7, rFactor: 0.96 },
+  { count: 7, centerY: 10, rFactor: 0.96 },
+  { count: 6, centerY: 13, rFactor: 0.96 },
+];
 
 function buildOrbits(urls: string[]): OrbitData[] {
   let urlIdx     = 0;
   let staggerIdx = 0;
 
-  return ORBIT_BANDS.map(({ count, centerY }) => {
+  return ORBIT_BANDS.map(({ count, centerY, rFactor }) => {
     const available = Math.min(count, urls.length - urlIdx);
     if (available <= 0) return null;
 
-    const radius   = DOME_R * (0.82 + Math.random() * 0.12);        // 23–26.5 m
-    // max tilt so the lowest panel stays ≥1 m above the floor
+    const radius   = DOME_R * rFactor;
     const maxTiltX = Math.asin(Math.min(1, (centerY - 1) / radius));
     const tiltX    = Math.random() * maxTiltX;
-    const tiltZ    = (Math.random() - 0.5) * 0.25;                  // ±0.12 rad
+    const tiltZ    = (Math.random() - 0.5) * 0.25;
     const azimuth  = Math.random() * Math.PI * 2;
-    const speed    = (Math.random() * 0.00025 + 0.00008)             // 0.00008–0.00033 rad/frame
+    const speed    = (Math.random() * 0.00025 + 0.00008)
                    * (Math.random() > 0.5 ? 1 : -1);
 
     const panels = Array.from({ length: available }, (_, i) => {
@@ -189,6 +199,7 @@ const SHELL_FRAG = RAINBOW_GLSL + /* glsl */`
   uniform vec3  uPrismPos;
   uniform float uRainbow;
   uniform float uPrismRot;
+  uniform float uShellOpacity;
   varying vec3  vWorldPos;
 
   void main() {
@@ -217,15 +228,16 @@ const SHELL_FRAG = RAINBOW_GLSL + /* glsl */`
       rainbow = clamp(rainbow * uRainbow * 1.8, 0.0, 1.0);
     }
 
-    gl_FragColor = vec4(bg + rainbow, 1.0);
+    gl_FragColor = vec4(bg + rainbow, uShellOpacity);
   }
 `;
 
 // Dome shell uniforms — module-level so the reference is stable across renders.
 const DOME_SHELL_UNIFORMS = {
-  uPrismPos: PRISM_POS_UNIFORM,
-  uRainbow:  PRISM_RAINBOW_UNIFORM,
-  uPrismRot: PRISM_ROT_UNIFORM,
+  uPrismPos:    PRISM_POS_UNIFORM,
+  uRainbow:     PRISM_RAINBOW_UNIFORM,
+  uPrismRot:    PRISM_ROT_UNIFORM,
+  uShellOpacity: { value: 1.0 }, // S3: fades to DBG_SILLAS.domeShellOpacity when visualizer active
 };
 
 // ── PanelMesh ─────────────────────────────────────────────────────────────────
@@ -281,7 +293,7 @@ function PanelMesh({ position, url, staggerSec, activatedRef }: PanelProps) {
 
   return (
     <mesh position={position} quaternion={quaternion}>
-      <planeGeometry args={[3.6, 2.4]} />
+      <planeGeometry args={[3.6 * PANEL_SCALE, 2.4 * PANEL_SCALE]} />
       <shaderMaterial
         ref={matRef}
         vertexShader={VERT}
@@ -332,8 +344,10 @@ function OrbitRing({
 
 // ── ExperienceDome ────────────────────────────────────────────────────────────
 export default function ExperienceDome() {
-  const [urls, setUrls] = useState<string[]>([]);
-  const activatedRef    = useRef<number | null>(null);
+  const [urls, setUrls]       = useState<string[]>([]);
+  const [vizActive, setVizActive] = useState(false); // mounts DomeVisualizer only when true
+  const activatedRef          = useRef<number | null>(null);
+  const vizActiveRef          = useRef(false); // for useFrame (avoids state read per frame)
 
   // Fetch both endpoints; sessionStorage prevents duplicate requests when the
   // user navigated through /proyectos or /guia first (same base data).
@@ -356,24 +370,49 @@ export default function ExperienceDome() {
   }, []);
 
   // Activation sequence:
-  // 1) Player reaches chairs → prism starts descending immediately
-  // 2) 5 s later → panels start lighting up one by one (staggered)
-  // 3) After the last panel finishes revealing → "alight:dome-revealed" fires
+  // 1) Prism finishes descending → "alight:prism-landed" fires
+  // 2) Immediately → panels start lighting up one by one (staggered)
+  // 3) After all panels reveal + dome-reveal animation → "alight:dome-revealed" fires
   //    → Player.useFrame re-enables WASD movement
   //
-  // Timing math: 5000ms delay + 60 panels×120ms stagger + 2600ms last-panel reveal
-  //            ≈ 14 800 ms total from the "chose-chairs" event.
+  // Timing math: 60 panels × 120ms stagger + ~2600ms last-panel reveal ≈ 9.8s
   useEffect(() => {
-    const handle = () => {
-      if (activatedRef.current !== null) return; // already activated
-      setTimeout(() => { activatedRef.current = Date.now(); }, 5000);
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("alight:dome-revealed"));
-      }, 14_800);
+    // prism-landed → start panel reveal sequence only (NOT the visualizer)
+    const onLanded = () => {
+      if (activatedRef.current !== null) return;
+      activatedRef.current = Date.now();
+      setTimeout(() => window.dispatchEvent(new CustomEvent("alight:dome-revealed")), 9_800);
     };
-    window.addEventListener("alight:chose-chairs", handle);
-    return () => window.removeEventListener("alight:chose-chairs", handle);
+    // visualizer-activate → begin shell fade + mount DomeVisualizer
+    const onVizOn  = () => { vizActiveRef.current = true;  setVizActive(true); };
+    const onVizOff = () => {
+      vizActiveRef.current = false;
+      setVizActive(false);
+      // opacity fades back to 1.0 via useFrame lerp — no jump-reset here
+    };
+    window.addEventListener("alight:prism-landed",          onLanded);
+    window.addEventListener("alight:visualizer-activate",   onVizOn);
+    window.addEventListener("alight:visualizer-deactivate", onVizOff);
+    return () => {
+      window.removeEventListener("alight:prism-landed",          onLanded);
+      window.removeEventListener("alight:visualizer-activate",   onVizOn);
+      window.removeEventListener("alight:visualizer-deactivate", onVizOff);
+    };
   }, []);
+
+  const shellRef = useRef<THREE.Mesh>(null);
+
+  // G1: animate shell opacity in both directions; hide shell when vizHideShell debug flag set
+  useFrame((_, dt) => {
+    if (shellRef.current) {
+      shellRef.current.visible = !DBG_SILLAS.vizHideShell;
+    }
+    const target = vizActiveRef.current ? DBG_SILLAS.domeShellOpacity : 1.0;
+    const cur    = DOME_SHELL_UNIFORMS.uShellOpacity.value;
+    if (Math.abs(cur - target) > 0.001) {
+      DOME_SHELL_UNIFORMS.uShellOpacity.value = THREE.MathUtils.lerp(cur, target, dt * 5);
+    }
+  });
 
   // Build orbital layout once per URL set — Math.random() inside ensures each
   // page load gets a unique arrangement of orbits, speeds, and directions.
@@ -381,18 +420,25 @@ export default function ExperienceDome() {
 
   return (
     <group>
+      {/* S3/H2: only mounted when visualizer is active */}
+      {vizActive && <DomeVisualizer />}
+      {vizActive && <FloorVisualizer />}
+      {vizActive && <SectorAudioFX />}
+
       {/* Dome shell — upper hemisphere, BackSide.
           thetaLength=0.52π puts the open rim at y≈-2 (below floor level) so
           the rim is never visible to the player.
-          Uses a ShaderMaterial so the prism rainbow can illuminate the shell
-          in the gaps between panels. */}
-      <mesh>
+          G1: depthWrite=false prevents shell from occluding DomeVisualizer sphere.
+          opacity lerps to 0 when visualizer active (domeShellOpacity default=0). */}
+      <mesh ref={shellRef}>
         <sphereGeometry args={[DOME_R + 2, 48, 32, 0, Math.PI * 2, 0, Math.PI * 0.52]} />
         <shaderMaterial
           vertexShader={SHELL_VERT}
           fragmentShader={SHELL_FRAG}
           uniforms={DOME_SHELL_UNIFORMS}
           side={THREE.BackSide}
+          transparent
+          depthWrite={false}
         />
       </mesh>
 

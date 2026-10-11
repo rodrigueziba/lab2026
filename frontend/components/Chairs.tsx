@@ -1,11 +1,13 @@
 "use client";
 
+export const CHAIR_Z = -3; // G2: 1 m más lejos de la tarima (era -2)
+
 const POSITIONS_X = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5];
 const LEGS: [number, number][] = [[-0.2, -0.2], [-0.2, 0.2], [0.2, -0.2], [0.2, 0.2]];
 
 function Chair({ x }: { x: number }) {
   return (
-    <group position={[x, 0, -2]}>
+    <group position={[x, 0, CHAIR_Z]}>
       {/* seat */}
       <mesh position={[0, 0.44, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.48, 0.05, 0.46]} />

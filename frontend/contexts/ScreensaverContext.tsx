@@ -71,8 +71,8 @@ export function ScreensaverProvider({ children }: { children: React.ReactNode })
   }, [isDesktop, isScreensaverActive, resetIdle]);
 
   useEffect(() => {
-    // En /login desactivamos el contador automático de inactividad (no se activa screensaver por timeout).
-    if (!isDesktop || isScreensaverActive || pathname === '/login') return;
+    // En /login y /alight desactivamos el contador automático de inactividad.
+    if (!isDesktop || isScreensaverActive || pathname === '/login' || pathname.startsWith('/alight')) return;
     tickRef.current = setInterval(() => {
       const elapsed = (Date.now() - lastActivityRef.current) / 1000;
       setIdleSeconds(elapsed);
