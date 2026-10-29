@@ -115,16 +115,71 @@ export const DBG_FACE = {
   qualityThreshold: 0.15,  // T1: score ≥ this → capture immediately
 };
 
+// J1: timing constants (module-level so alightStore / Audience can import them)
+export const PEOPLE_MIN_DELAY_MS      = 5_000;  // min ms from stars-visible to people-visible
+export const LECTERNS_AFTER_PEOPLE_MS = 10_000; // ms from people-visible to lecterns request
+export const LECTERN_OUTWARD_OFFSET_M = 0.30;   // extra outward offset added to LECTERN_X
+
+// J4: TARIMA audio-effect tuning constants (exposed in debug menu)
+export const DBG_AUDIO = {
+  // Phaser
+  phaserBaseFreq: 1000, // allpass center frequency (Hz) — reload to apply
+  phaserQ:        10,   // allpass Q — reload to apply
+  // Pitch shifter
+  grainDurMs:     80,   // granular grain duration (ms) — reload to apply
+  // Lights
+  lightStep:      0.1,  // LUZ+/LUZ- intensity step
+  lightMin:       0.2,  // minimum globalIntensity
+  lightMax:       3.0,  // maximum globalIntensity
+  lightHoldMs:    120,  // hold-repeat interval (ms) — reload to apply
+  maxExtraLights: 12,   // cap on random extra lights from LUZ*
+};
+
+// K1: per-side lectern camera debug overrides (TARIMA path)
+// Set override: true to bypass fitLecternCamera and use the manual values below.
+// Apply by re-entering the lectern (press Q then E).
+export const DBG_CAM_IMAGE = {
+  override: false,
+  fov:     75,
+  height:  0.90,
+  dist:    0.75,
+  pitch:  -22,
+};
+
+export const DBG_CAM_SOUND = {
+  override: false,
+  fov:     60,
+  height:  0.80,
+  dist:    0.80,
+  pitch:  -45,
+};
+
 export const DBG_LECTERNS = {
-  delayMs:          10_000, // T3: ms after dome-visible before lecterns appear
+  delayMs:          10_000, // legacy — no longer used for trigger (kept for reference)
   lightIntensity:   120,    // SpotLight per lectern (W-equivalent)
   emissiveBrightness: 0.7,  // emissiveIntensity for active buttons/knobs
-  panelW:           1.20,   // top plate width  (m) — geometry reload needed
-  panelD:           0.70,   // top plate depth  (m) — geometry reload needed
-  yawOffsetDeg:     15,     // E1: additional inward yaw beyond 90° base — geometry reload needed
-  // E3: lectern camera (re-enter mode to apply)
-  camFov:           55,     // horizontal FOV (deg)
-  camHeight:        1.15,   // camera height above plate centre (m)
-  camLookUpM:       0.35,   // look-at offset above plate centre (m), for dome framing
+  panelW:           1.50,   // J2: inner black panel width (m) — geometry reload needed
+  panelD:           0.75,   // top plate depth  (m) — geometry reload needed
+  yawOffsetDeg:     0,      // I1: fine-tune offset (deg) added to atan2 formula — geometry reload needed
+  yawFlipLeft:      false,  // I1: debug toggle — invert left lectern 180°
+  yawFlipRight:     false,  // I1: debug toggle — invert right lectern 180°
+  // J1: per-side camera (re-enter mode to apply)
+  camFov:           55,     // horizontal FOV (deg) — shared
+  camPitchLeft:    -12,     // image lectern camera pitch (deg, negative = down)
+  camPitchRight:   -25,     // sound lectern camera pitch (deg, negative = down)
+  camHeightLeft:    0.45,   // image lectern camera height above plate centre (m)
+  camHeightRight:   0.55,   // sound lectern camera height above plate centre (m)
+  showGizmo:        false,  // J1: show I1 debug arrow gizmo
+  showSections:     false,  // J3: overlay section frames + cell grid in dev mode
   knobSens:         2.5,    // knob full-range sweep as fraction of screen diagonal
+};
+
+// ── J5: retro skin (cassette futurism) for TARIMA lecterns ───────────────────
+export const DBG_RETRO = {
+  lecterns:  true,   // J5: beige/carbón + desgaste — live (rótulos/teclas: reload)
+  wear:      0.55,   // J5: edge wear + chipped paint amount (0–1) — live
+  wearScale: 6,      // J5: wear noise frequency (1/m) — live
+  grime:     0.35,   // J5: dirt in noise valleys (0–1) — live
+  crtCurve:  0.08,   // J5: indicator CRT barrel distortion — live
+  crtScan:   0.30,   // J5: indicator CRT scanline intensity — live
 };

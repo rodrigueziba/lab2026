@@ -29,12 +29,16 @@ export const STORE = {
     lowPass:    { enabled: false, frequency: 8000 },
     highPass:   { enabled: false, frequency:  200 },
     distortion: 0.0,
+    distEffect: { enabled: false, drive: 10,  mix: 0.5 },
+    phaser:     { enabled: false, speed: 1.0, depth: 0.5 },
+    pitch:      { enabled: false, semitones: 0, mix: 0.5 },
     delay:      { amount: 0.0, feedback: 0.3 },
     reverb:     0.0,
     lfo:        { speed: 2.0, depth: 0.0, waveform: "sine" as OscType, target: "volume" as LFOTarget },
     sampler:    { loopStart: 0, loopEnd: -1, loopActive: false },
     trackIndex: 0,
     tracks:     [] as string[],
+    paused:     false,
   },
 };
 
@@ -45,6 +49,12 @@ export const storeSubscribe = (fn: Listener): (() => void) => {
   return () => { _listeners.delete(fn); };
 };
 export const storeNotify = () => _listeners.forEach(fn => fn());
+
+// J1: lectern trigger — today called by the timer after people appear; future: ink.js dialog
+export const LECTERN_TRIGGER = "timer" as const;
+export function requestLecterns(): void {
+  window.dispatchEvent(new CustomEvent("alight:request-lecterns"));
+}
 
 // Interaction mode — shared between Player (ThreeScene) and LecternSystem
 export const INTERACT_STATE = {
@@ -59,8 +69,9 @@ export const INTERACT_STATE = {
   camAnimStart:    0,
   camAnimDur:      600,
   camAnimReverse:  false,   // false = saved→target (enter), true = target→saved (exit)
-  camSaved:  null as { pos: [number,number,number]; quat: [number,number,number,number] } | null,
-  camTarget: null as { pos: [number,number,number]; quat: [number,number,number,number] } | null,
+  camSaved:     null as { pos: [number,number,number]; quat: [number,number,number,number] } | null,
+  camTarget:    null as { pos: [number,number,number]; quat: [number,number,number,number] } | null,
+  camFovSaved:  90,   // K1: player FOV saved before lectern mode
   // S2: player world position — written each frame by ThreeScene, read by Prism
   playerPos: { x: 0, y: 1.6, z: 0 } as { x: number; y: number; z: number },
 };

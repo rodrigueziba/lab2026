@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { PointerLockControls, SpotLight } from "@react-three/drei";
 import * as THREE from "three";
@@ -10,7 +11,8 @@ import Audience from "./Audience";
 import Prism from "./Prism";
 import Tarima from "./Tarima";
 import FaceDome from "./FaceDome";
-import LecternSystem, { LECTERN_X, LECTERN_PROMPT_M } from "./LecternSystem";
+import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from "./LecternSystem";
+import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import { STORE, INTERACT_STATE, storeSubscribe } from "@/lib/alightStore";
 import { DBG_SPOTLIGHT, DBG_SILLAS, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
@@ -115,30 +117,34 @@ function Player() {
   const pathRef     = useRef<"none" | "sillas" | "tarima">("none");
   const prismLanded = useRef(false);
   const prismNearRef = useRef(false); // within prismInteractM horizontally
-  const nearLectern = useRef<"none" | "image" | "sound">("none");
+  const nearLectern     = useRef<"none" | "image" | "sound">("none");
+  const lecternsVisible = useRef(false);
   const front       = useRef(new THREE.Vector3());
   const side        = useRef(new THREE.Vector3());
   const dir         = useRef(new THREE.Vector3());
-  const leftPos     = useMemo(() => new THREE.Vector3(-LECTERN_X, 1.6, 0), []);
-  const rightPos    = useMemo(() => new THREE.Vector3( LECTERN_X, 1.6, 0), []);
+  const leftPos     = useMemo(() => new THREE.Vector3(-LECTERN_PLACE_X, 1.6, 0), []);
+  const rightPos    = useMemo(() => new THREE.Vector3( LECTERN_PLACE_X, 1.6, 0), []);
   const { camera }  = useThree();
 
   useEffect(() => { camera.position.set(-10, 1.6, -7); }, [camera]);
 
   useEffect(() => {
-    const onSit    = () => { seated.current = true;  pathRef.current = "sillas"; _D.path = "sillas"; };
-    const onLight  = () => {                          pathRef.current = "tarima"; _D.path = "tarima"; };
-    const onReveal = () => { seated.current = false; };
-    const onLanded = () => { prismLanded.current = true; _D.prismLanded = true; };
-    window.addEventListener("alight:chose-chairs", onSit);
-    window.addEventListener("alight:chose-light",  onLight);
-    window.addEventListener("alight:dome-revealed", onReveal);
-    window.addEventListener("alight:prism-landed",  onLanded);
+    const onSit      = () => { seated.current = true;  pathRef.current = "sillas"; _D.path = "sillas"; };
+    const onLight    = () => {                          pathRef.current = "tarima"; _D.path = "tarima"; };
+    const onReveal   = () => { seated.current = false; };
+    const onLanded   = () => { prismLanded.current = true; _D.prismLanded = true; };
+    const onLecterns = () => { lecternsVisible.current = true; };
+    window.addEventListener("alight:chose-chairs",    onSit);
+    window.addEventListener("alight:chose-light",     onLight);
+    window.addEventListener("alight:dome-revealed",   onReveal);
+    window.addEventListener("alight:prism-landed",    onLanded);
+    window.addEventListener("alight:lecterns-visible", onLecterns);
     return () => {
-      window.removeEventListener("alight:chose-chairs", onSit);
-      window.removeEventListener("alight:chose-light",  onLight);
-      window.removeEventListener("alight:dome-revealed", onReveal);
-      window.removeEventListener("alight:prism-landed",  onLanded);
+      window.removeEventListener("alight:chose-chairs",    onSit);
+      window.removeEventListener("alight:chose-light",     onLight);
+      window.removeEventListener("alight:dome-revealed",   onReveal);
+      window.removeEventListener("alight:prism-landed",    onLanded);
+      window.removeEventListener("alight:lecterns-visible", onLecterns);
     };
   }, []);
 
@@ -255,10 +261,10 @@ function Player() {
       }
     }
 
-    // ── TARIMA path: lectern proximity prompt ─────────────────────────────────
-    if (pathRef.current === "tarima") {
-      leftPos.set(-LECTERN_X, cam.position.y, 0);
-      rightPos.set( LECTERN_X, cam.position.y, 0);
+    // ── TARIMA path: lectern proximity prompt (J1: only when lecterns are in scene) ──
+    if (pathRef.current === "tarima" && lecternsVisible.current) {
+      leftPos.set(-LECTERN_PLACE_X, cam.position.y, 0);
+      rightPos.set( LECTERN_PLACE_X, cam.position.y, 0);
       const dL = cam.position.distanceTo(leftPos);
       const dR = cam.position.distanceTo(rightPos);
       let near: "none" | "image" | "sound" = "none";
@@ -496,21 +502,87 @@ function PrismDebugOverlay() {
   );
 }
 
+// ── Debug: lectern interaction overlay ───────────────────────────────────────
+function LecternDebugOverlay() {
+  const [info, setInfo] = useState("");
+  useEffect(() => {
+    const id = setInterval(() => {
+      const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
+      const locked = document.pointerLockElement ? "LOCKED" : "free";
+      const cursor = canvas?.style.cursor?.slice(0, 30) || "(empty)";
+      setInfo(
+        `mode=${INTERACT_STATE.mode} | lock=${locked}` +
+        ` | hover=${LECTERN_DBG.hoveredId ?? "—"} | drag=${LECTERN_DBG.dragType}` +
+        ` | cursor=${cursor}`,
+      );
+    }, 100);
+    return () => clearInterval(id);
+  }, []);
+  if (INTERACT_STATE.mode === "none") return null;
+  return (
+    <div style={{
+      position: "fixed", bottom: 8, left: "50%", transform: "translateX(-50%)",
+      background: "rgba(0,0,0,0.82)", color: "#ffcc44",
+      fontFamily: "monospace", fontSize: 11, padding: "4px 14px",
+      borderRadius: 3, zIndex: 3000, pointerEvents: "none", whiteSpace: "nowrap",
+    }}>
+      {info}
+    </div>
+  );
+}
+
+// ── Knob drag tooltip ─────────────────────────────────────────────────────────
+function KnobTooltip() {
+  const [info, setInfo] = useState<{ x: number; y: number; val: number } | null>(null);
+  useEffect(() => {
+    const id = setInterval(() => setInfo(LECTERN_DBG.knobTooltip ? { ...LECTERN_DBG.knobTooltip } : null), 40);
+    return () => clearInterval(id);
+  }, []);
+  if (!info || typeof document === "undefined") return null;
+  return createPortal(
+    <div style={{
+      position: "fixed", left: info.x + 14, top: info.y - 26,
+      background: "rgba(0,0,0,0.80)", color: "#f1efe6",
+      fontFamily: "monospace", fontSize: 13, fontWeight: "bold",
+      padding: "2px 8px", borderRadius: 3,
+      pointerEvents: "none", zIndex: 9999,
+    }}>
+      {info.val.toFixed(1)}
+    </div>,
+    document.body,
+  );
+}
+
 // ── Canvas wrapper ─────────────────────────────────────────────────────────────
 export default function ThreeScene() {
-  // Pointer lock cooldown: blocks canvas click if within POINTERLOCK_RETRY_MS of lock exit,
-  // preventing drei's PointerLockControls from requesting lock too early after Escape.
+  // Pointer lock guards:
+  // 1. Block canvas click in lectern mode (prevents drei re-locking on control clicks)
+  // 2. Block click if within cooldown after lock exit (prevents early re-lock after Escape)
+  // 3. Safety net: if somehow locked while in lectern mode, force-exit immediately
   useEffect(() => {
     const lockExit = { t: 0 };
-    const onLockChange = () => { if (!document.pointerLockElement) lockExit.t = Date.now(); };
+
+    const onLockChange = () => {
+      if (!document.pointerLockElement) {
+        lockExit.t = Date.now();
+      } else if (INTERACT_STATE.mode !== "none") {
+        console.warn("[ThreeScene] pointer locked while in lectern mode — forcing exit\n" + new Error().stack);
+        document.exitPointerLock();
+      }
+    };
     document.addEventListener("pointerlockchange", onLockChange);
 
-    // Canvas created by R3F, available after child effects run
     const canvas = document.querySelector("canvas");
     const onClick = (e: MouseEvent) => {
+      // Block in lectern mode
+      if (INTERACT_STATE.mode !== "none") {
+        e.stopImmediatePropagation();
+        return;
+      }
+      // Block if too soon after lock exit
       const elapsed = Date.now() - lockExit.t;
       if (elapsed > 0 && elapsed < POINTERLOCK_RETRY_MS) {
-        e.stopImmediatePropagation(); // prevent drei from calling requestPointerLock
+        e.stopImmediatePropagation();
         window.dispatchEvent(new CustomEvent("alight:show-retake"));
       }
     };
@@ -538,6 +610,9 @@ export default function ThreeScene() {
       {DEBUG_ENABLED && <PrismDebugOverlay />}
       {DEBUG_ENABLED && <AudioDebugOverlay />}
       {DEBUG_ENABLED && <EffectsDebugOverlay />}
+      {DEBUG_ENABLED && <LecternDebugOverlay />}
+      <KnobTooltip />
+      <LecternHUD />
     </>
   );
 }

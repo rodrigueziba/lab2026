@@ -13,13 +13,17 @@ import {
   DBG_DOME,
   DBG_FACE,
   DBG_LECTERNS,
+  DBG_RETRO,
   DBG_SILLAS,
   DBG_FLOOR,
   DBG_EFFECTS,
+  DBG_CAM_IMAGE,
+  DBG_CAM_SOUND,
 } from "@/lib/debugConfig";
 import { setVizVolume, restartVizAudio } from "@/lib/vizAudio";
 import { DBG_STAR_MAT, DBG_DOME_MAT } from "./FaceDome";
 import { STORE, storeSubscribe } from "@/lib/alightStore";
+import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 
 type Tab = "SILLAS" | "TARIMA";
 
@@ -174,10 +178,13 @@ export default function DebugMenu() {
   const [dome,     setDome]     = useState({ ...DBG_DOME });
   const [face,     setFace]     = useState({ ...DBG_FACE });
   const [lectern,  setLectern]  = useState({ ...DBG_LECTERNS });
+  const [retro,    setRetro]    = useState({ ...DBG_RETRO });
   const [sillas,   setSillas]   = useState({ ...DBG_SILLAS });
   const [prism,    setPrism]    = useState({ ...DBG_PRISM });
   const [floor,    setFloor]    = useState({ ...DBG_FLOOR });
   const [fx,       setFx]       = useState({ ...DBG_EFFECTS });
+  const [camImg,   setCamImg]   = useState({ ...DBG_CAM_IMAGE });
+  const [camSnd,   setCamSnd]   = useState({ ...DBG_CAM_SOUND });
   const [audioVol, setAudioVol] = useState(STORE.audio.volume);
   const focusRef                = useRef(false);
 
@@ -532,14 +539,54 @@ export default function DebugMenu() {
           <NumField label="panelW (m)"    value={lectern.panelW}      note="reload" step={0.01} />
           <NumField label="panelD (m)"    value={lectern.panelD}      note="reload" step={0.01} />
           <NumField label="yawOffsetDeg"  value={lectern.yawOffsetDeg} note="reload" step={1} min={0} max={45} />
-          <NumField label="camFov (deg)"  value={lectern.camFov}      note="re-enter" step={1} min={30} max={90}
-            onChange={v => { DBG_LECTERNS.camFov = v;      setLectern(l => ({ ...l, camFov: v })); }} />
-          <NumField label="camHeight (m)" value={lectern.camHeight}   note="re-enter" step={0.05} min={0} max={3}
-            onChange={v => { DBG_LECTERNS.camHeight = v;   setLectern(l => ({ ...l, camHeight: v })); }} />
-          <NumField label="camLookUpM"    value={lectern.camLookUpM}  note="re-enter" step={0.05} min={-1} max={2}
-            onChange={v => { DBG_LECTERNS.camLookUpM = v;  setLectern(l => ({ ...l, camLookUpM: v })); }} />
-          <NumField label="knobSens"      value={lectern.knobSens}    note="live" step={0.1} min={0.1} max={10}
-            onChange={v => { DBG_LECTERNS.knobSens = v;    setLectern(l => ({ ...l, knobSens: v })); }} />
+          {/* K1: IMAGEN lectern camera override */}
+          <div style={{ ...ROW, marginTop: 4 }}>
+            <span style={LABEL}>IMG cam override</span>
+            <input type="checkbox" checked={camImg.override}
+              onChange={e => { DBG_CAM_IMAGE.override = e.target.checked; setCamImg(s => ({ ...s, override: e.target.checked })); }} />
+          </div>
+          <NumField label="IMG fov (°)"    value={camImg.fov}    note="re-enter" step={1} min={30} max={120}
+            onChange={v => { DBG_CAM_IMAGE.fov = v;    setCamImg(s => ({ ...s, fov: v })); }} />
+          <NumField label="IMG height (m)" value={camImg.height} note="re-enter" step={0.05} min={0.3} max={2}
+            onChange={v => { DBG_CAM_IMAGE.height = v; setCamImg(s => ({ ...s, height: v })); }} />
+          <NumField label="IMG dist (m)"   value={camImg.dist}   note="re-enter" step={0.05} min={0.2} max={2}
+            onChange={v => { DBG_CAM_IMAGE.dist = v;   setCamImg(s => ({ ...s, dist: v })); }} />
+          <NumField label="IMG pitch (°)"  value={camImg.pitch}  note="re-enter" step={1} min={-60} max={0}
+            onChange={v => { DBG_CAM_IMAGE.pitch = v;  setCamImg(s => ({ ...s, pitch: v })); }} />
+          {/* K1: SONIDO lectern camera override */}
+          <div style={{ ...ROW, marginTop: 4 }}>
+            <span style={LABEL}>SND cam override</span>
+            <input type="checkbox" checked={camSnd.override}
+              onChange={e => { DBG_CAM_SOUND.override = e.target.checked; setCamSnd(s => ({ ...s, override: e.target.checked })); }} />
+          </div>
+          <NumField label="SND fov (°)"    value={camSnd.fov}    note="re-enter" step={1} min={30} max={120}
+            onChange={v => { DBG_CAM_SOUND.fov = v;    setCamSnd(s => ({ ...s, fov: v })); }} />
+          <NumField label="SND height (m)" value={camSnd.height} note="re-enter" step={0.05} min={0.3} max={2}
+            onChange={v => { DBG_CAM_SOUND.height = v; setCamSnd(s => ({ ...s, height: v })); }} />
+          <NumField label="SND dist (m)"   value={camSnd.dist}   note="re-enter" step={0.05} min={0.2} max={2}
+            onChange={v => { DBG_CAM_SOUND.dist = v;   setCamSnd(s => ({ ...s, dist: v })); }} />
+          <NumField label="SND pitch (°)"  value={camSnd.pitch}  note="re-enter" step={1} min={-70} max={0}
+            onChange={v => { DBG_CAM_SOUND.pitch = v;  setCamSnd(s => ({ ...s, pitch: v })); }} />
+          <NumField label="knobSens"           value={lectern.knobSens}       note="live" step={0.1} min={0.1} max={10}
+            onChange={v => { DBG_LECTERNS.knobSens = v;         setLectern(l => ({ ...l, knobSens: v })); }} />
+          <div style={ROW}>
+            <span style={LABEL}>Gizmo flecha +Z</span>
+            <input type="checkbox" checked={lectern.showGizmo}
+              onChange={e => { DBG_LECTERNS.showGizmo = e.target.checked; setLectern(l => ({ ...l, showGizmo: e.target.checked })); }} />
+          </div>
+          <div style={ROW}>
+            <span>Orientación atriles <span style={NOTE}>(I1 — giro 180°)</span></span>
+          </div>
+          <div style={ROW}>
+            <button
+              style={{ ...INPUT, width: "auto", padding: "2px 8px", cursor: "pointer" }}
+              onClick={() => window.dispatchEvent(new CustomEvent("alight:flip-lectern", { detail: { side: "left" } }))}
+            >Invertir 180° Izq</button>
+            <button
+              style={{ ...INPUT, width: "auto", padding: "2px 8px", cursor: "pointer", marginLeft: 6 }}
+              onClick={() => window.dispatchEvent(new CustomEvent("alight:flip-lectern", { detail: { side: "right" } }))}
+            >Invertir 180° Der</button>
+          </div>
           <div style={ROW}>
             <span>Keyboard shortcuts</span>
             <button
@@ -547,6 +594,19 @@ export default function DebugMenu() {
               onClick={() => window.dispatchEvent(new CustomEvent("alight:reshuffle-keys"))}
             >Re-sortear Z–M</button>
           </div>
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Retro atriles <span style={NOTE}>(J5)</span></span>
+          <div style={ROW}>
+            <span>Skin retro <span style={NOTE}>(live; rótulos/CRT: reload)</span></span>
+            <input type="checkbox" checked={retro.lecterns}
+              onChange={e => { setLecternRetro(e.target.checked); setRetro(r => ({ ...r, lecterns: e.target.checked })); }} />
+          </div>
+          {(["wear", "wearScale", "grime", "crtCurve", "crtScan"] as const).map(k => (
+            <NumField key={k} label={k} value={retro[k]} note="live"
+              step={k === "wearScale" ? 0.5 : 0.01} min={0} max={k === "wearScale" ? 30 : 1}
+              onChange={v => { DBG_RETRO[k] = v; syncRetroUniforms(); setRetro(r => ({ ...r, [k]: v })); }} />
+          ))}
 
           <div style={DIVIDER} />
           <span style={LABEL}>Face capture <span style={NOTE}>(T7 — reload to apply)</span></span>

@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useFaceTracking } from "@/hooks/useFaceTracking";
 import { CHAIR_Z } from "./Chairs";
+import { PEOPLE_MIN_DELAY_MS } from "@/lib/debugConfig";
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 const CHAIR_X  = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5] as const;
@@ -373,6 +374,8 @@ export default function Audience() {
   const startedCamera = useRef(false);
   const starsReady    = useRef(false);
   const faceReady     = useRef(false);
+  const starsTime     = useRef(0);
+  const timerPending  = useRef(false);
 
   // Start camera on chose-light
   useEffect(() => {
@@ -383,14 +386,23 @@ export default function Audience() {
     return () => window.removeEventListener("alight:chose-light", onLight);
   }, [start]);
 
-  // T1: figures appear when BOTH stars-visible AND face-captured have fired
+  // T1/J1: figures appear when BOTH stars-visible AND face-captured fire,
+  // with a minimum delay of PEOPLE_MIN_DELAY_MS from stars-visible.
+  // Dispatches alight:people-visible when activating.
   useEffect(() => {
     const check = () => {
-      if (starsReady.current && faceReady.current && activatedRef.current === null) {
+      if (!starsReady.current || !faceReady.current) return;
+      if (activatedRef.current !== null || timerPending.current) return;
+      const elapsed = Date.now() - starsTime.current;
+      const delay   = Math.max(0, PEOPLE_MIN_DELAY_MS - elapsed);
+      timerPending.current = true;
+      setTimeout(() => {
+        if (activatedRef.current !== null) return;
         activatedRef.current = Date.now();
-      }
+        window.dispatchEvent(new CustomEvent("alight:people-visible"));
+      }, delay);
     };
-    const onStars = () => { starsReady.current = true; check(); };
+    const onStars = () => { starsReady.current = true; starsTime.current = Date.now(); check(); };
     const onFace  = () => { faceReady.current  = true; check(); };
     window.addEventListener("alight:stars-visible",  onStars);
     window.addEventListener("alight:face-captured",  onFace);
