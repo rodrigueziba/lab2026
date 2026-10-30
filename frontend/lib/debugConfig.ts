@@ -172,6 +172,7 @@ export const DBG_LECTERNS = {
   showGizmo:        false,  // J1: show I1 debug arrow gizmo
   showSections:     false,  // J3: overlay section frames + cell grid in dev mode
   knobSens:         2.5,    // knob full-range sweep as fraction of screen diagonal
+  debugOverlays:    false,  // L5: show lectern status line — off by default
 };
 
 // ── J5: retro skin (cassette futurism) for TARIMA lecterns ───────────────────

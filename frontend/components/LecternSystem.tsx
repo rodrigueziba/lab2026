@@ -163,6 +163,9 @@ registerLecternMats({
   rockerA: ROCKER_NARANJA_MAT, rockerB: ROCKER_TURQUESA_MAT, rockerBase: ROCKER_BASE_DARK_MAT, silk: SILK_MAT,
 });
 
+// L3: 'silkscreen' = single canvas texture replaces individual label/frame meshes
+const LABEL_MODE: "mesh" | "silkscreen" = "silkscreen";
+
 // ── Canvas label texture ──────────────────────────────────────────────────────
 const _labelCache = new Map<string, THREE.CanvasTexture>();
 function labelTex(text: string): THREE.CanvasTexture {
@@ -1005,28 +1008,39 @@ export function runControlDirectionTests(): void {
   if (typeof window === "undefined") return;
   console.group("[K2] Control direction tests");
 
-  // 1. Slider drag: railDir = (0,0,1) → dragging toward back (+Z) gives positive proj → value increases
-  const railDirTest = new THREE.Vector3(0, 0, 1);
-  const deltaBack   = new THREE.Vector3(0, 0, 0.05);
+  // 1. Slider drag: railDir = (0,0,-1) → dragging toward back (−Z) gives positive proj → value increases
+  const railDirTest = new THREE.Vector3(0, 0, -1);
+  const deltaBack   = new THREE.Vector3(0, 0, -0.05);  // moving toward −Z (back/high)
   const projTest    = deltaBack.dot(railDirTest);
   const sliderPass  = projTest > 0;
-  console.log(`Slider drag +Z (toward back): proj=${projTest.toFixed(3)} → ${sliderPass ? "✅ PASS" : "❌ FAIL"}`);
+  console.log(`Slider drag −Z (toward back): proj=${projTest.toFixed(3)} → ${sliderPass ? "✅ PASS" : "❌ FAIL"}`);
+
+  // 1b. Slider thumb at max: z = rail/2 - norm*rail → at norm=1, z = −rail/2 < 0 (screen top)
+  const RAIL = 0.28;
+  const thumbAtMax = RAIL / 2 - RAIL;
+  console.log(`Slider thumb at max (z<0 = screen top): z=${thumbAtMax.toFixed(3)} → ${thumbAtMax < 0 ? "✅ PASS" : "❌ FAIL"}`);
 
   // 2. Knob drag: (dx=+10, dy=0) → delta=(dx-dy)/diag > 0 → value increases
   const knobDelta = (10 - 0) / 1000 * DBG_LECTERNS.knobSens;
   console.log(`Knob drag right: delta=${knobDelta.toFixed(4)} → ${knobDelta > 0 ? "✅ PASS" : "❌ FAIL"}`);
 
-  // 3. Knob visual min (7:30): angle=-PI*0.75, indicator at x<0 and z<0 (left + toward front)
-  const angleMin = -Math.PI * 0.75;
+  // 3. Knob visual min (7:30 = lower-left): angle=π*1.75 (norm=0) → x<0, z>0
+  const angleMin = Math.PI * 1.75;
   const xMin = Math.sin(angleMin), zMin = Math.cos(angleMin);
-  const kMinPass = xMin < 0 && zMin < 0;
-  console.log(`Knob min pos (7:30, x<0 z<0): x=${xMin.toFixed(3)}, z=${zMin.toFixed(3)} → ${kMinPass ? "✅ PASS" : "❌ FAIL"}`);
+  const kMinPass = xMin < 0 && zMin > 0;
+  console.log(`Knob min pos (7:30, x<0 z>0): x=${xMin.toFixed(3)}, z=${zMin.toFixed(3)} → ${kMinPass ? "✅ PASS" : "❌ FAIL"}`);
 
-  // 4. Knob visual max (4:30): angle=+PI*0.75, indicator at x>0 and z<0 (right + toward front)
-  const angleMax = Math.PI * 0.75;
+  // 3b. Knob visual mid (12:00 = top): angle=π (norm=0.5) → x≈0, z<0 (toward back = screen up)
+  const angleMid = Math.PI;
+  const xMid = Math.sin(angleMid), zMid = Math.cos(angleMid);
+  const kMidPass = Math.abs(xMid) < 0.01 && zMid < 0;
+  console.log(`Knob mid pos (12:00, x≈0 z<0): x=${xMid.toFixed(3)}, z=${zMid.toFixed(3)} → ${kMidPass ? "✅ PASS" : "❌ FAIL"}`);
+
+  // 4. Knob visual max (4:30 = lower-right): angle=π*0.25 (norm=1) → x>0, z>0
+  const angleMax = Math.PI * 0.25;
   const xMax = Math.sin(angleMax), zMax = Math.cos(angleMax);
-  const kMaxPass = xMax > 0 && zMax < 0;
-  console.log(`Knob max pos (4:30, x>0 z<0): x=${xMax.toFixed(3)}, z=${zMax.toFixed(3)} → ${kMaxPass ? "✅ PASS" : "❌ FAIL"}`);
+  const kMaxPass = xMax > 0 && zMax > 0;
+  console.log(`Knob max pos (4:30, x>0 z>0): x=${xMax.toFixed(3)}, z=${zMax.toFixed(3)} → ${kMaxPass ? "✅ PASS" : "❌ FAIL"}`);
 
   // 5. Initial values
   const initTests: Array<[string, number]> = [
@@ -1075,6 +1089,7 @@ function CtrlMesh({
   const ringMatRef     = useRef<THREE.MeshBasicMaterial | null>(null);
   const overlayMatRef  = useRef<THREE.MeshBasicMaterial | null>(null);
   const haloMatRef     = useRef<THREE.MeshBasicMaterial | null>(null);
+  const keycapMatRef   = useRef<THREE.MeshStandardMaterial | null>(null);
 
   const register = (mesh: THREE.Mesh | null) => {
     if (!mesh || meshesRef.current.includes(mesh)) return;
@@ -1112,10 +1127,11 @@ function CtrlMesh({
     const norm = (v - def.min) / Math.max(0.001, def.max - def.min);
 
     // J2 fix: rotate the whole body+indicator group around Y
-    // K2: sweep ±135° (270° total) so min=7:30 and max=4:30 in user's view
+    // L2: rotation.y = π − θ where θ = −135° + 270°×norm (CW from 12:00 = back/up)
+    // min(0)→7:30 (lower-left), mid(0.5)→12:00 (top), max(1)→4:30 (lower-right)
     if (def.type === "knob") {
       if (knobRotRef.current) {
-        const angle = norm * Math.PI * 1.5 - Math.PI * 0.75;
+        const angle = Math.PI * 1.75 - norm * Math.PI * 1.5;
         knobRotRef.current.rotation.y = angle;
       }
       return;
@@ -1157,9 +1173,9 @@ function CtrlMesh({
           const t2 = (t - 0.15) / 0.85;
           sinkAmt = 0.018 * Math.max(0, Math.exp(-7 * t2) * Math.cos(Math.PI * 2 * t2));
         }
-        ctrlRef.current.position.y = BTN_H - sinkAmt;
+        ctrlRef.current.position.y = BTN_H / 2 - sinkAmt;
       } else {
-        ctrlRef.current.position.y = on ? BTN_H * 0.35 : BTN_H;
+        ctrlRef.current.position.y = on ? BTN_H * 0.25 : BTN_H / 2;
       }
       // K3: emissive flash then state-based LED
       if (ledMatRef.current) {
@@ -1188,6 +1204,10 @@ function CtrlMesh({
         const tex = labelTex(names[_lfoTgIdx % 3]);
         if (destLabelMatRef.current.map !== tex) { destLabelMatRef.current.map = tex; destLabelMatRef.current.needsUpdate = true; }
       }
+      // L4: keycap illumination flash on press
+      if (keycapMatRef.current) {
+        keycapMatRef.current.emissiveIntensity = pressMs < 120 ? (1 - pressMs / 120) * 2.0 : 0;
+      }
       // K3: ring expansion
       if (ringMeshRef.current && ringMatRef.current) {
         if (pressMs < 260) {
@@ -1200,13 +1220,14 @@ function CtrlMesh({
       }
     } else if (def.type === "slider") {
       const rail = def.railLen ?? SLIDER_RAIL;
-      ctrlRef.current.position.z = -rail / 2 + norm * rail;
+      // L2: back (-Z) = high value = screen top; front (+Z) = low value = screen bottom
+      ctrlRef.current.position.z = rail / 2 - norm * rail;
       if (fillRef.current) {
         const thumbZ = ctrlRef.current.position.z;
-        const frontZ = -rail / 2;
-        const fillLen = Math.max(0.001, thumbZ - frontZ);
+        const botZ = rail / 2;        // bottom (front, low-value end)
+        const fillLen = Math.max(0.001, botZ - thumbZ);
         fillRef.current.scale.z = fillLen;
-        fillRef.current.position.z = frontZ + fillLen / 2;
+        fillRef.current.position.z = thumbZ + fillLen / 2;
       }
     }
   });
@@ -1233,11 +1254,13 @@ function CtrlMesh({
           <planeGeometry args={[DW - 0.012, DD - 0.010]} />
           <primitive object={indMat} attach="material" />
         </mesh>
-        <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
-          <planeGeometry args={[LBL_W, LBL_H]} />
-          <meshBasicMaterial map={labelTex(def.label)} transparent alphaTest={0.05} depthWrite={false}
-            polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
-        </mesh>
+        {LABEL_MODE === "mesh" && (
+          <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
+            <planeGeometry args={[LBL_W, LBL_H]} />
+            <meshBasicMaterial map={labelTex(def.label)} transparent alphaTest={0.05} depthWrite={false}
+              polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+          </mesh>
+        )}
       </group>
     );
   }
@@ -1256,12 +1279,14 @@ function CtrlMesh({
           <primitive object={TRACK_MAT} attach="material" />
         </mesh>
         {/* White border around track (J2) */}
-        <mesh position={[0, BORDER_T, 0]}>
-          <boxGeometry args={[TRACK_W + 0.003, BORDER_T, rail + 0.003]} />
-          <primitive object={SILK_MAT} attach="material" />
-        </mesh>
-        {/* Scale on left side: 11 marks, white hueso */}
-        {Array.from({ length: nMarks }, (_, i) => {
+        {LABEL_MODE === "mesh" && (
+          <mesh position={[0, BORDER_T, 0]}>
+            <boxGeometry args={[TRACK_W + 0.003, BORDER_T, rail + 0.003]} />
+            <primitive object={SILK_MAT} attach="material" />
+          </mesh>
+        )}
+        {/* Scale on left side: 11 marks — hidden in silkscreen mode */}
+        {LABEL_MODE === "mesh" && Array.from({ length: nMarks }, (_, i) => {
           const z = -rail / 2 + (i / (nMarks - 1)) * rail;
           const isMajor = i === 0 || i === 5 || i === 10;
           return (
@@ -1277,7 +1302,7 @@ function CtrlMesh({
           <primitive object={THUMB_MAT} attach="material" />
         </mesh>
         {/* White line across thumb center */}
-        <mesh ref={fillRef} position={[0, THUMB_H + 0.001, -rail / 2]}>
+        <mesh ref={fillRef} position={[0, THUMB_H + 0.001, rail / 2]}>
           <boxGeometry args={[THUMB_W * 0.75, 0.002, 0.003]} />
           <primitive object={SILK_MAT} attach="material" />
         </mesh>
@@ -1286,33 +1311,37 @@ function CtrlMesh({
           <boxGeometry args={[THUMB_W * HIT_PAD, THUMB_H * HIT_PAD, rail]} />
           <meshBasicMaterial transparent opacity={0} />
         </mesh>
-        <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
-          <planeGeometry args={[LBL_W, LBL_H]} />
-          <meshBasicMaterial map={labelTex(def.label)} transparent alphaTest={0.05} depthWrite={false}
-            polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
-        </mesh>
-        {/* J3: volume/mute icons at rail ends for VOLUMEN slider */}
-        {def.icon === "volume" && (
+        {LABEL_MODE === "mesh" && (
           <>
-            <mesh position={[0, 0.001, rail / 2 + 0.025]} rotation={LBL_ROT}>
-              <planeGeometry args={[BTN_W * 0.70, BTN_W * 0.70]} />
-              <meshBasicMaterial map={iconTex("volume")} transparent alphaTest={0.05} depthWrite={false}
+            <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
+              <planeGeometry args={[LBL_W, LBL_H]} />
+              <meshBasicMaterial map={labelTex(def.label)} transparent alphaTest={0.05} depthWrite={false}
                 polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
             </mesh>
-            <mesh position={[0, 0.001, -(rail / 2 + 0.025)]} rotation={LBL_ROT}>
-              <planeGeometry args={[BTN_W * 0.70, BTN_W * 0.70]} />
-              <meshBasicMaterial map={iconTex("mute")} transparent alphaTest={0.05} depthWrite={false}
-                polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
-            </mesh>
+            {/* J3: volume/mute icons at rail ends for VOLUMEN slider */}
+            {def.icon === "volume" && (
+              <>
+                <mesh position={[0, 0.001, -(rail / 2 + 0.025)]} rotation={LBL_ROT}>
+                  <planeGeometry args={[BTN_W * 0.70, BTN_W * 0.70]} />
+                  <meshBasicMaterial map={iconTex("volume")} transparent alphaTest={0.05} depthWrite={false}
+                    polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+                </mesh>
+                <mesh position={[0, 0.001, rail / 2 + 0.025]} rotation={LBL_ROT}>
+                  <planeGeometry args={[BTN_W * 0.70, BTN_W * 0.70]} />
+                  <meshBasicMaterial map={iconTex("mute")} transparent alphaTest={0.05} depthWrite={false}
+                    polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+                </mesh>
+              </>
+            )}
+            {/* L1: icon at top of rail for camera sliders */}
+            {def.icon && def.icon !== "volume" && (
+              <mesh position={[0, 0.001, -(rail / 2 + 0.025)]} rotation={LBL_ROT}>
+                <planeGeometry args={[BTN_W * 0.70, BTN_W * 0.70]} />
+                <meshBasicMaterial map={iconTex(def.icon)} transparent alphaTest={0.05} depthWrite={false}
+                  polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+              </mesh>
+            )}
           </>
-        )}
-        {/* L1: icon at top of rail (high-value end) for camera sliders */}
-        {def.icon && def.icon !== "volume" && (
-          <mesh position={[0, 0.001, rail / 2 + 0.025]} rotation={LBL_ROT}>
-            <planeGeometry args={[BTN_W * 0.70, BTN_W * 0.70]} />
-            <meshBasicMaterial map={iconTex(def.icon)} transparent alphaTest={0.05} depthWrite={false}
-              polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
-          </mesh>
         )}
       </group>
     );
@@ -1326,10 +1355,11 @@ function CtrlMesh({
     const indCtrZ = KNOB_R * 0.20 + indLen / 2;
     // Fixed scale marks: 11 marks, 270° arc (K2: ±135° = ±PI*0.75), radius 0.054
     const arcMarks = Array.from({ length: 11 }, (_, i) => {
+      // L2: θ = −135° + 270°×(i/10); position = (sin θ, −cos θ) → gap at bottom (6:00)
       const angle = (i / 10) * Math.PI * 1.5 - Math.PI * 0.75;
       const r = KNOB_SKIRT_R + 0.006;
       const isEnd = i === 0 || i === 10;
-      return { x: Math.sin(angle) * r, z: Math.cos(angle) * r, isEnd };
+      return { x: Math.sin(angle) * r, z: -Math.cos(angle) * r, isEnd };
     });
     return (
       <group position={[def.px, surfY, -def.py]}>
@@ -1351,8 +1381,8 @@ function CtrlMesh({
             <primitive object={SILK_MAT} attach="material" />
           </mesh>
         </group>
-        {/* Fixed scale marks (white hueso, outside rotating group) */}
-        {arcMarks.map((p, i) => (
+        {/* Fixed scale marks — hidden in silkscreen mode */}
+        {LABEL_MODE === "mesh" && arcMarks.map((p, i) => (
           <mesh key={i} position={[p.x, KNOB_SKIRT_H + 0.001, p.z]}>
             <boxGeometry args={[0.002, 0.001, p.isEnd ? 0.010 : 0.006]} />
             <primitive object={SILK_MAT} attach="material" />
@@ -1365,11 +1395,13 @@ function CtrlMesh({
             (KNOB_H + KNOB_SKIRT_H) * HIT_PAD, 12]} />
           <meshBasicMaterial transparent opacity={0} />
         </mesh>
-        <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
-          <planeGeometry args={[LBL_W, LBL_H]} />
-          <meshBasicMaterial map={labelTex(def.label)} transparent alphaTest={0.05} depthWrite={false}
-            polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
-        </mesh>
+        {LABEL_MODE === "mesh" && (
+          <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
+            <planeGeometry args={[LBL_W, LBL_H]} />
+            <meshBasicMaterial map={labelTex(def.label)} transparent alphaTest={0.05} depthWrite={false}
+              polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+          </mesh>
+        )}
       </group>
     );
   }
@@ -1389,6 +1421,14 @@ function CtrlMesh({
               position={[0, ROCKER_BASE_H / 2 + ROCKER_H / 2, 0]}>
           <boxGeometry args={[ROCKER_W, ROCKER_H, ROCKER_D]} />
           <primitive object={rockerMat} attach="material" />
+          {/* L4: icon child — tilts with rocker lever */}
+          {def.icon && (
+            <mesh position={[0, ROCKER_H / 2 + 0.0008, 0]} rotation={LBL_ROT}>
+              <planeGeometry args={[0.022, 0.022]} />
+              <meshBasicMaterial map={iconTex(def.icon)} transparent alphaTest={0.05} depthWrite={false}
+                polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+            </mesh>
+          )}
         </mesh>
         {/* LED: small square above rocker (toward user = -z) */}
         <mesh position={[0, ROCKER_BASE_H + 0.004, -ROCKER_BASE_D / 2 - 0.005]}>
@@ -1403,16 +1443,10 @@ function CtrlMesh({
             ROCKER_BASE_D * HIT_PAD]} />
           <meshBasicMaterial transparent opacity={0} />
         </mesh>
-        <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
-          <planeGeometry args={[LBL_W, LBL_H]} />
-          <meshBasicMaterial map={labelTex(def.label)} transparent alphaTest={0.05} depthWrite={false}
-            polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
-        </mesh>
-        {/* J3: icon on top face of rocker lever */}
-        {def.icon && (
-          <mesh position={[0, ROCKER_BASE_H + ROCKER_H + 0.001, 0]} rotation={LBL_ROT}>
-            <planeGeometry args={[ROCKER_W * 0.55, ROCKER_D * 0.55]} />
-            <meshBasicMaterial map={iconTex(def.icon)} transparent alphaTest={0.05} depthWrite={false}
+        {LABEL_MODE === "mesh" && (
+          <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
+            <planeGeometry args={[LBL_W, LBL_H]} />
+            <meshBasicMaterial map={labelTex(def.label)} transparent alphaTest={0.05} depthWrite={false}
               polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
           </mesh>
         )}
@@ -1437,43 +1471,48 @@ function CtrlMesh({
   // ── Button → Pushbutton crema ───────────────────────────────────────────────
   return (
     <group position={[def.px, surfY, -def.py]}>
-      {/* Pushbutton: square crema block */}
-      <mesh ref={m => { ctrlRef.current = m!; register(m); }} position={[0, BTN_H, 0]}>
-        <boxGeometry args={[BTN_W, BTN_H * 2, BTN_W]} />
+      {/* L4: flat plate 60×20×60mm — center at BTN_H/2 so top face = BTN_H */}
+      <mesh ref={m => { ctrlRef.current = m!; register(m); }} position={[0, BTN_H / 2, 0]}>
+        <boxGeometry args={[BTN_W, BTN_H, BTN_W]} />
         <primitive object={PUSHBTN_MAT} attach="material" />
+        {/* L4: icon child — sinks with button press */}
+        {def.icon && (
+          <mesh position={[0, BTN_H / 2 + 0.0008, 0]} rotation={LBL_ROT}>
+            <planeGeometry args={[BTN_W * 0.55, BTN_W * 0.55]} />
+            {def.id === "s_play"
+              ? <meshBasicMaterial ref={playIconMatRef} map={iconTex("play")} transparent alphaTest={0.05} depthWrite={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+              : def.id === "s_lfo_wf"
+              ? <meshBasicMaterial ref={waveIconMatRef} map={iconTex("wave_sine")} transparent alphaTest={0.05} depthWrite={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+              : <meshBasicMaterial map={iconTex(def.icon)} transparent alphaTest={0.05} depthWrite={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+            }
+          </mesh>
+        )}
       </mesh>
-      {/* LED: tiny red corner flash */}
-      <mesh position={[BTN_W * 0.38, BTN_H * 2 + 0.003, BTN_W * 0.38]}>
+      {/* LED: tiny corner flash */}
+      <mesh position={[BTN_W * 0.38, BTN_H + 0.003, BTN_W * 0.38]}>
         <boxGeometry args={[0.004, 0.003, 0.004]} />
         <meshStandardMaterial ref={ledMatRef}
           color="#1a0000" emissive={lecternPalette().ledButton} emissiveIntensity={0} />
       </mesh>
-      <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, BTN_H, 0]} visible={false}>
-        <boxGeometry args={[BTN_W * HIT_PAD, BTN_H * 2 * HIT_PAD, BTN_W * HIT_PAD]} />
+      {/* Hit zone */}
+      <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, BTN_H / 2, 0]} visible={false}>
+        <boxGeometry args={[BTN_W * HIT_PAD, BTN_H * HIT_PAD, BTN_W * HIT_PAD]} />
         <meshBasicMaterial transparent opacity={0} />
       </mesh>
-      <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
-        <planeGeometry args={[LBL_W, LBL_H]} />
-        <meshBasicMaterial map={labelTex(def.label)} transparent alphaTest={0.05} depthWrite={false}
-          polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
-      </mesh>
-      {/* Keycap J2 K3: centered at top-right corner, square 32×8×32 */}
-      {keyLetter && (
-        <mesh position={[+0.034, BTN_H * 2 + 0.004, +0.034]}>
-          <boxGeometry args={[0.032, 0.008, 0.032]} />
-          <meshBasicMaterial map={keycapTex(keyLetter)} />
+      {LABEL_MODE === "mesh" && (
+        <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
+          <planeGeometry args={[LBL_W, LBL_H]} />
+          <meshBasicMaterial map={labelTex(def.label)} transparent alphaTest={0.05} depthWrite={false}
+            polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
         </mesh>
       )}
-      {/* J3/L1: icon on top face of button */}
-      {def.icon && (
-        <mesh position={[0, BTN_H * 2 + 0.002, 0]} rotation={LBL_ROT}>
-          <planeGeometry args={[BTN_W * 0.55, BTN_W * 0.55]} />
-          {def.id === "s_play"
-            ? <meshBasicMaterial ref={playIconMatRef} map={iconTex("play")} transparent alphaTest={0.05} depthWrite={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
-            : def.id === "s_lfo_wf"
-            ? <meshBasicMaterial ref={waveIconMatRef} map={iconTex("wave_sine")} transparent alphaTest={0.05} depthWrite={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
-            : <meshBasicMaterial map={iconTex(def.icon)} transparent alphaTest={0.05} depthWrite={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
-          }
+      {/* L4: keycap — rests on panel beside button, does NOT sink with press */}
+      {keyLetter && (
+        <mesh position={[0.050, -0.001, 0.026]}>
+          <boxGeometry args={[0.030, 0.004, 0.030]} />
+          <meshStandardMaterial ref={m => { keycapMatRef.current = m; }}
+            map={keycapTex(keyLetter)} roughness={1} metalness={0}
+            emissive="#ffeedd" emissiveIntensity={0} />
         </mesh>
       )}
       {/* L1: DESTINO sub-label showing current LFO target */}
@@ -1496,16 +1535,209 @@ function CtrlMesh({
   );
 }
 
+// ── L3: silkscreen canvas texture ────────────────────────────────────────────
+// Canvas 4096×2048: u axis → canvas x; z-axis of controls group → canvas y.
+// toY(py) = (CPANEL_D/2 − py) / CPANEL_D * H  (Band A at bottom, Band B at top)
+// High value ends (sliders) appear at top (smaller canvas_y).
+
+const _silkCanvases: Partial<Record<"left" | "right", HTMLCanvasElement>> = {};
+
+async function buildSilkscreen(side: "left" | "right"): Promise<THREE.CanvasTexture> {
+  await document.fonts.ready;
+  const W = 4096, H = 2048;
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d")!;
+  _silkCanvases[side] = cv;
+
+  const CW = CPANEL_W, CD = CPANEL_D;
+  // Map control surface coords → canvas pixels
+  const toX  = (u: number)     => (u + CW / 2) / CW * W;
+  const toY  = (py: number)    => (CD / 2 - py) / CD * H;
+  // Map absolute z in controls group → canvas y
+  const toYz = (z: number)     => (CD / 2 + z)  / CD * H;
+  const ppmX = W / CW;   // pixels per metre (horizontal)
+  const ppmY = H / CD;   // pixels per metre (vertical)
+
+  // Background
+  ctx.fillStyle = "#0d0d11";
+  ctx.fillRect(0, 0, W, H);
+
+  const sections = side === "left" ? IMAGE_SECTIONS : SOUND_SECTIONS;
+  const controls = side === "left" ? IMAGE_CONTROLS : SOUND_CONTROLS;
+
+  // ── Section frames ──────────────────────────────────────────────────────
+  for (const sec of sections) {
+    const vB = sec.band === "B" ? BAND_B_V_BACK  : BAND_A_V_BACK;
+    const vF = sec.band === "A" ? -0.02 : BAND_B_V_FRONT;
+    // For AB bands, use full extent
+    const vBack  = sec.band === "AB" ? BAND_A_V_BACK  : vB;
+    const vFront = sec.band === "AB" ? BAND_B_V_FRONT : vF;
+
+    const x0 = toX(sec.u_left);
+    const x1 = toX(sec.u_right);
+    // toY: Band A (negative py) → higher canvas_y (bottom). vBack > vFront in canvas.
+    const yTop = Math.min(toY(vBack), toY(vFront));
+    const yBot = Math.max(toY(vBack), toY(vFront));
+
+    ctx.strokeStyle = "rgba(241,239,230,0.6)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x0 + 1.5, yTop + 1.5, x1 - x0 - 3, yBot - yTop - 3);
+
+    // Title + subtitle at same z as 3D zLbl
+    const zLbl = sec.band === "A" ? -(BAND_A_V_BACK + 0.295) : -(BAND_B_V_BACK + 0.295);
+    const lyT = toYz(zLbl);
+    const xCtr = (x0 + x1) / 2;
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(241,239,230,0.95)";
+    ctx.font = "bold 55px monospace";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(sec.label.toUpperCase(), xCtr, lyT - 10);
+
+    if (sec.subtitle) {
+      ctx.fillStyle = "rgba(241,239,230,0.60)";
+      ctx.font = "30px monospace";
+      ctx.fillText(sec.subtitle.toUpperCase(), xCtr, lyT + 28);
+    }
+  }
+
+  // ── Control labels ──────────────────────────────────────────────────────
+  for (const def of controls) {
+    if (def.type === "indicator") continue;
+    const cx = toX(def.px);
+    // 3D places label at z = -(def.py) + lblZ_local where lblZ_local = −LBL_AHEAD or −0.29
+    const lblZlocal = def.type === "slider" ? -0.29 : -LBL_AHEAD;
+    const zAbs = -def.py + lblZlocal;  // absolute z in controls group
+    const ly = toYz(zAbs);
+
+    ctx.fillStyle = "rgba(241,239,230,0.90)";
+    ctx.font = "bold 38px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(def.label.toUpperCase(), cx, ly);
+  }
+
+  // ── Slider scale marks + numbers ────────────────────────────────────────
+  for (const def of controls) {
+    if (def.type !== "slider") continue;
+    const rail = def.railLen ?? SLIDER_RAIL;
+    const cx = toX(def.px);
+    const xLeft = cx - (THUMB_W / 2 + 0.013) * ppmX;
+
+    for (let i = 0; i <= 10; i++) {
+      // z_mark in ctrl local (relative to slider group center)
+      // i=0 → z = −rail/2 (high-value end = back = screen top = small canvas_y)
+      const zMark  = -rail / 2 + (i / 10) * rail;
+      const zAbs   = -def.py + zMark;
+      const my = toYz(zAbs);
+      const isMajor = (i === 0 || i === 5 || i === 10);
+      const mLen = isMajor ? 20 : 12;
+
+      ctx.fillStyle = isMajor ? "rgba(241,239,230,0.85)" : "rgba(241,239,230,0.55)";
+      ctx.fillRect(xLeft - mLen, my - 1, mLen, 2);
+
+      if (isMajor) {
+        // i=0 = "10" (high value, top of canvas)
+        const numStr = i === 0 ? "10" : i === 5 ? "5" : "0";
+        ctx.fillStyle = "rgba(241,239,230,0.70)";
+        ctx.font = "26px monospace";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillText(numStr, xLeft - mLen - 5, my);
+      }
+    }
+  }
+
+  // ── Knob arc marks + numbers ────────────────────────────────────────────
+  for (const def of controls) {
+    if (def.type !== "knob") continue;
+    const cx = toX(def.px);
+    const cy = toY(def.py);
+    const rInner = KNOB_SKIRT_R + 0.006;
+
+    for (let i = 0; i <= 10; i++) {
+      const angle  = (i / 10) * Math.PI * 1.5 - Math.PI * 0.75;
+      // Same as 3D: x=sin(angle)*r, z=−cos(angle)*r
+      const xMark  = Math.sin(angle) * rInner;
+      const zMark  = -Math.cos(angle) * rInner;
+      const isEnd  = (i === 0 || i === 10);
+      const rOuter = rInner + (isEnd ? 0.011 : 0.007);
+
+      const mxI = cx + xMark * ppmX;
+      const myI = cy + zMark * ppmY;
+      const mxO = cx + Math.sin(angle) * rOuter * ppmX;
+      const myO = cy + (-Math.cos(angle) * rOuter) * ppmY;
+
+      ctx.strokeStyle = isEnd ? "rgba(241,239,230,0.85)" : "rgba(241,239,230,0.55)";
+      ctx.lineWidth = isEnd ? 2.5 : 1.5;
+      ctx.beginPath();
+      ctx.moveTo(mxI, myI);
+      ctx.lineTo(mxO, myO);
+      ctx.stroke();
+
+      if (i === 0 || i === 5 || i === 10) {
+        const rNum  = rOuter + 0.015;
+        const nxAbs = def.px + Math.sin(angle) * rNum;
+        const nzAbs = -def.py + (-Math.cos(angle) * rNum);
+        const nx = toX(nxAbs);
+        const ny = toYz(nzAbs);
+        // i=0 → angle=−135° (lower-left) → value 0; i=10 → +135° → value 10
+        const numStr = i === 0 ? "0" : i === 5 ? "5" : "10";
+        ctx.fillStyle = "rgba(241,239,230,0.65)";
+        ctx.font = "26px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(numStr, nx, ny);
+      }
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 16;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Expose dump helper for browser console debugging
+if (typeof window !== "undefined") {
+  (window as any).__dumpSilkscreen = (side: "left" | "right" = "left") => {
+    const cv = _silkCanvases[side];
+    if (!cv) { console.warn(`[silkscreen] ${side} not built yet`); return; }
+    const a = document.createElement("a");
+    a.href = cv.toDataURL("image/png");
+    a.download = `silkscreen_${side}.png`;
+    a.click();
+  };
+}
+
 // ── Lectern geometry ──────────────────────────────────────────────────────────
 function LecternBody({ side }: { side: "left" | "right" }) {
   const { gl } = useThree();
   const sign   = side === "left" ? -1 : 1;
+  const silkMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
 
   useEffect(() => {
     const env = getEnvMap(gl);
     CHROME_MAT.envMap = env;
     CHROME_MAT.needsUpdate = true;
   }, [gl]);
+
+  // L3: build silkscreen canvas texture and apply to the plane
+  useEffect(() => {
+    if (LABEL_MODE !== "silkscreen") return;
+    let cancelled = false;
+    buildSilkscreen(side).then(tex => {
+      if (cancelled) { tex.dispose(); return; }
+      if (silkMatRef.current) {
+        silkMatRef.current.map = tex;
+        silkMatRef.current.needsUpdate = true;
+      }
+    });
+    return () => { cancelled = true; };
+  }, [side]);
 
   return (
     <group>
@@ -1555,6 +1787,15 @@ function LecternBody({ side }: { side: "left" | "right" }) {
             <boxGeometry args={[CPANEL_W, CPANEL_T, CPANEL_D]} />
             <primitive object={CPANEL_MAT} attach="material" />
           </mesh>
+          {/* L3: silkscreen plane — 1mm above cpanel top, covers full cpanel area */}
+          {LABEL_MODE === "silkscreen" && (
+            <mesh position={[0, PANEL_T / 2 + CPANEL_T + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[CPANEL_W, CPANEL_D]} />
+              <meshBasicMaterial ref={m => { silkMatRef.current = m; }}
+                transparent depthWrite={false}
+                polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
+            </mesh>
+          )}
           {/* J5: retro brand guard on the rear bar's user-facing side */}
           <LecternRearStrip side={side} faceZ={-(OUTER_D / 2 - REAR_BAR_D)} plateTopY={PANEL_T / 2} height={REAR_BAR_EXTRA} />
         </group>
@@ -1637,11 +1878,11 @@ function Lectern({
         {/* Controls + zone decorations — pivot at +Z (front) edge, matches plate hierarchy */}
         <group position={[0, LEG_H, PANEL_D / 2]} rotation={[TILT_RAD, 0, 0]}>
           <group position={[0, PANEL_T + CPANEL_T, -PANEL_D / 2]}>
-            {/* J3: section frames + labels ─────────────────────────────────── */}
-            {(side === "left" ? IMAGE_SECTIONS : SOUND_SECTIONS).map(sec => {
+            {/* J3: section frames + labels — skipped in silkscreen mode */}
+            {LABEL_MODE === "mesh" && (side === "left" ? IMAGE_SECTIONS : SOUND_SECTIONS).map(sec => {
               const vBack  = sec.band === "B" ? BAND_B_V_BACK  : BAND_A_V_BACK;
               const vFront = sec.band === "A" ? -0.02 : BAND_B_V_FRONT;
-              const zBack  = -vBack;   // z = -v in controls frame
+              const zBack  = -vBack;
               const zFront = -vFront;
               const zCtr   = (zBack + zFront) / 2;
               const zH     = Math.abs(zBack - zFront);
@@ -1652,7 +1893,6 @@ function Lectern({
               const lblW   = Math.min(uW - 0.02, 0.20);
               return (
                 <group key={sec.label}>
-                  {/* L1: raised to y=0.002 so frames sit above cpanel surface (cpanel top = y=0.001) */}
                   <mesh position={[uCtr, 0.002, zFront]}>
                     <boxGeometry args={[uW + BT * 2, 0.001, BT]} />
                     <primitive object={SILK_MAT} attach="material" />
@@ -1669,13 +1909,11 @@ function Lectern({
                     <boxGeometry args={[BT, 0.001, zH + BT * 2]} />
                     <primitive object={SILK_MAT} attach="material" />
                   </mesh>
-                  {/* Title label — y=0.003, polygonOffset to prevent z-fighting */}
                   <mesh position={[uCtr, 0.003, zLbl]} rotation={[Math.PI / 2, 0, 0]}>
                     <planeGeometry args={[lblW, 0.012]} />
                     <meshBasicMaterial map={zoneTitleTex(sec.label)} transparent alphaTest={0.05} depthWrite={false}
                       polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
                   </mesh>
-                  {/* L1: subtitle — smaller, below title */}
                   {sec.subtitle && (
                     <mesh position={[uCtr, 0.003, zLbl + 0.013]} rotation={[Math.PI / 2, 0, 0]}>
                       <planeGeometry args={[lblW, 0.009]} />
@@ -1872,8 +2110,8 @@ function InteractionHandler() {
         _drag.plane.setFromNormalAndCoplanarPoint(planeNorm, point);
         // Rail axis and origin
         if (isV) {
-          // K2: +Z is toward back (high value); dragging toward back increases value
-          _drag.railDir.set(0, 0, 1).transformDirection(mesh.parent!.matrixWorld).normalize();
+          // L2: −Z is toward back (higher in world); dragging toward back increases value
+          _drag.railDir.set(0, 0, -1).transformDirection(mesh.parent!.matrixWorld).normalize();
         } else {
           _drag.railDir.set(1, 0, 0).transformDirection(mesh.parent!.matrixWorld).normalize();
         }

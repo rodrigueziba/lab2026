@@ -15,7 +15,7 @@ import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from ".
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import { STORE, INTERACT_STATE, storeSubscribe } from "@/lib/alightStore";
-import { DBG_SPOTLIGHT, DBG_SILLAS, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { startVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
 
 const ZONA_LUZ    = new THREE.Vector3(0, 1.6,  0);
@@ -503,10 +503,15 @@ function PrismDebugOverlay() {
 }
 
 // ── Debug: lectern interaction overlay ───────────────────────────────────────
+// L5: hidden by default — enable via DBG_LECTERNS.debugOverlays in TARIMA debug menu
 function LecternDebugOverlay() {
   const [info, setInfo] = useState("");
+  const [enabled, setEnabled] = useState(DBG_LECTERNS.debugOverlays);
   useEffect(() => {
     const id = setInterval(() => {
+      const en = DBG_LECTERNS.debugOverlays;
+      setEnabled(en);
+      if (!en) return;
       const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
       const locked = document.pointerLockElement ? "LOCKED" : "free";
       const cursor = canvas?.style.cursor?.slice(0, 30) || "(empty)";
@@ -518,7 +523,7 @@ function LecternDebugOverlay() {
     }, 100);
     return () => clearInterval(id);
   }, []);
-  if (INTERACT_STATE.mode === "none") return null;
+  if (!enabled || INTERACT_STATE.mode === "none") return null;
   return (
     <div style={{
       position: "fixed", bottom: 8, left: "50%", transform: "translateX(-50%)",

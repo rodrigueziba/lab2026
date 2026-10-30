@@ -575,6 +575,11 @@ export default function DebugMenu() {
               onChange={e => { DBG_LECTERNS.showGizmo = e.target.checked; setLectern(l => ({ ...l, showGizmo: e.target.checked })); }} />
           </div>
           <div style={ROW}>
+            <span style={LABEL}>Debug overlays (mode/lock/hover)</span>
+            <input type="checkbox" checked={lectern.debugOverlays}
+              onChange={e => { DBG_LECTERNS.debugOverlays = e.target.checked; setLectern(l => ({ ...l, debugOverlays: e.target.checked })); }} />
+          </div>
+          <div style={ROW}>
             <span>Orientación atriles <span style={NOTE}>(I1 — giro 180°)</span></span>
           </div>
           <div style={ROW}>

@@ -25,17 +25,17 @@ export default function LecternHUD() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  if (!text) return null;
+  // L5: always in DOM for smooth 200ms fade; opacity drives visibility
   return (
     <div style={{
       position: "fixed",
-      bottom: 52,
+      top: 24,
       left: "50%",
       transform: "translateX(-50%)",
       background: "rgba(42,20,0,0.88)",
       color: "#FF9A1F",
       fontFamily: "monospace",
-      fontSize: 14,
+      fontSize: 16,
       fontWeight: "bold",
       letterSpacing: "0.08em",
       padding: "4px 14px",
@@ -44,6 +44,8 @@ export default function LecternHUD() {
       zIndex: 3100,
       pointerEvents: "none",
       whiteSpace: "nowrap",
+      opacity: text ? 1 : 0,
+      transition: "opacity 0.2s ease",
     }}>
       {text}
     </div>
