@@ -19,10 +19,10 @@ export const DBG_PRISM = {
   landOffset:  0.09, // C3 hover gap (read-only, changes require code edit + reload)
   // S1
   spinDir:     -1,   // -1 = inverted (CCW from above)
-  // S2 / H1.3: PRISM_RANGE_SCALE = 1.5 × original (nearM 1.5→2.25, closeM 1.0→1.5)
-  prismRangeScale: 1.5, // H1: multiplier applied to nearM and closeM at startup
-  nearM:       2.25, // proximity effect starts (m)  was 1.5
-  closeM:      1.5,  // glow threshold (m)            was 1.0
+  // N2: absolute radii (prismRangeScale multiplier removed)
+  prismRangeScale: 1.0, // legacy N1 — no longer applied; kept for history
+  nearM:       5.0,  // proximity effect starts (m)
+  closeM:      3.33, // glow threshold (m)
   maxEffectM:  0.3,  // full effect at this distance (m) — unchanged
   translucentMs:      3000, // ms to ramp to translucent opacity
   translucentOpacity: 0.35, // glass opacity when player is near
@@ -34,7 +34,7 @@ export const POINTERLOCK_RETRY_MS = 1300;
 
 // S3: dome exterior visualizer (SILLAS path)
 export const DBG_SILLAS = {
-  prismInteractM:  1.5,   // horizontal distance (m) at which "Tocar E" prompt appears
+  prismInteractM:  5.0,   // horizontal distance (m) at which "Apretar E" prompt appears
   prismTouchM:     0.75,  // horizontal distance (m) at which touching auto-activates
   touchEpsM:       0.05,  // legacy surface threshold (kept for compat) — use prismTouchM
   vizTrackUrl:      '/music.mp3' as string, // G2: default track (same as /login)

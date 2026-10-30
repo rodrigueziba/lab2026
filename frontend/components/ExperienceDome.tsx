@@ -8,6 +8,11 @@ import DomeVisualizer from "./DomeVisualizer";
 import FloorVisualizer from "./FloorVisualizer";
 import SectorAudioFX from "./SectorAudioFX";
 import { DBG_SILLAS } from "@/lib/debugConfig";
+import { resetEffects } from "@/lib/vizAudio";
+
+// N2: disable legacy floor textures and sector audio
+const LEGACY_FLOOR_TEXTURES_ENABLED = false;
+const LEGACY_SECTOR_AUDIO_ENABLED   = false;
 
 const API_URL    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 const DOME_R     = 28;
@@ -383,8 +388,8 @@ export default function ExperienceDome() {
       activatedRef.current = Date.now();
       setTimeout(() => window.dispatchEvent(new CustomEvent("alight:dome-revealed")), 9_800);
     };
-    // visualizer-activate → begin shell fade + mount DomeVisualizer
-    const onVizOn  = () => { vizActiveRef.current = true;  setVizActive(true); };
+    // visualizer-activate → begin shell fade + mount DomeVisualizer; reset legacy effects (N2)
+    const onVizOn  = () => { resetEffects(); vizActiveRef.current = true;  setVizActive(true); };
     const onVizOff = () => {
       vizActiveRef.current = false;
       setVizActive(false);
@@ -420,10 +425,11 @@ export default function ExperienceDome() {
 
   return (
     <group>
-      {/* S3/H2: only mounted when visualizer is active */}
+      {/* S3: DomeVisualizer always mounted when visualizer active */}
       {vizActive && <DomeVisualizer />}
-      {vizActive && <FloorVisualizer />}
-      {vizActive && <SectorAudioFX />}
+      {/* N2: legacy floor + sector audio disabled; gated by flags to allow re-enable */}
+      {vizActive && LEGACY_FLOOR_TEXTURES_ENABLED && <FloorVisualizer />}
+      {vizActive && LEGACY_SECTOR_AUDIO_ENABLED   && <SectorAudioFX />}
 
       {/* Dome shell — upper hemisphere, BackSide.
           thetaLength=0.52π puts the open rim at y≈-2 (below floor level) so

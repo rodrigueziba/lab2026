@@ -180,6 +180,7 @@ export default function DebugMenu() {
   const [lectern,  setLectern]  = useState({ ...DBG_LECTERNS });
   const [retro,    setRetro]    = useState({ ...DBG_RETRO });
   const [sillas,   setSillas]   = useState({ ...DBG_SILLAS });
+  const [legacyOpen, setLegacyOpen] = useState(false); // N2: Legado section collapsed by default
   const [prism,    setPrism]    = useState({ ...DBG_PRISM });
   const [floor,    setFloor]    = useState({ ...DBG_FLOOR });
   const [fx,       setFx]       = useState({ ...DBG_EFFECTS });
@@ -271,14 +272,8 @@ export default function DebugMenu() {
           <NumField label="landOffset (m)" value={DBG_PRISM.landOffset} note="reload to change" />
 
           <div style={DIVIDER} />
-          <span style={LABEL}>Prism proximity <span style={NOTE}>(S2/H1.3 — live)</span></span>
-          <NumField label="prismRangeScale" value={prism.prismRangeScale} step={0.1} min={0.5} max={4} note="H1.3 — updates nearM/closeM"
-            onChange={v => {
-              DBG_PRISM.prismRangeScale = v;
-              DBG_PRISM.nearM  = parseFloat((1.5 * v).toFixed(3));
-              DBG_PRISM.closeM = parseFloat((1.0 * v).toFixed(3));
-              setPrism(p => ({ ...p, prismRangeScale: v, nearM: 1.5 * v, closeM: v }));
-            }} />
+          <span style={LABEL}>Prism proximity <span style={NOTE}>(N2 — live, absolute)</span></span>
+          <NumField label="prismRangeScale" value={prism.prismRangeScale} note="legacy N1 — no longer applied" />
           <NumField label="spinDir" value={prism.spinDir} step={2} min={-1} max={1} note="live"
             onChange={v => { DBG_PRISM.spinDir = v; setPrism(p => ({ ...p, spinDir: v })); }} />
           <NumField label="nearM" value={prism.nearM} step={0.1} min={0} max={5} note="live"
@@ -401,6 +396,13 @@ export default function DebugMenu() {
           >↺ Reiniciar música</button>
 
           <div style={DIVIDER} />
+          {/* N2: Legado — FloorVisualizer + SectorAudioFX (disabled, kept for reference) */}
+          <div style={{ ...ROW, marginBottom: 4 }}>
+            <span style={{ ...LABEL, marginBottom: 0 }}>Legado <span style={NOTE}>(N2 — desactivado)</span></span>
+            <button style={{ ...INPUT, width: "auto", padding: "1px 6px", cursor: "pointer" }}
+              onClick={() => setLegacyOpen(o => !o)}>{legacyOpen ? "▲" : "▼"}</button>
+          </div>
+          {legacyOpen && <>
           <span style={LABEL}>Floor visualizer <span style={NOTE}>(H2 — live)</span></span>
           <NumField label="innerR (m)"   value={floor.innerR}   step={0.1} min={0} max={10}
             onChange={v => { DBG_FLOOR.innerR = v;   setFloor(f => ({ ...f, innerR: v })); }} />
@@ -469,6 +471,7 @@ export default function DebugMenu() {
             <NumField label="simT (0-1)" value={fx.simT} step={0.05} min={0} max={1}
               onChange={v => { DBG_EFFECTS.simT = v; setFx(f => ({ ...f, simT: v })); }} />
           </>}
+          </>} {/* end Legado */}
 
           <div style={DIVIDER} />
           <span style={LABEL}>Secuencia sillas <span style={NOTE}>(N1)</span></span>

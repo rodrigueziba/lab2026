@@ -16,7 +16,7 @@ import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import { STORE, INTERACT_STATE, storeSubscribe } from "@/lib/alightStore";
 import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
-import { startVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
+import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
 
 const ZONA_LUZ    = new THREE.Vector3(0, 1.6,  0);
 const ZONA_SILLAS = new THREE.Vector3(0, 1.6, -6); // G2: 1 m further
@@ -198,13 +198,10 @@ function Player() {
       const k = e.key.toLowerCase();
       if (k in keys.current) keys.current[k as keyof Keys] = true;
       // E key: activate visualizer (SILLAS only, when close to prism)
-      // startVizAudio() is called first so it runs within the gesture stack → no NotAllowedError
+      // prepareVizAudio() runs in gesture context → unblocks AudioContext for later play (N2/N4)
       if (k === "e" && pathRef.current === "sillas" && prismNearRef.current && !_vizActivated
           && INTERACT_STATE.experienceState === 'sala_activa') {
-        startVizAudio().then(r => {
-          if (r === "need-gesture")
-            window.dispatchEvent(new CustomEvent("alight:audio-need-gesture", { detail: { need: true } }));
-        });
+        void prepareVizAudio();
         activateVisualizer();
       }
     };
@@ -294,19 +291,18 @@ function Player() {
       _D.d    = horizDist;
       _D.minD = Math.min(_D.minD, horizDist);
 
-      const nearNow = horizDist <= DBG_SILLAS.prismInteractM;
+      // N2: prompt only in sala_activa, before visualizer activates
+      const nearNow = horizDist <= DBG_SILLAS.prismInteractM
+        && INTERACT_STATE.experienceState === 'sala_activa' && !_vizActivated;
       if (nearNow !== prismNearRef.current) {
         prismNearRef.current = nearNow;
         window.dispatchEvent(new CustomEvent("alight:near-prism", { detail: { near: nearNow } }));
       }
 
-      // Auto-activate on touch distance (only once sala_activa — N1)
+      // Auto-activate on touch distance (N1); prepare audio without playing (N2)
       if (!_vizActivated && horizDist <= DBG_SILLAS.prismTouchM
           && INTERACT_STATE.experienceState === 'sala_activa') {
-        startVizAudio().then(r => {
-          if (r === "need-gesture")
-            window.dispatchEvent(new CustomEvent("alight:audio-need-gesture", { detail: { need: true } }));
-        });
+        void prepareVizAudio();
         activateVisualizer();
       }
     }
@@ -378,10 +374,10 @@ function NearLecternHUD() {
       const which = (e as CustomEvent).detail?.which as string;
       setNearMsg(which !== "none" ? "Tocar E para interactuar" : "");
     };
-    // SILLAS: prism proximity (hide on visualizer activation)
+    // SILLAS: prism proximity prompt — only show in sala_activa (N2)
     const onNearPrism = (e: Event) => {
       const near = (e as CustomEvent).detail?.near as boolean;
-      setNearMsg(near ? "Tocar E para interactuar" : "");
+      setNearMsg(near && INTERACT_STATE.experienceState === 'sala_activa' ? "Apretar E para interactuar" : "");
     };
     const onVizOn = () => setNearMsg(""); // hide once activated
     const onMode  = (e: Event) => {

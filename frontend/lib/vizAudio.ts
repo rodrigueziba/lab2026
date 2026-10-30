@@ -114,57 +114,76 @@ function onTrackEnded(): void {
   });
 }
 
+// ── _buildChain: create audio element + Web Audio graph (no play) ─────────────
+async function _buildChain(): Promise<void> {
+  if (_vizCtx) return; // already built
+  const url   = DBG_SILLAS.vizTrackUrl;
+  _currentUrl = url;
+  _vizAudioEl = new Audio(url);
+  _vizAudioEl.crossOrigin = "anonymous";
+  _vizAudioEl.loop = false; // H1.2: playlist via onTrackEnded
+  _vizAudioEl.addEventListener("ended", onTrackEnded);
+
+  _vizCtx = new AudioContext();
+
+  // H3: source → LP → HP → dry/echo/reverb → master → analyser → out
+  _lpFilter = _vizCtx.createBiquadFilter(); _lpFilter.type = "lowpass";  _lpFilter.frequency.value = 20000;
+  _hpFilter = _vizCtx.createBiquadFilter(); _hpFilter.type = "highpass"; _hpFilter.frequency.value = 20;
+  _dryGain  = _vizCtx.createGain();  _dryGain.gain.value  = 1;
+  _delay    = _vizCtx.createDelay(1.0); _delay.delayTime.value = 0.35;
+  _echoFeedback  = _vizCtx.createGain(); _echoFeedback.gain.value  = 0;
+  _echoOutGain   = _vizCtx.createGain(); _echoOutGain.gain.value   = 0;
+  _convolver = _vizCtx.createConvolver(); _convolver.buffer = makeIR(_vizCtx);
+  _reverbOutGain = _vizCtx.createGain(); _reverbOutGain.gain.value = 0;
+  _masterGain    = _vizCtx.createGain(); _masterGain.gain.value    = 1;
+  _vizAnalyser = _vizCtx.createAnalyser(); _vizAnalyser.fftSize = 256;
+  _vizFreq = new Uint8Array(_vizAnalyser.frequencyBinCount) as any as U8;
+
+  const src = _vizCtx.createMediaElementSource(_vizAudioEl!);
+  src.connect(_lpFilter);
+  _lpFilter.connect(_hpFilter);
+  _hpFilter.connect(_dryGain);
+  _hpFilter.connect(_delay);
+  _hpFilter.connect(_convolver);
+  _dryGain.connect(_masterGain);
+  _delay.connect(_echoFeedback);
+  _echoFeedback.connect(_delay);           // feedback loop
+  _delay.connect(_echoOutGain);
+  _echoOutGain.connect(_masterGain);
+  _convolver.connect(_reverbOutGain);
+  _reverbOutGain.connect(_masterGain);
+  _masterGain.connect(_vizAnalyser);
+  _vizAnalyser.connect(_vizCtx.destination);
+
+  VIZ_AUDIO_DEBUG.sourceType = `file:${url}`;
+}
+
+// ── prepareVizAudio (N2) ───────────────────────────────────────────────────────
+// Builds the audio graph and pre-buffers the first track without starting playback.
+// Call from a user-gesture (keydown/click) to unblock the AudioContext while keeping
+// the gesture context for a future play() call (N4).
+export async function prepareVizAudio(): Promise<void> {
+  try {
+    await _buildChain();
+    VIZ_AUDIO_DEBUG.ctxState = _vizCtx!.state;
+    if (_vizCtx!.state === "suspended") await _vizCtx!.resume();
+    _vizAudioEl!.preload = "auto";
+    _vizAudioEl!.load();
+    void fetchVizPlaylist();
+  } catch (err) {
+    console.warn("[VizAudio] prepareVizAudio error:", err);
+  }
+}
+
 // ── startVizAudio ──────────────────────────────────────────────────────────────
+// Builds chain (if not yet built) and starts playback immediately.
 // Must be called directly from a user-gesture handler (keydown / click).
-// Uses DBG_SILLAS.vizTrackUrl directly — no fetch() — to keep play() in the
-// gesture stack and avoid NotAllowedError.
 export async function startVizAudio(): Promise<"ok" | "need-gesture"> {
   try {
-    if (!_vizCtx) {
-      const url        = DBG_SILLAS.vizTrackUrl;
-      _currentUrl      = url;
-      _vizAudioEl      = new Audio(url);
-      _vizAudioEl.crossOrigin = "anonymous";
-      // H1.2: loop=false; next track chosen by onTrackEnded when playlist is loaded
-      _vizAudioEl.loop = false;
-      _vizAudioEl.addEventListener("ended", onTrackEnded);
+    await _buildChain();
 
-      _vizCtx = new AudioContext();
-
-      // H3: source → LP → HP → dry/echo/reverb → master → analyser → out
-      _lpFilter = _vizCtx.createBiquadFilter(); _lpFilter.type = "lowpass";  _lpFilter.frequency.value = 20000;
-      _hpFilter = _vizCtx.createBiquadFilter(); _hpFilter.type = "highpass"; _hpFilter.frequency.value = 20;
-      _dryGain  = _vizCtx.createGain();  _dryGain.gain.value  = 1;
-      _delay    = _vizCtx.createDelay(1.0); _delay.delayTime.value = 0.35;
-      _echoFeedback  = _vizCtx.createGain(); _echoFeedback.gain.value  = 0;
-      _echoOutGain   = _vizCtx.createGain(); _echoOutGain.gain.value   = 0;
-      _convolver = _vizCtx.createConvolver(); _convolver.buffer = makeIR(_vizCtx);
-      _reverbOutGain = _vizCtx.createGain(); _reverbOutGain.gain.value = 0;
-      _masterGain    = _vizCtx.createGain(); _masterGain.gain.value    = 1;
-      _vizAnalyser = _vizCtx.createAnalyser(); _vizAnalyser.fftSize = 256;
-      _vizFreq = new Uint8Array(_vizAnalyser.frequencyBinCount) as any as U8;
-
-      const src = _vizCtx.createMediaElementSource(_vizAudioEl!);
-      src.connect(_lpFilter);
-      _lpFilter.connect(_hpFilter);
-      _hpFilter.connect(_dryGain);
-      _hpFilter.connect(_delay);
-      _hpFilter.connect(_convolver);
-      _dryGain.connect(_masterGain);
-      _delay.connect(_echoFeedback);
-      _echoFeedback.connect(_delay);           // feedback loop
-      _delay.connect(_echoOutGain);
-      _echoOutGain.connect(_masterGain);
-      _convolver.connect(_reverbOutGain);
-      _reverbOutGain.connect(_masterGain);
-      _masterGain.connect(_vizAnalyser);
-      _vizAnalyser.connect(_vizCtx.destination);
-
-      VIZ_AUDIO_DEBUG.sourceType = `file:${url}`;
-    }
-
-    VIZ_AUDIO_DEBUG.ctxState = _vizCtx.state;
-    if (_vizCtx.state === "suspended") await _vizCtx.resume();
+    VIZ_AUDIO_DEBUG.ctxState = _vizCtx!.state;
+    if (_vizCtx!.state === "suspended") await _vizCtx!.resume();
     await _vizAudioEl!.play();
     VIZ_AUDIO_DEBUG.lastPlayResult = "ok";
 
