@@ -5,6 +5,11 @@
 
 import { DBG_SILLAS } from "./debugConfig";
 
+// ── N4 constants ──────────────────────────────────────────────────────────────
+const MUSIC_FIRST             = '/music.mp3'; // always the first track each session
+const BANDS_FILTER_ORDER      = 2;            // cascaded biquads per crossover edge
+const LEGACY_H3_CHAIN_ENABLED = false;        // N4: disabled; applyEffects() is a no-op
+
 // ── Audio bands ────────────────────────────────────────────────────────────────
 export interface AudioBands {
   sub: number; bass: number; lowMid: number; mid: number;
@@ -27,6 +32,15 @@ export const VIZ_AUDIO_DEBUG = {
   lastPlayResult: ""       as string,
 };
 
+// ── N4: band state (published per-frame for SymbolSystem, DomeVisualizer) ─────
+export const BAND_STATE = {
+  energy:     [0, 0, 0, 0] as number[],                 // pre-gate smoothed RMS per band
+  gateOpen:   [false, false, false, false] as boolean[], // per band (indexed by bandIdx)
+  assignment: [0, 1, 2, 3] as number[],                 // assignment[symbolIdx] = bandIdx
+  domeEnergy: 0 as number,                              // max energy of bands with open gate
+  kick:       false as boolean,                         // true for one getVizBands() call
+};
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type U8 = Uint8Array<ArrayBuffer>;
 
@@ -37,6 +51,21 @@ let _vizAudioEl:  HTMLAudioElement | null = null;
 let _beatPrev     = 0;
 let _beatLast     = 0;
 let _silenceTimer: ReturnType<typeof setTimeout> | null = null;
+let _playStarted  = false;
+
+// N4: band chain nodes
+let _bandFilters:   BiquadFilterNode[][] = [];
+let _bandAnalysers: AnalyserNode[]       = [];
+let _bandTimeDom:   U8[]                 = [];
+let _bandGates:     GainNode[]           = [];
+let _sumGain:       GainNode | null      = null;
+
+// N4: per-band energy + kick detection state
+const _bandEnergySmooth = [0, 0, 0, 0];
+let _lastBandTime   = 0;
+let _kickBandPrev   = 0;
+let _kickBandLast   = 0;
+let _bandAssignment: number[] = [0, 1, 2, 3];
 
 // H3: effect chain nodes
 let _lpFilter:      BiquadFilterNode | null = null;
@@ -61,6 +90,43 @@ function makeIR(ctx: AudioContext, dur = 2.8, decay = 3.5): AudioBuffer {
     for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
   }
   return buf;
+}
+
+// ── N4: update per-band energy, kick detection, dome energy ──────────────────
+// Called once per frame by getVizBands(). Reads pre-gate analysers.
+function _updateBandEnergy(): void {
+  if (!_bandAnalysers.length) return;
+  const now = performance.now() / 1000;
+  const dt  = Math.min(0.1, Math.max(0.001, now - _lastBandTime));
+  _lastBandTime = now;
+
+  const atkF = 1 - Math.exp(-dt / 0.040); // 40 ms attack
+  const relF = 1 - Math.exp(-dt / 0.200); // 200 ms release
+
+  let domeE = 0;
+  for (let i = 0; i < 4; i++) {
+    _bandAnalysers[i].getByteTimeDomainData(_bandTimeDom[i]);
+    let ss = 0;
+    const buf = _bandTimeDom[i];
+    for (let j = 0; j < buf.length; j++) { const v = (buf[j] - 128) / 128; ss += v * v; }
+    const rms  = Math.sqrt(ss / buf.length);
+    const prev = _bandEnergySmooth[i];
+    _bandEnergySmooth[i] = rms > prev ? prev + (rms - prev) * atkF : prev + (rms - prev) * relF;
+    BAND_STATE.energy[i] = _bandEnergySmooth[i];
+    if (BAND_STATE.gateOpen[i]) domeE = Math.max(domeE, _bandEnergySmooth[i]);
+  }
+
+  // Kick on band 1 (bombos 80–250 Hz), 150 ms refractory
+  const kickE = _bandEnergySmooth[1];
+  if (kickE > _kickBandPrev * 1.4 && kickE > 0.05 && (now - _kickBandLast) > 0.150) {
+    _kickBandLast = now;
+    BAND_STATE.kick = true;
+    window.dispatchEvent(new CustomEvent("alight:kick"));
+  } else {
+    BAND_STATE.kick = false;
+  }
+  _kickBandPrev = kickE;
+  BAND_STATE.domeEnergy = domeE;
 }
 
 export const VIZ_EFFECTS_DEBUG = {
@@ -114,48 +180,96 @@ function onTrackEnded(): void {
   });
 }
 
-// ── _buildChain: create audio element + Web Audio graph (no play) ─────────────
+// ── _buildChain: create audio element + N4 band chain (no play) ──────────────
 async function _buildChain(): Promise<void> {
   if (_vizCtx) return; // already built
-  const url   = DBG_SILLAS.vizTrackUrl;
-  _currentUrl = url;
-  _vizAudioEl = new Audio(url);
+
+  _currentUrl = MUSIC_FIRST; // N4: first track is always MUSIC_FIRST
+  _vizAudioEl = new Audio(MUSIC_FIRST);
   _vizAudioEl.crossOrigin = "anonymous";
   _vizAudioEl.loop = false; // H1.2: playlist via onTrackEnded
   _vizAudioEl.addEventListener("ended", onTrackEnded);
 
   _vizCtx = new AudioContext();
 
-  // H3: source → LP → HP → dry/echo/reverb → master → analyser → out
-  _lpFilter = _vizCtx.createBiquadFilter(); _lpFilter.type = "lowpass";  _lpFilter.frequency.value = 20000;
-  _hpFilter = _vizCtx.createBiquadFilter(); _hpFilter.type = "highpass"; _hpFilter.frequency.value = 20;
-  _dryGain  = _vizCtx.createGain();  _dryGain.gain.value  = 1;
-  _delay    = _vizCtx.createDelay(1.0); _delay.delayTime.value = 0.35;
-  _echoFeedback  = _vizCtx.createGain(); _echoFeedback.gain.value  = 0;
-  _echoOutGain   = _vizCtx.createGain(); _echoOutGain.gain.value   = 0;
-  _convolver = _vizCtx.createConvolver(); _convolver.buffer = makeIR(_vizCtx);
-  _reverbOutGain = _vizCtx.createGain(); _reverbOutGain.gain.value = 0;
-  _masterGain    = _vizCtx.createGain(); _masterGain.gain.value    = 1;
+  // N4: source → 4 parallel bands → sumGain → masterGain → vizAnalyser → destination
+  _masterGain  = _vizCtx.createGain(); _masterGain.gain.value  = 1;
   _vizAnalyser = _vizCtx.createAnalyser(); _vizAnalyser.fftSize = 256;
-  _vizFreq = new Uint8Array(_vizAnalyser.frequencyBinCount) as any as U8;
+  _vizFreq     = new Uint8Array(_vizAnalyser.frequencyBinCount) as any as U8;
+  _sumGain     = _vizCtx.createGain(); _sumGain.gain.value = 0.25; // 4 bands → normalize
 
-  const src = _vizCtx.createMediaElementSource(_vizAudioEl!);
-  src.connect(_lpFilter);
-  _lpFilter.connect(_hpFilter);
-  _hpFilter.connect(_dryGain);
-  _hpFilter.connect(_delay);
-  _hpFilter.connect(_convolver);
-  _dryGain.connect(_masterGain);
-  _delay.connect(_echoFeedback);
-  _echoFeedback.connect(_delay);           // feedback loop
-  _delay.connect(_echoOutGain);
-  _echoOutGain.connect(_masterGain);
-  _convolver.connect(_reverbOutGain);
-  _reverbOutGain.connect(_masterGain);
+  const src = _vizCtx.createMediaElementSource(_vizAudioEl);
+
+  // Band defs: { hp: cutoff|null, lp: cutoff|null }
+  const BAND_DEFS: Array<{ hp: number | null; lp: number | null }> = [
+    { hp: null, lp: 80   }, // 0: bass   < 80 Hz
+    { hp: 80,   lp: 250  }, // 1: kick   80–250 Hz
+    { hp: 250,  lp: 4000 }, // 2: mids   250–4 kHz
+    { hp: 4000, lp: null }, // 3: treble > 4 kHz
+  ];
+
+  _bandFilters = []; _bandAnalysers = []; _bandTimeDom = []; _bandGates = [];
+
+  for (let bi = 0; bi < 4; bi++) {
+    const def     = BAND_DEFS[bi];
+    const filters: BiquadFilterNode[] = [];
+
+    if (def.hp !== null) {
+      for (let f = 0; f < BANDS_FILTER_ORDER; f++) {
+        const n = _vizCtx.createBiquadFilter();
+        n.type = "highpass"; n.frequency.value = def.hp; n.Q.value = 0.707;
+        filters.push(n);
+      }
+    }
+    if (def.lp !== null) {
+      for (let f = 0; f < BANDS_FILTER_ORDER; f++) {
+        const n = _vizCtx.createBiquadFilter();
+        n.type = "lowpass"; n.frequency.value = def.lp; n.Q.value = 0.707;
+        filters.push(n);
+      }
+    }
+
+    // src → filters in series → analyser → gate → sumGain
+    let prev: AudioNode = src;
+    for (const ff of filters) { prev.connect(ff); prev = ff; }
+    const analyser = _vizCtx.createAnalyser(); analyser.fftSize = 256;
+    prev.connect(analyser);
+    const gate = _vizCtx.createGain(); gate.gain.value = 0; // all closed
+    analyser.connect(gate);
+    gate.connect(_sumGain);
+
+    _bandFilters.push(filters);
+    _bandAnalysers.push(analyser);
+    _bandTimeDom.push(new Uint8Array(analyser.fftSize) as U8);
+    _bandGates.push(gate);
+  }
+
+  // H3 legacy chain disabled (LEGACY_H3_CHAIN_ENABLED = false)
+  // _lpFilter etc. remain null → applyEffects() null-guards prevent crashes
+  if (LEGACY_H3_CHAIN_ENABLED) {
+    _lpFilter = _vizCtx.createBiquadFilter(); _lpFilter.type = "lowpass";  _lpFilter.frequency.value = 20000;
+    _hpFilter = _vizCtx.createBiquadFilter(); _hpFilter.type = "highpass"; _hpFilter.frequency.value = 20;
+    _dryGain  = _vizCtx.createGain();         _dryGain.gain.value         = 1;
+    _delay    = _vizCtx.createDelay(1.0);     _delay.delayTime.value      = 0.35;
+    _echoFeedback  = _vizCtx.createGain();    _echoFeedback.gain.value    = 0;
+    _echoOutGain   = _vizCtx.createGain();    _echoOutGain.gain.value     = 0;
+    _convolver     = _vizCtx.createConvolver(); _convolver.buffer         = makeIR(_vizCtx);
+    _reverbOutGain = _vizCtx.createGain();    _reverbOutGain.gain.value   = 0;
+  }
+
+  _sumGain.connect(_masterGain);
   _masterGain.connect(_vizAnalyser);
   _vizAnalyser.connect(_vizCtx.destination);
 
-  VIZ_AUDIO_DEBUG.sourceType = `file:${url}`;
+  // Shuffle band→symbol assignment once per session
+  _bandAssignment      = shuffleArray([0, 1, 2, 3]);
+  BAND_STATE.assignment = [..._bandAssignment];
+  console.info(
+    "[VizAudio] N4 band assignment:",
+    _bandAssignment.map((b, i) => `symbol${i}→band${b}`).join(', ')
+  );
+
+  VIZ_AUDIO_DEBUG.sourceType = `file:${MUSIC_FIRST}`;
 }
 
 // ── prepareVizAudio (N2) ───────────────────────────────────────────────────────
@@ -184,7 +298,9 @@ export async function startVizAudio(): Promise<"ok" | "need-gesture"> {
 
     VIZ_AUDIO_DEBUG.ctxState = _vizCtx!.state;
     if (_vizCtx!.state === "suspended") await _vizCtx!.resume();
+    _vizAudioEl!.currentTime = 0; // N4: start MUSIC_FIRST from the beginning
     await _vizAudioEl!.play();
+    _playStarted = true;
     VIZ_AUDIO_DEBUG.lastPlayResult = "ok";
 
     // H1.2: fetch playlist async after play() — never before (preserves gesture context)
@@ -224,6 +340,12 @@ export function stopVizAudio(): void {
   _vizCtx = null; _vizAnalyser = null; _vizFreq = null; _vizAudioEl = null;
   _beatPrev = 0; _beatLast = 0;
   _playlist = []; _currentUrl = ""; _recentUrls = [];
+  // N4: band chain cleanup
+  _bandFilters = []; _bandAnalysers = []; _bandTimeDom = []; _bandGates = []; _sumGain = null;
+  _bandEnergySmooth.fill(0); _kickBandPrev = 0; _kickBandLast = 0; _lastBandTime = 0;
+  _playStarted = false;
+  BAND_STATE.energy.fill(0); BAND_STATE.gateOpen.fill(false);
+  BAND_STATE.domeEnergy = 0; BAND_STATE.kick = false;
   // H3: clear effect nodes
   _lpFilter = null; _hpFilter = null; _dryGain = null;
   _delay = null; _echoFeedback = null; _echoOutGain = null;
@@ -251,6 +373,7 @@ export function restartVizAudio(): void {
 
 // ── getVizBands ────────────────────────────────────────────────────────────────
 export function getVizBands(): AudioBands {
+  _updateBandEnergy(); // N4: update per-band state before reading spectrum
   if (!_vizAnalyser || !_vizFreq) return zeroBands();
   _vizAnalyser.getByteFrequencyData(_vizFreq as any);
   const d    = _vizFreq;
@@ -325,4 +448,37 @@ export function resetEffects(): void {
   if (_echoOutGain)   _echoOutGain.gain.value         = 0;
   if (_reverbOutGain) _reverbOutGain.gain.value        = 0;
   if (_vizAudioEl)    { _vizAudioEl.playbackRate = 1.0; (_vizAudioEl as any).preservesPitch = true; }
+}
+
+// ── N4: gate control ──────────────────────────────────────────────────────────
+// symbolIdx (0–3) → bandIdx via _bandAssignment permutation.
+// setTargetAtTime gives smooth attack/release envelopes.
+export function openGate(symbolIdx: number): void {
+  if (!_vizCtx || !_bandGates.length) return;
+  const bandIdx = _bandAssignment[symbolIdx] ?? symbolIdx;
+  const gate    = _bandGates[bandIdx];
+  if (!gate) return;
+  const tau = (DBG_SILLAS.gateAttackMs / 1000) / 3;
+  gate.gain.setTargetAtTime(1, _vizCtx.currentTime, tau);
+  BAND_STATE.gateOpen[bandIdx] = true;
+}
+
+export function closeGate(symbolIdx: number): void {
+  if (!_vizCtx || !_bandGates.length) return;
+  const bandIdx = _bandAssignment[symbolIdx] ?? symbolIdx;
+  const gate    = _bandGates[bandIdx];
+  if (!gate) return;
+  const tau = (DBG_SILLAS.gateReleaseMs / 1000) / 3;
+  gate.gain.setTargetAtTime(0, _vizCtx.currentTime, tau);
+  BAND_STATE.gateOpen[bandIdx] = false;
+}
+
+export function isPlaying(): boolean {
+  return _playStarted && !(_vizAudioEl?.paused ?? true);
+}
+
+export function reshuffleAssignment(): void {
+  _bandAssignment      = shuffleArray([0, 1, 2, 3]);
+  BAND_STATE.assignment = [..._bandAssignment];
+  console.info("[VizAudio] N4 reshuffle:", _bandAssignment.map((b, i) => `s${i}→b${b}`).join(', '));
 }

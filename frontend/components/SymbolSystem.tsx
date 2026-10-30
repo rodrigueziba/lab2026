@@ -10,6 +10,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { getHazEnteredOnce, getHazPositionsXZ } from "@/lib/haz";
+import { BAND_STATE } from "@/lib/vizAudio";
 
 const SYMBOL_VERT = /* glsl */`
   varying vec2 vUv;
@@ -116,6 +117,8 @@ export default function SymbolSystem() {
       u.uTime.value      = t;
       u.uPeriodS.value   = DBG_SILLAS.symbolPeriodS;
       u.uLineWidth.value = DBG_SILLAS.symbolLineWidthM;
+      // N4: energy from the band assigned to this symbol (pre-gate, always active)
+      u.uEnergy.value    = BAND_STATE.energy[BAND_STATE.assignment[i]] ?? 0;
 
       colorObjs.current[i].set(DBG_SILLAS[COLOR_KEYS[i]]);
       u.uColor.value.copy(colorObjs.current[i]);

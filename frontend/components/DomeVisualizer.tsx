@@ -8,7 +8,7 @@ import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
-import { prepareVizAudio, stopVizAudio, getVizBands } from "@/lib/vizAudio";
+import { prepareVizAudio, stopVizAudio, getVizBands, BAND_STATE } from "@/lib/vizAudio";
 
 const DOME_R = 28;
 const LOGIN_VISUALIZER_ENABLED = false; // N3: sky + sun replace /login FBO on dome sphere
@@ -438,10 +438,11 @@ export default function DomeVisualizer() {
     };
   }, []);
 
-  const lastFBORef = useRef(0);
-  const meshRef    = useRef<THREE.Mesh>(null);
-  const matRef     = useRef<THREE.ShaderMaterial>(null);
-  const scaleRef   = useRef(1.0);
+  const lastFBORef    = useRef(0);
+  const meshRef       = useRef<THREE.Mesh>(null);
+  const matRef        = useRef<THREE.ShaderMaterial>(null);
+  const scaleRef      = useRef(1.0);
+  const domeESmoothRef = useRef(0); // N4: smoothed domeEnergy for sun reactivity
 
   useFrame(({ gl, clock }, dt) => {
     // ── Update login shader uniforms ──────────────────────────────────────────
@@ -485,9 +486,10 @@ export default function DomeVisualizer() {
     // ── Update sky uniforms (N3) ──────────────────────────────────────────────
     const SU = skyUniforms;
     SU.uFade.value = Math.min(1, SU.uFade.value + dt / (DBG_SILLAS.vizFadeMs / 1000));
-    // Sun breathing ±10 % at 0.1 Hz; audio reactive +80 % max (b, ar declared above)
-    const breathe    = 1.0 + 0.10 * Math.sin(2 * Math.PI * 0.1 * clock.elapsedTime);
-    const audioBoost = 1.0 + b.rms * ar * 0.80;
+    // Sun breathing ±10 % at 0.1 Hz; dome energy (max of active-gate bands) reactive +80 %
+    const breathe = 1.0 + 0.10 * Math.sin(2 * Math.PI * 0.1 * clock.elapsedTime);
+    domeESmoothRef.current += (BAND_STATE.domeEnergy - domeESmoothRef.current) * Math.min(1, dt * 4);
+    const audioBoost = 1.0 + domeESmoothRef.current * ar * 0.80;
     SU.uSunIntensity.value  = DBG_SILLAS.sunIntensity * breathe * audioBoost;
     SU.uSunAngularRad.value = DBG_SILLAS.sunAngularDeg * Math.PI / 360;
 

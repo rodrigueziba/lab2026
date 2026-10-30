@@ -8,6 +8,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { getHazUnderUser, getHazPositionsXZ } from "@/lib/haz";
+import { startVizAudio, openGate, closeGate, isPlaying } from "@/lib/vizAudio";
 
 const COLOR_KEYS = [
   "hazColor0", "hazColor1", "hazColor2", "hazColor3",
@@ -26,6 +27,32 @@ export default function HazSystem() {
   const conesRef     = useRef<THREE.Mesh[]>([]);
   // Pre-allocated Color objects — reused each frame (no per-frame allocs)
   const colorObjs    = useRef(INITIAL_COLORS.map(c => new THREE.Color(c)));
+
+  // N4: start audio + open/close gates on beam events
+  useEffect(() => {
+    const onEnter = (e: Event) => {
+      const { index } = (e as CustomEvent).detail as { index: number };
+      if (!isPlaying()) {
+        void startVizAudio().then(result => {
+          if (result === "need-gesture") {
+            window.dispatchEvent(new CustomEvent("alight:audio-need-gesture", { detail: { need: true } }));
+          }
+        });
+      }
+      openGate(index);
+    };
+    const onExit = (e: Event) => {
+      const { index } = (e as CustomEvent).detail as { index: number };
+      closeGate(index);
+    };
+    window.addEventListener("alight:haz-enter", onEnter);
+    window.addEventListener("alight:haz-exit",  onExit);
+    return () => {
+      window.removeEventListener("alight:haz-enter", onEnter);
+      window.removeEventListener("alight:haz-exit",  onExit);
+      for (let i = 0; i < 4; i++) closeGate(i);
+    };
+  }, []);
 
   useEffect(() => {
     const spotH  = DBG_SILLAS.hazSpotY;

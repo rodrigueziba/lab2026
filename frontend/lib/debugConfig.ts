@@ -80,6 +80,10 @@ export const DBG_SILLAS = {
   sunIntensity:     0.35,   // base emissive brightness
   sunAngularDeg:    4.0,    // angular diameter (degrees)
   sunDriftEnabled:  false,  // slow azimuth drift (debug only)
+  // N4: audio gates
+  gateAttackMs:     300,    // gate open time constant (ms)
+  gateReleaseMs:    600,    // gate close time constant (ms)
+  showBandOverlay:  false,  // debug overlay: per-band energy + gate state
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

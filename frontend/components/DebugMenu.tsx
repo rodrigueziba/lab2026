@@ -20,7 +20,7 @@ import {
   DBG_CAM_IMAGE,
   DBG_CAM_SOUND,
 } from "@/lib/debugConfig";
-import { setVizVolume, restartVizAudio } from "@/lib/vizAudio";
+import { setVizVolume, restartVizAudio, BAND_STATE, reshuffleAssignment } from "@/lib/vizAudio";
 import { DBG_STAR_MAT, DBG_DOME_MAT } from "./FaceDome";
 import { STORE, storeSubscribe } from "@/lib/alightStore";
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
@@ -170,6 +170,38 @@ const EFFECT_NAMES = [
   "6: Posterize",
 ];
 
+// N4: band energy + gate state overlay — polls BAND_STATE at 20 fps via setInterval
+function BandEnergyOverlay() {
+  const [energies, setEnergies] = useState([0, 0, 0, 0]);
+  const [gates,    setGates]    = useState([false, false, false, false]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setEnergies([...BAND_STATE.energy]);
+      setGates([...BAND_STATE.gateOpen]);
+    }, 50);
+    return () => clearInterval(id);
+  }, []);
+  const BAND_LABELS = ["0:bass", "1:kick", "2:mids", "3:treble"];
+  return (
+    <div style={{ marginTop: 6 }}>
+      {[0,1,2,3].map(i => (
+        <div key={i} style={{ display:"flex", alignItems:"center", gap:4, marginBottom:3 }}>
+          <span style={{ fontSize:9, width:52, color: gates[i] ? "#ff9a1f" : "#556" }}>{BAND_LABELS[i]}</span>
+          <div style={{ flex:1, background:"#1a1a2a", height:5, borderRadius:2 }}>
+            <div style={{
+              width:`${Math.min(1, energies[i]) * 100}%`, height:"100%",
+              background: gates[i] ? "#ff9a1f" : "#3a5a8a", borderRadius:2, transition:"width 0.05s",
+            }} />
+          </div>
+          <span style={{ fontSize:9, width:26, textAlign:"right", color:"#889" }}>
+            {(energies[i] * 100).toFixed(0)}%
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function DebugMenu() {
   const [visible, setVisible] = useState(false);
   const [tab, setTab]         = useState<Tab>("SILLAS");
@@ -181,6 +213,7 @@ export default function DebugMenu() {
   const [retro,    setRetro]    = useState({ ...DBG_RETRO });
   const [sillas,   setSillas]   = useState({ ...DBG_SILLAS });
   const [legacyOpen, setLegacyOpen] = useState(false); // N2: Legado section collapsed by default
+  const [bandRev,    setBandRev]    = useState(0);     // N4: bumped on reshuffle to re-render assignment
   const [prism,    setPrism]    = useState({ ...DBG_PRISM });
   const [floor,    setFloor]    = useState({ ...DBG_FLOOR });
   const [fx,       setFx]       = useState({ ...DBG_EFFECTS });
@@ -538,6 +571,34 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.symbolPeriodS = v; setSillas(s => ({ ...s, symbolPeriodS: v })); }} />
           <NumField label="symbolLineWidthM" value={sillas.symbolLineWidthM} step={0.005} min={0.005} max={0.3} note="live"
             onChange={v => { DBG_SILLAS.symbolLineWidthM = v; setSillas(s => ({ ...s, symbolLineWidthM: v })); }} />
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Audio bandas N4 <span style={NOTE}>(live)</span></span>
+          <NumField label="gateAttackMs" value={sillas.gateAttackMs} step={10} min={10} max={2000} note="live"
+            onChange={v => { DBG_SILLAS.gateAttackMs = v; setSillas(s => ({ ...s, gateAttackMs: v })); }} />
+          <NumField label="gateReleaseMs" value={sillas.gateReleaseMs} step={10} min={10} max={3000} note="live"
+            onChange={v => { DBG_SILLAS.gateReleaseMs = v; setSillas(s => ({ ...s, gateReleaseMs: v })); }} />
+          <div style={ROW}>
+            <span>Asignación <span style={NOTE}>(s→banda)</span></span>
+            <span style={{ ...INPUT, padding:"2px 4px", fontSize:9, lineHeight:"1.6" }}>
+              {bandRev >= 0 && BAND_STATE.assignment.map((b, i) => `S${i}→B${b}`).join(" ")}
+            </span>
+          </div>
+          <div style={ROW}>
+            <button style={{ ...INPUT, cursor:"pointer", width:"auto", padding:"3px 8px" }}
+              onClick={() => { reshuffleAssignment(); setBandRev(r => r + 1); }}>
+              Resortear bandas
+            </button>
+          </div>
+          <div style={ROW}>
+            <span>showBandOverlay</span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.showBandOverlay;
+              DBG_SILLAS.showBandOverlay = v;
+              setSillas(s => ({ ...s, showBandOverlay: v }));
+            }}>{sillas.showBandOverlay ? "ON" : "off"}</button>
+          </div>
+          {sillas.showBandOverlay && <BandEnergyOverlay />}
         </>
       )}
 
