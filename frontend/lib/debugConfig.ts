@@ -59,6 +59,9 @@ export const DBG_SILLAS = {
   vizAudioReact:   1.0,
   vizTopColor:     "#0a198c" as string,
   vizBottomColor:  "#11133b" as string,
+  // N1: sillas sequence timing
+  releaseDelayMs: 5000,  // ms after alight:dome-revealed before movement is freed (sala_activa)
+  lockLook:       false, // N1: also lock mouse-look during sillas_secuencia (not yet implemented)
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

@@ -469,6 +469,29 @@ export default function DebugMenu() {
             <NumField label="simT (0-1)" value={fx.simT} step={0.05} min={0} max={1}
               onChange={v => { DBG_EFFECTS.simT = v; setFx(f => ({ ...f, simT: v })); }} />
           </>}
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Secuencia sillas <span style={NOTE}>(N1)</span></span>
+          <NumField label="releaseDelayMs" value={sillas.releaseDelayMs} step={500} min={0} max={30000} note="ms post dome-revealed → sala_activa"
+            onChange={v => { DBG_SILLAS.releaseDelayMs = v; setSillas(s => ({ ...s, releaseDelayMs: v })); }} />
+          <div style={ROW}>
+            <span>lockLook <span style={NOTE}>(lock mouse-look)</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.lockLook;
+              DBG_SILLAS.lockLook = v;
+              setSillas(s => ({ ...s, lockLook: v }));
+            }}>{sillas.lockLook ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
+              onClick={() => window.dispatchEvent(new CustomEvent("alight:debug-skip-sillas"))}>
+              Saltar → sala activa
+            </button>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
+              onClick={() => window.dispatchEvent(new CustomEvent("alight:debug-reset-sillas"))}>
+              Reiniciar secuencia
+            </button>
+          </div>
         </>
       )}
 

@@ -74,4 +74,7 @@ export const INTERACT_STATE = {
   camFovSaved:  90,   // K1: player FOV saved before lectern mode
   // S2: player world position — written each frame by ThreeScene, read by Prism
   playerPos: { x: 0, y: 1.6, z: 0 } as { x: number; y: number; z: number },
+  // N1: sillas narrative sequencer
+  experienceState: 'exploracion' as 'exploracion' | 'sillas_secuencia' | 'sala_activa',
+  movementLocked: false,
 };

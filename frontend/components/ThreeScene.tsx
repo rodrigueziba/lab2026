@@ -113,8 +113,9 @@ const SEAT_CAM_Y = 1.0;
 function Player() {
   const keys        = useRef<Keys>({ w: false, a: false, s: false, d: false });
   const triggered   = useRef(false);
-  const seated      = useRef(false);
-  const pathRef     = useRef<"none" | "sillas" | "tarima">("none");
+  const seated           = useRef(false);
+  const releaseTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null); // N1: timer → sala_activa
+  const pathRef          = useRef<"none" | "sillas" | "tarima">("none");
   const prismLanded = useRef(false);
   const prismNearRef = useRef(false); // within prismInteractM horizontally
   const nearLectern     = useRef<"none" | "image" | "sound">("none");
@@ -129,22 +130,66 @@ function Player() {
   useEffect(() => { camera.position.set(-10, 1.6, -7); }, [camera]);
 
   useEffect(() => {
-    const onSit      = () => { seated.current = true;  pathRef.current = "sillas"; _D.path = "sillas"; };
-    const onLight    = () => {                          pathRef.current = "tarima"; _D.path = "tarima"; };
-    const onReveal   = () => { seated.current = false; };
+    const onSit = () => {
+      seated.current = true;
+      pathRef.current = "sillas";
+      _D.path = "sillas";
+      // N1: lock movement during sillas sequence
+      INTERACT_STATE.movementLocked  = true;
+      INTERACT_STATE.experienceState = 'sillas_secuencia';
+    };
+    const onLight = () => { pathRef.current = "tarima"; _D.path = "tarima"; };
+
+    // N1: dome-revealed → start release timer; release after releaseDelayMs
+    const activateSalaActiva = () => {
+      if (releaseTimerRef.current) clearTimeout(releaseTimerRef.current);
+      releaseTimerRef.current = setTimeout(() => {
+        releaseTimerRef.current = null;
+        seated.current = false;
+        INTERACT_STATE.movementLocked  = false;
+        INTERACT_STATE.experienceState = 'sala_activa';
+        window.dispatchEvent(new CustomEvent("alight:sala-activa"));
+      }, DBG_SILLAS.releaseDelayMs);
+    };
+    const onReveal = () => { activateSalaActiva(); };
+
     const onLanded   = () => { prismLanded.current = true; _D.prismLanded = true; };
     const onLecterns = () => { lecternsVisible.current = true; };
-    window.addEventListener("alight:chose-chairs",    onSit);
-    window.addEventListener("alight:chose-light",     onLight);
-    window.addEventListener("alight:dome-revealed",   onReveal);
-    window.addEventListener("alight:prism-landed",    onLanded);
+
+    // N1 debug shortcuts (dispatched by DebugMenu buttons)
+    const onSkip = () => {
+      if (releaseTimerRef.current) { clearTimeout(releaseTimerRef.current); releaseTimerRef.current = null; }
+      seated.current = false;
+      INTERACT_STATE.movementLocked  = false;
+      INTERACT_STATE.experienceState = 'sala_activa';
+      window.dispatchEvent(new CustomEvent("alight:sala-activa"));
+    };
+    const onReset = () => {
+      if (releaseTimerRef.current) { clearTimeout(releaseTimerRef.current); releaseTimerRef.current = null; }
+      seated.current = false;
+      triggered.current = false;
+      INTERACT_STATE.movementLocked  = false;
+      INTERACT_STATE.experienceState = 'exploracion';
+      pathRef.current = "none";
+      _D.path = "none";
+    };
+
+    window.addEventListener("alight:chose-chairs",     onSit);
+    window.addEventListener("alight:chose-light",      onLight);
+    window.addEventListener("alight:dome-revealed",    onReveal);
+    window.addEventListener("alight:prism-landed",     onLanded);
     window.addEventListener("alight:lecterns-visible", onLecterns);
+    window.addEventListener("alight:debug-skip-sillas",  onSkip);
+    window.addEventListener("alight:debug-reset-sillas", onReset);
     return () => {
-      window.removeEventListener("alight:chose-chairs",    onSit);
-      window.removeEventListener("alight:chose-light",     onLight);
-      window.removeEventListener("alight:dome-revealed",   onReveal);
-      window.removeEventListener("alight:prism-landed",    onLanded);
+      if (releaseTimerRef.current) clearTimeout(releaseTimerRef.current);
+      window.removeEventListener("alight:chose-chairs",     onSit);
+      window.removeEventListener("alight:chose-light",      onLight);
+      window.removeEventListener("alight:dome-revealed",    onReveal);
+      window.removeEventListener("alight:prism-landed",     onLanded);
       window.removeEventListener("alight:lecterns-visible", onLecterns);
+      window.removeEventListener("alight:debug-skip-sillas",  onSkip);
+      window.removeEventListener("alight:debug-reset-sillas", onReset);
     };
   }, []);
 
@@ -154,7 +199,8 @@ function Player() {
       if (k in keys.current) keys.current[k as keyof Keys] = true;
       // E key: activate visualizer (SILLAS only, when close to prism)
       // startVizAudio() is called first so it runs within the gesture stack → no NotAllowedError
-      if (k === "e" && pathRef.current === "sillas" && prismNearRef.current && !_vizActivated) {
+      if (k === "e" && pathRef.current === "sillas" && prismNearRef.current && !_vizActivated
+          && INTERACT_STATE.experienceState === 'sala_activa') {
         startVizAudio().then(r => {
           if (r === "need-gesture")
             window.dispatchEvent(new CustomEvent("alight:audio-need-gesture", { detail: { need: true } }));
@@ -204,10 +250,13 @@ function Player() {
       return;
     }
 
+    // N1: lerp cam down while seated (visual only, independent of movement lock)
     if (seated.current) {
       cam.position.y = THREE.MathUtils.lerp(cam.position.y, SEAT_CAM_Y, 0.04);
-      return;
     }
+
+    // N1: block WASD + prism interaction during sillas_secuencia
+    if (INTERACT_STATE.movementLocked) return;
 
     if (INTERACT_STATE.mode !== "none") return;
 
@@ -251,8 +300,9 @@ function Player() {
         window.dispatchEvent(new CustomEvent("alight:near-prism", { detail: { near: nearNow } }));
       }
 
-      // Auto-activate on touch distance (player already clicked to enter pointer lock)
-      if (!_vizActivated && horizDist <= DBG_SILLAS.prismTouchM) {
+      // Auto-activate on touch distance (only once sala_activa — N1)
+      if (!_vizActivated && horizDist <= DBG_SILLAS.prismTouchM
+          && INTERACT_STATE.experienceState === 'sala_activa') {
         startVizAudio().then(r => {
           if (r === "need-gesture")
             window.dispatchEvent(new CustomEvent("alight:audio-need-gesture", { detail: { need: true } }));
