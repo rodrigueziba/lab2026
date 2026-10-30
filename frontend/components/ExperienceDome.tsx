@@ -9,6 +9,7 @@ import FloorVisualizer from "./FloorVisualizer";
 import SectorAudioFX from "./SectorAudioFX";
 import HazSystem from "./HazSystem";
 import SymbolSystem from "./SymbolSystem";
+import Monoliths from "./Monoliths";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { resetEffects } from "@/lib/vizAudio";
 
@@ -435,6 +436,8 @@ export default function ExperienceDome() {
       {/* N3: beams + floor symbols */}
       {vizActive && <HazSystem />}
       {vizActive && <SymbolSystem />}
+      {/* N5: monoliths flanking tarima path */}
+      {vizActive && <Monoliths />}
 
       {/* Dome shell — upper hemisphere, BackSide.
           thetaLength=0.52π puts the open rim at y≈-2 (below floor level) so

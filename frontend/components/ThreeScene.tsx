@@ -11,6 +11,7 @@ import Audience from "./Audience";
 import Prism from "./Prism";
 import Tarima from "./Tarima";
 import FaceDome from "./FaceDome";
+import WatcherEye from "./WatcherEye";
 import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from "./LecternSystem";
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
@@ -354,6 +355,7 @@ function Scene() {
       {path !== "tarima" && <ExperienceDome />}
       {path !== "sillas" && <Audience />}
       {path !== "sillas" && <FaceDome />}
+      {path !== "sillas" && <WatcherEye />}
       {path !== "sillas" && <LecternSystem />}
       {path !== "sillas" && <DynamicLights />}
       <Player />

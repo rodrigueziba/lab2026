@@ -32,6 +32,12 @@ export const VIZ_AUDIO_DEBUG = {
   lastPlayResult: ""       as string,
 };
 
+// ── N5: monolith proximity state (set by Monoliths.tsx, read by DomeVisualizer) ─
+export const N5_STATE = {
+  leftProximity:  0 as number, // 0–1; drives uRemoteMix + uStaticMix on dome
+  rightProximity: 0 as number, // 0–1; drives music fade + white noise
+};
+
 // ── N4: band state (published per-frame for SymbolSystem, DomeVisualizer) ─────
 export const BAND_STATE = {
   energy:     [0, 0, 0, 0] as number[],                 // pre-gate smoothed RMS per band
@@ -52,6 +58,11 @@ let _beatPrev     = 0;
 let _beatLast     = 0;
 let _silenceTimer: ReturnType<typeof setTimeout> | null = null;
 let _playStarted  = false;
+
+// N5: white noise cross-fade nodes
+let _noiseSource:    AudioBufferSourceNode | null = null;
+let _noiseGain:      GainNode | null = null;
+let _musicFadeGain:  GainNode | null = null;
 
 // N4: band chain nodes
 let _bandFilters:   BiquadFilterNode[][] = [];
@@ -257,7 +268,24 @@ async function _buildChain(): Promise<void> {
     _reverbOutGain = _vizCtx.createGain();    _reverbOutGain.gain.value   = 0;
   }
 
-  _sumGain.connect(_masterGain);
+  // N5: insert music-fade gain between sumGain and masterGain
+  _musicFadeGain = _vizCtx.createGain(); _musicFadeGain.gain.value = 1;
+  _sumGain.connect(_musicFadeGain);
+  _musicFadeGain.connect(_masterGain);
+
+  // N5: white noise source looped through a closed gain → masterGain
+  const noiseSr  = _vizCtx.sampleRate;
+  const noiseBuf = _vizCtx.createBuffer(1, noiseSr * 2, noiseSr);
+  const noiseD   = noiseBuf.getChannelData(0);
+  for (let i = 0; i < noiseD.length; i++) noiseD[i] = Math.random() * 2 - 1;
+  _noiseSource = _vizCtx.createBufferSource();
+  _noiseSource.buffer = noiseBuf;
+  _noiseSource.loop   = true;
+  _noiseGain = _vizCtx.createGain(); _noiseGain.gain.value = 0;
+  _noiseSource.connect(_noiseGain);
+  _noiseGain.connect(_masterGain);
+  _noiseSource.start();
+
   _masterGain.connect(_vizAnalyser);
   _vizAnalyser.connect(_vizCtx.destination);
 
@@ -342,6 +370,10 @@ export function stopVizAudio(): void {
   _playlist = []; _currentUrl = ""; _recentUrls = [];
   // N4: band chain cleanup
   _bandFilters = []; _bandAnalysers = []; _bandTimeDom = []; _bandGates = []; _sumGain = null;
+  // N5: noise cleanup
+  try { _noiseSource?.stop(); } catch { /* already stopped */ }
+  _noiseSource = null; _noiseGain = null; _musicFadeGain = null;
+  N5_STATE.leftProximity = 0; N5_STATE.rightProximity = 0;
   _bandEnergySmooth.fill(0); _kickBandPrev = 0; _kickBandLast = 0; _lastBandTime = 0;
   _playStarted = false;
   BAND_STATE.energy.fill(0); BAND_STATE.gateOpen.fill(false);
@@ -481,4 +513,17 @@ export function reshuffleAssignment(): void {
   _bandAssignment      = shuffleArray([0, 1, 2, 3]);
   BAND_STATE.assignment = [..._bandAssignment];
   console.info("[VizAudio] N4 reshuffle:", _bandAssignment.map((b, i) => `s${i}→b${b}`).join(', '));
+}
+
+// ── N5: monolith proximity crossfade ─────────────────────────────────────────
+// left  (0–1): image monolith proximity → updates N5_STATE.leftProximity
+// right (0–1): sound monolith proximity → fades music, raises white noise
+export function setMonolithProximity(left: number, right: number): void {
+  N5_STATE.leftProximity  = left;
+  N5_STATE.rightProximity = right;
+  if (!_vizCtx) return;
+  const t   = _vizCtx.currentTime;
+  const tau = 0.12;
+  if (_musicFadeGain) _musicFadeGain.gain.setTargetAtTime(1 - right * 0.85, t, tau);
+  if (_noiseGain)     _noiseGain.gain.setTargetAtTime(right * DBG_SILLAS.noiseGain, t, tau);
 }

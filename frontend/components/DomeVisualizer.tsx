@@ -8,7 +8,7 @@ import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
-import { prepareVizAudio, stopVizAudio, getVizBands, BAND_STATE } from "@/lib/vizAudio";
+import { prepareVizAudio, stopVizAudio, getVizBands, BAND_STATE, N5_STATE } from "@/lib/vizAudio";
 
 const DOME_R = 28;
 const LOGIN_VISUALIZER_ENABLED = false; // N3: sky + sun replace /login FBO on dome sphere
@@ -249,18 +249,18 @@ const SPHERE_FRAG = /* glsl */`
 `;
 
 // ── N3: Night sky + sun shader (replaces /login FBO on exterior sphere) ──────
-// Renders a deep dark gradient with a sun disc + glow.
-// uSunDir:         normalized direction to sun (world space)
-// uSunAngularRad:  half-angle of sun disc (radians)
-// uSunIntensity:   emissive brightness; breathing + audio-reactive in useFrame
-// uRemoteMix:      future N4+ FBO blend weight (0 = off)
+// N5: uRemoteMix drives image blend weight; uStaticMix drives interference noise overlay.
 const DOMESKY_FRAG = /* glsl */`
   uniform float uFade;
+  uniform float uTime;
   uniform vec3  uSunDir;
   uniform float uSunAngularRad;
   uniform float uSunIntensity;
   uniform float uRemoteMix;
+  uniform float uStaticMix;
   varying vec3  vWorldPos;
+
+  float hash31(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 
   void main() {
     float floorFade = smoothstep(-2.0, 2.0, vWorldPos.y);
@@ -282,6 +282,14 @@ const DOMESKY_FRAG = /* glsl */`
     float sunGlow   = pow(max(0.0, cosAngle), 48.0) * 0.45;
     vec3  sunColor  = vec3(1.0, 0.855, 0.608);
     sky += sunColor * (sunDisc + sunGlow) * uSunIntensity;
+
+    // N5: static interference overlay (left monolith proximity)
+    if (uStaticMix > 0.001) {
+      float t  = floor(uTime * 15.0);
+      float n  = hash31(floor(dir * 12.0) + vec3(t * 0.11, t * 0.07, 0.0));
+      vec3 staticCol = vec3(n * 0.7 + 0.08) * vec3(1.05, 0.88, 0.55);
+      sky = mix(sky, staticCol, uStaticMix * 0.38);
+    }
 
     gl_FragColor = vec4(sky, uFade * floorFade);
   }
@@ -398,10 +406,12 @@ export default function DomeVisualizer() {
   if (!skyUniformsRef.current) {
     skyUniformsRef.current = {
       uFade:          { value: 0 },
+      uTime:          { value: 0 },
       uSunDir:        { value: sunData.dir },
       uSunAngularRad: { value: DBG_SILLAS.sunAngularDeg * Math.PI / 360 },
       uSunIntensity:  { value: DBG_SILLAS.sunIntensity },
       uRemoteMix:     { value: 0.0 },
+      uStaticMix:     { value: 0.0 },
     };
   }
   const skyUniforms = skyUniformsRef.current;
@@ -486,12 +496,16 @@ export default function DomeVisualizer() {
     // ── Update sky uniforms (N3) ──────────────────────────────────────────────
     const SU = skyUniforms;
     SU.uFade.value = Math.min(1, SU.uFade.value + dt / (DBG_SILLAS.vizFadeMs / 1000));
+    SU.uTime.value = clock.elapsedTime;
     // Sun breathing ±10 % at 0.1 Hz; dome energy (max of active-gate bands) reactive +80 %
     const breathe = 1.0 + 0.10 * Math.sin(2 * Math.PI * 0.1 * clock.elapsedTime);
     domeESmoothRef.current += (BAND_STATE.domeEnergy - domeESmoothRef.current) * Math.min(1, dt * 4);
     const audioBoost = 1.0 + domeESmoothRef.current * ar * 0.80;
     SU.uSunIntensity.value  = DBG_SILLAS.sunIntensity * breathe * audioBoost;
     SU.uSunAngularRad.value = DBG_SILLAS.sunAngularDeg * Math.PI / 360;
+    // N5: proximity-driven image blend + static interference
+    SU.uRemoteMix.value = N5_STATE.leftProximity;
+    SU.uStaticMix.value = N5_STATE.leftProximity * DBG_SILLAS.staticMixMax;
 
     // H1 Prueba A: when vizSolidTest is on, override depth/side/renderOrder for diagnostics
     if (matRef.current && meshRef.current) {

@@ -84,6 +84,14 @@ export const DBG_SILLAS = {
   gateAttackMs:     300,    // gate open time constant (ms)
   gateReleaseMs:    600,    // gate close time constant (ms)
   showBandOverlay:  false,  // debug overlay: per-band energy + gate state
+  // N5: monoliths + interference
+  monolithDistM:       3.0,   // left/right monolith distance from tarima center (m)
+  monolithFadeMs:   1500,    // monolith appear/disappear fade duration (ms)
+  monolithProxFullM:   0.5,   // distance for full proximity effect (m)
+  monolithProxStartM:  3.0,   // distance where proximity effect starts (m)
+  noiseGain:           0.5,   // white noise max gain (right monolith proximity)
+  staticMixMax:        0.35,  // max uStaticMix value on dome (left monolith proximity)
+  watcherEyeEnabled:   true,  // N5: show watcher eye disc when watchers > 0
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

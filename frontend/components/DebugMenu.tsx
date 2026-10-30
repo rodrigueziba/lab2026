@@ -20,7 +20,7 @@ import {
   DBG_CAM_IMAGE,
   DBG_CAM_SOUND,
 } from "@/lib/debugConfig";
-import { setVizVolume, restartVizAudio, BAND_STATE, reshuffleAssignment } from "@/lib/vizAudio";
+import { setVizVolume, restartVizAudio, BAND_STATE, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
 import { DBG_STAR_MAT, DBG_DOME_MAT } from "./FaceDome";
 import { STORE, storeSubscribe } from "@/lib/alightStore";
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
@@ -196,6 +196,28 @@ function BandEnergyOverlay() {
           <span style={{ fontSize:9, width:26, textAlign:"right", color:"#889" }}>
             {(energies[i] * 100).toFixed(0)}%
           </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// N5: proximity display — polls N5_STATE at 10 fps
+function N5ProximityOverlay() {
+  const [prox, setProx] = useState({ l: 0, r: 0 });
+  useEffect(() => {
+    const id = setInterval(() => setProx({ l: N5_STATE.leftProximity, r: N5_STATE.rightProximity }), 100);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div style={{ marginTop: 4 }}>
+      {[{ label: "izq (img)", v: prox.l }, { label: "der (snd)", v: prox.r }].map(({ label, v }) => (
+        <div key={label} style={{ display:"flex", alignItems:"center", gap:4, marginBottom:3 }}>
+          <span style={{ fontSize:9, width:56 }}>{label}</span>
+          <div style={{ flex:1, background:"#1a1a2a", height:5, borderRadius:2 }}>
+            <div style={{ width:`${v * 100}%`, height:"100%", background:"#2e9e5b", borderRadius:2, transition:"width 0.1s" }} />
+          </div>
+          <span style={{ fontSize:9, width:26, textAlign:"right", color:"#889" }}>{(v * 100).toFixed(0)}%</span>
         </div>
       ))}
     </div>
@@ -599,6 +621,30 @@ export default function DebugMenu() {
             }}>{sillas.showBandOverlay ? "ON" : "off"}</button>
           </div>
           {sillas.showBandOverlay && <BandEnergyOverlay />}
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Monolitos N5 <span style={NOTE}>(live)</span></span>
+          <NumField label="monolithDistM"      value={sillas.monolithDistM}       step={0.1} min={0.5} max={8}    note="live"
+            onChange={v => { DBG_SILLAS.monolithDistM      = v; setSillas(s => ({ ...s, monolithDistM:      v })); }} />
+          <NumField label="monolithFadeMs"     value={sillas.monolithFadeMs}      step={50}  min={100} max={5000} note="live"
+            onChange={v => { DBG_SILLAS.monolithFadeMs     = v; setSillas(s => ({ ...s, monolithFadeMs:     v })); }} />
+          <NumField label="monolithProxStartM" value={sillas.monolithProxStartM}  step={0.1} min={0.5} max={10}   note="live"
+            onChange={v => { DBG_SILLAS.monolithProxStartM = v; setSillas(s => ({ ...s, monolithProxStartM: v })); }} />
+          <NumField label="monolithProxFullM"  value={sillas.monolithProxFullM}   step={0.05} min={0.1} max={3}   note="live"
+            onChange={v => { DBG_SILLAS.monolithProxFullM  = v; setSillas(s => ({ ...s, monolithProxFullM:  v })); }} />
+          <NumField label="noiseGain"          value={sillas.noiseGain}           step={0.05} min={0}  max={1}    note="live"
+            onChange={v => { DBG_SILLAS.noiseGain          = v; setSillas(s => ({ ...s, noiseGain:          v })); }} />
+          <NumField label="staticMixMax"       value={sillas.staticMixMax}        step={0.05} min={0}  max={1}    note="live"
+            onChange={v => { DBG_SILLAS.staticMixMax       = v; setSillas(s => ({ ...s, staticMixMax:       v })); }} />
+          <N5ProximityOverlay />
+          <div style={ROW}>
+            <span>watcherEyeEnabled</span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.watcherEyeEnabled;
+              DBG_SILLAS.watcherEyeEnabled = v;
+              setSillas(s => ({ ...s, watcherEyeEnabled: v }));
+            }}>{sillas.watcherEyeEnabled ? "ON" : "off"}</button>
+          </div>
         </>
       )}
 
