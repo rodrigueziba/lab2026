@@ -7,6 +7,8 @@ import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/l
 import DomeVisualizer from "./DomeVisualizer";
 import FloorVisualizer from "./FloorVisualizer";
 import SectorAudioFX from "./SectorAudioFX";
+import HazSystem from "./HazSystem";
+import SymbolSystem from "./SymbolSystem";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { resetEffects } from "@/lib/vizAudio";
 
@@ -430,6 +432,9 @@ export default function ExperienceDome() {
       {/* N2: legacy floor + sector audio disabled; gated by flags to allow re-enable */}
       {vizActive && LEGACY_FLOOR_TEXTURES_ENABLED && <FloorVisualizer />}
       {vizActive && LEGACY_SECTOR_AUDIO_ENABLED   && <SectorAudioFX />}
+      {/* N3: beams + floor symbols */}
+      {vizActive && <HazSystem />}
+      {vizActive && <SymbolSystem />}
 
       {/* Dome shell — upper hemisphere, BackSide.
           thetaLength=0.52π puts the open rim at y≈-2 (below floor level) so

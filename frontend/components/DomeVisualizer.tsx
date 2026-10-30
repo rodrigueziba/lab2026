@@ -8,9 +8,15 @@ import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
-import { startVizAudio, stopVizAudio, getVizBands } from "@/lib/vizAudio";
+import { prepareVizAudio, stopVizAudio, getVizBands } from "@/lib/vizAudio";
 
 const DOME_R = 28;
+const LOGIN_VISUALIZER_ENABLED = false; // N3: sky + sun replace /login FBO on dome sphere
+
+// N3: Sun azimuth/elevation randomised once at module-load — stable for the session.
+// Moved outside the component to avoid Math.random() inside useMemo (purity rule).
+const _SUN_AZ_DEG = Math.random() * 360;
+const _SUN_EL_DEG = 25 + Math.random() * 45;
 
 // ── Login GLSL rendered to offscreen FBO ─────────────────────────────────────
 // Renders to a flat quad (PlaneGeometry 2×2) with an orthographic camera.
@@ -192,6 +198,8 @@ const SPHERE_VERT = /* glsl */`
   }
 `;
 
+// Kept for LOGIN_VISUALIZER_ENABLED re-enable — not currently used.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SPHERE_FRAG = /* glsl */`
   uniform sampler2D uVizTex;
   uniform float     uFade;
@@ -237,6 +245,45 @@ const SPHERE_FRAG = /* glsl */`
     vec4 col = texture2D(uVizTex, uv);
 
     gl_FragColor = vec4(col.rgb, uFade * floorFade);
+  }
+`;
+
+// ── N3: Night sky + sun shader (replaces /login FBO on exterior sphere) ──────
+// Renders a deep dark gradient with a sun disc + glow.
+// uSunDir:         normalized direction to sun (world space)
+// uSunAngularRad:  half-angle of sun disc (radians)
+// uSunIntensity:   emissive brightness; breathing + audio-reactive in useFrame
+// uRemoteMix:      future N4+ FBO blend weight (0 = off)
+const DOMESKY_FRAG = /* glsl */`
+  uniform float uFade;
+  uniform vec3  uSunDir;
+  uniform float uSunAngularRad;
+  uniform float uSunIntensity;
+  uniform float uRemoteMix;
+  varying vec3  vWorldPos;
+
+  void main() {
+    float floorFade = smoothstep(-2.0, 2.0, vWorldPos.y);
+    if (vWorldPos.y < -3.0) discard;
+
+    vec3  dir  = normalize(vWorldPos);
+    float elev = dir.y;
+
+    // Dark gradient: #02030a (zenith) → #060a1c (horizon/below)
+    vec3 zenith = vec3(0.00784, 0.01176, 0.03922);
+    vec3 horiz  = vec3(0.02353, 0.03922, 0.10980);
+    vec3 sky    = mix(horiz, zenith, smoothstep(-0.30, 0.80, elev));
+
+    // Sun disc + soft glow
+    float cosAngle  = dot(dir, normalize(uSunDir));
+    float cosEdge   = cos(uSunAngularRad);
+    float cosInner  = cos(uSunAngularRad * 0.65);
+    float sunDisc   = smoothstep(cosEdge, cosInner, cosAngle);
+    float sunGlow   = pow(max(0.0, cosAngle), 48.0) * 0.45;
+    vec3  sunColor  = vec3(1.0, 0.855, 0.608);
+    sky += sunColor * (sunDisc + sunGlow) * uSunIntensity;
+
+    gl_FragColor = vec4(sky, uFade * floorFade);
   }
 `;
 
@@ -333,30 +380,55 @@ export default function DomeVisualizer() {
     return () => { geo.dispose(); mat.dispose(); offScene.remove(quad); };
   }, [offScene, loginUniforms]);
 
-  // Exterior sphere uniforms (use the FBO texture, fade in, polar projection)
-  const sphereUniforms = useMemo<Record<string, THREE.IUniform>>(() => ({
-    uVizTex:      { value: renderTarget.texture },
-    uFade:        { value: 0 },
-    uThetaMax:    { value: THREE.MathUtils.degToRad(DBG_SILLAS.vizThetaMax) },
-    uTestPattern: { value: DBG_SILLAS.vizTestPattern ? 1.0 : 0.0 },
-    uSolidTest:   { value: DBG_SILLAS.vizSolidTest  ? 1.0 : 0.0 },
-  }), [renderTarget]);
+  // N3: sun position derived from module-level random values (avoids Math.random in useMemo)
+  const sunData = useMemo(() => {
+    const az  = _SUN_AZ_DEG * Math.PI / 180;
+    const el  = _SUN_EL_DEG * Math.PI / 180;
+    const dir = new THREE.Vector3(
+      Math.cos(el) * Math.cos(az),
+      Math.sin(el),
+      Math.cos(el) * Math.sin(az),
+    ).normalize();
+    console.log(`[DomeViz] N3 sun: az=${_SUN_AZ_DEG.toFixed(1)}° el=${_SUN_EL_DEG.toFixed(1)}°`);
+    return { dir, pos: dir.clone().multiplyScalar(DOME_R * 0.92) };
+  }, []);
+
+  // N3: sky uniforms stored in a ref — mutable per-frame without triggering lint immutability rule.
+  const skyUniformsRef = useRef<Record<string, THREE.IUniform> | null>(null);
+  if (!skyUniformsRef.current) {
+    skyUniformsRef.current = {
+      uFade:          { value: 0 },
+      uSunDir:        { value: sunData.dir },
+      uSunAngularRad: { value: DBG_SILLAS.sunAngularDeg * Math.PI / 360 },
+      uSunIntensity:  { value: DBG_SILLAS.sunIntensity },
+      uRemoteMix:     { value: 0.0 },
+    };
+  }
+  const skyUniforms = skyUniformsRef.current;
+
+  // N3: radial halo sprite texture (additive glow around sun sphere)
+  const haloTex = useMemo(() => {
+    const sz  = 256;
+    const c   = document.createElement("canvas");
+    c.width   = c.height = sz;
+    const ctx = c.getContext("2d")!;
+    const g   = ctx.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, sz / 2);
+    g.addColorStop(0,    "rgba(255,220,160,0.9)");
+    g.addColorStop(0.25, "rgba(255,190,100,0.5)");
+    g.addColorStop(1,    "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, sz, sz);
+    return new THREE.CanvasTexture(c);
+  }, []);
+  useEffect(() => () => haloTex.dispose(), [haloTex]);
 
   // Audio lifecycle — ThreeScene calls startVizAudio() on activation (gesture context).
   // This effect handles retry (user banner click) and cleanup on unmount.
   useEffect(() => {
-    // Fallback: if somehow audio wasn't started yet (e.g. debug button activate)
-    startVizAudio().then(result => {
-      if (result === "need-gesture") {
-        window.dispatchEvent(new CustomEvent("alight:audio-need-gesture", { detail: { need: true } }));
-      }
-    });
+    // N3: prepareVizAudio builds the audio graph without playing (play starts in N4 on haz entry)
+    void prepareVizAudio();
     const onRetry = () => {
-      startVizAudio().then(result => {
-        if (result === "ok") {
-          window.dispatchEvent(new CustomEvent("alight:audio-need-gesture", { detail: { need: false } }));
-        }
-      });
+      void prepareVizAudio();
     };
     window.addEventListener("alight:retry-viz-audio", onRetry);
     return () => {
@@ -399,21 +471,25 @@ export default function DomeVisualizer() {
     LU.uLayerRings.value = DBG_SILLAS.vizRings;
     LU.uAngle.value      = DBG_SILLAS.vizAngle;
 
-    // ── Render login shader to FBO (cap at ~60 fps) ───────────────────────────
-    const now = performance.now();
-    if (now - lastFBORef.current >= 16.0) {
-      lastFBORef.current = now;
-      gl.setRenderTarget(renderTarget);
-      gl.render(offScene, offCam);
-      gl.setRenderTarget(null);
+    // ── Render login shader to FBO (disabled in N3; flag re-enables) ────────────
+    if (LOGIN_VISUALIZER_ENABLED) {
+      const now = performance.now();
+      if (now - lastFBORef.current >= 16.0) {
+        lastFBORef.current = now;
+        gl.setRenderTarget(renderTarget);
+        gl.render(offScene, offCam);
+        gl.setRenderTarget(null);
+      }
     }
 
-    // ── Update sphere uniforms ────────────────────────────────────────────────
-    const SU = sphereUniforms;
-    SU.uFade.value        = Math.min(1, SU.uFade.value + dt / (DBG_SILLAS.vizFadeMs / 1000));
-    SU.uThetaMax.value    = THREE.MathUtils.degToRad(DBG_SILLAS.vizThetaMax);
-    SU.uTestPattern.value = DBG_SILLAS.vizTestPattern ? 1.0 : 0.0;
-    SU.uSolidTest.value   = DBG_SILLAS.vizSolidTest   ? 1.0 : 0.0;
+    // ── Update sky uniforms (N3) ──────────────────────────────────────────────
+    const SU = skyUniforms;
+    SU.uFade.value = Math.min(1, SU.uFade.value + dt / (DBG_SILLAS.vizFadeMs / 1000));
+    // Sun breathing ±10 % at 0.1 Hz; audio reactive +80 % max (b, ar declared above)
+    const breathe    = 1.0 + 0.10 * Math.sin(2 * Math.PI * 0.1 * clock.elapsedTime);
+    const audioBoost = 1.0 + b.rms * ar * 0.80;
+    SU.uSunIntensity.value  = DBG_SILLAS.sunIntensity * breathe * audioBoost;
+    SU.uSunAngularRad.value = DBG_SILLAS.sunAngularDeg * Math.PI / 360;
 
     // H1 Prueba A: when vizSolidTest is on, override depth/side/renderOrder for diagnostics
     if (matRef.current && meshRef.current) {
@@ -438,21 +514,36 @@ export default function DomeVisualizer() {
   });
 
   return (
-    // renderOrder=-1: renders before (behind) the dome shell (renderOrder=0 default)
-    // depthWrite=false: doesn't interfere with depth buffer of other objects
-    // G1: base radius DOME_R, mesh.scale animated 1.0 → vizSphereScale in useFrame
-    <mesh ref={meshRef} renderOrder={-1}>
-      <sphereGeometry args={[DOME_R, 64, 32]} />
-      <shaderMaterial
-        ref={matRef}
-        vertexShader={SPHERE_VERT}
-        fragmentShader={SPHERE_FRAG}
-        uniforms={sphereUniforms}
-        side={THREE.BackSide}
-        transparent
-        depthWrite={false}
-        toneMapped={false}
-      />
-    </mesh>
+    <>
+      {/* Sky dome sphere — renderOrder=-1 renders behind dome shell */}
+      <mesh ref={meshRef} renderOrder={-1}>
+        <sphereGeometry args={[DOME_R, 64, 32]} />
+        <shaderMaterial
+          ref={matRef}
+          vertexShader={SPHERE_VERT}
+          fragmentShader={DOMESKY_FRAG}
+          uniforms={skyUniforms}
+          side={THREE.BackSide}
+          transparent
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+      {/* N3: sun sphere — small emissive mesh at sun world position */}
+      <mesh position={sunData.pos}>
+        <sphereGeometry args={[0.9, 12, 8]} />
+        <meshBasicMaterial color="#ffd9a0" toneMapped={false} />
+      </mesh>
+      {/* N3: halo sprite — additive glow billboard centred on sun */}
+      <sprite position={sunData.pos} scale={[7, 7, 1]}>
+        <spriteMaterial
+          map={haloTex}
+          transparent
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </sprite>
+    </>
   );
 }

@@ -62,6 +62,24 @@ export const DBG_SILLAS = {
   // N1: sillas sequence timing
   releaseDelayMs: 5000,  // ms after alight:dome-revealed before movement is freed (sala_activa)
   lockLook:       false, // N1: also lock mouse-look during sillas_secuencia (not yet implemented)
+  // N3: beams (haces)
+  hazRadiusM:       4.0,    // beam center distance from prism XZ origin (m)
+  hazZoneRadiusM:   1.0,    // "under beam" trigger zone radius (m)
+  hazSpotY:         22,     // spotlight height above floor (m)
+  hazSpotIntensity: 80,     // Three.js SpotLight intensity
+  hazConeOpacity:   0.12,   // visible cone mesh base opacity (additive)
+  hazColor0:        '#ff2d95' as string, // S0 magenta
+  hazColor1:        '#25e1ff' as string, // S1 cyan
+  hazColor2:        '#ffb000' as string, // S2 amber
+  hazColor3:        '#3dff8a' as string, // S3 green
+  // N3: symbols
+  symbolRadiusM:    1.0,    // floor symbol disc radius (m)
+  symbolPeriodS:    2.5,    // animation cycle period (s)
+  symbolLineWidthM: 0.04,   // trace thickness (m)
+  // N3: sun
+  sunIntensity:     0.35,   // base emissive brightness
+  sunAngularDeg:    4.0,    // angular diameter (degrees)
+  sunDriftEnabled:  false,  // slow azimuth drift (debug only)
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

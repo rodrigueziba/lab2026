@@ -495,6 +495,49 @@ export default function DebugMenu() {
               Reiniciar secuencia
             </button>
           </div>
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Haces N3 <span style={NOTE}>(live)</span></span>
+          <NumField label="hazRadiusM" value={sillas.hazRadiusM} step={0.1} min={0} max={15} note="live"
+            onChange={v => { DBG_SILLAS.hazRadiusM = v; setSillas(s => ({ ...s, hazRadiusM: v })); }} />
+          <NumField label="hazZoneRadiusM" value={sillas.hazZoneRadiusM} step={0.1} min={0.1} max={5} note="live"
+            onChange={v => { DBG_SILLAS.hazZoneRadiusM = v; setSillas(s => ({ ...s, hazZoneRadiusM: v })); }} />
+          <NumField label="hazSpotIntensity" value={sillas.hazSpotIntensity} step={5} min={0} max={400} note="live"
+            onChange={v => { DBG_SILLAS.hazSpotIntensity = v; setSillas(s => ({ ...s, hazSpotIntensity: v })); }} />
+          <NumField label="hazConeOpacity" value={sillas.hazConeOpacity} step={0.01} min={0} max={1} note="live"
+            onChange={v => { DBG_SILLAS.hazConeOpacity = v; setSillas(s => ({ ...s, hazConeOpacity: v })); }} />
+          <ColorField label="hazColor0 (S0)" value={sillas.hazColor0}
+            onChange={v => { DBG_SILLAS.hazColor0 = v; setSillas(s => ({ ...s, hazColor0: v })); }} />
+          <ColorField label="hazColor1 (S1)" value={sillas.hazColor1}
+            onChange={v => { DBG_SILLAS.hazColor1 = v; setSillas(s => ({ ...s, hazColor1: v })); }} />
+          <ColorField label="hazColor2 (S2)" value={sillas.hazColor2}
+            onChange={v => { DBG_SILLAS.hazColor2 = v; setSillas(s => ({ ...s, hazColor2: v })); }} />
+          <ColorField label="hazColor3 (S3)" value={sillas.hazColor3}
+            onChange={v => { DBG_SILLAS.hazColor3 = v; setSillas(s => ({ ...s, hazColor3: v })); }} />
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Sol N3 <span style={NOTE}>(live)</span></span>
+          <NumField label="sunIntensity" value={sillas.sunIntensity} step={0.05} min={0} max={3} note="live"
+            onChange={v => { DBG_SILLAS.sunIntensity = v; setSillas(s => ({ ...s, sunIntensity: v })); }} />
+          <NumField label="sunAngularDeg" value={sillas.sunAngularDeg} step={0.5} min={0.5} max={20} note="live"
+            onChange={v => { DBG_SILLAS.sunAngularDeg = v; setSillas(s => ({ ...s, sunAngularDeg: v })); }} />
+          <div style={ROW}>
+            <span>sunDriftEnabled <span style={NOTE}>debug drift</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.sunDriftEnabled;
+              DBG_SILLAS.sunDriftEnabled = v;
+              setSillas(s => ({ ...s, sunDriftEnabled: v }));
+            }}>{sillas.sunDriftEnabled ? "ON" : "off"}</button>
+          </div>
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Símbolos N3 <span style={NOTE}>(live)</span></span>
+          <NumField label="symbolRadiusM" value={sillas.symbolRadiusM} step={0.1} min={0.1} max={5} note="live"
+            onChange={v => { DBG_SILLAS.symbolRadiusM = v; setSillas(s => ({ ...s, symbolRadiusM: v })); }} />
+          <NumField label="symbolPeriodS" value={sillas.symbolPeriodS} step={0.1} min={0.5} max={10} note="live"
+            onChange={v => { DBG_SILLAS.symbolPeriodS = v; setSillas(s => ({ ...s, symbolPeriodS: v })); }} />
+          <NumField label="symbolLineWidthM" value={sillas.symbolLineWidthM} step={0.005} min={0.005} max={0.3} note="live"
+            onChange={v => { DBG_SILLAS.symbolLineWidthM = v; setSillas(s => ({ ...s, symbolLineWidthM: v })); }} />
         </>
       )}
 
