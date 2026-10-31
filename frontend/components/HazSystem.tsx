@@ -175,6 +175,7 @@ export default function HazSystem() {
         side:           THREE.DoubleSide,
       });
       const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+      coneMesh.renderOrder = 10; // U3: render after panorama layers (rO 0-7)
       scene.add(coneMesh);
       cones.push({ mesh: coneMesh, mat: coneMat });
 

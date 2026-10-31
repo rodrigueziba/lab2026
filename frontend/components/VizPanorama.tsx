@@ -372,34 +372,12 @@ export default function VizPanorama({ growRef, pulseRef, flowRef, kickRef }: Viz
   return (
     <>
       {/* Mountain bands: fondo (bg) < medias < frente (fg) */}
-      <mesh ref={fondoMeshRef} frustumCulled={false} renderOrder={2}>
-        <sphereGeometry args={[DOME_R * 0.98, 256, 32, 0, Math.PI * 2, MT_T0, MT_TL]} />
-        <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
-          uniforms={fondoU}
-          side={THREE.BackSide} transparent depthTest={false} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh ref={mediasMeshRef} frustumCulled={false} renderOrder={3}>
-        <sphereGeometry args={[DOME_R * 0.98, 256, 32, 0, Math.PI * 2, MT_T0, MT_TL]} />
-        <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
-          uniforms={mediasU}
-          side={THREE.BackSide} transparent depthTest={false} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh ref={frenteMeshRef} frustumCulled={false} renderOrder={4}>
-        <sphereGeometry args={[DOME_R * 0.98, 256, 32, 0, Math.PI * 2, MT_T0, MT_TL]} />
-        <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
-          uniforms={frenteU}
-          side={THREE.BackSide} transparent depthTest={false} depthWrite={false} toneMapped={false} />
-      </mesh>
+      {/* U3: depthTest=true so panorama is occluded by opaque room geometry.
+          renderOrder hierarchy: sky(DomeViz=-1) < stars(0) < clouds(1) < sol(2-3) < mts(4-6) < lines(7).
+          Opaque objects (sillas, tarima, piso) write depth → panorama depth-tests against them correctly.
+          Transparent 3D objects (haces, floor symbols) must have renderOrder>7. */}
 
-      {/* Lines band */}
-      <mesh frustumCulled={false} renderOrder={5}>
-        <sphereGeometry args={[DOME_R * 0.98, 256, 16, 0, Math.PI * 2, LN_T0, LN_TL]} />
-        <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
-          uniforms={lineU}
-          side={THREE.BackSide} transparent depthTest={false} depthWrite={false} toneMapped={false} />
-      </mesh>
-
-      {/* Stars: 120 sprites (initially invisible, texture loaded async) */}
+      {/* Stars: 120 sprites — behind mountains (lower rO) */}
       {STAR_DATA.map((s, i) => (
         <sprite key={`star-${i}`}
           ref={(sp: THREE.Sprite | null) => { if (sp) starSpritesRef.current[i] = sp; }}
@@ -409,11 +387,11 @@ export default function VizPanorama({ growRef, pulseRef, flowRef, kickRef }: Viz
           frustumCulled={false}
         >
           <spriteMaterial transparent opacity={0}
-            depthTest={false} depthWrite={false} toneMapped={false} rotation={s.rot} />
+            depthTest={true} depthWrite={false} toneMapped={false} rotation={s.rot} />
         </sprite>
       ))}
 
-      {/* Clouds: 10 sprites (position updated in useFrame) */}
+      {/* Clouds: 10 sprites — above stars, below mountains */}
       {CLOUD_DATA.map((c, i) => {
         const e = c.el * DEG, a = c.az0 * DEG, sr = DOME_R * 0.94;
         return (
@@ -421,25 +399,53 @@ export default function VizPanorama({ growRef, pulseRef, flowRef, kickRef }: Viz
             ref={(sp: THREE.Sprite | null) => { if (sp) cloudSpritesRef.current[i] = sp; }}
             position={[sr * Math.cos(e) * Math.cos(a), sr * Math.sin(e), sr * Math.cos(e) * Math.sin(a)]}
             scale={[c.sz, c.sz, 1]}
-            renderOrder={0}
+            renderOrder={1}
             frustumCulled={false}
           >
             <spriteMaterial transparent opacity={0}
-              depthTest={false} depthWrite={false} toneMapped={false} />
+              depthTest={true} depthWrite={false} toneMapped={false} />
           </sprite>
         );
       })}
 
-      {/* Sun: 3 concentric sprites (position updated in useFrame) */}
-      <sprite ref={sunAnilloRef} scale={[SUN_RING_SZ,   SUN_RING_SZ,   1]} renderOrder={1} frustumCulled={false}>
-        <spriteMaterial transparent opacity={0} depthTest={false} depthWrite={false} toneMapped={false} />
+      {/* Sun: 3 concentric sprites — above clouds, below mountains (partial occlusion OK) */}
+      <sprite ref={sunAnilloRef} scale={[SUN_RING_SZ,   SUN_RING_SZ,   1]} renderOrder={2} frustumCulled={false}>
+        <spriteMaterial transparent opacity={0} depthTest={true} depthWrite={false} toneMapped={false} />
       </sprite>
-      <sprite ref={sunDiscoRef}  scale={[SUN_DISCO_SZ,  SUN_DISCO_SZ,  1]} renderOrder={1} frustumCulled={false}>
-        <spriteMaterial transparent opacity={0} depthTest={false} depthWrite={false} toneMapped={false} />
+      <sprite ref={sunDiscoRef}  scale={[SUN_DISCO_SZ,  SUN_DISCO_SZ,  1]} renderOrder={2} frustumCulled={false}>
+        <spriteMaterial transparent opacity={0} depthTest={true} depthWrite={false} toneMapped={false} />
       </sprite>
-      <sprite ref={sunNucleoRef} scale={[SUN_NUCLEO_SZ, SUN_NUCLEO_SZ, 1]} renderOrder={1} frustumCulled={false}>
-        <spriteMaterial transparent opacity={0} depthTest={false} depthWrite={false} toneMapped={false} />
+      <sprite ref={sunNucleoRef} scale={[SUN_NUCLEO_SZ, SUN_NUCLEO_SZ, 1]} renderOrder={3} frustumCulled={false}>
+        <spriteMaterial transparent opacity={0} depthTest={true} depthWrite={false} toneMapped={false} />
       </sprite>
+
+      {/* Mountain bands: fondo (bg) < medias < frente (fg) */}
+      <mesh ref={fondoMeshRef} frustumCulled={false} renderOrder={4}>
+        <sphereGeometry args={[DOME_R * 0.98, 256, 32, 0, Math.PI * 2, MT_T0, MT_TL]} />
+        <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
+          uniforms={fondoU}
+          side={THREE.BackSide} transparent depthTest={true} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh ref={mediasMeshRef} frustumCulled={false} renderOrder={5}>
+        <sphereGeometry args={[DOME_R * 0.98, 256, 32, 0, Math.PI * 2, MT_T0, MT_TL]} />
+        <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
+          uniforms={mediasU}
+          side={THREE.BackSide} transparent depthTest={true} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh ref={frenteMeshRef} frustumCulled={false} renderOrder={6}>
+        <sphereGeometry args={[DOME_R * 0.98, 256, 32, 0, Math.PI * 2, MT_T0, MT_TL]} />
+        <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
+          uniforms={frenteU}
+          side={THREE.BackSide} transparent depthTest={true} depthWrite={false} toneMapped={false} />
+      </mesh>
+
+      {/* Lines band */}
+      <mesh frustumCulled={false} renderOrder={7}>
+        <sphereGeometry args={[DOME_R * 0.98, 256, 16, 0, Math.PI * 2, LN_T0, LN_TL]} />
+        <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
+          uniforms={lineU}
+          side={THREE.BackSide} transparent depthTest={true} depthWrite={false} toneMapped={false} />
+      </mesh>
     </>
   );
 }

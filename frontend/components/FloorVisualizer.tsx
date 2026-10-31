@@ -288,7 +288,7 @@ export default function FloorVisualizer() {
   });
 
   return (
-    <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={10}>
       <circleGeometry args={[DOME_R, 128]} />
       <shaderMaterial
         vertexShader={FLOOR_VERT}

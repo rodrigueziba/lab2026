@@ -796,6 +796,29 @@ export default function DebugMenu() {
               </div>
             );
           })}
+          {/* U3: forzar todos los grupos al máximo — activa visualizador + fuerza grow=1 */}
+          <div style={ROW}>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
+              onClick={() => {
+                (["vizGrowForce0","vizGrowForce1","vizGrowForce2","vizGrowForce3"] as const).forEach(k => {
+                  DBG_SILLAS[k] = 1;
+                });
+                setSillas(s => ({ ...s, vizGrowForce0: 1, vizGrowForce1: 1, vizGrowForce2: 1, vizGrowForce3: 1 }));
+                activateVisualizerOnce();
+              }}>
+              Todos grow=1 (U3)
+            </button>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
+              onClick={() => {
+                (["vizGrowForce0","vizGrowForce1","vizGrowForce2","vizGrowForce3"] as const).forEach(k => {
+                  DBG_SILLAS[k] = -1;
+                });
+                setSillas(s => ({ ...s, vizGrowForce0: -1, vizGrowForce1: -1, vizGrowForce2: -1, vizGrowForce3: -1 }));
+                resetVizActivated();
+              }}>
+              Reset (U3)
+            </button>
+          </div>
 
           <div style={DIVIDER} />
           <span style={LABEL}>Reacción T3 — audio <span style={NOTE}>(live)</span></span>
