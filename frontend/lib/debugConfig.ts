@@ -224,6 +224,17 @@ export const DBG_SILLAS = {
   u6FlashDecS:   4.0,    // exponential decay τ back to normal (s)
   u6DimFactor:   0.7,    // off-toggle dim multiplier (< 1)
   u6DimDecS:     1.0,    // off-toggle return-to-normal τ (s)
+  // U7: per-layer visibility + magenta test mode
+  u7VisStars:    true,
+  u7VisClouds:   true,
+  u7VisSun:      true,
+  u7VisSky:      true,   // CIELO warm gradient in PANORAMA_FRAG
+  u7VisMtFondo:  true,
+  u7VisMtMedias: true,
+  u7VisMtFrente: true,
+  u7VisLines:    true,
+  // 0=off 1=stars 2=clouds 3=sun 4=sky 5=mt-fondo 6=mt-medias 7=mt-frente 8=lines
+  u7MagentaIdx:  0,
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

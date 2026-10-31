@@ -32,15 +32,17 @@ const BAND_VERT = /* glsl */`
 `;
 const BAND_FRAG = /* glsl */`
   uniform sampler2D uTex;
-  uniform float uReveal;  // -0.1=nothing, 1.1=fully revealed
-  uniform float uOpacity; // global fade (0 until texture loads)
-  uniform float uBright;  // audio brightness boost (1.0 = no boost)
-  uniform float uOffset;  // horizontal scroll 0–1 (seamless, for lines)
+  uniform float uReveal;   // -0.1=nothing, 1.1=fully revealed
+  uniform float uOpacity;  // global fade (0 until texture loads)
+  uniform float uBright;   // audio brightness boost (1.0 = no boost)
+  uniform float uOffset;   // horizontal scroll 0–1 (seamless, for lines)
+  uniform float uMagenta;  // U7: 1.0 = replace with magenta test color
   varying vec2 vUv;
   void main() {
     vec2 uv = vec2(fract(vUv.x + uOffset), vUv.y);
     vec4 c  = texture2D(uTex, uv);
     float m = 1.0 - smoothstep(uReveal - 0.06, uReveal + 0.06, uv.y);
+    if (uMagenta > 0.5) c = vec4(1.0, 0.0, 1.0, 1.0);
     gl_FragColor = vec4(c.rgb * uBright, c.a * m * uOpacity);
   }
 `;
@@ -53,10 +55,12 @@ interface BandUni {
   uOpacity: THREE.IUniform<number>;
   uBright:  THREE.IUniform<number>;
   uOffset:  THREE.IUniform<number>;
+  uMagenta: THREE.IUniform<number>;
 }
 const mkBU = (): BandUni => ({
   uTex: { value: null }, uReveal: { value: -0.1 },
   uOpacity: { value: 0 }, uBright: { value: 1 }, uOffset: { value: 0 },
+  uMagenta: { value: 0 },
 });
 
 // ── U5: liquid psychedelic lines shader ───────────────────────────────────────
@@ -74,6 +78,7 @@ const LINE_FRAG = /* glsl */`
   uniform float uWaveFreq; // wave cycles across azimuth
   uniform float uWaveSpd;  // wave temporal speed
   uniform float uFbmSpd;   // FBM animation speed multiplier
+  uniform float uMagenta;  // U7: 1.0 = replace with magenta test color
   varying vec2 vUv;
 
   vec2 hash22(vec2 p) {
@@ -121,6 +126,7 @@ const LINE_FRAG = /* glsl */`
     // Paso 3: sharpen alpha → thinner dark outlines at high energy
     float aSharp = 1.0 + uEnergy * 2.5;
     float a      = pow(clamp(orig.a, 0.0, 1.0), 1.0 / aSharp);
+    if (uMagenta > 0.5) { gl_FragColor = vec4(1.0, 0.0, 1.0, m * uOpacity); return; }
     gl_FragColor = vec4(rgb, a * m * uOpacity);
   }
 `;
@@ -139,6 +145,7 @@ interface LineUni {
   uWaveFreq: THREE.IUniform<number>;
   uWaveSpd:  THREE.IUniform<number>;
   uFbmSpd:   THREE.IUniform<number>;
+  uMagenta:  THREE.IUniform<number>;
 }
 const mkLU = (): LineUni => ({
   uTex:     { value: null }, uReveal:  { value: -0.1 },
@@ -147,6 +154,7 @@ const mkLU = (): LineUni => ({
   uPsyMix:  { value: 0.15 }, uPsyMode: { value: 1 },
   uWaveAmp: { value: 0.08 }, uWaveFreq: { value: 3.0 },
   uWaveSpd: { value: 1.5 },  uFbmSpd:  { value: 0.08 },
+  uMagenta: { value: 0 },
 });
 
 // ── Seeded deterministic RNG ──────────────────────────────────────────────────
@@ -478,25 +486,46 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
     lineU.uWaveSpd.value  = DBG_SILLAS.u5WaveSpd;
     lineU.uFbmSpd.value   = DBG_SILLAS.u5FbmSpd;
 
+    // ── U7: visibility flags and magenta mode ─────────────────────────────
+    const mgIdx = DBG_SILLAS.u7MagentaIdx;
+    fondoU.uMagenta.value  = mgIdx === 5 ? 1 : 0;
+    mediasU.uMagenta.value = mgIdx === 6 ? 1 : 0;
+    frenteU.uMagenta.value = mgIdx === 7 ? 1 : 0;
+    lineU.uMagenta.value   = mgIdx === 8 ? 1 : 0;
+    // Visibility: override uOpacity (texture load sets 1; we restore when re-enabled)
+    if (!DBG_SILLAS.u7VisMtFondo)  fondoU.uOpacity.value  = 0;
+    else if (fondoU.uTex.value)    fondoU.uOpacity.value  = 1;
+    if (!DBG_SILLAS.u7VisMtMedias) mediasU.uOpacity.value = 0;
+    else if (mediasU.uTex.value)   mediasU.uOpacity.value = 1;
+    if (!DBG_SILLAS.u7VisMtFrente) frenteU.uOpacity.value = 0;
+    else if (frenteU.uTex.value)   frenteU.uOpacity.value = 1;
+    if (!DBG_SILLAS.u7VisLines)    lineU.uOpacity.value   = 0;
+    else if (lineU.uTex.value)     lineU.uOpacity.value   = 1;
+
     // ── CIELO stars (group 2) — centelleo con fase propia ────────────────
     const twFq  = DBG_SILLAS.starTwinkleFq;
     const twAmp = DBG_SILLAS.starTwinkleAmp;
+    const starMag = mgIdx === 1;
     for (let i = 0; i < STAR_COUNT; i++) {
       const sp = starSpritesRef.current[i];
       if (!sp) continue;
+      if (!DBG_SILLAS.u7VisStars) { sp.material.opacity = 0; continue; }
       const t     = STAR_DATA[i].t;
       const ph    = STAR_DATA[i].rot;
-      const freq  = twFq * (0.7 + t * 0.6);  // higher stars twinkle faster
-      const osc   = 0.5 + 0.5 * Math.sin(t_s * freq + ph);   // 0–1
+      const freq  = twFq * (0.7 + t * 0.6);
+      const osc   = 0.5 + 0.5 * Math.sin(t_s * freq + ph);
       const rev   = THREE.MathUtils.smoothstep(1 - t, 1 - t + 0.1, g2);
       sp.material.opacity = Math.min(1, rev * (1 + p2 * 0.5 * osc + kick * 0.3));
       sp.scale.setScalar(STAR_DATA[i].sz * (1 + p2 * twAmp * osc + kick * DBG_SILLAS.u2KickScale));
+      sp.material.color.setHex(starMag ? 0xFF00FF : 0xFFFFFF);
     }
 
     // ── CIELO clouds (group 2) — drift faster with energy ─────────────────
+    const cloudMag = mgIdx === 2;
     for (let i = 0; i < CLOUD_COUNT; i++) {
       const sp = cloudSpritesRef.current[i];
       if (!sp) continue;
+      if (!DBG_SILLAS.u7VisClouds) { sp.material.opacity = 0; continue; }
       cloudAzRef.current[i] += CLOUD_DATA[i].driftSpeed * (1 + p2 * 3) * dt;
       const az = cloudAzRef.current[i] * DEG;
       const el = CLOUD_DATA[i].el * DEG;
@@ -504,6 +533,23 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
       sp.position.set(sr * Math.cos(el) * Math.cos(az), sr * Math.sin(el), sr * Math.cos(el) * Math.sin(az));
       const ct = CLOUD_DATA[i].t;
       sp.material.opacity = THREE.MathUtils.smoothstep(1 - ct, 1 - ct + 0.15, g2) * (0.75 + p2 * 0.25);
+      sp.material.color.setHex(cloudMag ? 0xFF00FF : 0xFFFFFF);
+    }
+
+    // ── U7: sol visibility / magenta ──────────────────────────────────────
+    const sunMag = mgIdx === 3;
+    if (!DBG_SILLAS.u7VisSun) {
+      if (sunAnilloRef.current)  sunAnilloRef.current.material.opacity  = 0;
+      if (sunDiscoRef.current)   sunDiscoRef.current.material.opacity   = 0;
+      if (sunNucleoRef.current)  sunNucleoRef.current.material.opacity  = 0;
+    } else if (sunMag) {
+      if (sunAnilloRef.current)  { sunAnilloRef.current.material.color.setHex(0xFF00FF);  sunAnilloRef.current.material.opacity  = sunOp; }
+      if (sunDiscoRef.current)   { sunDiscoRef.current.material.color.setHex(0xFF00FF);   sunDiscoRef.current.material.opacity   = sunOp; }
+      if (sunNucleoRef.current)  { sunNucleoRef.current.material.color.setHex(0xFF00FF);  sunNucleoRef.current.material.opacity  = coreOp; }
+    } else {
+      if (sunAnilloRef.current)  sunAnilloRef.current.material.color.setHex(0xFFFFFF);
+      if (sunDiscoRef.current)   sunDiscoRef.current.material.color.setHex(0xFFFFFF);
+      if (sunNucleoRef.current)  sunNucleoRef.current.material.color.setHex(0xFFFFFF);
     }
   });
 

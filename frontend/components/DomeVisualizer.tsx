@@ -270,6 +270,8 @@ const PANORAMA_FRAG = /* glsl */`
   uniform float uPulse0, uPulse1, uPulse2, uPulse3;
   uniform float uFlow3, uKick;
   uniform float uMtH, uMtB, uMtK, uSkyB, uSunB, uLineA;
+  uniform float uSkyVis;     // U7: 0=hide warm sky, 1=show
+  uniform float uSkyMagenta; // U7: 1=replace sky with magenta
   varying vec3 vWorldPos;
 
   float hash31(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
@@ -292,15 +294,16 @@ const PANORAMA_FRAG = /* glsl */`
 
     // ── Grupo 2: CIELO — warm 3-stop gradient ────────────────────────────────
     // U1 palette: zenith #B5432A, mid #E2702A, horizon #F5B83A
-    if (uGrow2 > 0.001) {
+    if (uGrow2 > 0.001 && uSkyVis > 0.5) {
       float skyEdge  = mix(1.20, -0.50, uGrow2);
-      float skyMask  = smoothstep(skyEdge + 0.10, skyEdge - 0.10, elev);
+      float skyMask  = smoothstep(skyEdge - 0.10, skyEdge + 0.10, elev); // U7 fix: was +0.10,-0.10 (inverted)
       float skyBrght = breath * (1.0 + uPulse2 * uSkyB);
       vec3 top = vec3(0.710, 0.263, 0.165); // #B5432A (zenith)
       vec3 mid = vec3(0.886, 0.439, 0.165); // #E2702A (mid)
       vec3 bot = vec3(0.961, 0.722, 0.227); // #F5B83A (horizon)
       float t  = smoothstep(-0.30, 0.80, elev);
       vec3 warmSky = mix(bot, mix(mid, top, smoothstep(0.35, 0.80, t)), t) * skyBrght;
+      if (uSkyMagenta > 0.5) warmSky = vec3(1.0, 0.0, 1.0);
       sky = mix(sky, warmSky, skyMask * uGrow2);
     }
 
@@ -483,6 +486,8 @@ export default function DomeVisualizer() {
       uSunIntensity:  { value: DBG_SILLAS.sunIntensity },
       uRemoteMix:     { value: 0.0 },
       uStaticMix:     { value: 0.0 },
+      uSkyVis:        { value: 1.0 },
+      uSkyMagenta:    { value: 0.0 },
       // T2: group growth
       uGrow0: { value: 0 }, uGrow1: { value: 0 }, uGrow2: { value: 0 }, uGrow3: { value: 0 },
       // T3: audio pulse + flow
@@ -600,9 +605,11 @@ export default function DomeVisualizer() {
     SU.uMtH.value   = DBG_SILLAS.mtHeightBoost;
     SU.uMtB.value   = DBG_SILLAS.mtBrightBoost;
     SU.uMtK.value   = DBG_SILLAS.kickExtraBoost;
-    SU.uSkyB.value  = DBG_SILLAS.skyBrightBoost;
-    SU.uSunB.value  = DBG_SILLAS.sunBrightBoost;
-    SU.uLineA.value = DBG_SILLAS.lineAmpBoost;
+    SU.uSkyB.value      = DBG_SILLAS.skyBrightBoost;
+    SU.uSunB.value      = DBG_SILLAS.sunBrightBoost;
+    SU.uLineA.value     = DBG_SILLAS.lineAmpBoost;
+    SU.uSkyVis.value    = DBG_SILLAS.u7VisSky     ? 1.0 : 0.0;
+    SU.uSkyMagenta.value = DBG_SILLAS.u7MagentaIdx === 4 ? 1.0 : 0.0;
 
     // ── T2: group growth ──────────────────────────────────────────────────────
     const growS = DBG_SILLAS.vizGrowS;

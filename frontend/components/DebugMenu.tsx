@@ -972,6 +972,31 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.u6DimDecS    = v; setSillas(s => ({ ...s, u6DimDecS:    v })); }} />
 
           <div style={DIVIDER} />
+          <span style={LABEL}>U7 — Capas visibles <span style={NOTE}>(debug)</span></span>
+          {([
+            ["u7VisStars",    "estrellas"],
+            ["u7VisClouds",   "nubes"],
+            ["u7VisSun",      "sol"],
+            ["u7VisSky",      "cielo"],
+            ["u7VisMtFondo",  "mt-fondo"],
+            ["u7VisMtMedias", "mt-medias"],
+            ["u7VisMtFrente", "mt-frente"],
+            ["u7VisLines",    "líneas"],
+          ] as [keyof typeof DBG_SILLAS, string][]).map(([key, label]) => (
+            <div key={key} style={ROW}>
+              <span>{label}</span>
+              <button style={INPUT} onClick={() => {
+                const v = !sillas[key];
+                (DBG_SILLAS as Record<string, unknown>)[key] = v;
+                setSillas(s => ({ ...s, [key]: v }));
+              }}>{sillas[key] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          <NumField label="u7MagentaIdx" value={sillas.u7MagentaIdx} step={1} min={0} max={8}
+            note="0=off 1=stars 2=clouds 3=sun 4=sky 5=mt-fondo 6=mt-medias 7=mt-frente 8=lines"
+            onChange={v => { DBG_SILLAS.u7MagentaIdx = v; setSillas(s => ({ ...s, u7MagentaIdx: v })); }} />
+
+          <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
           <NumField label="agcFloorRise"   value={sillas.agcFloorRise}   step={0.1}  min={0}    max={5}     note="live"
             onChange={v => { DBG_SILLAS.agcFloorRise   = v; setSillas(s => ({ ...s, agcFloorRise:   v })); }} />

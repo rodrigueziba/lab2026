@@ -151,6 +151,8 @@ function Player() {
 
     const onLanded   = () => { prismLanded.current = true; _D.prismLanded = true; };
     const onLecterns = () => { lecternsVisible.current = true; };
+    // U7 fix: sync _D.vizActive from the event so debug-button activation hides the ceiling too
+    const onVizActivate = () => { _D.vizActive = true; };
 
     // N1 debug shortcuts (dispatched by DebugMenu buttons)
     const onSkip = () => {
@@ -186,6 +188,7 @@ function Player() {
     window.addEventListener("alight:dome-revealed",         onReveal);
     window.addEventListener("alight:prism-landed",          onLanded);
     window.addEventListener("alight:lecterns-visible",      onLecterns);
+    window.addEventListener("alight:visualizer-activate",   onVizActivate);
     window.addEventListener("alight:debug-skip-sillas",     onSkip);
     window.addEventListener("alight:debug-reset-sillas",    onReset);
     window.addEventListener("alight:curtain-passed",        onCurtainPassed);
@@ -198,6 +201,7 @@ function Player() {
       window.removeEventListener("alight:dome-revealed",         onReveal);
       window.removeEventListener("alight:prism-landed",          onLanded);
       window.removeEventListener("alight:lecterns-visible",      onLecterns);
+      window.removeEventListener("alight:visualizer-activate",   onVizActivate);
       window.removeEventListener("alight:debug-skip-sillas",     onSkip);
       window.removeEventListener("alight:debug-reset-sillas",    onReset);
       window.removeEventListener("alight:curtain-passed",        onCurtainPassed);
