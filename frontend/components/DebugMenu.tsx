@@ -1016,6 +1016,29 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.u7MagentaIdx = v; setSillas(s => ({ ...s, u7MagentaIdx: v })); }} />
 
           <div style={DIVIDER} />
+          <span style={LABEL}>U9 — Secuencia amanecer <span style={NOTE}>(debug)</span></span>
+          <NumField label="amanecerDurS"       value={sillas.amanecerDurS}       step={1}    min={1}   max={60}   note="duración fase 1 (s)"
+            onChange={v => { DBG_SILLAS.amanecerDurS       = v; setSillas(s => ({ ...s, amanecerDurS:       v })); }} />
+          <NumField label="amanecerSectorDeg"  value={sillas.amanecerSectorDeg}  step={10}   min={10}  max={360}  note="ancho sector (°)"
+            onChange={v => { DBG_SILLAS.amanecerSectorDeg  = v; setSillas(s => ({ ...s, amanecerSectorDeg:  v })); }} />
+          <NumField label="amanecerEdgeDeg"    value={sillas.amanecerEdgeDeg}    step={1}    min={0}   max={30}   note="borde suave (°)"
+            onChange={v => { DBG_SILLAS.amanecerEdgeDeg    = v; setSillas(s => ({ ...s, amanecerEdgeDeg:    v })); }} />
+          <NumField label="amanecerP2StaggerS" value={sillas.amanecerP2StaggerS} step={0.5}  min={0}   max={5}    note="retraso entre capas fase 2 (s)"
+            onChange={v => { DBG_SILLAS.amanecerP2StaggerS = v; setSillas(s => ({ ...s, amanecerP2StaggerS: v })); }} />
+          <NumField label="amanecerP2GrowS"    value={sillas.amanecerP2GrowS}    step={0.5}  min={0.5} max={10}   note="duración crecimiento fase 2 (s)"
+            onChange={v => { DBG_SILLAS.amanecerP2GrowS    = v; setSillas(s => ({ ...s, amanecerP2GrowS:    v })); }} />
+          <div style={ROW}>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
+              onClick={() => window.dispatchEvent(new CustomEvent('alight:dawn-reset'))}>
+              Reiniciar amanecer
+            </button>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer", marginLeft: 6 }}
+              onClick={() => window.dispatchEvent(new CustomEvent('alight:dawn-skip'))}>
+              Saltar al final
+            </button>
+          </div>
+
+          <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
           <NumField label="agcFloorRise"   value={sillas.agcFloorRise}   step={0.1}  min={0}    max={5}     note="live"
             onChange={v => { DBG_SILLAS.agcFloorRise   = v; setSillas(s => ({ ...s, agcFloorRise:   v })); }} />

@@ -9,6 +9,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { prepareVizAudio, stopVizAudio, getVizBands, BAND_STATE, N5_STATE } from "@/lib/vizAudio";
+import { getDawnState } from "@/lib/alightStore";
 import { getHazEnteredOnce, getHazBandOn } from "@/lib/haz";
 import { VIZ_SUN_AZ_DEG, VIZ_SUN_EL_DEG } from "@/lib/vizSunState";
 import VizPanorama from "./VizPanorama";
@@ -267,6 +268,7 @@ const PANORAMA_FRAG = /* glsl */`
   uniform float uRemoteMix;
   uniform float uStaticMix;
   uniform float uGrow0, uGrow1, uGrow2, uGrow3;
+  uniform float uDawnSkyT; // U9: 0=dark sky, 1=full warm sky (replaces uGrow2 in sky section)
   uniform float uPulse0, uPulse1, uPulse2, uPulse3;
   uniform float uFlow3, uKick;
   uniform float uMtH, uMtB, uMtK, uSkyB, uSunB, uLineA;
@@ -294,9 +296,10 @@ const PANORAMA_FRAG = /* glsl */`
 
     // ── Grupo 2: CIELO — warm 3-stop gradient ────────────────────────────────
     // U1 palette: zenith #B5432A, mid #E2702A, horizon #F5B83A
-    if (uGrow2 > 0.001 && uSkyVis > 0.5) {
-      float skyEdge  = mix(1.20, -0.50, uGrow2);
-      float skyMask  = smoothstep(skyEdge - 0.10, skyEdge + 0.10, elev); // U7 fix: was +0.10,-0.10 (inverted)
+    // U9: driven by uDawnSkyT (0=dark, 1=full dawn) instead of uGrow2
+    if (uDawnSkyT > 0.001 && uSkyVis > 0.5) {
+      float skyEdge  = mix(1.20, -0.50, uDawnSkyT);
+      float skyMask  = smoothstep(skyEdge - 0.10, skyEdge + 0.10, elev);
       float skyBrght = breath * (1.0 + uPulse2 * uSkyB);
       vec3 top = vec3(0.710, 0.263, 0.165); // #B5432A (zenith)
       vec3 mid = vec3(0.886, 0.439, 0.165); // #E2702A (mid)
@@ -304,7 +307,7 @@ const PANORAMA_FRAG = /* glsl */`
       float t  = smoothstep(-0.30, 0.80, elev);
       vec3 warmSky = mix(bot, mix(mid, top, smoothstep(0.35, 0.80, t)), t) * skyBrght;
       if (uSkyMagenta > 0.5) warmSky = vec3(1.0, 0.0, 1.0);
-      sky = mix(sky, warmSky, skyMask * uGrow2);
+      sky = mix(sky, warmSky, skyMask * uDawnSkyT);
     }
 
     // ── N5: static interference (preserved) ──────────────────────────────────
@@ -488,6 +491,7 @@ export default function DomeVisualizer() {
       uStaticMix:     { value: 0.0 },
       uSkyVis:        { value: 1.0 },
       uSkyMagenta:    { value: 0.0 },
+      uDawnSkyT:      { value: 0.0 }, // U9: driven by dawn sequence
       // T2: group growth
       uGrow0: { value: 0 }, uGrow1: { value: 0 }, uGrow2: { value: 0 }, uGrow3: { value: 0 },
       // T3: audio pulse + flow
@@ -610,6 +614,11 @@ export default function DomeVisualizer() {
     SU.uLineA.value     = DBG_SILLAS.lineAmpBoost;
     SU.uSkyVis.value    = DBG_SILLAS.u7VisSky     ? 1.0 : 0.0;
     SU.uSkyMagenta.value = DBG_SILLAS.u7MagentaIdx === 4 ? 1.0 : 0.0;
+    // U9: dawn sky progress — replaces uGrow2 in sky gradient section
+    { const ds = getDawnState();
+      SU.uDawnSkyT.value = ds.phase === 'completo' ? 1.0
+        : ds.phase === 'amanecer' ? THREE.MathUtils.clamp((clock.elapsedTime - ds.startT) / DBG_SILLAS.amanecerDurS, 0, 1)
+        : 0.0; }
 
     // ── T2: group growth ──────────────────────────────────────────────────────
     const growS = DBG_SILLAS.vizGrowS;

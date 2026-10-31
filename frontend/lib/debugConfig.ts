@@ -235,6 +235,12 @@ export const DBG_SILLAS = {
   u7VisLines:    true,
   // 0=off 1=stars 2=clouds 3=sun 4=sky 5=mt-fondo 6=mt-medias 7=mt-frente 8=lines
   u7MagentaIdx:  0,
+  // U9: dawn sequence
+  amanecerDurS:       10.0,  // phase 1 duration (s) — AMANECER_DURACION_S
+  amanecerSectorDeg:  90.0,  // mountain sector full width (°)
+  amanecerEdgeDeg:     8.0,  // soft edge width (°)
+  amanecerP2StaggerS:  1.0,  // stagger between layers in phase 2 (s)
+  amanecerP2GrowS:     4.0,  // phase 2 grow duration (s)
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

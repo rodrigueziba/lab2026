@@ -68,6 +68,38 @@ export function activateVisualizerOnce(): void {
 export function isVizActivated(): boolean { return _vizActivated; }
 export function resetVizActivated(): void { _vizActivated = false; }
 
+// U9: dawn sequence state machine
+export type DawnPhase = 'inactivo' | 'amanecer' | 'completo';
+const _DAWN_SECTOR_DEG = Math.floor(Math.random() * 360); // random on page load, stable per session
+let _dawnPhase: DawnPhase = 'inactivo';
+let _dawnStartT   = 0;   // clock.elapsedTime when phase 1 started
+let _dawnCompleteT = 0;  // clock.elapsedTime when phase 1 ended
+
+export function getDawnState() {
+  return { phase: _dawnPhase, startT: _dawnStartT, completeT: _dawnCompleteT, sectorDeg: _DAWN_SECTOR_DEG };
+}
+export function startDawnSequence(clockT: number): void {
+  if (_dawnPhase !== 'inactivo') return;
+  _dawnPhase = 'amanecer';
+  _dawnStartT = clockT;
+}
+export function finishDawnPhase1(clockT: number): void {
+  if (_dawnPhase !== 'amanecer') return;
+  _dawnPhase = 'completo';
+  _dawnCompleteT = clockT;
+  window.dispatchEvent(new CustomEvent('alight:dawn-complete'));
+}
+export function resetDawn(): void {
+  _dawnPhase = 'inactivo';
+  _dawnStartT = 0;
+  _dawnCompleteT = 0;
+}
+export function skipDawnToFinal(clockT: number): void {
+  _dawnPhase = 'completo';
+  _dawnStartT    = clockT - 9999;
+  _dawnCompleteT = clockT - 9999;
+}
+
 // Interaction mode — shared between Player (ThreeScene) and LecternSystem
 export const INTERACT_STATE = {
   mode:         "none" as "none" | "image" | "sound",

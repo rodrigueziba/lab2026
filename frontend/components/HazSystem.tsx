@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { DBG_SILLAS, DBG_RETRO_FX } from "@/lib/debugConfig";
 import { getHazUnderUser, getHazPositionsXZ } from "@/lib/haz";
 import { startVizAudio, openGate, closeGate, isPlaying } from "@/lib/vizAudio";
+import { getDawnState, startDawnSequence } from "@/lib/alightStore";
 import { createStripeBandTex } from "@/lib/retro/decals";
 
 const R5_HAZ_RETRO = true; // R5: retro housing color + stripe decal + amber LED
@@ -87,6 +88,8 @@ export default function HazSystem() {
     { active: false, startT: 0, wasOn: false },
   ]);
   const flashPendingRef = useRef<Array<boolean | null>>([null, null, null, null]);
+  // U9: first-haz dawn trigger — set in event handler, consumed in useFrame (needs clock.elapsedTime)
+  const dawnPendingRef  = useRef(false);
   // Pre-allocated Color objects — reused each frame (no per-frame allocs)
   const colorObjs     = useRef(INITIAL_COLORS.map(c => new THREE.Color(c)));
   // Pre-allocated Vector3 for LED lookAt target — avoids per-frame allocation
@@ -98,6 +101,8 @@ export default function HazSystem() {
       const { index, on } = (e as CustomEvent).detail as { index: number; on: boolean };
       gateStateRef.current[index] = on;
       flashPendingRef.current[index] = on; // U6B: signal flash to useFrame
+      // U9: first haz ever triggers dawn sequence (pending flag consumed in useFrame for clock access)
+      if (on && getDawnState().phase === 'inactivo') dawnPendingRef.current = true;
       if (on) {
         if (!isPlaying()) {
           void startVizAudio().then(result => {
@@ -236,6 +241,8 @@ export default function HazSystem() {
   }, [scene]);
 
   useFrame(({ camera, clock }) => {
+    // U9: consume first-haz dawn trigger (clock.elapsedTime available here)
+    if (dawnPendingRef.current) { dawnPendingRef.current = false; startDawnSequence(clock.elapsedTime); }
     getHazUnderUser(camera.position.x, camera.position.z);
 
     const positions = getHazPositionsXZ();

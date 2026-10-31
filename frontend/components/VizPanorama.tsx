@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { VIZ_SUN_AZ_DEG, VIZ_SUN_EL_DEG } from "@/lib/vizSunState";
 import { BAND_STATE } from "@/lib/vizAudio";
+import { getDawnState, finishDawnPhase1, resetDawn, skipDawnToFinal } from "@/lib/alightStore";
 
 // ── Geometry constants ────────────────────────────────────────────────────────
 const DOME_R = 28;
@@ -32,35 +33,46 @@ const BAND_VERT = /* glsl */`
 `;
 const BAND_FRAG = /* glsl */`
   uniform sampler2D uTex;
-  uniform float uReveal;   // -0.1=nothing, 1.1=fully revealed
-  uniform float uOpacity;  // global fade (0 until texture loads)
-  uniform float uBright;   // audio brightness boost (1.0 = no boost)
-  uniform float uOffset;   // horizontal scroll 0–1 (seamless, for lines)
-  uniform float uMagenta;  // U7: 1.0 = replace with magenta test color
+  uniform float uReveal;        // -0.1=nothing, 1.1=fully revealed
+  uniform float uOpacity;       // global fade (0 until texture loads)
+  uniform float uBright;        // audio brightness boost (1.0 = no boost)
+  uniform float uOffset;        // horizontal scroll 0–1 (seamless, for lines)
+  uniform float uMagenta;       // U7: 1.0 = replace with magenta test color
+  uniform float uSectorCenter;  // U9: normalized azimuth 0–1 of sector center
+  uniform float uSectorWidth;   // U9: normalized full width (90/360=0.25, >1.0=full circle)
+  uniform float uSectorEdge;    // U9: normalized soft edge (8/360≈0.022)
   varying vec2 vUv;
   void main() {
     vec2 uv = vec2(fract(vUv.x + uOffset), vUv.y);
     vec4 c  = texture2D(uTex, uv);
     float m = 1.0 - smoothstep(uReveal - 0.06, uReveal + 0.06, uv.y);
+    // U9: azimuth sector mask (halfW>0.5 → full circle, no visible seam)
+    float delta = abs(fract(vUv.x - uSectorCenter + 0.5) - 0.5);
+    float halfW = uSectorWidth * 0.5;
+    float sectM = 1.0 - smoothstep(halfW - uSectorEdge, halfW + uSectorEdge, delta);
     if (uMagenta > 0.5) c = vec4(1.0, 0.0, 1.0, 1.0);
-    gl_FragColor = vec4(c.rgb * uBright, c.a * m * uOpacity);
+    gl_FragColor = vec4(c.rgb * uBright, c.a * m * sectM * uOpacity);
   }
 `;
 
 // ── Band uniform factory ──────────────────────────────────────────────────────
 interface BandUni {
   [k: string]: THREE.IUniform;
-  uTex:     THREE.IUniform<THREE.Texture | null>;
-  uReveal:  THREE.IUniform<number>;
-  uOpacity: THREE.IUniform<number>;
-  uBright:  THREE.IUniform<number>;
-  uOffset:  THREE.IUniform<number>;
-  uMagenta: THREE.IUniform<number>;
+  uTex:          THREE.IUniform<THREE.Texture | null>;
+  uReveal:       THREE.IUniform<number>;
+  uOpacity:      THREE.IUniform<number>;
+  uBright:       THREE.IUniform<number>;
+  uOffset:       THREE.IUniform<number>;
+  uMagenta:      THREE.IUniform<number>;
+  uSectorCenter: THREE.IUniform<number>;
+  uSectorWidth:  THREE.IUniform<number>;
+  uSectorEdge:   THREE.IUniform<number>;
 }
 const mkBU = (): BandUni => ({
   uTex: { value: null }, uReveal: { value: -0.1 },
   uOpacity: { value: 0 }, uBright: { value: 1 }, uOffset: { value: 0 },
   uMagenta: { value: 0 },
+  uSectorCenter: { value: 0 }, uSectorWidth: { value: 2.0 }, uSectorEdge: { value: 0.022 },
 });
 
 // ── U5: liquid psychedelic lines shader ───────────────────────────────────────
@@ -279,6 +291,22 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
   // ── Cloud current azimuths (mutable, no React state) ─────────────────────
   const cloudAzRef = useRef(CLOUD_DATA.map(c => c.az0));
 
+  // U9: dawn debug button signals — set by event handlers, consumed in useFrame
+  const dawnResetRef = useRef(false);
+  const dawnSkipRef  = useRef(false);
+
+  // U9: dawn debug event listeners
+  useEffect(() => {
+    const onReset = () => { dawnResetRef.current = true; };
+    const onSkip  = () => { dawnSkipRef.current  = true; };
+    window.addEventListener('alight:dawn-reset', onReset);
+    window.addEventListener('alight:dawn-skip',  onSkip);
+    return () => {
+      window.removeEventListener('alight:dawn-reset', onReset);
+      window.removeEventListener('alight:dawn-skip',  onSkip);
+    };
+  }, []);
+
   // ── Sprite refs (populated via callback refs in JSX) ──────────────────────
   const starSpritesRef   = useRef<THREE.Sprite[]>([]);
   const cloudSpritesRef  = useRef<THREE.Sprite[]>([]);
@@ -417,6 +445,59 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
     const p2 = gp[2];  // CIELO
     const p3 = gp[3];  // LÍNEAS
 
+    // ── U9: dawn sequence overrides — all local floats, no allocations ───────
+    if (dawnResetRef.current) { dawnResetRef.current = false; resetDawn(); }
+    if (dawnSkipRef.current)  { dawnSkipRef.current  = false; skipDawnToFinal(t_s); }
+    const dawn      = getDawnState();
+    const DEG_NORM  = 1 / 360;  // normalizing factor (degrees → 0–1)
+    let effG0       = g0;
+    let effG2       = g2;
+    let effSunAz    = SUN_AZ_RAD;
+    let dawnStarSc  = 1.0;
+    let dawnCloudSc = 1.0;
+    let dawnFrW     = 2.0;      // uSectorWidth — 2.0 = full circle (halfW=1.0>any delta)
+    const dawnFrC   = dawn.sectorDeg * DEG_NORM;
+    let dawnFrenteRev = 1.1;
+    let dawnFondoRev  = 1.1;
+    let dawnMediasRev = 1.1;
+    let dawnLineRev   = 1.1;
+    let overRev     = false;
+    const dawnEdge  = DBG_SILLAS.amanecerEdgeDeg * DEG_NORM;
+
+    if (dawn.phase === 'inactivo') {
+      effG0 = 0; effG2 = 0;
+      dawnStarSc = 0; dawnCloudSc = 0;
+      dawnFrenteRev = dawnFondoRev = dawnMediasRev = dawnLineRev = -0.1;
+      overRev = true;
+    } else if (dawn.phase === 'amanecer') {
+      const rawT = THREE.MathUtils.clamp((t_s - dawn.startT) / DBG_SILLAS.amanecerDurS, 0, 1);
+      const t    = eo3(rawT);
+      effG0      = t; effG2 = 0;
+      effSunAz   = ((dawn.sectorDeg + 180) % 360) * DEG;
+      dawnStarSc = 0; dawnCloudSc = 0;
+      dawnFrW    = DBG_SILLAS.amanecerSectorDeg * DEG_NORM;
+      dawnFrenteRev = t * 1.2 - 0.1;
+      dawnFondoRev  = dawnMediasRev = dawnLineRev = -0.1;
+      overRev    = true;
+      if (rawT >= 1.0) finishDawnPhase1(t_s);
+    } else {
+      // completo — phase 2 staggered reveals
+      const p2T  = t_s - dawn.completeT;
+      const stS  = DBG_SILLAS.amanecerP2StaggerS;
+      const grS  = DBG_SILLAS.amanecerP2GrowS;
+      effG0 = 1; effG2 = 1;
+      const sunAzDawn = ((dawn.sectorDeg + 180) % 360) * DEG;
+      effSunAz    = sunAzDawn + (SUN_AZ_RAD - sunAzDawn) * THREE.MathUtils.clamp(p2T / 2, 0, 1);
+      dawnStarSc  = THREE.MathUtils.clamp(p2T / 3, 0, 1);
+      dawnCloudSc = THREE.MathUtils.clamp((p2T - 1) / 2, 0, 1);
+      dawnFrW     = 0.25 + 1.75 * THREE.MathUtils.clamp(p2T / 3, 0, 1);  // 0.25→2.0 over 3 s
+      dawnFrenteRev  = 1.1;
+      dawnFondoRev   = eo3(THREE.MathUtils.clamp(p2T / grS, 0, 1)) * 1.2 - 0.1;
+      dawnMediasRev  = eo3(THREE.MathUtils.clamp((p2T - stS) / grS, 0, 1)) * 1.2 - 0.1;
+      dawnLineRev    = eo3(THREE.MathUtils.clamp((p2T - stS * 2) / grS, 0, 1)) * 1.2 - 0.1;
+      overRev = true;
+    }
+
     // ── SOL (group 0) — golpe seco, 3 rings desfasados 40ms ──────────────
     const ss   = sunSmoRef.current;
     const b0   = assign[0];
@@ -430,12 +511,12 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
       const prev   = ss[r];
       ss[r]        = raw0 > prev ? prev + (raw0 - prev) * af : prev + (raw0 - prev) * rf;
     }
-    const sunEl  = VIZ_SUN_EL_DEG * g0 * DEG;
-    const sunAz  = SUN_AZ_RAD;
+    const sunEl  = VIZ_SUN_EL_DEG * effG0 * DEG;
+    const sunAz  = effSunAz;
     const sunPX  = SUN_R * Math.cos(sunEl) * Math.cos(sunAz);
     const sunPY  = SUN_R * Math.sin(sunEl);
     const sunPZ  = SUN_R * Math.cos(sunEl) * Math.sin(sunAz);
-    const sunOp  = Math.min(1, THREE.MathUtils.smoothstep(0, 0.15, g0) * (1 + p0 * DBG_SILLAS.sunBrightBoost));
+    const sunOp  = Math.min(1, THREE.MathUtils.smoothstep(0, 0.15, effG0) * (1 + p0 * DBG_SILLAS.sunBrightBoost));
     const ringSz = SUN_RING_SZ   * (1 + ss[0] * DBG_SILLAS.u2SunRingBoost + kick * DBG_SILLAS.u2KickScale);
     const discSz = SUN_DISCO_SZ  * (1 + ss[1] * DBG_SILLAS.u2SunDiscBoost + kick * DBG_SILLAS.u2KickScale * 0.8);
     const coreSz = SUN_NUCLEO_SZ * (1 + ss[2] * DBG_SILLAS.u2SunCoreBoost + kick * DBG_SILLAS.u2KickScale * 1.2);
@@ -486,6 +567,17 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
     lineU.uWaveSpd.value  = DBG_SILLAS.u5WaveSpd;
     lineU.uFbmSpd.value   = DBG_SILLAS.u5FbmSpd;
 
+    // ── U9: apply dawn reveal + sector overrides ────────────────────────────
+    if (overRev) {
+      frenteU.uReveal.value       = dawnFrenteRev;
+      mediasU.uReveal.value       = dawnMediasRev;
+      fondoU.uReveal.value        = dawnFondoRev;
+      lineU.uReveal.value         = dawnLineRev;
+      frenteU.uSectorWidth.value  = dawnFrW;
+      frenteU.uSectorCenter.value = dawnFrC;
+      frenteU.uSectorEdge.value   = dawnEdge;
+    }
+
     // ── U7: visibility flags and magenta mode ─────────────────────────────
     const mgIdx = DBG_SILLAS.u7MagentaIdx;
     fondoU.uMagenta.value  = mgIdx === 5 ? 1 : 0;
@@ -514,8 +606,8 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
       const ph    = STAR_DATA[i].rot;
       const freq  = twFq * (0.7 + t * 0.6);
       const osc   = 0.5 + 0.5 * Math.sin(t_s * freq + ph);
-      const rev   = THREE.MathUtils.smoothstep(1 - t, 1 - t + 0.1, g2);
-      sp.material.opacity = Math.min(1, rev * (1 + p2 * 0.5 * osc + kick * 0.3));
+      const rev   = THREE.MathUtils.smoothstep(1 - t, 1 - t + 0.1, effG2);
+      sp.material.opacity = Math.min(1, rev * (1 + p2 * 0.5 * osc + kick * 0.3)) * dawnStarSc;
       sp.scale.setScalar(STAR_DATA[i].sz * (1 + p2 * twAmp * osc + kick * DBG_SILLAS.u2KickScale));
       sp.material.color.setHex(starMag ? 0xFF00FF : 0xFFFFFF);
     }
@@ -532,7 +624,7 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
       const sr = DOME_R * 0.94;
       sp.position.set(sr * Math.cos(el) * Math.cos(az), sr * Math.sin(el), sr * Math.cos(el) * Math.sin(az));
       const ct = CLOUD_DATA[i].t;
-      sp.material.opacity = THREE.MathUtils.smoothstep(1 - ct, 1 - ct + 0.15, g2) * (0.75 + p2 * 0.25);
+      sp.material.opacity = THREE.MathUtils.smoothstep(1 - ct, 1 - ct + 0.15, effG2) * (0.75 + p2 * 0.25) * dawnCloudSc;
       sp.material.color.setHex(cloudMag ? 0xFF00FF : 0xFFFFFF);
     }
 
