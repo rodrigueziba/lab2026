@@ -942,6 +942,36 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.u5FbmSpd    = v; setSillas(s => ({ ...s, u5FbmSpd:    v })); }} />
 
           <div style={DIVIDER} />
+          <span style={LABEL}>U6A — Anillos en piso <span style={NOTE}>(al entrar al haz)</span></span>
+          <NumField label="u6RingCount" value={sillas.u6RingCount} step={1}    min={2}   max={7}    note="live"
+            onChange={v => { DBG_SILLAS.u6RingCount = v; setSillas(s => ({ ...s, u6RingCount: v })); }} />
+          <NumField label="u6Duration"  value={sillas.u6Duration}  step={0.1}  min={0.5} max={10}   note="live (s)"
+            onChange={v => { DBG_SILLAS.u6Duration  = v; setSillas(s => ({ ...s, u6Duration:  v })); }} />
+          <NumField label="u6SeqDelay"  value={sillas.u6SeqDelay}  step={0.05} min={0}   max={1}    note="live (s)"
+            onChange={v => { DBG_SILLAS.u6SeqDelay  = v; setSillas(s => ({ ...s, u6SeqDelay:  v })); }} />
+          <NumField label="u6MinRadius" value={sillas.u6MinRadius} step={0.05} min={0.1} max={2}    note="live (m)"
+            onChange={v => { DBG_SILLAS.u6MinRadius = v; setSillas(s => ({ ...s, u6MinRadius: v })); }} />
+          <NumField label="u6MaxRadius" value={sillas.u6MaxRadius} step={0.1}  min={0.5} max={5}    note="live (m)"
+            onChange={v => { DBG_SILLAS.u6MaxRadius = v; setSillas(s => ({ ...s, u6MaxRadius: v })); }} />
+          <NumField label="u6TwinkleFq" value={sillas.u6TwinkleFq} step={0.5}  min={1}   max={30}   note="live (rad/s)"
+            onChange={v => { DBG_SILLAS.u6TwinkleFq = v; setSillas(s => ({ ...s, u6TwinkleFq: v })); }} />
+          <NumField label="u6Opacity"   value={sillas.u6Opacity}   step={0.05} min={0}   max={2}    note="live"
+            onChange={v => { DBG_SILLAS.u6Opacity   = v; setSillas(s => ({ ...s, u6Opacity:   v })); }} />
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>U6B — Destello del haz <span style={NOTE}>(al activar/desactivar)</span></span>
+          <NumField label="u6FlashPeak"  value={sillas.u6FlashPeak}  step={0.1}  min={1}   max={10}   note="live (×)"
+            onChange={v => { DBG_SILLAS.u6FlashPeak  = v; setSillas(s => ({ ...s, u6FlashPeak:  v })); }} />
+          <NumField label="u6FlashAtkS"  value={sillas.u6FlashAtkS}  step={0.01} min={0.01} max={1}   note="live (s)"
+            onChange={v => { DBG_SILLAS.u6FlashAtkS  = v; setSillas(s => ({ ...s, u6FlashAtkS:  v })); }} />
+          <NumField label="u6FlashDecS"  value={sillas.u6FlashDecS}  step={0.5}  min={0.5} max={20}   note="live (s)"
+            onChange={v => { DBG_SILLAS.u6FlashDecS  = v; setSillas(s => ({ ...s, u6FlashDecS:  v })); }} />
+          <NumField label="u6DimFactor"  value={sillas.u6DimFactor}  step={0.05} min={0}   max={1}    note="live"
+            onChange={v => { DBG_SILLAS.u6DimFactor  = v; setSillas(s => ({ ...s, u6DimFactor:  v })); }} />
+          <NumField label="u6DimDecS"    value={sillas.u6DimDecS}    step={0.1}  min={0.1} max={10}   note="live (s)"
+            onChange={v => { DBG_SILLAS.u6DimDecS    = v; setSillas(s => ({ ...s, u6DimDecS:    v })); }} />
+
+          <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
           <NumField label="agcFloorRise"   value={sillas.agcFloorRise}   step={0.1}  min={0}    max={5}     note="live"
             onChange={v => { DBG_SILLAS.agcFloorRise   = v; setSillas(s => ({ ...s, agcFloorRise:   v })); }} />

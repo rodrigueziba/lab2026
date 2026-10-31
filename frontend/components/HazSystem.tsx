@@ -67,6 +67,8 @@ const CABLE_LEN = 10.0;
 
 type ConeEntry  = { mesh: THREE.Mesh; mat: THREE.ShaderMaterial };
 type LedEntry   = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial };
+// U6B: per-beam flash state
+interface FlashSt { active: boolean; startT: number; wasOn: boolean; }
 
 export default function HazSystem() {
   const { scene }     = useThree();
@@ -76,7 +78,15 @@ export default function HazSystem() {
   const cablesRef     = useRef<THREE.Mesh[]>([]);
   const ledsRef       = useRef<LedEntry[]>([]);
   const stripeDecalsRef = useRef<THREE.Mesh[]>([]);
-  const gateStateRef  = useRef([false, false, false, false]);
+  const gateStateRef    = useRef([false, false, false, false]);
+  // U6B: flash state + pending (event handler sets pending; useFrame consumes it)
+  const flashRef        = useRef<FlashSt[]>([
+    { active: false, startT: 0, wasOn: false },
+    { active: false, startT: 0, wasOn: false },
+    { active: false, startT: 0, wasOn: false },
+    { active: false, startT: 0, wasOn: false },
+  ]);
+  const flashPendingRef = useRef<Array<boolean | null>>([null, null, null, null]);
   // Pre-allocated Color objects — reused each frame (no per-frame allocs)
   const colorObjs     = useRef(INITIAL_COLORS.map(c => new THREE.Color(c)));
   // Pre-allocated Vector3 for LED lookAt target — avoids per-frame allocation
@@ -87,6 +97,7 @@ export default function HazSystem() {
     const onToggle = (e: Event) => {
       const { index, on } = (e as CustomEvent).detail as { index: number; on: boolean };
       gateStateRef.current[index] = on;
+      flashPendingRef.current[index] = on; // U6B: signal flash to useFrame
       if (on) {
         if (!isPlaying()) {
           void startVizAudio().then(result => {
@@ -237,16 +248,53 @@ export default function HazSystem() {
 
     const originH = DBG_SILLAS.hazOriginHM;
     const scale   = DBG_SILLAS.globalLightScale;
+    const now     = clock.elapsedTime;
+
+    // U6B: consume pending flash requests
+    for (let fi = 0; fi < 4; fi++) {
+      const pnd = flashPendingRef.current[fi];
+      if (pnd !== null) {
+        flashRef.current[fi] = { active: true, startT: now, wasOn: pnd };
+        flashPendingRef.current[fi] = null;
+      }
+    }
 
     for (let i = 0; i < 4; i++) {
       const [bx, bz] = positions[i];
       const col = colorObjs.current[i];
       col.set(DBG_SILLAS[COLOR_KEYS[i]]);
 
+      // U6B: compute flash multiplier (1.0 = no flash)
+      const fl = flashRef.current[i];
+      let flashMult = 1.0;
+      if (fl.active) {
+        const fe = now - fl.startT;
+        if (fl.wasOn) {
+          const atkS = DBG_SILLAS.u6FlashAtkS;
+          const decS = DBG_SILLAS.u6FlashDecS;
+          const peak = DBG_SILLAS.u6FlashPeak;
+          flashMult = fe < atkS
+            ? 1.0 + (peak - 1.0) * fe / atkS
+            : 1.0 + (peak - 1.0) * Math.exp(-(fe - atkS) / decS);
+          if (flashMult < 1.005) { fl.active = false; flashMult = 1.0; }
+        } else {
+          const dimF = DBG_SILLAS.u6DimFactor;
+          const decS = DBG_SILLAS.u6DimDecS;
+          flashMult = dimF + (1.0 - dimF) * (1.0 - Math.exp(-fe / decS));
+          if (flashMult > 0.995) { fl.active = false; flashMult = 1.0; }
+        }
+      }
+
       // SpotLight at origin height
       const light = lights[i];
       light.position.set(bx, originH, bz);
-      light.intensity = DBG_SILLAS.hazSpotIntensity * scale;
+      light.intensity = DBG_SILLAS.hazSpotIntensity * scale * flashMult;
+      // U6B: widen angle 15 % proportionally to peak overshoot
+      const baseAngle  = Math.atan(DBG_SILLAS.hazConeFloorRM / DBG_SILLAS.hazOriginHM);
+      const peakOver   = fl.active && fl.wasOn
+        ? Math.max(0, (flashMult - 1.0) / Math.max(0.01, DBG_SILLAS.u6FlashPeak - 1.0))
+        : 0;
+      light.angle = baseAngle * (1.0 + 0.15 * peakOver);
       light.color.copy(col);
       light.target.position.set(bx, 0, bz);
       light.target.updateMatrixWorld();
@@ -256,8 +304,8 @@ export default function HazSystem() {
       coneMesh.position.set(bx, originH / 2, bz);
       coneMat.uniforms.uColor.value.copy(col);
       coneMat.uniforms.uOpacity.value     = DBG_SILLAS.hazConeOpacity *
-        (gateStateRef.current[i] ? DBG_SILLAS.hazOnBoost : 1.0);
-      coneMat.uniforms.uTime.value        = clock.elapsedTime;
+        (gateStateRef.current[i] ? DBG_SILLAS.hazOnBoost : 1.0) * flashMult;
+      coneMat.uniforms.uTime.value        = now;
       coneMat.uniforms.uStripeM.value     = DBG_RETRO_FX.hazStripeM;
       coneMat.uniforms.uStripeWidth.value = DBG_RETRO_FX.hazStripeWidth;
       coneMat.uniforms.uStripeSpeed.value = DBG_RETRO_FX.hazStripeSpeed;

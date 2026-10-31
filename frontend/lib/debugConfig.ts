@@ -210,6 +210,20 @@ export const DBG_SILLAS = {
   u5WaveFreq:    3.0,    // wave cycles across full azimuth (0–1 U)
   u5WaveSpd:     1.5,    // wave temporal speed (rad/s)
   u5FbmSpd:      0.08,   // FBM animation speed multiplier
+  // U6A: floor rings on alight:haz-toggle
+  u6RingCount:   6,      // rings per effect (2–7)
+  u6Duration:    2.5,    // effect lifetime (s)
+  u6SeqDelay:    0.25,   // activation stagger between rings (s)
+  u6MinRadius:   0.3,    // innermost ring starting radius (m)
+  u6MaxRadius:   2.0,    // outermost ring ending radius (m)
+  u6TwinkleFq:   8.0,    // twinkle frequency (rad/s)
+  u6Opacity:     1.0,    // ring opacity scale
+  // U6B: beam flash surge on on-toggle
+  u6FlashPeak:   3.0,    // intensity multiplier at peak (on-toggle)
+  u6FlashAtkS:   0.15,   // attack time to peak (s)
+  u6FlashDecS:   4.0,    // exponential decay τ back to normal (s)
+  u6DimFactor:   0.7,    // off-toggle dim multiplier (< 1)
+  u6DimDecS:     1.0,    // off-toggle return-to-normal τ (s)
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

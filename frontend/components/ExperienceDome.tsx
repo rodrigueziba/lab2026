@@ -8,6 +8,7 @@ import DomeVisualizer from "./DomeVisualizer";
 import FloorVisualizer from "./FloorVisualizer";
 import SectorAudioFX from "./SectorAudioFX";
 import HazSystem from "./HazSystem";
+import HazRings from "./HazRings";
 import SymbolSystem from "./SymbolSystem";
 import Monoliths from "./Monoliths";
 import { DBG_SILLAS } from "@/lib/debugConfig";
@@ -472,6 +473,7 @@ export default function ExperienceDome() {
       {vizActive && LEGACY_SECTOR_AUDIO_ENABLED   && <SectorAudioFX />}
       {/* N3: beams + floor symbols */}
       {vizActive && <HazSystem />}
+      {vizActive && <HazRings />}
       {vizActive && <SymbolSystem />}
       {/* N5: monoliths flanking tarima path */}
       {vizActive && <Monoliths />}
