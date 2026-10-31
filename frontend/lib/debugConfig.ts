@@ -300,11 +300,12 @@ export const DBG_SILLAS = {
   domePortalAzimuth:      Math.PI,     // portal direction: behind tarima (+Z from audience)
   domePortalElevation:    0.58,        // portal elevation above horizon (rad)
   domePortalHalfFovDeg:   42.0,        // portal half-FOV (degrees) → uPortalTan≈0.90
-  // W2: group energy multipliers (uniforms en DomeSky, default 1.5 → reacción evidente)
-  domeSolAmt:             1.5,         // SOL: sol + anillos dorados
-  domeMontAmt:            1.5,         // MONTAÑAS: máscaras R+G, respiración
-  domeCieloAmt:           1.5,         // CIELO: domain warp, nubes, estrellas, confeti
-  domeLinAmt:             1.5,         // LÍNEAS: máscara B (olas)
+  // W2: group energy multipliers (uniforms en DomeSky)
+  // W5-P1: SOL y CIELO son los más visibles; MONTAÑAS y LÍNEAS tienen efectos sutiles → mult más alto
+  domeSolAmt:             1.5,         // SOL: anillos pulsantes + halo del sol (ya muy visible)
+  domeMontAmt:            3.0,         // MONTAÑAS: despl. 2% + brillo 8% (sutil → x2 default)
+  domeCieloAmt:           2.0,         // CIELO: domain warp + estrellas + confeti (moderado → ×1.3)
+  domeLinAmt:             3.0,         // LÍNEAS: amplitud ola 0.010UV + 10% brillo (muy sutil → x2 default)
   domeKickAmt:            1.0,         // KICK: destello de rebote
   // W3: secuencia de amanecer (DomeSky)
   domeAmanecerDurS:       10.0,        // duración fase 1 (s)
