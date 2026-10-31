@@ -16,7 +16,7 @@ import Curtain from "./Curtain";
 import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from "./LecternSystem";
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
-import { STORE, INTERACT_STATE, storeSubscribe } from "@/lib/alightStore";
+import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
 import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
@@ -26,18 +26,9 @@ const RetroPostFX = dynamic(() => import("@/components/RetroPostFX"), { ssr: fal
 const ZONA_LUZ    = new THREE.Vector3(0, 1.6,  0);
 const ZONA_SILLAS = new THREE.Vector3(0, 1.6, -6); // G2: 1 m further
 
-// ── F1: SILLAS visualizer activation (idempotent, module-level) ───────────────
+// ── F1: SILLAS visualizer activation — T1: moved to alightStore.activateVisualizerOnce() ──
+// _vizActivated / activateVisualizer / deactivateVisualizer were here; removed in T1.
 const _D = { path: "none", prismLanded: false, vizActive: false, d: 999, minD: 999 };
-let _vizActivated = false;
-function activateVisualizer(): void {
-  if (_vizActivated) return;
-  _vizActivated = true; _D.vizActive = true;
-  window.dispatchEvent(new CustomEvent("alight:visualizer-activate"));
-}
-function deactivateVisualizer(): void {
-  _vizActivated = false; _D.vizActive = false;
-  window.dispatchEvent(new CustomEvent("alight:visualizer-deactivate"));
-}
 
 // ── Room ──────────────────────────────────────────────────────────────────────
 function Room() {
@@ -221,10 +212,11 @@ function Player() {
       if (k in keys.current) keys.current[k as keyof Keys] = true;
       // E key: activate visualizer (SILLAS only, when close to prism)
       // prepareVizAudio() runs in gesture context → unblocks AudioContext for later play (N2/N4)
-      if (k === "e" && pathRef.current === "sillas" && prismNearRef.current && !_vizActivated
+      if (k === "e" && pathRef.current === "sillas" && prismNearRef.current && !isVizActivated()
           && INTERACT_STATE.experienceState === 'sala_activa') {
         void prepareVizAudio();
-        activateVisualizer();
+        activateVisualizerOnce();
+        _D.vizActive = true;
       }
     };
     const up = (e: KeyboardEvent) => {
@@ -316,17 +308,18 @@ function Player() {
 
       // N2: prompt only in sala_activa, before visualizer activates
       const nearNow = horizDist <= DBG_SILLAS.prismInteractM
-        && INTERACT_STATE.experienceState === 'sala_activa' && !_vizActivated;
+        && INTERACT_STATE.experienceState === 'sala_activa' && !isVizActivated();
       if (nearNow !== prismNearRef.current) {
         prismNearRef.current = nearNow;
         window.dispatchEvent(new CustomEvent("alight:near-prism", { detail: { near: nearNow } }));
       }
 
       // Auto-activate on touch distance (N1); prepare audio without playing (N2)
-      if (!_vizActivated && horizDist <= DBG_SILLAS.prismTouchM
+      if (!isVizActivated() && horizDist <= DBG_SILLAS.prismTouchM
           && INTERACT_STATE.experienceState === 'sala_activa') {
         void prepareVizAudio();
-        activateVisualizer();
+        activateVisualizerOnce();
+        _D.vizActive = true;
       }
     }
 

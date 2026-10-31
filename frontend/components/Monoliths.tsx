@@ -120,7 +120,9 @@ export default function Monoliths() {
   const leftGlowRef    = useRef<THREE.Mesh>(null);
   const rightGlowRef   = useRef<THREE.Mesh>(null);
 
-  const activeRef  = useRef(false);
+  // T1: activeRef starts true — this component only mounts AFTER alight:visualizer-activate fired.
+  // Listening for the event is a race condition (event fires before useEffect registers the listener).
+  const activeRef  = useRef(true);
   const opacityRef = useRef(0);
 
   // S1: body materials — fog:false + rim fresnel
@@ -158,14 +160,12 @@ export default function Monoliths() {
     rightTarget.updateMatrixWorld();
   }, [leftTarget, rightTarget]);
 
-  // Listen for visualizer-activate / deactivate
+  // T1: no longer listen for visualizer-activate (race condition — event fires before mount).
+  // activeRef starts true. Only need to handle deactivate.
   useEffect(() => {
-    const onOn  = () => { activeRef.current = true; };
     const onOff = () => { activeRef.current = false; };
-    window.addEventListener("alight:visualizer-activate",   onOn);
     window.addEventListener("alight:visualizer-deactivate", onOff);
     return () => {
-      window.removeEventListener("alight:visualizer-activate",   onOn);
       window.removeEventListener("alight:visualizer-deactivate", onOff);
       setMonolithProximity(0, 0);
     };

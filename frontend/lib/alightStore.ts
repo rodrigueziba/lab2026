@@ -56,6 +56,18 @@ export function requestLecterns(): void {
   window.dispatchEvent(new CustomEvent("alight:request-lecterns"));
 }
 
+// T1: single idempotent entry point for visualizer activation.
+// Used by key E, prism touch, and the debug button — nothing else activates the visualizer.
+let _vizActivated = false;
+export function activateVisualizerOnce(): void {
+  if (_vizActivated) return;
+  _vizActivated = true;
+  console.info("[ACTIVACION] activateVisualizerOnce — dispatching alight:visualizer-activate");
+  window.dispatchEvent(new CustomEvent("alight:visualizer-activate"));
+}
+export function isVizActivated(): boolean { return _vizActivated; }
+export function resetVizActivated(): void { _vizActivated = false; }
+
 // Interaction mode — shared between Player (ThreeScene) and LecternSystem
 export const INTERACT_STATE = {
   mode:         "none" as "none" | "image" | "sound",

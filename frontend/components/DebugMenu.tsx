@@ -26,7 +26,7 @@ import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { setVizVolume, restartVizAudio, BAND_STATE, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
 import { setHazBandOn } from "@/lib/haz";
 import { DBG_STAR_MAT, DBG_DOME_MAT } from "./FaceDome";
-import { STORE, storeSubscribe } from "@/lib/alightStore";
+import { STORE, storeSubscribe, activateVisualizerOnce, resetVizActivated } from "@/lib/alightStore";
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 
 type Tab = "SILLAS" | "TARIMA";
@@ -452,12 +452,12 @@ export default function DebugMenu() {
             <button
               style={{ flex: 1, padding: "4px 0", cursor: "pointer", fontFamily: "monospace", fontSize: 11,
                 background: "rgba(20,80,40,0.7)", color: "#7fff9f", border: "1px solid rgba(80,180,100,0.4)", borderRadius: 3 }}
-              onClick={() => window.dispatchEvent(new CustomEvent("alight:visualizer-activate"))}
+              onClick={() => activateVisualizerOnce()}
             >Activar visualizador</button>
             <button
               style={{ flex: 1, padding: "4px 0", cursor: "pointer", fontFamily: "monospace", fontSize: 11,
                 background: "rgba(80,20,20,0.7)", color: "#ff9f9f", border: "1px solid rgba(180,80,80,0.4)", borderRadius: 3 }}
-              onClick={() => window.dispatchEvent(new CustomEvent("alight:visualizer-deactivate"))}
+              onClick={() => { resetVizActivated(); window.dispatchEvent(new CustomEvent("alight:visualizer-deactivate")); }}
             >Desactivar visualizador</button>
           </div>
           <button
