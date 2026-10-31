@@ -162,15 +162,29 @@ export const DBG_SILLAS = {
   simPulse2:       0 as number,
   simPulse3:       0 as number,
   // T3: reaction intensities — live uniforms
-  mtHeightBoost:   0.06,  // MONTAÑAS height pulse per unit energy
-  mtBrightBoost:   0.20,  // MONTAÑAS brightness boost
-  kickExtraBoost:  0.10,  // kick extra height (only for kick-band group)
-  skyBrightBoost:  0.25,  // CIELO brightness boost
-  sunBrightBoost:  0.25,  // SOL overall brightness boost
-  lineAmpBoost:    0.80,  // LÍNEAS amplitude boost
+  mtHeightBoost:   0.18,  // MONTAÑAS Y-scale per unit normEnergy (±18%)
+  mtBrightBoost:   0.40,  // MONTAÑAS brightness boost
+  kickExtraBoost:  0.12,  // kick extra height (only for kick-band group)
+  skyBrightBoost:  0.40,  // CIELO brightness boost
+  sunBrightBoost:  0.40,  // SOL overall brightness boost
+  lineAmpBoost:    1.60,  // LÍNEAS amplitude boost
   lineSpeedBoost:  3.00,  // LÍNEAS phase speed boost factor
   kickDecayMs:     150,   // kick impulse decay (ms)
   showReactionOverlay: false, // T3: show haz→group→band assignment in corner
+  // U2: AGC normalization (live)
+  agcFloorRise:    0.5,   // floor max rise rate (energy units/s)
+  agcCeilDecayS:   4.0,   // ceiling exp-decay τ (s)
+  agcPow:          0.6,   // normEnergy exponent (< 1 boosts weak signals)
+  agcEpsilon:      0.002, // denominator guard
+  agcAttackMs:     40,    // normEnergy smoothing attack (ms)
+  agcReleaseMs:    220,   // normEnergy smoothing release (ms)
+  showU2Meters:    false, // U2: audio meters panel (oculto por defecto)
+  // U2: VizPanorama scale effects (live)
+  u2SunRingBoost:    0.12, // ring scale +% per unit normEnergy
+  u2SunDiscBoost:    0.08, // disc scale +%
+  u2SunCoreBoost:    0.20, // core scale +%
+  u2StarScaleBoost:  1.20, // star scale boost (size × (1 + boost × energy) → max 2.2×)
+  u2KickScale:       0.05, // kick flash scale boost (+5%)
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

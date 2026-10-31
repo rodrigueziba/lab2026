@@ -23,7 +23,7 @@ import {
 } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
-import { setVizVolume, restartVizAudio, BAND_STATE, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
+import { setVizVolume, restartVizAudio, BAND_STATE, BAND_U2_DEBUG, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
 import { setHazBandOn } from "@/lib/haz";
 import { DBG_STAR_MAT, DBG_DOME_MAT } from "./FaceDome";
 import { STORE, storeSubscribe, activateVisualizerOnce, resetVizActivated } from "@/lib/alightStore";
@@ -200,6 +200,51 @@ function BandEnergyOverlay() {
           <span style={{ fontSize:9, width:26, textAlign:"right", color:"#889" }}>
             {(energies[i] * 100).toFixed(0)}%
           </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// U2: AGC meters — per-band rawRMS, normEnergy bar, floor/ceil, kick, paused
+function AudioU2Meters() {
+  const [d, setD] = useState({
+    raw:   [0,0,0,0] as number[],
+    norm:  [0,0,0,0] as number[],
+    floor: [0,0,0,0] as number[],
+    ceil:  [0.1,0.1,0.1,0.1] as number[],
+    kick:  false,
+    gate:  [false,false,false,false] as boolean[],
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      setD({
+        raw:   [...BAND_U2_DEBUG.rawEnergy],
+        norm:  [...BAND_U2_DEBUG.normEnergy],
+        floor: [...BAND_U2_DEBUG.agcFloor],
+        ceil:  [...BAND_U2_DEBUG.agcCeil],
+        kick:  BAND_STATE.kick,
+        gate:  [...BAND_STATE.gateOpen],
+      });
+    }, 50);
+    return () => clearInterval(id);
+  }, []);
+  const LABELS = ["B0:sol","B1:mt","B2:sky","B3:ln"];
+  return (
+    <div style={{ marginTop:6, fontSize:9, fontFamily:"monospace" }}>
+      <div style={{ color:"#556080", marginBottom:3 }}>kick: <span style={{ color: d.kick ? "#ff9a1f" : "#556" }}>{d.kick ? "■" : "·"}</span></div>
+      {[0,1,2,3].map(i => (
+        <div key={i} style={{ marginBottom:4 }}>
+          <div style={{ display:"flex", gap:4, alignItems:"center", marginBottom:1 }}>
+            <span style={{ width:48, color: d.gate[i] ? "#ff9a1f" : "#667" }}>{LABELS[i]}</span>
+            <span style={{ width:34, color:"#557" }}>raw:{(d.raw[i]*1000).toFixed(1)}</span>
+            <span style={{ width:28, color:"#9cf" }}>N:{(d.norm[i]*100).toFixed(0)}%</span>
+            <span style={{ color:"#556" }}>fl:{d.floor[i].toFixed(3)} ce:{d.ceil[i].toFixed(3)}</span>
+          </div>
+          <div style={{ background:"#1a1a2a", height:5, borderRadius:2 }}>
+            <div style={{ width:`${d.norm[i]*100}%`, height:"100%",
+              background: d.gate[i] ? "#ff9a1f" : "#3a7aaa", borderRadius:2, transition:"width 0.05s" }} />
+          </div>
         </div>
       ))}
     </div>
@@ -804,6 +849,40 @@ export default function DebugMenu() {
               })}
             </div>
           )}
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
+          <NumField label="agcFloorRise"   value={sillas.agcFloorRise}   step={0.1}  min={0}    max={5}     note="live"
+            onChange={v => { DBG_SILLAS.agcFloorRise   = v; setSillas(s => ({ ...s, agcFloorRise:   v })); }} />
+          <NumField label="agcCeilDecayS"  value={sillas.agcCeilDecayS}  step={0.5}  min={0.5}  max={20}    note="live"
+            onChange={v => { DBG_SILLAS.agcCeilDecayS  = v; setSillas(s => ({ ...s, agcCeilDecayS:  v })); }} />
+          <NumField label="agcPow"         value={sillas.agcPow}         step={0.05} min={0.1}  max={2}     note="live"
+            onChange={v => { DBG_SILLAS.agcPow         = v; setSillas(s => ({ ...s, agcPow:         v })); }} />
+          <NumField label="agcEpsilon"     value={sillas.agcEpsilon}     step={0.001} min={0.001} max={0.1}  note="live"
+            onChange={v => { DBG_SILLAS.agcEpsilon     = v; setSillas(s => ({ ...s, agcEpsilon:     v })); }} />
+          <NumField label="agcAttackMs"    value={sillas.agcAttackMs}    step={5}    min={5}    max={500}   note="live"
+            onChange={v => { DBG_SILLAS.agcAttackMs    = v; setSillas(s => ({ ...s, agcAttackMs:    v })); }} />
+          <NumField label="agcReleaseMs"   value={sillas.agcReleaseMs}   step={10}   min={10}   max={2000}  note="live"
+            onChange={v => { DBG_SILLAS.agcReleaseMs   = v; setSillas(s => ({ ...s, agcReleaseMs:   v })); }} />
+          <NumField label="u2SunRingBoost" value={sillas.u2SunRingBoost} step={0.02} min={0}    max={1}     note="live"
+            onChange={v => { DBG_SILLAS.u2SunRingBoost = v; setSillas(s => ({ ...s, u2SunRingBoost: v })); }} />
+          <NumField label="u2SunDiscBoost" value={sillas.u2SunDiscBoost} step={0.02} min={0}    max={1}     note="live"
+            onChange={v => { DBG_SILLAS.u2SunDiscBoost = v; setSillas(s => ({ ...s, u2SunDiscBoost: v })); }} />
+          <NumField label="u2SunCoreBoost" value={sillas.u2SunCoreBoost} step={0.02} min={0}    max={1}     note="live"
+            onChange={v => { DBG_SILLAS.u2SunCoreBoost = v; setSillas(s => ({ ...s, u2SunCoreBoost: v })); }} />
+          <NumField label="u2StarScaleBoost" value={sillas.u2StarScaleBoost} step={0.05} min={0} max={3}    note="live"
+            onChange={v => { DBG_SILLAS.u2StarScaleBoost = v; setSillas(s => ({ ...s, u2StarScaleBoost: v })); }} />
+          <NumField label="u2KickScale"    value={sillas.u2KickScale}    step={0.01} min={0}    max={0.5}   note="live"
+            onChange={v => { DBG_SILLAS.u2KickScale    = v; setSillas(s => ({ ...s, u2KickScale:    v })); }} />
+          <div style={ROW}>
+            <span>showU2Meters</span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.showU2Meters;
+              DBG_SILLAS.showU2Meters = v;
+              setSillas(s => ({ ...s, showU2Meters: v }));
+            }}>{sillas.showU2Meters ? "ON" : "off"}</button>
+          </div>
+          {sillas.showU2Meters && <AudioU2Meters />}
 
           <div style={DIVIDER} />
           <span style={LABEL}>Debug overlays <span style={NOTE}>(R1 — prism / audio / fx)</span></span>

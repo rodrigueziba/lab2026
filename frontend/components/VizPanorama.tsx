@@ -168,6 +168,11 @@ export default function VizPanorama({ growRef, pulseRef, flowRef, kickRef }: Viz
   const frenteU = frenteURef.current;
   const lineU   = lineURef.current;
 
+  // ── Mountain mesh refs (for Y scale in useFrame) ─────────────────────────
+  const fondoMeshRef  = useRef<THREE.Mesh | null>(null);
+  const mediasMeshRef = useRef<THREE.Mesh | null>(null);
+  const frenteMeshRef = useRef<THREE.Mesh | null>(null);
+
   // ── Cloud current azimuths (mutable, no React state) ─────────────────────
   const cloudAzRef = useRef(CLOUD_DATA.map(c => c.az0));
 
@@ -291,29 +296,35 @@ export default function VizPanorama({ growRef, pulseRef, flowRef, kickRef }: Viz
     const g2 = eo3(DBG_SILLAS.vizGrowForce2 >= 0 ? DBG_SILLAS.vizGrowForce2 : gr[2]);
     const g3 = eo3(DBG_SILLAS.vizGrowForce3 >= 0 ? DBG_SILLAS.vizGrowForce3 : gr[3]);
 
-    // ── Mountains (group 1) — staggered bottom-to-top reveal ────────────
+    // ── Mountains (group 1) — staggered bottom-to-top reveal + Y scale ─
     // uReveal = -0.1 (nothing) … 1.1 (fully revealed)
-    const mtBright = 1 + pu[1] * DBG_SILLAS.mtBrightBoost + kick * DBG_SILLAS.kickExtraBoost;
+    const p1 = pu[1];
+    const mtBright = 1 + p1 * DBG_SILLAS.mtBrightBoost + kick * DBG_SILLAS.kickExtraBoost;
+    const mtSc     = 1 + p1 * DBG_SILLAS.mtHeightBoost  + kick * DBG_SILLAS.u2KickScale;
     fondoU.uReveal.value  = eo3(Math.min(1, g1 / 0.6))                     * 1.2 - 0.1;
     fondoU.uBright.value  = mtBright;
     mediasU.uReveal.value = eo3(Math.max(0, Math.min(1, (g1 - 0.2) / 0.6))) * 1.2 - 0.1;
     mediasU.uBright.value = mtBright;
     frenteU.uReveal.value = eo3(Math.max(0, Math.min(1, (g1 - 0.4) / 0.6))) * 1.2 - 0.1;
     frenteU.uBright.value = mtBright;
+    if (fondoMeshRef.current)  fondoMeshRef.current.scale.y  = mtSc;
+    if (mediasMeshRef.current) mediasMeshRef.current.scale.y = mtSc;
+    if (frenteMeshRef.current) frenteMeshRef.current.scale.y = mtSc;
 
     // ── Lines (group 3) — scroll + amplitude brightness ─────────────────
     lineU.uReveal.value  = g3 * 1.2 - 0.1;
-    lineU.uBright.value  = 1 + pu[3] * DBG_SILLAS.lineAmpBoost;
+    lineU.uBright.value  = 1 + pu[3] * DBG_SILLAS.lineAmpBoost + kick * DBG_SILLAS.kickExtraBoost;
     lineU.uOffset.value  = flowRef.current / (Math.PI * 2);
 
-    // ── Stars (group 2) — top-down reveal ────────────────────────────────
+    // ── Stars (group 2) — top-down reveal + scale + brightness ──────────
     const p2 = pu[2];
     for (let i = 0; i < STAR_COUNT; i++) {
       const sp = starSpritesRef.current[i];
       if (!sp) continue;
-      const t  = STAR_DATA[i].t;                         // 0=low, 1=high elev
-      const op = THREE.MathUtils.smoothstep(1 - t, 1 - t + 0.1, g2) * (1 + p2 * 0.6);
-      sp.material.opacity = Math.min(1, op);
+      const t   = STAR_DATA[i].t;
+      const rev = THREE.MathUtils.smoothstep(1 - t, 1 - t + 0.1, g2);
+      sp.material.opacity = Math.min(1, rev * (1 + p2 * 0.6 + kick * 0.3));
+      sp.scale.setScalar(STAR_DATA[i].sz * (1 + p2 * DBG_SILLAS.u2StarScaleBoost + kick * DBG_SILLAS.u2KickScale));
     }
 
     // ── Clouds (group 2) — drift + reveal ────────────────────────────────
@@ -329,35 +340,51 @@ export default function VizPanorama({ growRef, pulseRef, flowRef, kickRef }: Viz
       sp.material.opacity = THREE.MathUtils.smoothstep(1 - ct, 1 - ct + 0.15, g2) * 0.85;
     }
 
-    // ── Sun (group 0) — rises from horizon ───────────────────────────────
+    // ── Sun (group 0) — rises from horizon + scale pulse ─────────────────
+    const p0  = pu[0];
     const sunEl  = VIZ_SUN_EL_DEG * g0 * DEG;
     const sunAz  = SUN_AZ_RAD;
     const sunPX  = SUN_R * Math.cos(sunEl) * Math.cos(sunAz);
     const sunPY  = SUN_R * Math.sin(sunEl);
     const sunPZ  = SUN_R * Math.cos(sunEl) * Math.sin(sunAz);
-    const sunOp  = Math.min(1, THREE.MathUtils.smoothstep(0, 0.15, g0) * (1 + pu[0] * DBG_SILLAS.sunBrightBoost));
-    if (sunAnilloRef.current)  { sunAnilloRef.current.position.set(sunPX, sunPY, sunPZ);  sunAnilloRef.current.material.opacity  = sunOp; }
-    if (sunDiscoRef.current)   { sunDiscoRef.current.position.set(sunPX, sunPY, sunPZ);   sunDiscoRef.current.material.opacity   = sunOp; }
-    if (sunNucleoRef.current)  { sunNucleoRef.current.position.set(sunPX, sunPY, sunPZ);  sunNucleoRef.current.material.opacity  = sunOp; }
+    const sunOp  = Math.min(1, THREE.MathUtils.smoothstep(0, 0.15, g0) * (1 + p0 * DBG_SILLAS.sunBrightBoost + kick * 0.3));
+    const ringSz = SUN_RING_SZ   * (1 + p0 * DBG_SILLAS.u2SunRingBoost  + kick * DBG_SILLAS.u2KickScale);
+    const discSz = SUN_DISCO_SZ  * (1 + p0 * DBG_SILLAS.u2SunDiscBoost  + kick * DBG_SILLAS.u2KickScale * 0.8);
+    const coreSz = SUN_NUCLEO_SZ * (1 + p0 * DBG_SILLAS.u2SunCoreBoost  + kick * DBG_SILLAS.u2KickScale * 1.2);
+    if (sunAnilloRef.current)  {
+      sunAnilloRef.current.position.set(sunPX, sunPY, sunPZ);
+      sunAnilloRef.current.material.opacity = sunOp;
+      sunAnilloRef.current.scale.set(ringSz, ringSz, 1);
+    }
+    if (sunDiscoRef.current)   {
+      sunDiscoRef.current.position.set(sunPX, sunPY, sunPZ);
+      sunDiscoRef.current.material.opacity = sunOp;
+      sunDiscoRef.current.scale.set(discSz, discSz, 1);
+    }
+    if (sunNucleoRef.current)  {
+      sunNucleoRef.current.position.set(sunPX, sunPY, sunPZ);
+      sunNucleoRef.current.material.opacity = sunOp;
+      sunNucleoRef.current.scale.set(coreSz, coreSz, 1);
+    }
   });
 
   // ── JSX ───────────────────────────────────────────────────────────────────
   return (
     <>
       {/* Mountain bands: fondo (bg) < medias < frente (fg) */}
-      <mesh frustumCulled={false} renderOrder={2}>
+      <mesh ref={fondoMeshRef} frustumCulled={false} renderOrder={2}>
         <sphereGeometry args={[DOME_R * 0.98, 256, 32, 0, Math.PI * 2, MT_T0, MT_TL]} />
         <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
           uniforms={fondoU}
           side={THREE.BackSide} transparent depthTest={false} depthWrite={false} toneMapped={false} />
       </mesh>
-      <mesh frustumCulled={false} renderOrder={3}>
+      <mesh ref={mediasMeshRef} frustumCulled={false} renderOrder={3}>
         <sphereGeometry args={[DOME_R * 0.98, 256, 32, 0, Math.PI * 2, MT_T0, MT_TL]} />
         <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
           uniforms={mediasU}
           side={THREE.BackSide} transparent depthTest={false} depthWrite={false} toneMapped={false} />
       </mesh>
-      <mesh frustumCulled={false} renderOrder={4}>
+      <mesh ref={frenteMeshRef} frustumCulled={false} renderOrder={4}>
         <sphereGeometry args={[DOME_R * 0.98, 256, 32, 0, Math.PI * 2, MT_T0, MT_TL]} />
         <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
           uniforms={frenteU}

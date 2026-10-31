@@ -41,10 +41,19 @@ export const N5_STATE = {
 // ── N4: band state (published per-frame for SymbolSystem, DomeVisualizer) ─────
 export const BAND_STATE = {
   energy:     [0, 0, 0, 0] as number[],                 // pre-gate smoothed RMS per band
+  normEnergy: [0, 0, 0, 0] as number[],                 // U2: AGC-normalized energy 0–1
   gateOpen:   [false, false, false, false] as boolean[], // per band (indexed by bandIdx)
   assignment: [0, 1, 2, 3] as number[],                 // assignment[symbolIdx] = bandIdx
   domeEnergy: 0 as number,                              // max energy of bands with open gate
   kick:       false as boolean,                         // true for one getVizBands() call
+};
+
+// ── U2: AGC debug (meters in DebugMenu) ──────────────────────────────────────
+export const BAND_U2_DEBUG = {
+  rawEnergy:  [0, 0, 0, 0] as number[],
+  normEnergy: [0, 0, 0, 0] as number[],
+  agcFloor:   [0, 0, 0, 0] as number[],
+  agcCeil:    [0.1, 0.1, 0.1, 0.1] as number[],
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -74,6 +83,11 @@ let _sumGain:       GainNode | null      = null;
 // N4: per-band energy + kick detection state
 const _bandEnergySmooth = [0, 0, 0, 0];
 let _lastBandTime   = 0;
+
+// U2: AGC per-band state
+const _agcFloor    = [0,   0,   0,   0  ];
+const _agcCeil     = [0.1, 0.1, 0.1, 0.1];
+const _agcNormSmo  = [0,   0,   0,   0  ];
 let _kickBandPrev   = 0;
 let _kickBandLast   = 0;
 let _bandAssignment: number[] = [0, 1, 2, 3];
@@ -114,6 +128,14 @@ function _updateBandEnergy(): void {
   const atkF = 1 - Math.exp(-dt / 0.040); // 40 ms attack
   const relF = 1 - Math.exp(-dt / 0.200); // 200 ms release
 
+  // U2: AGC coefficients (read from debug config each frame for live tuning)
+  const agcCeilDecF = 1 - Math.exp(-dt / DBG_SILLAS.agcCeilDecayS);
+  const agcAtkF     = 1 - Math.exp(-dt / (DBG_SILLAS.agcAttackMs  / 1000));
+  const agcRelF     = 1 - Math.exp(-dt / (DBG_SILLAS.agcReleaseMs / 1000));
+  const agcEps      = DBG_SILLAS.agcEpsilon;
+  const agcPow      = DBG_SILLAS.agcPow;
+  const floorRise   = DBG_SILLAS.agcFloorRise;
+
   let domeE = 0;
   for (let i = 0; i < 4; i++) {
     _bandAnalysers[i].getByteTimeDomainData(_bandTimeDom[i]);
@@ -125,6 +147,22 @@ function _updateBandEnergy(): void {
     _bandEnergySmooth[i] = rms > prev ? prev + (rms - prev) * atkF : prev + (rms - prev) * relF;
     BAND_STATE.energy[i] = _bandEnergySmooth[i];
     if (BAND_STATE.gateOpen[i]) domeE = Math.max(domeE, _bandEnergySmooth[i]);
+
+    // U2: AGC — floor tracks min (instant drop, slow rise), ceiling tracks peak (instant attack, slow decay)
+    const s = _bandEnergySmooth[i];
+    if (s < _agcFloor[i]) { _agcFloor[i] = s; }
+    else                  { _agcFloor[i] = Math.min(_agcFloor[i] + floorRise * dt, s); }
+    if (s > _agcCeil[i])  { _agcCeil[i]  = s; }
+    else                  { _agcCeil[i]  = Math.max(_agcCeil[i] + (s - _agcCeil[i]) * agcCeilDecF, _agcFloor[i] + agcEps); }
+    const raw     = (s - _agcFloor[i]) / Math.max(_agcCeil[i] - _agcFloor[i], agcEps);
+    const normRaw = Math.pow(Math.min(1, Math.max(0, raw)), agcPow);
+    const nPrev   = _agcNormSmo[i];
+    _agcNormSmo[i]          = normRaw > nPrev ? nPrev + (normRaw - nPrev) * agcAtkF : nPrev + (normRaw - nPrev) * agcRelF;
+    BAND_STATE.normEnergy[i]   = _agcNormSmo[i];
+    BAND_U2_DEBUG.rawEnergy[i] = s;
+    BAND_U2_DEBUG.normEnergy[i]= _agcNormSmo[i];
+    BAND_U2_DEBUG.agcFloor[i]  = _agcFloor[i];
+    BAND_U2_DEBUG.agcCeil[i]   = _agcCeil[i];
   }
 
   // Kick on band 1 (bombos 80–250 Hz), 150 ms refractory
@@ -375,8 +413,10 @@ export function stopVizAudio(): void {
   _noiseSource = null; _noiseGain = null; _musicFadeGain = null;
   N5_STATE.leftProximity = 0; N5_STATE.rightProximity = 0;
   _bandEnergySmooth.fill(0); _kickBandPrev = 0; _kickBandLast = 0; _lastBandTime = 0;
+  _agcFloor.fill(0); _agcCeil.fill(0.1); _agcNormSmo.fill(0);
   _playStarted = false;
-  BAND_STATE.energy.fill(0); BAND_STATE.gateOpen.fill(false);
+  BAND_STATE.energy.fill(0); BAND_STATE.normEnergy.fill(0);
+  BAND_STATE.gateOpen.fill(false);
   BAND_STATE.domeEnergy = 0; BAND_STATE.kick = false;
   // H3: clear effect nodes
   _lpFilter = null; _hpFilter = null; _dryGain = null;
