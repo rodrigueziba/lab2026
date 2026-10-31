@@ -122,7 +122,8 @@ export const DBG_SILLAS = {
   gateReleaseMs:    600,    // gate close time constant (ms)
   showBandOverlay:  false,  // debug overlay: per-band energy + gate state
   // N5: monoliths + interference
-  monolithDistM:       3.0,   // left/right monolith distance from tarima center (m)
+  monolitoDistFactor:  1.25,  // V1: multiplier applied to base 3.0 m distance (base×factor=monolithDistM)
+  monolithDistM:       3.75,  // V1: left/right monolith distance from center (m) — was 3.0, now 3.0×1.25
   monolithFadeMs:   1500,    // monolith appear/disappear fade duration (ms)
   monolithProxFullM:   0.5,   // distance for full proximity effect (m)
   monolithProxStartM:  3.0,   // distance where proximity effect starts (m)
@@ -339,7 +340,7 @@ export const DBG_FACE = {
 // J1: timing constants (module-level so alightStore / Audience can import them)
 export const PEOPLE_MIN_DELAY_MS      = 5_000;  // min ms from stars-visible to people-visible
 export const LECTERNS_AFTER_PEOPLE_MS = 10_000; // ms from people-visible to lecterns request
-export const LECTERN_OUTWARD_OFFSET_M = 0.70;   // V1: extra outward offset → LECTERN_X(1.3)+0.70=2.0m (×1.25 from 1.60m)
+export const LECTERN_OUTWARD_OFFSET_M = 0.30;   // extra outward offset added to LECTERN_X
 
 // J4: TARIMA audio-effect tuning constants (exposed in debug menu)
 export const DBG_AUDIO = {
@@ -376,7 +377,6 @@ export const DBG_CAM_SOUND = {
 };
 
 export const DBG_LECTERNS = {
-  monolitoDistFactor: 1.25, // V1: placement factor (base 1.60m × factor = 2.0m) — geometry: reload
   delayMs:          10_000, // legacy — no longer used for trigger (kept for reference)
   lightIntensity:   120,    // SpotLight per lectern (W-equivalent)
   emissiveBrightness: 0.7,  // emissiveIntensity for active buttons/knobs

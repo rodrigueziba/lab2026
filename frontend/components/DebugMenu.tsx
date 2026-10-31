@@ -733,8 +733,10 @@ export default function DebugMenu() {
           {sillas.showBandOverlay && <BandEnergyOverlay />}
 
           <div style={DIVIDER} />
-          <span style={LABEL}>Monolitos N5 <span style={NOTE}>(live)</span></span>
-          <NumField label="monolithDistM"      value={sillas.monolithDistM}       step={0.1} min={0.5} max={8}    note="live"
+          <span style={LABEL}>Monolitos N5 V1 <span style={NOTE}>(live)</span></span>
+          <NumField label="monolitoDistFactor" value={sillas.monolitoDistFactor}  step={0.05} min={0.5} max={3}   note="V1: base 3.0m × factor → monolithDistM"
+            onChange={v => { DBG_SILLAS.monolitoDistFactor = v; DBG_SILLAS.monolithDistM = 3 * v; setSillas(s => ({ ...s, monolitoDistFactor: v, monolithDistM: 3 * v })); }} />
+          <NumField label="monolithDistM"      value={sillas.monolithDistM}       step={0.1} min={0.5} max={10}   note="live"
             onChange={v => { DBG_SILLAS.monolithDistM      = v; setSillas(s => ({ ...s, monolithDistM:      v })); }} />
           <NumField label="monolithFadeMs"     value={sillas.monolithFadeMs}      step={50}  min={100} max={5000} note="live"
             onChange={v => { DBG_SILLAS.monolithFadeMs     = v; setSillas(s => ({ ...s, monolithFadeMs:     v })); }} />
@@ -1258,14 +1260,7 @@ export default function DebugMenu() {
           ))}
 
           <div style={DIVIDER} />
-          <span style={LABEL}>Lecterns <span style={NOTE}>(T7 V1)</span></span>
-          <NumField
-            label="monolitoDistFactor"
-            value={lectern.monolitoDistFactor}
-            step={0.05} min={0.5} max={3}
-            note="V1: base 1.60m × factor = LECTERN_PLACE_X (geometry: reload)"
-            onChange={v => { DBG_LECTERNS.monolitoDistFactor = v; setLectern(l => ({ ...l, monolitoDistFactor: v })); }}
-          />
+          <span style={LABEL}>Lecterns <span style={NOTE}>(T7)</span></span>
           <NumField
             label="delayMs (after dome)"
             value={lectern.delayMs}
