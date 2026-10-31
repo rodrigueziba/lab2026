@@ -144,6 +144,32 @@ export const DBG_SILLAS = {
   curtainDamping:        0.985,         // velocity damping per substep — live
   curtainLightIntensity: 2400,          // SpotLight intensity — live
   curtainLightColor:     '#fff1dc' as string, // SpotLight color — live
+  // T2: panoramic dome growth (0→1 per group, cubic-eased)
+  vizGrowS:       3.0,            // group grow animation duration (s)
+  vizGrowForce0:  -1 as number,   // force group 0 grow value (0–1); -1 = off
+  vizGrowForce1:  -1 as number,
+  vizGrowForce2:  -1 as number,
+  vizGrowForce3:  -1 as number,
+  // T3: audio reaction — timing
+  pulseAttackMs:  300,  // gate-open ramp (ms)
+  pulseDecayMs:   600,  // gate-close decay (ms)
+  pulseSmoothMs:   80,  // extra energy smoothing after gating (ms)
+  idleFlow:        0.15,// LÍNEAS idle flow fraction (× base speed) when gate off
+  // T3: debug pulse simulators (0 = off; >0 = override energy)
+  simPulse0:       0 as number,
+  simPulse1:       0 as number,
+  simPulse2:       0 as number,
+  simPulse3:       0 as number,
+  // T3: reaction intensities — live uniforms
+  mtHeightBoost:   0.06,  // MONTAÑAS height pulse per unit energy
+  mtBrightBoost:   0.20,  // MONTAÑAS brightness boost
+  kickExtraBoost:  0.10,  // kick extra height (only for kick-band group)
+  skyBrightBoost:  0.25,  // CIELO brightness boost
+  sunBrightBoost:  0.25,  // SOL overall brightness boost
+  lineAmpBoost:    0.80,  // LÍNEAS amplitude boost
+  lineSpeedBoost:  3.00,  // LÍNEAS phase speed boost factor
+  kickDecayMs:     150,   // kick impulse decay (ms)
+  showReactionOverlay: false, // T3: show haz→group→band assignment in corner
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

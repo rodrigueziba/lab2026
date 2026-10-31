@@ -731,6 +731,81 @@ export default function DebugMenu() {
           </div>
 
           <div style={DIVIDER} />
+          <span style={LABEL}>Panorama T2 — crecimiento de grupos <span style={NOTE}>(live)</span></span>
+          <NumField label="vizGrowS" value={sillas.vizGrowS} step={0.5} min={0.5} max={15} note="live"
+            onChange={v => { DBG_SILLAS.vizGrowS = v; setSillas(s => ({ ...s, vizGrowS: v })); }} />
+          {([0,1,2,3] as const).map(i => {
+            const key = `vizGrowForce${i}` as "vizGrowForce0"|"vizGrowForce1"|"vizGrowForce2"|"vizGrowForce3";
+            const labels = ["SOL","MONTAÑAS","CIELO","LÍNEAS"] as const;
+            return (
+              <div key={i} style={ROW}>
+                <span>force{i} {labels[i]}</span>
+                <input type="range" min={-1} max={1} step={0.01} style={{ flex: 1 }}
+                  value={sillas[key]}
+                  onChange={e => {
+                    const v = parseFloat(e.target.value);
+                    DBG_SILLAS[key] = v;
+                    setSillas(s => ({ ...s, [key]: v }));
+                  }} />
+                <span style={{ width: 34, textAlign: "right" }}>{(sillas[key] as number).toFixed(2)}</span>
+              </div>
+            );
+          })}
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Reacción T3 — audio <span style={NOTE}>(live)</span></span>
+          <NumField label="pulseAttackMs"  value={sillas.pulseAttackMs}  step={50}  min={50}  max={2000} note="live"
+            onChange={v => { DBG_SILLAS.pulseAttackMs  = v; setSillas(s => ({ ...s, pulseAttackMs:  v })); }} />
+          <NumField label="pulseDecayMs"   value={sillas.pulseDecayMs}   step={50}  min={50}  max={3000} note="live"
+            onChange={v => { DBG_SILLAS.pulseDecayMs   = v; setSillas(s => ({ ...s, pulseDecayMs:   v })); }} />
+          {([0,1,2,3] as const).map(i => {
+            const key = `simPulse${i}` as "simPulse0"|"simPulse1"|"simPulse2"|"simPulse3";
+            const labels = ["SOL","MONTAÑAS","CIELO","LÍNEAS"] as const;
+            return (
+              <div key={i} style={ROW}>
+                <span>sim{i} {labels[i]}</span>
+                <input type="range" min={0} max={1} step={0.01} style={{ flex: 1 }}
+                  value={sillas[key]}
+                  onChange={e => {
+                    const v = parseFloat(e.target.value);
+                    DBG_SILLAS[key] = v;
+                    setSillas(s => ({ ...s, [key]: v }));
+                  }} />
+                <span style={{ width: 34, textAlign: "right" }}>{(sillas[key] as number).toFixed(2)}</span>
+              </div>
+            );
+          })}
+          <NumField label="mtHeightBoost"  value={sillas.mtHeightBoost}  step={0.01} min={0} max={1} note="live"
+            onChange={v => { DBG_SILLAS.mtHeightBoost  = v; setSillas(s => ({ ...s, mtHeightBoost:  v })); }} />
+          <NumField label="mtBrightBoost"  value={sillas.mtBrightBoost}  step={0.05} min={0} max={2} note="live"
+            onChange={v => { DBG_SILLAS.mtBrightBoost  = v; setSillas(s => ({ ...s, mtBrightBoost:  v })); }} />
+          <NumField label="skyBrightBoost" value={sillas.skyBrightBoost} step={0.05} min={0} max={2} note="live"
+            onChange={v => { DBG_SILLAS.skyBrightBoost = v; setSillas(s => ({ ...s, skyBrightBoost: v })); }} />
+          <NumField label="sunBrightBoost" value={sillas.sunBrightBoost} step={0.05} min={0} max={2} note="live"
+            onChange={v => { DBG_SILLAS.sunBrightBoost = v; setSillas(s => ({ ...s, sunBrightBoost: v })); }} />
+          <NumField label="lineAmpBoost"   value={sillas.lineAmpBoost}   step={0.1}  min={0} max={5} note="live"
+            onChange={v => { DBG_SILLAS.lineAmpBoost   = v; setSillas(s => ({ ...s, lineAmpBoost:   v })); }} />
+          <NumField label="lineSpeedBoost" value={sillas.lineSpeedBoost} step={0.5}  min={0} max={10} note="live"
+            onChange={v => { DBG_SILLAS.lineSpeedBoost = v; setSillas(s => ({ ...s, lineSpeedBoost: v })); }} />
+          <div style={ROW}>
+            <span>showReactionOverlay</span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.showReactionOverlay;
+              DBG_SILLAS.showReactionOverlay = v;
+              setSillas(s => ({ ...s, showReactionOverlay: v }));
+            }}>{sillas.showReactionOverlay ? "ON" : "off"}</button>
+          </div>
+          {sillas.showReactionOverlay && (
+            <div style={{ fontSize: 10, color: "#9cf", padding: "4px 0" }}>
+              {[0,1,2,3].map(i => {
+                const bIdx = BAND_STATE.assignment[i];
+                const labels = ["SOL","MONTAÑAS","CIELO","LÍNEAS"];
+                return <div key={i}>haz{i}={labels[i]} → band{bIdx} | E={BAND_STATE.energy[bIdx]?.toFixed(3) ?? "?"}</div>;
+              })}
+            </div>
+          )}
+
+          <div style={DIVIDER} />
           <span style={LABEL}>Debug overlays <span style={NOTE}>(R1 — prism / audio / fx)</span></span>
           <div style={ROW}>
             <span>debugOverlays</span>
