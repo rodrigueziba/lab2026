@@ -552,13 +552,19 @@ export default function DebugMenu() {
           </div>
 
           <div style={DIVIDER} />
-          <span style={LABEL}>Haces N3 <span style={NOTE}>(live)</span></span>
-          <NumField label="hazRadiusM" value={sillas.hazRadiusM} step={0.1} min={0} max={15} note="live"
+          <span style={LABEL}>Haces N3 R2 <span style={NOTE}>(live salvo origen/radio del cono: reload)</span></span>
+          <NumField label="hazRadiusM" value={sillas.hazRadiusM} step={0.5} min={4} max={20} note="live"
             onChange={v => { DBG_SILLAS.hazRadiusM = v; setSillas(s => ({ ...s, hazRadiusM: v })); }} />
           <NumField label="hazZoneRadiusM" value={sillas.hazZoneRadiusM} step={0.1} min={0.1} max={5} note="live"
             onChange={v => { DBG_SILLAS.hazZoneRadiusM = v; setSillas(s => ({ ...s, hazZoneRadiusM: v })); }} />
-          <NumField label="hazSpotIntensity" value={sillas.hazSpotIntensity} step={5} min={0} max={400} note="live"
+          <NumField label="hazOriginHM" value={sillas.hazOriginHM} step={0.1} min={1} max={6} note="reload"
+            onChange={v => { DBG_SILLAS.hazOriginHM = v; setSillas(s => ({ ...s, hazOriginHM: v })); }} />
+          <NumField label="hazConeFloorRM" value={sillas.hazConeFloorRM} step={0.05} min={0.2} max={3} note="reload"
+            onChange={v => { DBG_SILLAS.hazConeFloorRM = v; setSillas(s => ({ ...s, hazConeFloorRM: v })); }} />
+          <NumField label="hazSpotIntensity" value={sillas.hazSpotIntensity} step={5} min={0} max={200} note="live (× globalLightScale)"
             onChange={v => { DBG_SILLAS.hazSpotIntensity = v; setSillas(s => ({ ...s, hazSpotIntensity: v })); }} />
+          <NumField label="globalLightScale" value={sillas.globalLightScale} step={0.05} min={0} max={2} note="live — all SILLAS lights"
+            onChange={v => { DBG_SILLAS.globalLightScale = v; setSillas(s => ({ ...s, globalLightScale: v })); }} />
           <NumField label="hazConeOpacity" value={sillas.hazConeOpacity} step={0.01} min={0} max={1} note="live"
             onChange={v => { DBG_SILLAS.hazConeOpacity = v; setSillas(s => ({ ...s, hazConeOpacity: v })); }} />
           <ColorField label="hazColor0 (S0)" value={sillas.hazColor0}

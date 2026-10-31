@@ -75,10 +75,10 @@ function Room() {
   );
 }
 
-// ── C1: DiagonalSpot — responds to STORE.lights.globalIntensity ───────────────
+// ── C1: DiagonalSpot — responds to STORE.lights.globalIntensity + SILLAS global scale ──
 function DiagonalSpot() {
-  const [intensity, setIntensity] = useState(DBG_SPOTLIGHT.intensity);
-  useEffect(() => storeSubscribe(() => setIntensity(DBG_SPOTLIGHT.intensity * STORE.lights.globalIntensity)), []);
+  const [intensity, setIntensity] = useState(DBG_SPOTLIGHT.intensity * DBG_SILLAS.globalLightScale);
+  useEffect(() => storeSubscribe(() => setIntensity(DBG_SPOTLIGHT.intensity * STORE.lights.globalIntensity * DBG_SILLAS.globalLightScale)), []);
   return (
     <SpotLight
       position={[9, 18, 10]}

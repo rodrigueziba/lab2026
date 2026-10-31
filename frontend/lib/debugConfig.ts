@@ -51,7 +51,7 @@ export const DBG_SILLAS = {
   vizSolidTest:    false, // Prueba A: solid magenta + depthTest=false + DoubleSide + renderOrder=10
   vizHideShell:    false, // force-hide dome shell (debug)
   // visualizer shader params (live)
-  vizIntensity:    1.2,
+  vizIntensity:    0.72,  // R2: was 1.2 (×0.6 = −40%)
   vizGhost:        1.0,
   vizMatrix:       0.25,
   vizRings:        1.0,
@@ -63,15 +63,18 @@ export const DBG_SILLAS = {
   releaseDelayMs: 5000,  // ms after alight:dome-revealed before movement is freed (sala_activa)
   lockLook:       false, // N1: also lock mouse-look during sillas_secuencia (not yet implemented)
   // N3: beams (haces)
-  hazRadiusM:       4.0,    // beam center distance from prism XZ origin (m)
+  hazRadiusM:       12.0,   // beam center distance from prism XZ origin (m) — R2: 4→12
   hazZoneRadiusM:   1.0,    // "under beam" trigger zone radius (m)
-  hazSpotY:         22,     // spotlight height above floor (m)
-  hazSpotIntensity: 80,     // Three.js SpotLight intensity
-  hazConeOpacity:   0.12,   // visible cone mesh base opacity (additive)
-  hazColor0:        '#ff2d95' as string, // S0 magenta
-  hazColor1:        '#25e1ff' as string, // S1 cyan
-  hazColor2:        '#ffb000' as string, // S2 amber
-  hazColor3:        '#3dff8a' as string, // S3 green
+  hazSpotY:         22,     // legacy — no longer used as beam height; kept for reference
+  hazOriginHM:      2.4,    // R2: beam origin height (m) above floor — reload to rebuild geometry
+  hazConeFloorRM:   1.05,   // R2: cone base radius at floor (m) — reload to rebuild geometry
+  hazSpotIntensity: 40,     // R2: SpotLight intensity (was 80, ×0.5) × globalLightScale in useFrame
+  hazConeOpacity:   0.14,   // R2: max additive cone opacity
+  globalLightScale: 0.55,   // R2: multiplier for all SILLAS lights — live
+  hazColor0:        '#7FEFE6' as string, // R2: S0 cyan
+  hazColor1:        '#34F28A' as string, // R2: S1 green
+  hazColor2:        '#FFD21A' as string, // R2: S2 yellow
+  hazColor3:        '#FF1A1A' as string, // R2: S3 red
   // N3: symbols
   symbolRadiusM:    1.0,    // floor symbol disc radius (m)
   symbolPeriodS:    2.5,    // animation cycle period (s)

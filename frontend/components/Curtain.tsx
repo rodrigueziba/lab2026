@@ -364,9 +364,9 @@ export default function Curtain() {
     sim.posAttr!.needsUpdate  = true;
     sim.normAttr!.needsUpdate = true;
 
-    // Live spotlight updates
+    // Live spotlight updates (R2: global scale applied)
     if (lightRef.current) {
-      lightRef.current.intensity = DBG_SILLAS.curtainLightIntensity;
+      lightRef.current.intensity = DBG_SILLAS.curtainLightIntensity * DBG_SILLAS.globalLightScale;
       lightRef.current.color.set(DBG_SILLAS.curtainLightColor);
     }
 
