@@ -14,13 +14,9 @@ import { ShaderPass }      from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass }      from "three/addons/postprocessing/OutputPass.js";
 import { RetroCRTShader, CRT_UNIFORMS } from "./retroCRT";
 import { DBG_RETRO_FX } from "@/lib/debugConfig";
+import { RETRO_FLAGS } from "./retroFlags";
 
-// ── Feature flags (mutated by DebugMenu) ──────────────────────────────────────
-export const RETRO_FLAGS = {
-  enabled:     true,   // RETRO_POSTFX_ENABLED
-  quality:    "medium" as "low" | "medium" | "high",
-  comfortMode: false,  // disables wobble + CA
-};
+export { RETRO_FLAGS };
 
 // Bloom resolution scale per quality level
 const QUALITY_BLOOM_SCALE: Record<string, number> = {

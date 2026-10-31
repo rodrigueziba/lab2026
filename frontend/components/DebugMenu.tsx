@@ -21,7 +21,7 @@ import {
   DBG_CAM_IMAGE,
   DBG_CAM_SOUND,
 } from "@/lib/debugConfig";
-import { RETRO_FLAGS } from "@/lib/retro/composer";
+import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { setVizVolume, restartVizAudio, BAND_STATE, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
 import { setHazBandOn } from "@/lib/haz";

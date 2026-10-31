@@ -18,7 +18,7 @@ import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import { STORE, INTERACT_STATE, storeSubscribe } from "@/lib/alightStore";
 import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
-import { RETRO_FLAGS } from "@/lib/retro/composer";
+import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
 import dynamic from "next/dynamic";
 const RetroPostFX = dynamic(() => import("@/lib/retro/composer"), { ssr: false });
