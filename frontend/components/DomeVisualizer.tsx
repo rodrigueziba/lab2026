@@ -7,7 +7,7 @@
 import { useRef, useEffect, useMemo, useState, Suspense } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS, DOME_METERS } from "@/lib/debugConfig";
+import { DBG_SILLAS, DOME_METERS, DBG_DOME_LIVE } from "@/lib/debugConfig";
 import { prepareVizAudio, stopVizAudio, getVizBands, BAND_STATE, N5_STATE } from "@/lib/vizAudio";
 import { getDawnState, getDomeDawnState, startDomeDawn, finishDomeDawnPhase1, resetDomeDawnState, skipDomeDawnState } from "@/lib/alightStore";
 import { getHazEnteredOnce, getHazBandOn } from "@/lib/haz";
@@ -515,6 +515,7 @@ function DomeSkyAnchor() {
     DOME_METERS.cielo = s.gp[2]; DOME_METERS.lin = s.gp[3];
     DOME_METERS.kick = s.kick; DOME_METERS.dawn = s.dawn;
     DOME_METERS.phase = domeDawn.phase;
+    DBG_DOME_LIVE.phase = domeDawn.phase; // X2 PASO 1
 
     // W2: per-group envelope — gated by bandOn, smoothed with group-specific τ
     for (let i = 0; i < 4; i++) {

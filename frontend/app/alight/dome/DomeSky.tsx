@@ -13,6 +13,7 @@ useTexture.preload([
   "/portal/portal-color.png",
 ]);
 import { domeVert, domeFrag } from "./domeShaders";
+import { DBG_DOME_LIVE, DBG_DOME_FORCE } from "@/lib/debugConfig";
 
 export type Bands = { bass: number; lowMid: number; highMid: number; treble: number }; // 0..1
 // W4: parámetros de ajuste del shader (leídos cada frame vía callback — sin recrear material)
@@ -130,6 +131,8 @@ export default function DomeSky({
           uReveal:      { value: new THREE.Vector4(1, 1, 1, 1) },
           // W5: bordes suaves
           uSoftEdge:    { value: 0 },
+          // X2b: debug máscaras
+          uDebugMasks:  { value: 0 },
         },
       }),
     // los uniformes sueltos se actualizan en useFrame; el material solo se recrea si cambia la calidad
@@ -191,6 +194,49 @@ export default function DomeSky({
       // W5: máscara y suavizado de bordes
       u.uMasks.value     = p.siluetasSuaves ? masks2k : masks;
       u.uSoftEdge.value  = p.siluetasSuaves ? p.softEdge : 0;
+    }
+    // X2a: forzar todo visible (bypasa máquina de estados)
+    if (DBG_DOME_FORCE.visible) {
+      u.uDawn.value = 1;
+      u.uReveal.value.set(1, 1, 1, 1);
+      tmp.ge.set(0.6, 0.6, 0.6, 0.6);
+      u.uGroupEnergy.value.copy(tmp.ge);
+    }
+    // X2b: debug máscaras
+    u.uDebugMasks.value = DBG_DOME_FORCE.masks ? 1.0 : 0.0;
+    // X2 PASO 1: escribir valores live (sin allocations — solo asignaciones de número)
+    DBG_DOME_LIVE.uDawn     = u.uDawn.value;
+    DBG_DOME_LIVE.revX      = u.uReveal.value.x;
+    DBG_DOME_LIVE.revY      = u.uReveal.value.y;
+    DBG_DOME_LIVE.revZ      = u.uReveal.value.z;
+    DBG_DOME_LIVE.revW      = u.uReveal.value.w;
+    DBG_DOME_LIVE.geX       = u.uGroupEnergy.value.x;
+    DBG_DOME_LIVE.geY       = u.uGroupEnergy.value.y;
+    DBG_DOME_LIVE.geZ       = u.uGroupEnergy.value.z;
+    DBG_DOME_LIVE.geW       = u.uGroupEnergy.value.w;
+    DBG_DOME_LIVE.kick      = u.uKick.value;
+    DBG_DOME_LIVE.portalTan = u.uPortalTan.value;
+    DBG_DOME_LIVE.pFX       = u.uPortalF.value.x;
+    DBG_DOME_LIVE.pFY       = u.uPortalF.value.y;
+    DBG_DOME_LIVE.pFZ       = u.uPortalF.value.z;
+    DBG_DOME_LIVE.pRX       = u.uPortalR.value.x;
+    DBG_DOME_LIVE.pRY       = u.uPortalR.value.y;
+    DBG_DOME_LIVE.pRZ       = u.uPortalR.value.z;
+    DBG_DOME_LIVE.pUX       = u.uPortalU.value.x;
+    DBG_DOME_LIVE.pUY       = u.uPortalU.value.y;
+    DBG_DOME_LIVE.pUZ       = u.uPortalU.value.z;
+    // X2 texturas (sin allocations)
+    const mi = masks.image as (HTMLImageElement & ImageBitmap) | null;
+    if (mi) {
+      DBG_DOME_LIVE.masksW  = mi.naturalWidth  ?? mi.width  ?? 0;
+      DBG_DOME_LIVE.masksH  = mi.naturalHeight ?? mi.height ?? 0;
+      DBG_DOME_LIVE.masksCS = masks.colorSpace;
+    }
+    const ci = color.image as (HTMLImageElement & ImageBitmap) | null;
+    if (ci) {
+      DBG_DOME_LIVE.colorW  = ci.naturalWidth  ?? ci.width  ?? 0;
+      DBG_DOME_LIVE.colorH  = ci.naturalHeight ?? ci.height ?? 0;
+      DBG_DOME_LIVE.colorCS = color.colorSpace;
     }
   });
 

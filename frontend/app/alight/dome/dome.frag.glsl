@@ -48,6 +48,8 @@ uniform vec4  uReveal;   // x=MONTAÑAS, y=LÍNEAS, z=SOL, w=CIELO (0..1 fase 2)
 
 // W5: bordes suaves (0 = hardstep; 0.35 = smoothstep suave con máscara 2k borrosa)
 uniform float uSoftEdge;
+// X2b: debug — pintar canales R/G/B de la máscara como colores sólidos (0=off, 1=on)
+uniform float uDebugMasks;
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -308,6 +310,8 @@ void main() {
     col = mix(col, waveCol * (1.0 + 0.10 * lin), m.b * uReveal.y);
     col = mix(col, strataCol * (1.0 + 0.08 * mont), m.g * uReveal.x);
     col = mix(col, vec3(0.098, 0.102, 0.133), m.r);
+    // X2b: debug — mostrar canales de máscara como colores de prueba (bypasa uReveal/uDawn)
+    if (uDebugMasks > 0.5) { col = m; }
     // destellos sobre las montanas
     float tw2 = 0.75 + 0.25 * sin(t * 2.3 + 1.0) + 0.7 * kick;
     col = mix(col, vec3(0.91, 0.54, 0.18), sparkle4(p - vec2(-0.6800, -0.7830), 0.040 * tw2));

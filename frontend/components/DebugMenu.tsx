@@ -21,6 +21,8 @@ import {
   DBG_CAM_IMAGE,
   DBG_CAM_SOUND,
   DOME_METERS,
+  DBG_DOME_LIVE,
+  DBG_DOME_FORCE,
 } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
@@ -302,6 +304,14 @@ export default function DebugMenu() {
     const id = setInterval(() => setDomeM({ ...DOME_METERS }), 100);
     return () => clearInterval(id);
   }, [sillas.showDomeMeters]);
+  // X2: diagnóstico domo — se pollea a 10fps solo cuando showDomeX2 está activo
+  const [domeX2, setDomeX2] = useState({ ...DBG_DOME_LIVE });
+  const [domeForce, setDomeForce] = useState({ visible: false, masks: false });
+  useEffect(() => {
+    if (!sillas.showDomeX2) return;
+    const id = setInterval(() => setDomeX2({ ...DBG_DOME_LIVE }), 100);
+    return () => clearInterval(id);
+  }, [sillas.showDomeX2]);
 
   // Sync audio volume from STORE changes
   useEffect(() => storeSubscribe(() => setAudioVol(STORE.audio.volume)), []);
@@ -1277,6 +1287,100 @@ export default function DebugMenu() {
           </div>
           <NumField label="domeSoftEdge"   value={sillas.domeSoftEdge}   step={0.05} min={0}    max={1}     note="0=duro 1=suave"
             onChange={v => { DBG_SILLAS.domeSoftEdge   = v; setSillas(s => ({ ...s, domeSoftEdge:   v })); }} />
+
+          <div style={DIVIDER} />
+          {/* X2: diagnóstico domo — oculto por defecto */}
+          <div style={ROW}>
+            <span style={{ ...LABEL, marginBottom: 0 }}>X2 Domo diagnóstico <span style={NOTE}>(oculto por defecto)</span></span>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer", marginLeft: "auto" }}
+              onClick={() => { DBG_SILLAS.showDomeX2 = !sillas.showDomeX2; setSillas(s => ({ ...s, showDomeX2: DBG_SILLAS.showDomeX2 })); }}>
+              {sillas.showDomeX2 ? "ON" : "off"}
+            </button>
+          </div>
+          {sillas.showDomeX2 && (
+            <div style={{ paddingTop: 6 }}>
+              {/* Botones de acción */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                <button style={{ flex: 1, padding: "4px 0", cursor: "pointer", fontFamily: "monospace", fontSize: 10,
+                  background: domeForce.visible ? "rgba(0,120,60,0.7)" : "rgba(40,40,60,0.7)",
+                  color: domeForce.visible ? "#7fff9f" : "#9fbfff",
+                  border: "1px solid rgba(80,180,100,0.4)", borderRadius: 3 }}
+                  onClick={() => {
+                    const v = !DBG_DOME_FORCE.visible;
+                    DBG_DOME_FORCE.visible = v;
+                    setDomeForce(f => ({ ...f, visible: v }));
+                  }}>
+                  {domeForce.visible ? "✓ forzar visible" : "forzar todo visible"}
+                </button>
+                <button style={{ flex: 1, padding: "4px 0", cursor: "pointer", fontFamily: "monospace", fontSize: 10,
+                  background: domeForce.masks ? "rgba(80,0,120,0.7)" : "rgba(40,40,60,0.7)",
+                  color: domeForce.masks ? "#df9fff" : "#9fbfff",
+                  border: "1px solid rgba(140,80,200,0.4)", borderRadius: 3 }}
+                  onClick={() => {
+                    const v = !DBG_DOME_FORCE.masks;
+                    DBG_DOME_FORCE.masks = v;
+                    setDomeForce(f => ({ ...f, masks: v }));
+                  }}>
+                  {domeForce.masks ? "✓ ver máscaras" : "ver máscaras"}
+                </button>
+              </div>
+              {/* Valores live */}
+              {([
+                ['fase',     domeX2.phase,                     '#e0d0b0', true],
+                ['uDawn',    domeX2.uDawn,                     '#e0d0b0', false],
+                ['rev.X mt', domeX2.revX,                      '#2E9E5B', false],
+                ['rev.Y ln', domeX2.revY,                      '#E5322B', false],
+                ['rev.Z sol',domeX2.revZ,                      '#f3b230', false],
+                ['rev.W sky',domeX2.revW,                      '#1F7FB8', false],
+                ['ge.X sol', domeX2.geX,                       '#f3b230', false],
+                ['ge.Y mt',  domeX2.geY,                       '#2E9E5B', false],
+                ['ge.Z sky', domeX2.geZ,                       '#1F7FB8', false],
+                ['ge.W ln',  domeX2.geW,                       '#E5322B', false],
+                ['kick',     domeX2.kick,                      '#FF9A1F', false],
+                ['portalTan',domeX2.portalTan,                 '#889',    false],
+              ] as [string, number|string, string, boolean][]).map(([label, val, color, isStr]) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{ ...NOTE, width: 58, textAlign: 'right', flexShrink: 0 }}>{label}</span>
+                  {isStr
+                    ? <span style={{ color, fontSize: 10, fontFamily: 'monospace' }}>{val as string}</span>
+                    : <>
+                        <div style={{ flex: 1, background: '#2a2a2a', height: 6, borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min((val as number) * 100, 100).toFixed(1)}%`, height: '100%', background: color as string, transition: 'width 0.1s' }} />
+                        </div>
+                        <span style={{ ...NOTE, width: 32 }}>{(val as number).toFixed(3)}</span>
+                      </>
+                  }
+                </div>
+              ))}
+              {/* Vectores del portal */}
+              <div style={{ ...NOTE, marginTop: 6, marginBottom: 2 }}>portal F/R/U (deben ser ortonormales, sin NaN):</div>
+              {([
+                ['F', domeX2.pFX, domeX2.pFY, domeX2.pFZ],
+                ['R', domeX2.pRX, domeX2.pRY, domeX2.pRZ],
+                ['U', domeX2.pUX, domeX2.pUY, domeX2.pUZ],
+              ] as [string, number, number, number][]).map(([n, x, y, z]) => (
+                <div key={n} style={{ display: 'flex', gap: 4, marginBottom: 2, alignItems: 'center' }}>
+                  <span style={{ ...NOTE, width: 10 }}>{n}:</span>
+                  {[x, y, z].map((v, i) => (
+                    <span key={i} style={{ ...NOTE, width: 46, color: !isFinite(v) ? '#f33' : '#889' }}>
+                      {!isFinite(v) ? 'NaN' : v.toFixed(3)}
+                    </span>
+                  ))}
+                  <span style={{ ...NOTE, color: Math.abs(Math.sqrt(x*x+y*y+z*z) - 1) < 0.01 ? '#4c4' : '#f33' }}>
+                    |v|={Math.sqrt(x*x+y*y+z*z).toFixed(3)}
+                  </span>
+                </div>
+              ))}
+              {/* Texturas */}
+              <div style={{ ...NOTE, marginTop: 6, marginBottom: 2 }}>texturas cargadas:</div>
+              <div style={{ ...NOTE, color: domeX2.masksW > 0 ? '#4c4' : '#f33' }}>
+                masks: {domeX2.masksW}×{domeX2.masksH} cs={domeX2.masksCS || '—'}
+              </div>
+              <div style={{ ...NOTE, color: domeX2.colorW > 0 ? '#4c4' : '#f33' }}>
+                color: {domeX2.colorW}×{domeX2.colorH} cs={domeX2.colorCS || '—'}
+              </div>
+            </div>
+          )}
 
           <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>

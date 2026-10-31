@@ -326,6 +326,27 @@ export const DBG_SILLAS = {
   // W5: máscaras suaves 2048×2048
   domeSiluetasSuaves:     false,       // W5: usar portal-masks-2k.png con blur + smoothstep
   domeSoftEdge:           0.35,        // W5: suavidad de bordes (0=duro, 1=muy suave)
+  // X2: panel de diagnóstico (oculto por defecto)
+  showDomeX2:             false,       // X2: mostrar bloque diagnóstico en DebugMenu
+};
+
+// X2: live dome diagnostic — written by DomeSky/DomeSkyAnchor useFrame, polled by DebugMenu
+export const DBG_DOME_LIVE = {
+  uDawn: 0, revX: 0, revY: 0, revZ: 0, revW: 0,
+  geX: 0, geY: 0, geZ: 0, geW: 0,
+  kick: 0, portalTan: 0,
+  phase: 'inactivo' as string,
+  masksW: 0, masksH: 0, masksCS: '' as string,
+  colorW: 0, colorH: 0, colorCS: '' as string,
+  pFX: 0, pFY: 0, pFZ: 0,
+  pRX: 0, pRY: 0, pRZ: 0,
+  pUX: 0, pUY: 0, pUZ: 0,
+};
+
+// X2: force override — written by DebugMenu buttons, read by DomeSky useFrame
+export const DBG_DOME_FORCE = {
+  visible: false,  // 2a: forzar uDawn=1, uReveal=(1,1,1,1), uGroupEnergy=(0.6,0.6,0.6,0.6)
+  masks:   false,  // 2b: pintar canales de máscara como colores de prueba (R/G/B)
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────
