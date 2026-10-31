@@ -322,6 +322,9 @@ export const DBG_SILLAS = {
   domeStarCut:            0.965,       // umbral de estrellas (más alto = menos)
   domeLowQuality:         false,       // menos octavas fbm (requiere remount del material)
   showDomeMeters:         false,       // W4: panel de medidores oculto por defecto
+  // W5: máscaras suaves 2048×2048
+  domeSiluetasSuaves:     false,       // W5: usar portal-masks-2k.png con blur + smoothstep
+  domeSoftEdge:           0.35,        // W5: suavidad de bordes (0=duro, 1=muy suave)
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

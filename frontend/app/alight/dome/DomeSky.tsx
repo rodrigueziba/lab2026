@@ -9,9 +9,11 @@ import { domeVert, domeFrag } from "./domeShaders";
 
 export type Bands = { bass: number; lowMid: number; highMid: number; treble: number }; // 0..1
 // W4: parámetros de ajuste del shader (leídos cada frame vía callback — sin recrear material)
+// W5: siluetasSuaves + softEdge controlan la máscara y el suavizado de bordes
 export type ShaderParams = {
   warp: number; ringFlow: number; ringScale: number;
   ringFade0: number; ringFade1: number; starCut: number;
+  siluetasSuaves: boolean; softEdge: number; // W5
 };
 
 // W2: energias por grupo (SOL, MONTAÑAS, CIELO, LÍNEAS) + kick impulse
@@ -79,10 +81,12 @@ export default function DomeSky({
   starCut = 0.965,
   lowQuality = false,
 }: Props) {
-  const [masks, color] = useTexture(["/portal/portal-masks.png", "/portal/portal-color.png"]);
-  masks.colorSpace = THREE.NoColorSpace; // son datos / colores ya en sRGB: el shader no hace conversion
+  // W5: carga ambas resoluciones; getShaderParams() decide cuál usar en useFrame
+  const [masks, masks2k, color] = useTexture(["/portal/portal-masks.png", "/portal/portal-masks-2k.png", "/portal/portal-color.png"]);
+  masks.colorSpace = THREE.NoColorSpace; // datos, el shader no hace conversión
+  masks2k.colorSpace = THREE.NoColorSpace;
   color.colorSpace = THREE.NoColorSpace;
-  masks.anisotropy = color.anisotropy = 4;
+  masks.anisotropy = masks2k.anisotropy = color.anisotropy = 4;
 
   const material = useMemo(
     () =>
@@ -117,6 +121,8 @@ export default function DomeSky({
           // W3: dawn + reveal
           uDawn:        { value: 1 },  // default 1 = fully visible (dawn skipped)
           uReveal:      { value: new THREE.Vector4(1, 1, 1, 1) },
+          // W5: bordes suaves
+          uSoftEdge:    { value: 0 },
         },
       }),
     // los uniformes sueltos se actualizan en useFrame; el material solo se recrea si cambia la calidad
@@ -170,11 +176,14 @@ export default function DomeSky({
     // W4: parámetros de shader live — sobreescriben los props si se provee el callback
     if (getShaderParams) {
       const p = getShaderParams();
-      u.uWarp.value     = p.warp;
-      u.uRingFlow.value = p.ringFlow;
+      u.uWarp.value      = p.warp;
+      u.uRingFlow.value  = p.ringFlow;
       u.uRingScale.value = p.ringScale;
       u.uRingFade.value.set(p.ringFade0, p.ringFade1);
-      u.uStarCut.value  = p.starCut;
+      u.uStarCut.value   = p.starCut;
+      // W5: máscara y suavizado de bordes
+      u.uMasks.value     = p.siluetasSuaves ? masks2k : masks;
+      u.uSoftEdge.value  = p.siluetasSuaves ? p.softEdge : 0;
     }
   });
 

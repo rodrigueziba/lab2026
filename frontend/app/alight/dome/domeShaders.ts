@@ -55,8 +55,11 @@ uniform float uLinAmt;      // multiplicador amplitud LÍNEAS
 uniform float uKickAmt;     // multiplicador amplitud kick
 
 // W3: amanecer + reveal
-uniform float uDawn;   // 0..1: progreso fase 1 amanecer (ease-out cúbico, calculado en JS)
-uniform vec4  uReveal; // x=MONTAÑAS, y=LÍNEAS, z=SOL, w=CIELO (0..1 fase 2)
+uniform float uDawn;     // 0..1: progreso fase 1 amanecer (ease-out cúbico, calculado en JS)
+uniform vec4  uReveal;   // x=MONTAÑAS, y=LÍNEAS, z=SOL, w=CIELO (0..1 fase 2)
+
+// W5: bordes suaves (0 = hardstep; 0.35 = smoothstep suave con máscara 2k borrosa)
+uniform float uSoftEdge;
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -308,6 +311,11 @@ void main() {
     // W2: montañas negras respiran con despl. vertical (~2%) + rebote de kick
     float blackDispY = 0.020 * mont * sin(uv.x * 9.0 + t * 0.6) + 0.008 * kick;
     vec3 m = texture2D(uMasks, uv + vec2(0.0, blackDispY)).rgb;
+    // W5: bordes suaves — smoothstep activo con máscara 2k borrosa (uSoftEdge > 0)
+    if (uSoftEdge > 0.001) {
+      float e = uSoftEdge * 0.48;
+      m = smoothstep(vec3(0.5 - e), vec3(0.5 + e), m);
+    }
     // W3: olas (LÍNEAS) y estratos (MONTAÑAS) aparecen en fase 2
     col = mix(col, waveCol * (1.0 + 0.10 * lin), m.b * uReveal.y);
     col = mix(col, strataCol * (1.0 + 0.08 * mont), m.g * uReveal.x);

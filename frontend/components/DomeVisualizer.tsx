@@ -429,6 +429,7 @@ function DomeSkyAnchor() {
     warp: DBG_SILLAS.domeWarp, ringFlow: DBG_SILLAS.domeRingFlow,
     ringScale: DBG_SILLAS.domeRingScale, ringFade0: DBG_SILLAS.domeRingFade0,
     ringFade1: DBG_SILLAS.domeRingFade1, starCut: DBG_SILLAS.domeStarCut,
+    siluetasSuaves: DBG_SILLAS.domeSiluetasSuaves, softEdge: DBG_SILLAS.domeSoftEdge, // W5
   });
   const getShaderParams = useMemo<() => ShaderParams>(() => {
     const sp = _sp;
@@ -437,6 +438,8 @@ function DomeSkyAnchor() {
       p.warp = DBG_SILLAS.domeWarp; p.ringFlow = DBG_SILLAS.domeRingFlow;
       p.ringScale = DBG_SILLAS.domeRingScale; p.ringFade0 = DBG_SILLAS.domeRingFade0;
       p.ringFade1 = DBG_SILLAS.domeRingFade1; p.starCut = DBG_SILLAS.domeStarCut;
+      p.siluetasSuaves = DBG_SILLAS.domeSiluetasSuaves; // W5
+      p.softEdge = DBG_SILLAS.domeSoftEdge;              // W5
       return p;
     };
   }, []);

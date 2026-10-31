@@ -1267,6 +1267,18 @@ export default function DebugMenu() {
           )}
 
           <div style={DIVIDER} />
+          <span style={LABEL}>W5 — Siluetas suaves <span style={NOTE}>(portal-masks-2k + blur σ=2.5)</span></span>
+          <div style={ROW}>
+            <span>domeSiluetasSuaves</span>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer", marginLeft: "auto" }}
+              onClick={() => { DBG_SILLAS.domeSiluetasSuaves = !sillas.domeSiluetasSuaves; setSillas(s => ({ ...s, domeSiluetasSuaves: DBG_SILLAS.domeSiluetasSuaves })); }}>
+              {sillas.domeSiluetasSuaves ? "ON" : "off"}
+            </button>
+          </div>
+          <NumField label="domeSoftEdge"   value={sillas.domeSoftEdge}   step={0.05} min={0}    max={1}     note="0=duro 1=suave"
+            onChange={v => { DBG_SILLAS.domeSoftEdge   = v; setSillas(s => ({ ...s, domeSoftEdge:   v })); }} />
+
+          <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
           <NumField label="agcFloorRise"   value={sillas.agcFloorRise}   step={0.1}  min={0}    max={5}     note="live"
             onChange={v => { DBG_SILLAS.agcFloorRise   = v; setSillas(s => ({ ...s, agcFloorRise:   v })); }} />
