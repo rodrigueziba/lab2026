@@ -27,6 +27,7 @@ const SYMBOL_FRAG = /* glsl */`
   uniform float uLineWidth;
   uniform float uEnergy;
   uniform float uPeriodS;
+  uniform float uBoost;
   uniform vec3  uColor;
   varying vec2  vUv;
 
@@ -74,7 +75,7 @@ const SYMBOL_FRAG = /* glsl */`
                       smoothstep(lw, 0.0, d3));
     }
 
-    alpha *= pulse * uReveal;
+    alpha *= pulse * uReveal * uBoost;
     gl_FragColor = vec4(uColor, alpha);
   }
 `;
@@ -104,6 +105,7 @@ export default function SymbolSystem() {
       uLineWidth: { value: DBG_SILLAS.symbolLineWidthM },
       uEnergy:    { value: 0 },
       uPeriodS:   { value: DBG_SILLAS.symbolPeriodS },
+      uBoost:     { value: 1.0 },
       uColor:     { value: new THREE.Color(DBG_SILLAS[COLOR_KEYS[i]]) },
     }))
   , []);
@@ -118,7 +120,9 @@ export default function SymbolSystem() {
       u.uPeriodS.value   = DBG_SILLAS.symbolPeriodS;
       u.uLineWidth.value = DBG_SILLAS.symbolLineWidthM;
       // N4: energy from the band assigned to this symbol (pre-gate, always active)
-      u.uEnergy.value    = BAND_STATE.energy[BAND_STATE.assignment[i]] ?? 0;
+      u.uEnergy.value = BAND_STATE.energy[BAND_STATE.assignment[i]] ?? 0;
+      // R3: boost symbol brightness when band is toggled on
+      u.uBoost.value  = BAND_STATE.gateOpen[BAND_STATE.assignment[i]] ? DBG_SILLAS.hazOnBoost : 1.0;
 
       colorObjs.current[i].set(DBG_SILLAS[COLOR_KEYS[i]]);
       u.uColor.value.copy(colorObjs.current[i]);

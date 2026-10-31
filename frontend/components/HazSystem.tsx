@@ -67,30 +67,27 @@ export default function HazSystem() {
   // Pre-allocated Vector3 for LED lookAt target — avoids per-frame allocation
   const ledLookTarget = useRef(new THREE.Vector3());
 
-  // N4: start audio + open/close gates on beam events; track gate state for LED
+  // R3: Toggle-switch semantics — entry flank fires alight:haz-toggle; exit has no gate effect.
   useEffect(() => {
-    const onEnter = (e: Event) => {
-      const { index } = (e as CustomEvent).detail as { index: number };
-      gateStateRef.current[index] = true;
-      if (!isPlaying()) {
-        void startVizAudio().then(result => {
-          if (result === "need-gesture") {
-            window.dispatchEvent(new CustomEvent("alight:audio-need-gesture", { detail: { need: true } }));
-          }
-        });
+    const onToggle = (e: Event) => {
+      const { index, on } = (e as CustomEvent).detail as { index: number; on: boolean };
+      gateStateRef.current[index] = on;
+      if (on) {
+        if (!isPlaying()) {
+          void startVizAudio().then(result => {
+            if (result === "need-gesture") {
+              window.dispatchEvent(new CustomEvent("alight:audio-need-gesture", { detail: { need: true } }));
+            }
+          });
+        }
+        openGate(index);
+      } else {
+        closeGate(index);
       }
-      openGate(index);
     };
-    const onExit = (e: Event) => {
-      const { index } = (e as CustomEvent).detail as { index: number };
-      gateStateRef.current[index] = false;
-      closeGate(index);
-    };
-    window.addEventListener("alight:haz-enter", onEnter);
-    window.addEventListener("alight:haz-exit",  onExit);
+    window.addEventListener("alight:haz-toggle", onToggle);
     return () => {
-      window.removeEventListener("alight:haz-enter", onEnter);
-      window.removeEventListener("alight:haz-exit",  onExit);
+      window.removeEventListener("alight:haz-toggle", onToggle);
       for (let i = 0; i < 4; i++) closeGate(i);
     };
   }, []);
@@ -213,7 +210,8 @@ export default function HazSystem() {
       const { mesh: coneMesh, mat: coneMat } = cones[i];
       coneMesh.position.set(bx, originH / 2, bz);
       coneMat.uniforms.uColor.value.copy(col);
-      coneMat.uniforms.uOpacity.value = DBG_SILLAS.hazConeOpacity;
+      coneMat.uniforms.uOpacity.value = DBG_SILLAS.hazConeOpacity *
+        (gateStateRef.current[i] ? DBG_SILLAS.hazOnBoost : 1.0);
 
       // Luminaria housing centred at origin height
       boxes[i].position.set(bx, originH, bz);

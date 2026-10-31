@@ -71,6 +71,8 @@ export const DBG_SILLAS = {
   hazSpotIntensity: 40,     // R2: SpotLight intensity (was 80, ×0.5) × globalLightScale in useFrame
   hazConeOpacity:   0.14,   // R2: max additive cone opacity
   globalLightScale: 0.55,   // R2: multiplier for all SILLAS lights — live
+  hazToggleCooldownMs: 800, // R3: anti-bounce cooldown after toggle (ms) — live
+  hazOnBoost:       1.35,   // R3: cone + symbol brightness multiplier when band is on — live
   hazColor0:        '#7FEFE6' as string, // R2: S0 cyan
   hazColor1:        '#34F28A' as string, // R2: S1 green
   hazColor2:        '#FFD21A' as string, // R2: S2 yellow

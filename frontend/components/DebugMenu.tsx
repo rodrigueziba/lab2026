@@ -21,6 +21,7 @@ import {
   DBG_CAM_SOUND,
 } from "@/lib/debugConfig";
 import { setVizVolume, restartVizAudio, BAND_STATE, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
+import { setHazBandOn } from "@/lib/haz";
 import { DBG_STAR_MAT, DBG_DOME_MAT } from "./FaceDome";
 import { STORE, storeSubscribe } from "@/lib/alightStore";
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
@@ -236,6 +237,7 @@ export default function DebugMenu() {
   const [sillas,   setSillas]   = useState({ ...DBG_SILLAS });
   const [legacyOpen, setLegacyOpen] = useState(false); // N2: Legado section collapsed by default
   const [bandRev,    setBandRev]    = useState(0);     // N4: bumped on reshuffle to re-render assignment
+  const [bandOnArr,  setBandOnArr]  = useState([false, false, false, false]); // R3: toggle state per beam
   const [prism,    setPrism]    = useState({ ...DBG_PRISM });
   const [floor,    setFloor]    = useState({ ...DBG_FLOOR });
   const [fx,       setFx]       = useState({ ...DBG_EFFECTS });
@@ -246,6 +248,16 @@ export default function DebugMenu() {
 
   // Sync audio volume from STORE changes
   useEffect(() => storeSubscribe(() => setAudioVol(STORE.audio.volume)), []);
+
+  // R3: keep bandOnArr in sync — fires from both walking and debug buttons
+  useEffect(() => {
+    const onToggle = (e: Event) => {
+      const { index, on } = (e as CustomEvent).detail as { index: number; on: boolean };
+      setBandOnArr(arr => { const next = [...arr]; next[index] = on; return next; });
+    };
+    window.addEventListener("alight:haz-toggle", onToggle);
+    return () => window.removeEventListener("alight:haz-toggle", onToggle);
+  }, []);
 
   // Shift toggles the panel; ignore when focus is in a text/number input
   useEffect(() => {
@@ -575,6 +587,28 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.hazColor2 = v; setSillas(s => ({ ...s, hazColor2: v })); }} />
           <ColorField label="hazColor3 (S3)" value={sillas.hazColor3}
             onChange={v => { DBG_SILLAS.hazColor3 = v; setSillas(s => ({ ...s, hazColor3: v })); }} />
+          <NumField label="hazToggleCooldownMs" value={sillas.hazToggleCooldownMs} step={50} min={0} max={5000} note="R3-live"
+            onChange={v => { DBG_SILLAS.hazToggleCooldownMs = v; setSillas(s => ({ ...s, hazToggleCooldownMs: v })); }} />
+          <NumField label="hazOnBoost" value={sillas.hazOnBoost} step={0.05} min={1} max={3} note="R3-live (cono + símbolo)"
+            onChange={v => { DBG_SILLAS.hazOnBoost = v; setSillas(s => ({ ...s, hazOnBoost: v })); }} />
+          <span style={{ ...LABEL, marginTop: 4 }}>Band on/off <span style={NOTE}>(R3 — toggle manual)</span></span>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+            {[0, 1, 2, 3].map(i => (
+              <button
+                key={i}
+                style={{ ...INPUT, width: 44, textAlign: "center", cursor: "pointer",
+                  background: bandOnArr[i] ? "rgba(0,120,60,0.6)" : "rgba(40,40,60,0.5)" }}
+                onClick={() => setHazBandOn(i, !bandOnArr[i])}
+              >S{i} {bandOnArr[i] ? "ON" : "off"}</button>
+            ))}
+          </div>
+          <button
+            style={{ width: "100%", marginBottom: 6, padding: "4px 0", cursor: "pointer",
+              fontFamily: "monospace", fontSize: 11,
+              background: "rgba(80,20,20,0.7)", color: "#ff9f9f",
+              border: "1px solid rgba(180,80,80,0.4)", borderRadius: 3 }}
+            onClick={() => { [0,1,2,3].forEach(i => setHazBandOn(i, false)); }}
+          >Apagar todas</button>
 
           <div style={DIVIDER} />
           <span style={LABEL}>Sol N3 <span style={NOTE}>(live)</span></span>
