@@ -308,10 +308,16 @@ export default function DebugMenu() {
     return () => window.removeEventListener("alight:haz-toggle", onToggle);
   }, []);
 
-  // Shift toggles the panel; ignore when focus is in a text/number input
+  // Shift toggles the panel; ignore when focus is in a text/number input.
+  // U8: release pointer lock when opening so the user doesn't need ESC first.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Shift" && !focusRef.current) setVisible(v => !v);
+      if (e.key === "Shift" && !focusRef.current) {
+        setVisible(v => {
+          if (!v && document.pointerLockElement) document.exitPointerLock();
+          return !v;
+        });
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -342,11 +348,24 @@ export default function DebugMenu() {
 
   if (!DEBUG_ENABLED || !visible) return null;
 
+  // U8: stop all pointer/mouse/click/wheel events from bubbling out of the panel.
+  // React SyntheticEvent.stopPropagation() also calls nativeEvent.stopPropagation(),
+  // which prevents events from reaching document — where drei's PointerLockControls
+  // listener lives (it adds `document.addEventListener('click', () => controls.lock())`
+  // when no `selector` prop is given).
+  const stopBubble = (e: React.SyntheticEvent) => e.stopPropagation();
+
   return (
     <div
+      data-debug-panel="1"
       style={PANEL}
       onFocus={() => { focusRef.current = true; }}
       onBlur={() =>  { focusRef.current = false; }}
+      onPointerDown={stopBubble}
+      onMouseDown={stopBubble}
+      onMouseUp={stopBubble}
+      onClick={stopBubble}
+      onWheel={stopBubble}
     >
       <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ color: "#aabbd0", fontWeight: "bold", fontSize: 12 }}>⬛ Debug [Shift]</span>

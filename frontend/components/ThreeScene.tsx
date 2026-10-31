@@ -212,6 +212,8 @@ function Player() {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      // U8: don't move camera while a debug panel input is focused
+      if ((document.activeElement as Element | null)?.closest?.('[data-debug-panel]')) return;
       const k = e.key.toLowerCase();
       if (k in keys.current) keys.current[k as keyof Keys] = true;
       // E key: activate visualizer (SILLAS only, when close to prism)
@@ -669,6 +671,11 @@ export default function ThreeScene() {
 
     const canvas = document.querySelector("canvas");
     const onClick = (e: MouseEvent) => {
+      // U8: block if click originated inside the debug panel
+      if ((e.target as Element | null)?.closest?.('[data-debug-panel]')) {
+        e.stopImmediatePropagation();
+        return;
+      }
       // Block in lectern mode
       if (INTERACT_STATE.mode !== "none") {
         e.stopImmediatePropagation();
