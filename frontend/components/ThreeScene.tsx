@@ -20,6 +20,7 @@ import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizAct
 import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
+import CameraFeedback from "./CameraFeedback";
 import dynamic from "next/dynamic";
 const RetroPostFX = dynamic(() => import("@/components/RetroPostFX"), { ssr: false });
 
@@ -393,6 +394,7 @@ function Scene() {
       <Chairs />
       {path !== "tarima" && <Prism />}
       {path !== "tarima" && <ExperienceDome />}
+      {path !== "tarima" && <CameraFeedback />}
       {path !== "sillas" && <Audience />}
       {path !== "sillas" && <FaceDome />}
       {path !== "sillas" && <WatcherEye />}

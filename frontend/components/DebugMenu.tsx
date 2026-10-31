@@ -1083,6 +1083,31 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.mtFogMedias     = v; setSillas(s => ({ ...s, mtFogMedias:     v })); }} />
 
           <div style={DIVIDER} />
+          <span style={LABEL}>U11 — Camera feedback (haz-toggle) <span style={NOTE}>(live)</span></span>
+          <NumField label="u11ShakeAmpDeg"   value={sillas.u11ShakeAmpDeg}   step={0.1}  min={0}    max={3}     note="sacudida amplitud (°)"
+            onChange={v => { DBG_SILLAS.u11ShakeAmpDeg   = v; setSillas(s => ({ ...s, u11ShakeAmpDeg:   v })); }} />
+          <NumField label="u11ShakeTauS"     value={sillas.u11ShakeTauS}     step={0.01} min={0.02} max={0.5}   note="decaimiento τ (s)"
+            onChange={v => { DBG_SILLAS.u11ShakeTauS     = v; setSillas(s => ({ ...s, u11ShakeTauS:     v })); }} />
+          <NumField label="u11GlarePeakOp"   value={sillas.u11GlarePeakOp}   step={0.05} min={0}    max={1}     note="glare on-toggle opacidad pico"
+            onChange={v => { DBG_SILLAS.u11GlarePeakOp   = v; setSillas(s => ({ ...s, u11GlarePeakOp:   v })); }} />
+          <NumField label="u11GlareAtkS"     value={sillas.u11GlareAtkS}     step={0.01} min={0.01} max={0.3}   note="glare attack time (s)"
+            onChange={v => { DBG_SILLAS.u11GlareAtkS     = v; setSillas(s => ({ ...s, u11GlareAtkS:     v })); }} />
+          <NumField label="u11GlareTauS"     value={sillas.u11GlareTauS}     step={0.01} min={0.05} max={1}     note="glare decaimiento τ (s)"
+            onChange={v => { DBG_SILLAS.u11GlareTauS     = v; setSillas(s => ({ ...s, u11GlareTauS:     v })); }} />
+          <NumField label="u11GlareDimOp"    value={sillas.u11GlareDimOp}    step={0.05} min={0}    max={1}     note="glare off-toggle opacidad pico"
+            onChange={v => { DBG_SILLAS.u11GlareDimOp    = v; setSillas(s => ({ ...s, u11GlareDimOp:    v })); }} />
+          <NumField label="u11FlareCount"    value={sillas.u11FlareCount}    step={1}    min={1}    max={4}     note="círculos de lens flare (1–4)"
+            onChange={v => { DBG_SILLAS.u11FlareCount    = v; setSillas(s => ({ ...s, u11FlareCount:    v })); }} />
+          <NumField label="u11ChromaMs"      value={sillas.u11ChromaMs}      step={10}   min={0}    max={400}   note="aberración cromática duración (ms)"
+            onChange={v => { DBG_SILLAS.u11ChromaMs      = v; setSillas(s => ({ ...s, u11ChromaMs:      v })); }} />
+          <NumField label="u11GlareRadiusFr" value={sillas.u11GlareRadiusFr} step={0.05} min={0.1}  max={1}     note="radio del glow radial (× altura)"
+            onChange={v => { DBG_SILLAS.u11GlareRadiusFr = v; setSillas(s => ({ ...s, u11GlareRadiusFr: v })); }} />
+          <NumField label="u11StreakLenFr"   value={sillas.u11StreakLenFr}   step={0.1}  min={0.2}  max={2}     note="largo del streak (× ancho)"
+            onChange={v => { DBG_SILLAS.u11StreakLenFr   = v; setSillas(s => ({ ...s, u11StreakLenFr:   v })); }} />
+          <NumField label="u11StreakHFr"     value={sillas.u11StreakHFr}     step={0.002} min={0.002} max={0.05} note="alto del streak (× altura)"
+            onChange={v => { DBG_SILLAS.u11StreakHFr     = v; setSillas(s => ({ ...s, u11StreakHFr:     v })); }} />
+
+          <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
           <NumField label="agcFloorRise"   value={sillas.agcFloorRise}   step={0.1}  min={0}    max={5}     note="live"
             onChange={v => { DBG_SILLAS.agcFloorRise   = v; setSillas(s => ({ ...s, agcFloorRise:   v })); }} />

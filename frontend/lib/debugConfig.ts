@@ -267,6 +267,18 @@ export const DBG_SILLAS = {
   mtFogMedias:    0.07,   // atmospheric fog for medias
   mtFogFrente:    0.00,   // atmospheric fog for frente (none)
   mtFogColor:     '#1b1428' as string, // fog color (dark purple-black)
+  // U11: camera feedback on haz-toggle (on = shake + full glare; off = dim glare only)
+  u11ShakeAmpDeg:   0.6,   // shake rotation amplitude (degrees)
+  u11ShakeTauS:     0.17,  // shake exponential decay τ (s) → ~0.5 s duration
+  u11GlarePeakOp:   0.85,  // on-toggle glare peak opacity
+  u11GlareAtkS:     0.08,  // glare attack time (s)
+  u11GlareTauS:     0.22,  // glare exponential decay τ (s) → ~0.8 s visible
+  u11GlareDimOp:    0.30,  // off-toggle glare peak opacity (no shake)
+  u11FlareCount:    3,     // lens flare circles count (1–4)
+  u11ChromaMs:      150,   // chromatic aberration duration (ms, on-toggle only)
+  u11GlareRadiusFr: 0.40,  // radial glow radius as fraction of screen height
+  u11StreakLenFr:   1.10,  // anamorphic streak length as fraction of screen width
+  u11StreakHFr:     0.012, // anamorphic streak height as fraction of screen height
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────
