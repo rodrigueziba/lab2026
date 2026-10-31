@@ -874,6 +874,52 @@ export default function DebugMenu() {
           )}
 
           <div style={DIVIDER} />
+          <span style={LABEL}>U4 — SOL <span style={NOTE}>(anillos desfasados)</span></span>
+          <NumField label="grp0AtkMs"     value={sillas.grp0AtkMs}     step={5}    min={5}   max={500}  note="live"
+            onChange={v => { DBG_SILLAS.grp0AtkMs     = v; setSillas(s => ({ ...s, grp0AtkMs:     v })); }} />
+          <NumField label="grp0RelMs"     value={sillas.grp0RelMs}     step={10}   min={10}  max={2000} note="live"
+            onChange={v => { DBG_SILLAS.grp0RelMs     = v; setSillas(s => ({ ...s, grp0RelMs:     v })); }} />
+          <NumField label="sunRingLagMs"  value={sillas.sunRingLagMs}  step={5}    min={0}   max={200}  note="live"
+            onChange={v => { DBG_SILLAS.sunRingLagMs  = v; setSillas(s => ({ ...s, sunRingLagMs:  v })); }} />
+          <NumField label="sunCoreKickBrt" value={sillas.sunCoreKickBrt} step={0.05} min={0}  max={3}   note="live"
+            onChange={v => { DBG_SILLAS.sunCoreKickBrt = v; setSillas(s => ({ ...s, sunCoreKickBrt: v })); }} />
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>U4 — MONTAÑAS <span style={NOTE}>(respiración lenta)</span></span>
+          <NumField label="grp1AtkMs"    value={sillas.grp1AtkMs}    step={10}   min={10}  max={2000} note="live"
+            onChange={v => { DBG_SILLAS.grp1AtkMs    = v; setSillas(s => ({ ...s, grp1AtkMs:    v })); }} />
+          <NumField label="grp1RelMs"    value={sillas.grp1RelMs}    step={50}   min={50}  max={5000} note="live"
+            onChange={v => { DBG_SILLAS.grp1RelMs    = v; setSillas(s => ({ ...s, grp1RelMs:    v })); }} />
+          <NumField label="mt0AmpBoost"  value={sillas.mt0AmpBoost}  step={0.01} min={0}   max={0.5}  note="fondo"
+            onChange={v => { DBG_SILLAS.mt0AmpBoost  = v; setSillas(s => ({ ...s, mt0AmpBoost:  v })); }} />
+          <NumField label="mt1AmpBoost"  value={sillas.mt1AmpBoost}  step={0.01} min={0}   max={0.5}  note="medias"
+            onChange={v => { DBG_SILLAS.mt1AmpBoost  = v; setSillas(s => ({ ...s, mt1AmpBoost:  v })); }} />
+          <NumField label="mt2AmpBoost"  value={sillas.mt2AmpBoost}  step={0.01} min={0}   max={0.5}  note="frente"
+            onChange={v => { DBG_SILLAS.mt2AmpBoost  = v; setSillas(s => ({ ...s, mt2AmpBoost:  v })); }} />
+          <NumField label="mtPhaseSpd"   value={sillas.mtPhaseSpd}   step={0.1}  min={0}   max={5}    note="rad/s"
+            onChange={v => { DBG_SILLAS.mtPhaseSpd   = v; setSillas(s => ({ ...s, mtPhaseSpd:   v })); }} />
+          <NumField label="mtAzParallax" value={sillas.mtAzParallax} step={0.1}  min={0}   max={5}    note="grados"
+            onChange={v => { DBG_SILLAS.mtAzParallax = v; setSillas(s => ({ ...s, mtAzParallax: v })); }} />
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>U4 — CIELO <span style={NOTE}>(centelleo)</span></span>
+          <NumField label="grp2AtkMs"      value={sillas.grp2AtkMs}      step={5}    min={5}  max={500}  note="live"
+            onChange={v => { DBG_SILLAS.grp2AtkMs      = v; setSillas(s => ({ ...s, grp2AtkMs:      v })); }} />
+          <NumField label="grp2RelMs"      value={sillas.grp2RelMs}      step={10}   min={10} max={2000} note="live"
+            onChange={v => { DBG_SILLAS.grp2RelMs      = v; setSillas(s => ({ ...s, grp2RelMs:      v })); }} />
+          <NumField label="starTwinkleAmp" value={sillas.starTwinkleAmp} step={0.05} min={0}  max={2}    note="live"
+            onChange={v => { DBG_SILLAS.starTwinkleAmp = v; setSillas(s => ({ ...s, starTwinkleAmp: v })); }} />
+          <NumField label="starTwinkleFq"  value={sillas.starTwinkleFq}  step={0.1}  min={0}  max={10}   note="rad/s"
+            onChange={v => { DBG_SILLAS.starTwinkleFq  = v; setSillas(s => ({ ...s, starTwinkleFq:  v })); }} />
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>U4 — LÍNEAS <span style={NOTE}>(ver U5)</span></span>
+          <NumField label="grp3AtkMs" value={sillas.grp3AtkMs} step={5}  min={5}  max={500}  note="live"
+            onChange={v => { DBG_SILLAS.grp3AtkMs = v; setSillas(s => ({ ...s, grp3AtkMs: v })); }} />
+          <NumField label="grp3RelMs" value={sillas.grp3RelMs} step={10} min={10} max={2000} note="live"
+            onChange={v => { DBG_SILLAS.grp3RelMs = v; setSillas(s => ({ ...s, grp3RelMs: v })); }} />
+
+          <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
           <NumField label="agcFloorRise"   value={sillas.agcFloorRise}   step={0.1}  min={0}    max={5}     note="live"
             onChange={v => { DBG_SILLAS.agcFloorRise   = v; setSillas(s => ({ ...s, agcFloorRise:   v })); }} />

@@ -9,6 +9,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { VIZ_SUN_AZ_DEG, VIZ_SUN_EL_DEG } from "@/lib/vizSunState";
+import { BAND_STATE } from "@/lib/vizAudio";
 
 // ── Geometry constants ────────────────────────────────────────────────────────
 const DOME_R = 28;
@@ -144,12 +145,12 @@ const SUN_NUCLEO_SZ = 2 * SUN_R * Math.tan(15 * DEG / 2);
 // ── Component ─────────────────────────────────────────────────────────────────
 export interface VizPanoramaProps {
   growRef:  React.MutableRefObject<number[]>;
-  pulseRef: React.MutableRefObject<number[]>;
+  pulseRef?: React.MutableRefObject<number[]>; // U4: VizPanorama reads BAND_STATE directly now
   flowRef:  React.MutableRefObject<number>;
   kickRef:  React.MutableRefObject<number>;
 }
 
-export default function VizPanorama({ growRef, pulseRef, flowRef, kickRef }: VizPanoramaProps) {
+export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaProps) {
   const { gl } = useThree();
   const maxAniso = useMemo(() => gl.capabilities.getMaxAnisotropy(), [gl]);
 
@@ -172,6 +173,10 @@ export default function VizPanorama({ growRef, pulseRef, flowRef, kickRef }: Viz
   const fondoMeshRef  = useRef<THREE.Mesh | null>(null);
   const mediasMeshRef = useRef<THREE.Mesh | null>(null);
   const frenteMeshRef = useRef<THREE.Mesh | null>(null);
+
+  // ── U4: per-group envelope smooth state (no per-frame alloc) ────────────
+  const grpPulseRef = useRef([0, 0, 0, 0]);  // smoothed normEnergy per group
+  const sunSmoRef   = useRef([0, 0, 0]);      // smoothed per ring (anillo, disco, nucleo)
 
   // ── Cloud current azimuths (mutable, no React state) ─────────────────────
   const cloudAzRef = useRef(CLOUD_DATA.map(c => c.az0));
@@ -285,72 +290,58 @@ export default function VizPanorama({ growRef, pulseRef, flowRef, kickRef }: Viz
   }, [maxAniso]);
 
   // ── Per-frame updates ─────────────────────────────────────────────────────
-  useFrame((_, dt) => {
+  useFrame(({ clock }, dt) => {
     const gr   = growRef.current;
-    const pu   = pulseRef.current;
     const kick = kickRef.current;
+    const t_s  = clock.elapsedTime;    // seconds, for oscillators
 
-    // Eased grow values (respect debug force overrides)
+    // ── Eased grow values (respect debug force overrides) ─────────────────
     const g0 = eo3(DBG_SILLAS.vizGrowForce0 >= 0 ? DBG_SILLAS.vizGrowForce0 : gr[0]);
     const g1 = eo3(DBG_SILLAS.vizGrowForce1 >= 0 ? DBG_SILLAS.vizGrowForce1 : gr[1]);
     const g2 = eo3(DBG_SILLAS.vizGrowForce2 >= 0 ? DBG_SILLAS.vizGrowForce2 : gr[2]);
     const g3 = eo3(DBG_SILLAS.vizGrowForce3 >= 0 ? DBG_SILLAS.vizGrowForce3 : gr[3]);
 
-    // ── Mountains (group 1) — staggered bottom-to-top reveal + Y scale ─
-    // uReveal = -0.1 (nothing) … 1.1 (fully revealed)
-    const p1 = pu[1];
-    const mtBright = 1 + p1 * DBG_SILLAS.mtBrightBoost + kick * DBG_SILLAS.kickExtraBoost;
-    const mtSc     = 1 + p1 * DBG_SILLAS.mtHeightBoost  + kick * DBG_SILLAS.u2KickScale;
-    fondoU.uReveal.value  = eo3(Math.min(1, g1 / 0.6))                     * 1.2 - 0.1;
-    fondoU.uBright.value  = mtBright;
-    mediasU.uReveal.value = eo3(Math.max(0, Math.min(1, (g1 - 0.2) / 0.6))) * 1.2 - 0.1;
-    mediasU.uBright.value = mtBright;
-    frenteU.uReveal.value = eo3(Math.max(0, Math.min(1, (g1 - 0.4) / 0.6))) * 1.2 - 0.1;
-    frenteU.uBright.value = mtBright;
-    if (fondoMeshRef.current)  fondoMeshRef.current.scale.y  = mtSc;
-    if (mediasMeshRef.current) mediasMeshRef.current.scale.y = mtSc;
-    if (frenteMeshRef.current) frenteMeshRef.current.scale.y = mtSc;
-
-    // ── Lines (group 3) — scroll + amplitude brightness ─────────────────
-    lineU.uReveal.value  = g3 * 1.2 - 0.1;
-    lineU.uBright.value  = 1 + pu[3] * DBG_SILLAS.lineAmpBoost + kick * DBG_SILLAS.kickExtraBoost;
-    lineU.uOffset.value  = flowRef.current / (Math.PI * 2);
-
-    // ── Stars (group 2) — top-down reveal + scale + brightness ──────────
-    const p2 = pu[2];
-    for (let i = 0; i < STAR_COUNT; i++) {
-      const sp = starSpritesRef.current[i];
-      if (!sp) continue;
-      const t   = STAR_DATA[i].t;
-      const rev = THREE.MathUtils.smoothstep(1 - t, 1 - t + 0.1, g2);
-      sp.material.opacity = Math.min(1, rev * (1 + p2 * 0.6 + kick * 0.3));
-      sp.scale.setScalar(STAR_DATA[i].sz * (1 + p2 * DBG_SILLAS.u2StarScaleBoost + kick * DBG_SILLAS.u2KickScale));
+    // ── U4: per-group envelope (attack/release from BAND_STATE directly) ──
+    const assign = BAND_STATE.assignment;
+    const norm   = BAND_STATE.normEnergy;
+    const gp     = grpPulseRef.current;
+    const atkMs  = [DBG_SILLAS.grp0AtkMs, DBG_SILLAS.grp1AtkMs, DBG_SILLAS.grp2AtkMs, DBG_SILLAS.grp3AtkMs];
+    const relMs  = [DBG_SILLAS.grp0RelMs, DBG_SILLAS.grp1RelMs, DBG_SILLAS.grp2RelMs, DBG_SILLAS.grp3RelMs];
+    for (let i = 0; i < 4; i++) {
+      const raw  = norm[assign[i]] ?? 0;
+      const prev = gp[i];
+      const af   = 1 - Math.exp(-dt / (atkMs[i] / 1000));
+      const rf   = 1 - Math.exp(-dt / (relMs[i] / 1000));
+      gp[i]      = raw > prev ? prev + (raw - prev) * af : prev + (raw - prev) * rf;
     }
+    const p0 = gp[0];  // SOL
+    const p1 = gp[1];  // MONTAÑAS
+    const p2 = gp[2];  // CIELO
+    const p3 = gp[3];  // LÍNEAS
 
-    // ── Clouds (group 2) — drift + reveal ────────────────────────────────
-    for (let i = 0; i < CLOUD_COUNT; i++) {
-      const sp = cloudSpritesRef.current[i];
-      if (!sp) continue;
-      cloudAzRef.current[i] += CLOUD_DATA[i].driftSpeed * dt;
-      const az = cloudAzRef.current[i] * DEG;
-      const el = CLOUD_DATA[i].el * DEG;
-      const sr = DOME_R * 0.94;
-      sp.position.set(sr * Math.cos(el) * Math.cos(az), sr * Math.sin(el), sr * Math.cos(el) * Math.sin(az));
-      const ct = CLOUD_DATA[i].t;
-      sp.material.opacity = THREE.MathUtils.smoothstep(1 - ct, 1 - ct + 0.15, g2) * 0.85;
+    // ── SOL (group 0) — golpe seco, 3 rings desfasados 40ms ──────────────
+    const ss   = sunSmoRef.current;
+    const b0   = assign[0];
+    const raw0 = norm[b0] ?? 0;
+    const lagMs = DBG_SILLAS.sunRingLagMs;
+    for (let r = 0; r < 3; r++) {
+      const effAtk = DBG_SILLAS.grp0AtkMs + r * lagMs;
+      const effRel = DBG_SILLAS.grp0RelMs + r * lagMs * 0.5;
+      const af     = 1 - Math.exp(-dt / (effAtk / 1000));
+      const rf     = 1 - Math.exp(-dt / (effRel / 1000));
+      const prev   = ss[r];
+      ss[r]        = raw0 > prev ? prev + (raw0 - prev) * af : prev + (raw0 - prev) * rf;
     }
-
-    // ── Sun (group 0) — rises from horizon + scale pulse ─────────────────
-    const p0  = pu[0];
     const sunEl  = VIZ_SUN_EL_DEG * g0 * DEG;
     const sunAz  = SUN_AZ_RAD;
     const sunPX  = SUN_R * Math.cos(sunEl) * Math.cos(sunAz);
     const sunPY  = SUN_R * Math.sin(sunEl);
     const sunPZ  = SUN_R * Math.cos(sunEl) * Math.sin(sunAz);
-    const sunOp  = Math.min(1, THREE.MathUtils.smoothstep(0, 0.15, g0) * (1 + p0 * DBG_SILLAS.sunBrightBoost + kick * 0.3));
-    const ringSz = SUN_RING_SZ   * (1 + p0 * DBG_SILLAS.u2SunRingBoost  + kick * DBG_SILLAS.u2KickScale);
-    const discSz = SUN_DISCO_SZ  * (1 + p0 * DBG_SILLAS.u2SunDiscBoost  + kick * DBG_SILLAS.u2KickScale * 0.8);
-    const coreSz = SUN_NUCLEO_SZ * (1 + p0 * DBG_SILLAS.u2SunCoreBoost  + kick * DBG_SILLAS.u2KickScale * 1.2);
+    const sunOp  = Math.min(1, THREE.MathUtils.smoothstep(0, 0.15, g0) * (1 + p0 * DBG_SILLAS.sunBrightBoost));
+    const ringSz = SUN_RING_SZ   * (1 + ss[0] * DBG_SILLAS.u2SunRingBoost + kick * DBG_SILLAS.u2KickScale);
+    const discSz = SUN_DISCO_SZ  * (1 + ss[1] * DBG_SILLAS.u2SunDiscBoost + kick * DBG_SILLAS.u2KickScale * 0.8);
+    const coreSz = SUN_NUCLEO_SZ * (1 + ss[2] * DBG_SILLAS.u2SunCoreBoost + kick * DBG_SILLAS.u2KickScale * 1.2);
+    const coreOp = Math.min(1, sunOp * (1 + kick * DBG_SILLAS.sunCoreKickBrt)); // core blinks on kick
     if (sunAnilloRef.current)  {
       sunAnilloRef.current.position.set(sunPX, sunPY, sunPZ);
       sunAnilloRef.current.material.opacity = sunOp;
@@ -363,8 +354,58 @@ export default function VizPanorama({ growRef, pulseRef, flowRef, kickRef }: Viz
     }
     if (sunNucleoRef.current)  {
       sunNucleoRef.current.position.set(sunPX, sunPY, sunPZ);
-      sunNucleoRef.current.material.opacity = sunOp;
+      sunNucleoRef.current.material.opacity = coreOp;
       sunNucleoRef.current.scale.set(coreSz, coreSz, 1);
+    }
+
+    // ── MONTAÑAS (group 1) — respiración lenta, per-layer phase + parallax
+    const mtBright = 1 + p1 * DBG_SILLAS.mtBrightBoost + kick * DBG_SILLAS.kickExtraBoost;
+    const phSpd    = DBG_SILLAS.mtPhaseSpd;
+    const mt0Sc = 1 + p1 * DBG_SILLAS.mt0AmpBoost * Math.sin(t_s * phSpd);
+    const mt1Sc = 1 + p1 * DBG_SILLAS.mt1AmpBoost * Math.sin(t_s * phSpd + 2.094); // +120°
+    const mt2Sc = 1 + p1 * DBG_SILLAS.mt2AmpBoost * Math.sin(t_s * phSpd + 4.189); // +240°
+    const azPar = p1 * DBG_SILLAS.mtAzParallax * DEG;
+    fondoU.uReveal.value  = eo3(Math.min(1, g1 / 0.6))                     * 1.2 - 0.1;
+    fondoU.uBright.value  = mtBright;
+    mediasU.uReveal.value = eo3(Math.max(0, Math.min(1, (g1 - 0.2) / 0.6))) * 1.2 - 0.1;
+    mediasU.uBright.value = mtBright;
+    frenteU.uReveal.value = eo3(Math.max(0, Math.min(1, (g1 - 0.4) / 0.6))) * 1.2 - 0.1;
+    frenteU.uBright.value = mtBright;
+    if (fondoMeshRef.current)  { fondoMeshRef.current.scale.y  = mt0Sc; fondoMeshRef.current.rotation.y  = azPar * 0.4; }
+    if (mediasMeshRef.current) { mediasMeshRef.current.scale.y = mt1Sc; mediasMeshRef.current.rotation.y = azPar * 0.7; }
+    if (frenteMeshRef.current) { frenteMeshRef.current.scale.y = mt2Sc; frenteMeshRef.current.rotation.y = azPar; }
+
+    // ── LÍNEAS (group 3) — scroll + amplitude (U5 will expand this) ───────
+    lineU.uReveal.value  = g3 * 1.2 - 0.1;
+    lineU.uBright.value  = 1 + p3 * DBG_SILLAS.lineAmpBoost + kick * DBG_SILLAS.kickExtraBoost;
+    lineU.uOffset.value  = flowRef.current / (Math.PI * 2);
+
+    // ── CIELO stars (group 2) — centelleo con fase propia ────────────────
+    const twFq  = DBG_SILLAS.starTwinkleFq;
+    const twAmp = DBG_SILLAS.starTwinkleAmp;
+    for (let i = 0; i < STAR_COUNT; i++) {
+      const sp = starSpritesRef.current[i];
+      if (!sp) continue;
+      const t     = STAR_DATA[i].t;
+      const ph    = STAR_DATA[i].rot;
+      const freq  = twFq * (0.7 + t * 0.6);  // higher stars twinkle faster
+      const osc   = 0.5 + 0.5 * Math.sin(t_s * freq + ph);   // 0–1
+      const rev   = THREE.MathUtils.smoothstep(1 - t, 1 - t + 0.1, g2);
+      sp.material.opacity = Math.min(1, rev * (1 + p2 * 0.5 * osc + kick * 0.3));
+      sp.scale.setScalar(STAR_DATA[i].sz * (1 + p2 * twAmp * osc + kick * DBG_SILLAS.u2KickScale));
+    }
+
+    // ── CIELO clouds (group 2) — drift faster with energy ─────────────────
+    for (let i = 0; i < CLOUD_COUNT; i++) {
+      const sp = cloudSpritesRef.current[i];
+      if (!sp) continue;
+      cloudAzRef.current[i] += CLOUD_DATA[i].driftSpeed * (1 + p2 * 3) * dt;
+      const az = cloudAzRef.current[i] * DEG;
+      const el = CLOUD_DATA[i].el * DEG;
+      const sr = DOME_R * 0.94;
+      sp.position.set(sr * Math.cos(el) * Math.cos(az), sr * Math.sin(el), sr * Math.cos(el) * Math.sin(az));
+      const ct = CLOUD_DATA[i].t;
+      sp.material.opacity = THREE.MathUtils.smoothstep(1 - ct, 1 - ct + 0.15, g2) * (0.75 + p2 * 0.25);
     }
   });
 

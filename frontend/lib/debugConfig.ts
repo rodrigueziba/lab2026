@@ -185,6 +185,23 @@ export const DBG_SILLAS = {
   u2SunCoreBoost:    0.20, // core scale +%
   u2StarScaleBoost:  1.20, // star scale boost (size × (1 + boost × energy) → max 2.2×)
   u2KickScale:       0.05, // kick flash scale boost (+5%)
+  // U4: per-group attack/release envelopes (ms)
+  grp0AtkMs:   15,   grp0RelMs:  120,  // SOL: golpe seco
+  grp1AtkMs:  120,   grp1RelMs:  600,  // MONTAÑAS: respiración lenta
+  grp2AtkMs:   30,   grp2RelMs:  300,  // CIELO: centelleo
+  grp3AtkMs:   50,   grp3RelMs:  250,  // LÍNEAS
+  // U4: SOL — ring phase lag + core kick brightness
+  sunRingLagMs:    40,    // ms of smoothing lag added per ring (ring < disco < core)
+  sunCoreKickBrt:  0.80,  // core brightness boost on kick
+  // U4: MONTAÑAS — per-layer amplitude + azimuth parallax
+  mt0AmpBoost:  0.20,  // fondo Y-scale amplitude (±20%)
+  mt1AmpBoost:  0.15,  // medias Y-scale amplitude (±15%)
+  mt2AmpBoost:  0.10,  // frente Y-scale amplitude (±10%)
+  mtPhaseSpd:   0.80,  // oscillation speed (rad/s on flowRef)
+  mtAzParallax: 1.00,  // max azimuth shift (degrees)
+  // U4: CIELO — star twinkle
+  starTwinkleAmp:  0.70,  // scale amplitude (max scale = 1 + amp ≈ 2.4× with energy)
+  starTwinkleFq:   2.20,  // twinkle base frequency (rad/s)
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────
