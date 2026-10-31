@@ -6,13 +6,43 @@ export const DEBUG_ENABLED = true; // set to false before production build
 
 // ── SILLAS path ───────────────────────────────────────────────────────────────
 export const DBG_SPOTLIGHT = {
-  color:       "#fff5dc" as string,
-  intensity:   3500,
+  color:       "#9fe6ff" as string, // R4: cool dim — was "#fff5dc"
+  intensity:   1400,                // R4: 40% of 3500
   distance:    55,
   angle:       0.3,
   penumbra:    0.4,
   attenuation: 6,
   anglePower:  5,
+};
+
+// ── R4: retro post-process + scene atmosphere ─────────────────────────────────
+export const DBG_RETRO_FX = {
+  enabled:          true,            // RETRO_POSTFX_ENABLED
+  quality:          "medium" as "low" | "medium" | "high",
+  comfortMode:      false,           // disables wobble + CA
+  // CRT pass tunable values (live)
+  crtCurveFX:       0.06,
+  crtScanFX:        0.18,
+  crtScanCount:     360,
+  crtCA:            0.0012,
+  crtGrain:         0.045,
+  crtVig:           0.38,
+  crtWobble:        0.0006,
+  crtLift:          0.015,
+  // Bloom
+  bloomIntensity:   0.45,
+  // Scene atmosphere
+  toneExposure:     0.8,
+  hemiSkyColor:     "#1a2330" as string,
+  hemiGndColor:     "#0d0a12" as string,
+  hemiIntensity:    0.25,
+  fogColor:         "#0b0a14" as string,
+  fogDensity:       0.015,
+  // Cone scanlines (R4)
+  hazStripeM:       0.05,    // stripe period in metres
+  hazStripeWidth:   0.22,    // lit fraction per period (0–1)
+  hazStripeSpeed:   0.08,    // rise speed (m/s)
+  hazStripeBoost:   2.5,     // brightness multiplier vs cone base
 };
 
 export const DBG_PRISM = {

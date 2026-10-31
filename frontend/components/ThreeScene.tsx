@@ -17,8 +17,11 @@ import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from ".
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import { STORE, INTERACT_STATE, storeSubscribe } from "@/lib/alightStore";
-import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { RETRO_FLAGS } from "@/lib/retro/composer";
 import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
+import dynamic from "next/dynamic";
+const RetroPostFX = dynamic(() => import("@/lib/retro/composer"), { ssr: false });
 
 const ZONA_LUZ    = new THREE.Vector3(0, 1.6,  0);
 const ZONA_SILLAS = new THREE.Vector3(0, 1.6, -6); // G2: 1 m further
@@ -82,7 +85,7 @@ function DiagonalSpot() {
   return (
     <SpotLight
       position={[9, 18, 10]}
-      color="#fff5dc"
+      color={DBG_SPOTLIGHT.color}
       intensity={intensity}
       distance={55}
       angle={0.3}
@@ -371,9 +374,18 @@ function Scene() {
 
   return (
     <>
-      <color attach="background" args={["#020202"]} />
-      <fog attach="fog" args={["#020202", 25, 65]} />
-      <ambientLight intensity={0.04} />
+      <color attach="background" args={["#0a0812"]} />
+      {/* R4: FogExp2 replaces linear fog — color #0b0a14, density 0.015 */}
+      <fogExp2 attach="fog" args={["#0b0a14", DBG_RETRO_FX.fogDensity]} />
+      <ambientLight intensity={0.02} />
+      {/* R4: hemisphere light — cool sky, warm ground */}
+      <hemisphereLight
+        args={[DBG_RETRO_FX.hemiSkyColor as THREE.ColorRepresentation,
+               DBG_RETRO_FX.hemiGndColor as THREE.ColorRepresentation,
+               DBG_RETRO_FX.hemiIntensity]}
+      />
+      {/* R4: retro post-process (CRT + bloom) */}
+      {RETRO_FLAGS.enabled && <RetroPostFX />}
       {/* N6: red velvet curtain — visible until player crosses the plane */}
       {curtainVisible && <Curtain />}
       <Room />

@@ -1,0 +1,88 @@
+import * as THREE from "three";
+
+// CRT + VHS tape post-process shader for ShaderPass (three/addons).
+// R4: R4 initial values are toned down from the brief defaults.
+
+export const RetroCRTShader = {
+  uniforms: {
+    tDiffuse:   { value: null },
+    uTime:      { value: 0 },
+    uRes:       { value: new THREE.Vector2(1, 1) },
+    uCurve:     { value: 0.06 },    // barrel distortion
+    uScan:      { value: 0.18 },    // scanline intensity
+    uScanCount: { value: 360.0 },   // scanline density
+    uCA:        { value: 0.0012 },  // chromatic aberration
+    uGrain:     { value: 0.045 },   // film grain
+    uVig:       { value: 0.38 },    // vignette strength
+    uWobble:    { value: 0.0006 },  // VHS horizontal jitter
+    uTint:      { value: new THREE.Color(1.0, 0.96, 0.88) }, // creamy whites
+    uLift:      { value: 0.015 },   // raised blacks
+    uComfort:   { value: 0 },       // 1 = comfort mode (kill wobble + CA)
+  },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse;
+    uniform vec2  uRes;
+    uniform float uTime, uCurve, uScan, uScanCount, uCA, uGrain, uVig, uWobble, uLift;
+    uniform float uComfort;
+    uniform vec3  uTint;
+    varying vec2  vUv;
+
+    float hash(vec2 p) {
+      return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+    }
+    vec2 barrel(vec2 uv, float k) {
+      vec2 c = uv * 2.0 - 1.0;
+      c *= 1.0 + k * dot(c, c);
+      return c * 0.5 + 0.5;
+    }
+
+    void main() {
+      vec2 uv = barrel(vUv, uCurve);
+      if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
+      }
+
+      // VHS tape wobble (comfort mode: disabled)
+      float effWobble = uWobble * (1.0 - uComfort);
+      float band = floor(uv.y * 48.0);
+      float jit  = (hash(vec2(band, floor(uTime * 8.0))) - 0.5) * effWobble * 2.0;
+      uv.x += jit + sin(uv.y * 30.0 + uTime * 2.0) * effWobble * 0.3;
+
+      // Chromatic aberration (comfort mode: disabled)
+      vec2  d   = uv - 0.5;
+      float effCA = uCA * (1.0 - uComfort);
+      vec3 col;
+      col.r = texture2D(tDiffuse, uv + d * effCA * 2.0).r;
+      col.g = texture2D(tDiffuse, uv).g;
+      col.b = texture2D(tDiffuse, uv - d * effCA * 2.0).b;
+
+      // Scanlines
+      float s = 0.5 - 0.5 * cos(uv.y * uScanCount * 6.28318);
+      col *= 1.0 - uScan * s;
+
+      // Film grain
+      col += (hash(uv * uRes + uTime) - 0.5) * uGrain;
+
+      // Vignette (uses pre-barrel UV)
+      vec2 vc = vUv * 2.0 - 1.0;
+      col *= 1.0 - uVig * smoothstep(0.4, 1.4, dot(vc, vc));
+
+      // Creamy whites + raised blacks — cap luminance at 0.92
+      col = col * uTint + uLift;
+      col = min(col, 0.92);
+
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+};
+
+// Shared singleton uniforms — mutated by RetroPostFX each frame
+export const CRT_UNIFORMS = RetroCRTShader.uniforms;

@@ -269,18 +269,21 @@ const DOMESKY_FRAG = /* glsl */`
     vec3  dir  = normalize(vWorldPos);
     float elev = dir.y;
 
-    // Dark gradient: #02030a (zenith) → #060a1c (horizon/below)
-    vec3 zenith = vec3(0.00784, 0.01176, 0.03922);
-    vec3 horiz  = vec3(0.02353, 0.03922, 0.10980);
-    vec3 sky    = mix(horiz, zenith, smoothstep(-0.30, 0.80, elev));
+    // R4: Dark sky — #0a0812 (zenith) → #1b1426 (horizon), amber glow #2A1400 near horizon
+    vec3 zenith  = vec3(0.03922, 0.03137, 0.07059);
+    vec3 horiz   = vec3(0.10588, 0.07843, 0.14902);
+    vec3 sky     = mix(horiz, zenith, smoothstep(-0.30, 0.80, elev));
+    // Horizon amber glow: 15% of #2A1400 fades in near elev=0
+    vec3 horizGlow = vec3(0.16471, 0.07843, 0.0);
+    sky = mix(sky, horizGlow, 0.15 * smoothstep(0.25, 0.0, abs(elev)));
 
-    // Sun disc + soft glow
+    // Sun disc + soft glow — R4: amber phosphor #FF9A1F
     float cosAngle  = dot(dir, normalize(uSunDir));
     float cosEdge   = cos(uSunAngularRad);
     float cosInner  = cos(uSunAngularRad * 0.65);
     float sunDisc   = smoothstep(cosEdge, cosInner, cosAngle);
     float sunGlow   = pow(max(0.0, cosAngle), 48.0) * 0.45;
-    vec3  sunColor  = vec3(1.0, 0.855, 0.608);
+    vec3  sunColor  = vec3(1.0, 0.60392, 0.12157);
     sky += sunColor * (sunDisc + sunGlow) * uSunIntensity;
 
     // N5: static interference overlay (left monolith proximity)
@@ -548,7 +551,7 @@ export default function DomeVisualizer() {
       {/* N3: sun sphere — small emissive mesh at sun world position */}
       <mesh position={sunData.pos}>
         <sphereGeometry args={[0.9, 12, 8]} />
-        <meshBasicMaterial color="#ffd9a0" toneMapped={false} />
+        <meshBasicMaterial color="#FF9A1F" toneMapped={false} />
       </mesh>
       {/* N3: halo sprite — additive glow billboard centred on sun */}
       <sprite position={sunData.pos} scale={[7, 7, 1]}>

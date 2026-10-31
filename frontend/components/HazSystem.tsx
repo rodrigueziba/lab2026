@@ -7,7 +7,7 @@
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_RETRO_FX } from "@/lib/debugConfig";
 import { getHazUnderUser, getHazPositionsXZ } from "@/lib/haz";
 import { startVizAudio, openGate, closeGate, isPlaying } from "@/lib/vizAudio";
 
@@ -39,12 +39,23 @@ const CONE_VERT = /* glsl */`
 const CONE_FRAG = /* glsl */`
   uniform float uOpacity;
   uniform vec3  uColor;
+  uniform float uHalfH;
+  uniform float uTime;
+  uniform float uStripeM;
+  uniform float uStripeWidth;
+  uniform float uStripeSpeed;
+  uniform float uStripeBoost;
   varying float vHeightFrac;
   varying float vFresnel;
   void main() {
-    float vGrad = sin(vHeightFrac * 3.14159265);
-    float alpha = uOpacity * (0.15 + 0.85 * vFresnel) * vGrad;
-    gl_FragColor = vec4(uColor, alpha);
+    float vGrad     = sin(vHeightFrac * 3.14159265);
+    float baseAlpha = uOpacity * (0.15 + 0.85 * vFresnel) * vGrad;
+    // R4: rising horizontal stripes — hard edges, neon boost
+    float worldH    = vHeightFrac * uHalfH * 2.0;
+    float sPos      = fract((worldH - uTime * uStripeSpeed) / uStripeM);
+    float stripe    = step(1.0 - uStripeWidth, sPos);
+    float alpha     = baseAlpha + stripe * uOpacity * uStripeBoost * vGrad;
+    gl_FragColor    = vec4(uColor, alpha);
   }
 `;
 
@@ -130,9 +141,14 @@ export default function HazSystem() {
       // Cone: short, additive, fresnel+gradient shader
       const coneMat = new THREE.ShaderMaterial({
         uniforms: {
-          uColor:   { value: new THREE.Color() },
-          uOpacity: { value: DBG_SILLAS.hazConeOpacity },
-          uHalfH:   { value: halfH },
+          uColor:       { value: new THREE.Color() },
+          uOpacity:     { value: DBG_SILLAS.hazConeOpacity },
+          uHalfH:       { value: halfH },
+          uTime:        { value: 0 },
+          uStripeM:     { value: DBG_RETRO_FX.hazStripeM },
+          uStripeWidth: { value: DBG_RETRO_FX.hazStripeWidth },
+          uStripeSpeed: { value: DBG_RETRO_FX.hazStripeSpeed },
+          uStripeBoost: { value: DBG_RETRO_FX.hazStripeBoost },
         },
         vertexShader:   CONE_VERT,
         fragmentShader: CONE_FRAG,
@@ -179,7 +195,7 @@ export default function HazSystem() {
     };
   }, [scene]);
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera, clock }) => {
     getHazUnderUser(camera.position.x, camera.position.z);
 
     const positions = getHazPositionsXZ();
@@ -210,8 +226,13 @@ export default function HazSystem() {
       const { mesh: coneMesh, mat: coneMat } = cones[i];
       coneMesh.position.set(bx, originH / 2, bz);
       coneMat.uniforms.uColor.value.copy(col);
-      coneMat.uniforms.uOpacity.value = DBG_SILLAS.hazConeOpacity *
+      coneMat.uniforms.uOpacity.value     = DBG_SILLAS.hazConeOpacity *
         (gateStateRef.current[i] ? DBG_SILLAS.hazOnBoost : 1.0);
+      coneMat.uniforms.uTime.value        = clock.elapsedTime;
+      coneMat.uniforms.uStripeM.value     = DBG_RETRO_FX.hazStripeM;
+      coneMat.uniforms.uStripeWidth.value = DBG_RETRO_FX.hazStripeWidth;
+      coneMat.uniforms.uStripeSpeed.value = DBG_RETRO_FX.hazStripeSpeed;
+      coneMat.uniforms.uStripeBoost.value = DBG_RETRO_FX.hazStripeBoost;
 
       // Luminaria housing centred at origin height
       boxes[i].position.set(bx, originH, bz);
