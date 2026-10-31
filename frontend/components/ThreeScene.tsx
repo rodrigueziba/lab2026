@@ -12,6 +12,7 @@ import Prism from "./Prism";
 import Tarima from "./Tarima";
 import FaceDome from "./FaceDome";
 import WatcherEye from "./WatcherEye";
+import Curtain from "./Curtain";
 import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from "./LecternSystem";
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
@@ -175,22 +176,39 @@ function Player() {
       _D.path = "none";
     };
 
-    window.addEventListener("alight:chose-chairs",     onSit);
-    window.addEventListener("alight:chose-light",      onLight);
-    window.addEventListener("alight:dome-revealed",    onReveal);
-    window.addEventListener("alight:prism-landed",     onLanded);
-    window.addEventListener("alight:lecterns-visible", onLecterns);
-    window.addEventListener("alight:debug-skip-sillas",  onSkip);
-    window.addEventListener("alight:debug-reset-sillas", onReset);
+    // N6: curtain-passed → unblock zone choices; debug shortcuts
+    const onCurtainPassed = () => { INTERACT_STATE.experienceState = 'exploracion'; };
+    const onSkipCurtain   = () => {
+      INTERACT_STATE.experienceState = 'exploracion';
+      window.dispatchEvent(new CustomEvent("alight:curtain-done"));
+    };
+    const onResetCurtain  = () => {
+      INTERACT_STATE.experienceState = 'cortina';
+      window.dispatchEvent(new CustomEvent("alight:curtain-reshow"));
+    };
+
+    window.addEventListener("alight:chose-chairs",          onSit);
+    window.addEventListener("alight:chose-light",           onLight);
+    window.addEventListener("alight:dome-revealed",         onReveal);
+    window.addEventListener("alight:prism-landed",          onLanded);
+    window.addEventListener("alight:lecterns-visible",      onLecterns);
+    window.addEventListener("alight:debug-skip-sillas",     onSkip);
+    window.addEventListener("alight:debug-reset-sillas",    onReset);
+    window.addEventListener("alight:curtain-passed",        onCurtainPassed);
+    window.addEventListener("alight:debug-skip-curtain",    onSkipCurtain);
+    window.addEventListener("alight:debug-reset-curtain",   onResetCurtain);
     return () => {
       if (releaseTimerRef.current) clearTimeout(releaseTimerRef.current);
-      window.removeEventListener("alight:chose-chairs",     onSit);
-      window.removeEventListener("alight:chose-light",      onLight);
-      window.removeEventListener("alight:dome-revealed",    onReveal);
-      window.removeEventListener("alight:prism-landed",     onLanded);
-      window.removeEventListener("alight:lecterns-visible", onLecterns);
-      window.removeEventListener("alight:debug-skip-sillas",  onSkip);
-      window.removeEventListener("alight:debug-reset-sillas", onReset);
+      window.removeEventListener("alight:chose-chairs",          onSit);
+      window.removeEventListener("alight:chose-light",           onLight);
+      window.removeEventListener("alight:dome-revealed",         onReveal);
+      window.removeEventListener("alight:prism-landed",          onLanded);
+      window.removeEventListener("alight:lecterns-visible",      onLecterns);
+      window.removeEventListener("alight:debug-skip-sillas",     onSkip);
+      window.removeEventListener("alight:debug-reset-sillas",    onReset);
+      window.removeEventListener("alight:curtain-passed",        onCurtainPassed);
+      window.removeEventListener("alight:debug-skip-curtain",    onSkipCurtain);
+      window.removeEventListener("alight:debug-reset-curtain",   onResetCurtain);
     };
   }, []);
 
@@ -275,7 +293,8 @@ function Player() {
     }
     cam.position.y = 1.6;
 
-    if (!triggered.current) {
+    // N6: zone choices blocked until player has passed the curtain
+    if (!triggered.current && INTERACT_STATE.experienceState !== 'cortina') {
       if (cam.position.distanceTo(ZONA_LUZ) < 2.5) {
         triggered.current = true;
         window.dispatchEvent(new CustomEvent("alight:chose-light"));
@@ -330,15 +349,23 @@ function Player() {
 // ── Scene content ─────────────────────────────────────────────────────────────
 function Scene() {
   const [path, setPath] = useState<"none" | "sillas" | "tarima">("none");
+  // N6: curtain visible until 'alight:curtain-done'; restored by 'alight:curtain-reshow'
+  const [curtainVisible, setCurtainVisible] = useState(true);
 
   useEffect(() => {
-    const onS = () => setPath("sillas");
-    const onT = () => setPath("tarima");
-    window.addEventListener("alight:chose-chairs", onS);
-    window.addEventListener("alight:chose-light",  onT);
+    const onS      = () => setPath("sillas");
+    const onT      = () => setPath("tarima");
+    const onDone   = () => setCurtainVisible(false);
+    const onReshow = () => setCurtainVisible(true);
+    window.addEventListener("alight:chose-chairs",   onS);
+    window.addEventListener("alight:chose-light",    onT);
+    window.addEventListener("alight:curtain-done",   onDone);
+    window.addEventListener("alight:curtain-reshow", onReshow);
     return () => {
-      window.removeEventListener("alight:chose-chairs", onS);
-      window.removeEventListener("alight:chose-light",  onT);
+      window.removeEventListener("alight:chose-chairs",   onS);
+      window.removeEventListener("alight:chose-light",    onT);
+      window.removeEventListener("alight:curtain-done",   onDone);
+      window.removeEventListener("alight:curtain-reshow", onReshow);
     };
   }, []);
 
@@ -347,6 +374,8 @@ function Scene() {
       <color attach="background" args={["#020202"]} />
       <fog attach="fog" args={["#020202", 25, 65]} />
       <ambientLight intensity={0.04} />
+      {/* N6: red velvet curtain — visible until player crosses the plane */}
+      {curtainVisible && <Curtain />}
       <Room />
       <DiagonalSpot />
       <Tarima />
