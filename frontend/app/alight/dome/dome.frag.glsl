@@ -42,6 +42,10 @@ uniform float uCieloAmt;    // multiplicador amplitud CIELO
 uniform float uLinAmt;      // multiplicador amplitud LÍNEAS
 uniform float uKickAmt;     // multiplicador amplitud kick
 
+// W3: amanecer + reveal
+uniform float uDawn;   // 0..1: progreso fase 1 amanecer (ease-out cúbico, calculado en JS)
+uniform vec4  uReveal; // x=MONTAÑAS, y=LÍNEAS, z=SOL, w=CIELO (0..1 fase 2)
+
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
 const float PORTAL_R = 0.848;
@@ -195,9 +199,12 @@ void main() {
   vec2 q = tp - PORTAL_C;
 
   // ---- mundo alrededor ----
-  vec3 col = worldSky(d, t);
+  // W3: antes del amanecer (uDawn=0) el cielo es violeta oscuro; se abre al atardecer con uDawn
+  vec3 nightSky = vec3(0.025, 0.018, 0.035);
+  vec3 col = mix(nightSky, worldSky(d, t), uDawn);
   float worldStars = starLayer(d, 58.0, uStarCut - 0.02 * cielo, 0.20, t, 0.6 + 0.4 * cielo);
-  col += vec3(1.0, 0.92, 0.80) * worldStars * (0.7 + 0.9 * cielo + 0.5 * kick) * smoothstep(0.02, 0.45, d.y);
+  // W3: estrellas del mundo solo después del amanecer + fase 2 CIELO
+  col += vec3(1.0, 0.92, 0.80) * worldStars * (0.7 + 0.9 * cielo + 0.5 * kick) * smoothstep(0.02, 0.45, d.y) * uReveal.w;
 
   // ---- marco de anillos (tunel) ----
   float wob  = fbm4(q * 2.2 + vec2(0.0, t * 0.04));
@@ -216,26 +223,31 @@ void main() {
   vec3 ringCol = mix(dark, gold, band) * (0.85 + 0.35 * sol * band + 0.20 * kick * band);
   float reach = 1.0 - smoothstep(uRingFade.x, uRingFade.y, s);
   float ringA = max(reach, 0.10);
-  col = mix(col, ringCol, ringA * (1.0 - inside));
+  // W3: anillos (SOL) aparecen en fase 2
+  col = mix(col, ringCol, ringA * (1.0 - inside) * uReveal.z);
 
-  // cordillera que rodea el domo (estatica): capa lejana azul oscuro + capa cercana negra
+  // cordillera que rodea el domo: capa lejana azul oscuro + capa cercana negra
+  // W3: la cordillera crece desde el horizonte durante la fase 1 (escala por uDawn)
   float az = atan(d.x, -d.z) / TAU;
-  float hFar = 1.25 * ridgeH(az, 0.31);
-  float hNear = 0.70 * ridgeH(az + 0.17, 0.77);
+  float hFar = 1.25 * ridgeH(az, 0.31) * uDawn;
+  float hNear = 0.70 * ridgeH(az + 0.17, 0.77) * uDawn;
   col = mix(col, vec3(0.133, 0.188, 0.227), smoothstep(0.0015, -0.0015, d.y - hFar) * (1.0 - inside));
   col = mix(col, vec3(0.098, 0.102, 0.133), smoothstep(0.0015, -0.0015, d.y - hNear) * (1.0 - inside));
 
   // ---- cielo del portal ----
   if (inside > 0.001) {
-    float amt = uWarp * (0.35 + 0.9 * cielo);
-    float f = warpField(p * 1.1, t * (0.6 + cielo), amt);
+    // W3: el warp del cielo (CIELO) solo aparece en fase 2; en fase 1 es skyRamp plano
+    float amt = uWarp * (0.35 + 0.9 * cielo) * uReveal.w;
+    float f = warpField(p * 1.1, t * (0.6 + cielo), max(amt, 0.001));
     float yy = p.y + 0.10 * (f - 0.5) * amt;
     vec3 sky = skyRamp(yy);
     sky += (f - 0.5) * 0.14 * amt * vec3(1.0, 0.6, 0.25);
 
     // sol en 3 discos
+    // W3: el sol sube desde abajo durante fase 1 (sunRiseOfs = 0.8 cuando dawn=0, 0 cuando dawn=1)
+    float sunRiseOfs = (1.0 - uDawn) * 0.8;
     float k = 1.0 + 0.05 * sol + 0.08 * kick;
-    float rs = length(p - SUN_C) / k + 0.010 * cielo * fbm4(p * 6.0 + t * 0.2);
+    float rs = length(p - SUN_C + vec2(0.0, sunRiseOfs)) / k + 0.010 * cielo * fbm4(p * 6.0 + t * 0.2);
     sky += vec3(0.9, 0.35, 0.1) * 0.22 * (0.5 + sol + 0.3 * kick) * exp(-5.0 * max(rs - RING_R, 0.0));
     vec3 ringRed = mix(vec3(0.898, 0.361, 0.161), vec3(0.894, 0.196, 0.169), smoothstep(-0.1, 0.4, p.y));
     sky = mix(sky, ringRed, smoothstep(RING_R + 0.004, RING_R - 0.004, rs));
@@ -259,14 +271,15 @@ void main() {
     sky = mix(sky, cloudCol, smoothstep(0.004, -0.004, c2));
     sky = mix(sky, cloudCol, smoothstep(0.004, -0.004, c3));
 
-    // estrellas y destellos fijos de la referencia
+    // estrellas y destellos fijos de la referencia — W3: solo en fase 2 CIELO
     float tw = 0.75 + 0.25 * sin(t * 3.0) + 0.6 * cielo + 0.4 * kick;
-    sky += vec3(1.0, 0.95, 0.85) * starLayer(d, 70.0, uStarCut - 0.03 * cielo, 0.22, t, 0.7) * smoothstep(-0.1, 0.5, p.y) * (0.7 + cielo + 0.5 * kick);
-    sky = mix(sky, vec3(0.30, 0.45, 0.83), sparkle4(p - vec2(-0.3740, 0.3651), 0.040 * tw));
-    sky = mix(sky, vec3(0.91, 0.32, 0.18), sparkle4(p - vec2( 0.0214, 0.7105), 0.036 * tw));
-    sky = mix(sky, vec3(0.96, 0.92, 0.82), disc(p - vec2( 0.3245, 0.4836), 0.022));
-    sky = mix(sky, vec3(0.95, 0.60, 0.18), disc(p - vec2(-0.1500, 0.6974), 0.014));
-    col = mix(col, sky, inside);
+    sky += vec3(1.0, 0.95, 0.85) * starLayer(d, 70.0, uStarCut - 0.03 * cielo, 0.22, t, 0.7) * smoothstep(-0.1, 0.5, p.y) * (0.7 + cielo + 0.5 * kick) * uReveal.w;
+    sky = mix(sky, vec3(0.30, 0.45, 0.83), sparkle4(p - vec2(-0.3740, 0.3651), 0.040 * tw) * uReveal.w);
+    sky = mix(sky, vec3(0.91, 0.32, 0.18), sparkle4(p - vec2( 0.0214, 0.7105), 0.036 * tw) * uReveal.w);
+    sky = mix(sky, vec3(0.96, 0.92, 0.82), disc(p - vec2( 0.3245, 0.4836), 0.022) * uReveal.w);
+    sky = mix(sky, vec3(0.95, 0.60, 0.18), disc(p - vec2(-0.1500, 0.6974), 0.014) * uReveal.w);
+    // W3: el portal se funde en con el progreso del amanecer (fase 1)
+    col = mix(col, sky, inside * uDawn);
   }
 
   // ---- montanas (mascaras + color posterizado) ----
@@ -283,8 +296,9 @@ void main() {
     // W2: montañas negras respiran con despl. vertical (~2%) + rebote de kick
     float blackDispY = 0.020 * mont * sin(uv.x * 9.0 + t * 0.6) + 0.008 * kick;
     vec3 m = texture2D(uMasks, uv + vec2(0.0, blackDispY)).rgb;
-    col = mix(col, waveCol * (1.0 + 0.10 * lin), m.b);
-    col = mix(col, strataCol * (1.0 + 0.08 * mont), m.g);
+    // W3: olas (LÍNEAS) y estratos (MONTAÑAS) aparecen en fase 2
+    col = mix(col, waveCol * (1.0 + 0.10 * lin), m.b * uReveal.y);
+    col = mix(col, strataCol * (1.0 + 0.08 * mont), m.g * uReveal.x);
     col = mix(col, vec3(0.098, 0.102, 0.133), m.r);
     // destellos sobre las montanas
     float tw2 = 0.75 + 0.25 * sin(t * 2.3 + 1.0) + 0.7 * kick;
@@ -292,11 +306,11 @@ void main() {
     col = mix(col, vec3(0.99, 0.95, 0.88), sparkle4(p - vec2( 0.8616, -0.3224), 0.040 * tw2));
   }
 
-  // ---- confeti en el marco ----
+  // ---- confeti en el marco — W3: solo en fase 2 CIELO ----
   vec2 cq = q * 14.0;
   vec2 cid = floor(cq);
   float hh = h21(cid);
-  float show = step(0.89 - 0.05 * cielo, hh) * (1.0 - inside) * reach;
+  float show = step(0.89 - 0.05 * cielo, hh) * (1.0 - inside) * reach * uReveal.w;
   if (show > 0.5) {
     float ang = hh * 20.0 + t * (hh - 0.5) * (1.0 + 4.0 * cielo);
     float ca = cos(ang), sa = sin(ang);

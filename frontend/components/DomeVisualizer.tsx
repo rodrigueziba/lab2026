@@ -9,7 +9,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { prepareVizAudio, stopVizAudio, getVizBands, BAND_STATE, N5_STATE } from "@/lib/vizAudio";
-import { getDawnState } from "@/lib/alightStore";
+import { getDawnState, getDomeDawnState, startDomeDawn, finishDomeDawnPhase1, resetDomeDawnState, skipDomeDawnState } from "@/lib/alightStore";
 import { getHazEnteredOnce, getHazBandOn } from "@/lib/haz";
 import { VIZ_SUN_AZ_DEG, VIZ_SUN_EL_DEG } from "@/lib/vizSunState";
 import VizPanorama from "./VizPanorama";
@@ -403,22 +403,88 @@ const _zeroBands = () => ({ bass: 0, lowMid: 0, highMid: 0, treble: 0 });
 const _GRP_ATK = [0.015, 0.120, 0.030, 0.060];
 const _GRP_REL = [0.120, 0.600, 0.300, 0.400];
 
+// W3: ease-out cúbico para el progreso del amanecer (sin allocations)
+const _easeOut3Dawn = (t: number) => 1 - (1 - t) ** 3;
+// W3: interpola un progreso lineal con delay y duración (s), dado el tiempo desde completeT
+const _revealProgress = (elapsed: number, delayS: number, durS: number): number => {
+  if (elapsed < delayS) return 0;
+  return Math.min((elapsed - delayS) / durS, 1);
+};
+
 function DomeSkyAnchor() {
   const groupRef = useRef<THREE.Group>(null);
   // W2: estado de energía de grupo sin allocations por frame
-  const _s = useRef({ gp: [0, 0, 0, 0], kick: 0, kickSeen: false });
+  // W3: se agregan dawn, revMont, revLin, revSol, revCielo
+  const _s = useRef({
+    gp: [0, 0, 0, 0], kick: 0, kickSeen: false,
+    dawn: 0, revMont: 0, revLin: 0, revSol: 0, revCielo: 0,
+  });
+  // W3: flags de reset/skip desde DebugMenu (seteados en evento, leídos en useFrame con acceso al clock)
+  const _dawnReset = useRef(false);
+  const _dawnSkip  = useRef(false);
+
+  useEffect(() => {
+    const onReset = () => { _dawnReset.current = true; };
+    const onSkip  = () => { _dawnSkip.current  = true; };
+    window.addEventListener('alight:dome-dawn-reset', onReset);
+    window.addEventListener('alight:dome-dawn-skip',  onSkip);
+    return () => {
+      window.removeEventListener('alight:dome-dawn-reset', onReset);
+      window.removeEventListener('alight:dome-dawn-skip',  onSkip);
+    };
+  }, []);
 
   const getGroupEnergy = useMemo(() => () => {
     const s = _s.current;
-    return { sol: s.gp[0], mont: s.gp[1], cielo: s.gp[2], lin: s.gp[3], kick: s.kick };
+    return {
+      sol: s.gp[0], mont: s.gp[1], cielo: s.gp[2], lin: s.gp[3], kick: s.kick,
+      dawn: s.dawn, revMont: s.revMont, revLin: s.revLin, revSol: s.revSol, revCielo: s.revCielo,
+    };
   }, []);
 
-  useFrame(({ camera }, dt) => {
+  useFrame(({ camera, clock }, dt) => {
     groupRef.current?.position.copy(camera.position);
 
     const s = _s.current;
     const assign = BAND_STATE.assignment;
     const norm   = BAND_STATE.normEnergy;
+    const clockT = clock.elapsedTime;
+
+    // W3: manejar reset/skip desde DebugMenu
+    if (_dawnReset.current) {
+      _dawnReset.current = false;
+      resetDomeDawnState();
+      s.dawn = 0; s.revMont = 0; s.revLin = 0; s.revSol = 0; s.revCielo = 0;
+    }
+    if (_dawnSkip.current) {
+      _dawnSkip.current = false;
+      skipDomeDawnState(clockT);
+      s.dawn = 1; s.revMont = 1; s.revLin = 1; s.revSol = 1; s.revCielo = 1;
+    }
+
+    // W3: disparar amanecer con el primer haz que se activa
+    const domeDawn = getDomeDawnState();
+    if (domeDawn.phase === 'inactivo') {
+      for (let i = 0; i < 4; i++) {
+        if (getHazBandOn(i)) { startDomeDawn(clockT); break; }
+      }
+    }
+
+    // W3: calcular progreso del amanecer (fase 1 + fase 2)
+    const amanecerDur = DBG_SILLAS.domeAmanecerDurS;
+    if (domeDawn.phase === 'amanecer') {
+      const raw = Math.min((clockT - domeDawn.startT) / amanecerDur, 1);
+      s.dawn = _easeOut3Dawn(raw);
+      if (raw >= 1) finishDomeDawnPhase1(clockT);
+    } else if (domeDawn.phase === 'completo') {
+      s.dawn = 1;
+      const elapsed = clockT - domeDawn.completeT;
+      s.revMont  = _revealProgress(elapsed, DBG_SILLAS.domeRevDelayMontS,  DBG_SILLAS.domeRevDurS);
+      s.revLin   = _revealProgress(elapsed, DBG_SILLAS.domeRevDelayLinS,   DBG_SILLAS.domeRevDurS);
+      s.revSol   = _revealProgress(elapsed, DBG_SILLAS.domeRevDelaySolS,   DBG_SILLAS.domeRevDurS);
+      s.revCielo = _revealProgress(elapsed, DBG_SILLAS.domeRevDelayCieloS, DBG_SILLAS.domeRevDurS);
+    }
+    // inactivo: dawn=0, reveal=0 (defaults)
 
     // W2: per-group envelope — gated by bandOn, smoothed with group-specific τ
     for (let i = 0; i < 4; i++) {

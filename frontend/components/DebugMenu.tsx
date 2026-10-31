@@ -1180,6 +1180,31 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.domeKickAmt  = v; setSillas(s => ({ ...s, domeKickAmt:  v })); }} />
 
           <div style={DIVIDER} />
+          <span style={LABEL}>W3 — Amanecer DomeSky <span style={NOTE}>(debug)</span></span>
+          <NumField label="domeAmanecerDurS"    value={sillas.domeAmanecerDurS}    step={1}   min={1}   max={60}  note="duración fase 1 (s)"
+            onChange={v => { DBG_SILLAS.domeAmanecerDurS    = v; setSillas(s => ({ ...s, domeAmanecerDurS:    v })); }} />
+          <NumField label="domeRevDelayMontS"   value={sillas.domeRevDelayMontS}   step={0.5} min={0}   max={20}  note="delay MONTAÑAS strata (s)"
+            onChange={v => { DBG_SILLAS.domeRevDelayMontS   = v; setSillas(s => ({ ...s, domeRevDelayMontS:   v })); }} />
+          <NumField label="domeRevDelayLinS"    value={sillas.domeRevDelayLinS}    step={0.5} min={0}   max={20}  note="delay LÍNEAS waves (s)"
+            onChange={v => { DBG_SILLAS.domeRevDelayLinS    = v; setSillas(s => ({ ...s, domeRevDelayLinS:    v })); }} />
+          <NumField label="domeRevDelaySolS"    value={sillas.domeRevDelaySolS}    step={0.5} min={0}   max={20}  note="delay SOL rings (s)"
+            onChange={v => { DBG_SILLAS.domeRevDelaySolS    = v; setSillas(s => ({ ...s, domeRevDelaySolS:    v })); }} />
+          <NumField label="domeRevDelayCieloS"  value={sillas.domeRevDelayCieloS}  step={0.5} min={0}   max={20}  note="delay CIELO stars+warp (s)"
+            onChange={v => { DBG_SILLAS.domeRevDelayCieloS  = v; setSillas(s => ({ ...s, domeRevDelayCieloS:  v })); }} />
+          <NumField label="domeRevDurS"         value={sillas.domeRevDurS}         step={0.5} min={0.5} max={20}  note="duración de cada reveal (s)"
+            onChange={v => { DBG_SILLAS.domeRevDurS         = v; setSillas(s => ({ ...s, domeRevDurS:         v })); }} />
+          <div style={ROW}>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
+              onClick={() => window.dispatchEvent(new CustomEvent('alight:dome-dawn-reset'))}>
+              Reiniciar amanecer
+            </button>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer", marginLeft: 6 }}
+              onClick={() => window.dispatchEvent(new CustomEvent('alight:dome-dawn-skip'))}>
+              Saltar al final
+            </button>
+          </div>
+
+          <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
           <NumField label="agcFloorRise"   value={sillas.agcFloorRise}   step={0.1}  min={0}    max={5}     note="live"
             onChange={v => { DBG_SILLAS.agcFloorRise   = v; setSillas(s => ({ ...s, agcFloorRise:   v })); }} />

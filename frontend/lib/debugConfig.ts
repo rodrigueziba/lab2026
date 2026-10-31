@@ -306,6 +306,13 @@ export const DBG_SILLAS = {
   domeCieloAmt:           1.5,         // CIELO: domain warp, nubes, estrellas, confeti
   domeLinAmt:             1.5,         // LÍNEAS: máscara B (olas)
   domeKickAmt:            1.0,         // KICK: destello de rebote
+  // W3: secuencia de amanecer (DomeSky)
+  domeAmanecerDurS:       10.0,        // duración fase 1 (s)
+  domeRevDelayMontS:       1.0,        // delay MONTAÑAS strata tras completeT (s)
+  domeRevDelayLinS:        2.0,        // delay LÍNEAS waves (s)
+  domeRevDelaySolS:        3.0,        // delay SOL rings (s)
+  domeRevDelayCieloS:      4.0,        // delay CIELO stars+warp+confeti (s)
+  domeRevDurS:             3.0,        // duración de cada reveal (s)
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

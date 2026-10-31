@@ -100,6 +100,38 @@ export function skipDawnToFinal(clockT: number): void {
   _dawnCompleteT = clockT - 9999;
 }
 
+// W3: dome dawn sequence state machine (independiente de U9 que maneja VizPanorama)
+export type DomeDawnPhase = 'inactivo' | 'amanecer' | 'completo';
+
+let _domeDawnPhase: DomeDawnPhase = 'inactivo';
+let _domeDawnStartT   = 0;   // clock.elapsedTime cuando arrancó la fase 1
+let _domeDawnCompleteT = 0;  // clock.elapsedTime cuando terminó la fase 1
+
+export function getDomeDawnState() {
+  return { phase: _domeDawnPhase, startT: _domeDawnStartT, completeT: _domeDawnCompleteT };
+}
+export function startDomeDawn(clockT: number): void {
+  if (_domeDawnPhase !== 'inactivo') return;
+  _domeDawnPhase = 'amanecer';
+  _domeDawnStartT = clockT;
+}
+export function finishDomeDawnPhase1(clockT: number): void {
+  if (_domeDawnPhase !== 'amanecer') return;
+  _domeDawnPhase = 'completo';
+  _domeDawnCompleteT = clockT;
+  window.dispatchEvent(new CustomEvent('alight:dome-dawn-complete'));
+}
+export function resetDomeDawnState(): void {
+  _domeDawnPhase = 'inactivo';
+  _domeDawnStartT = 0;
+  _domeDawnCompleteT = 0;
+}
+export function skipDomeDawnState(clockT: number): void {
+  _domeDawnPhase = 'completo';
+  _domeDawnStartT    = clockT - 9999;
+  _domeDawnCompleteT = clockT - 9999;
+}
+
 // Interaction mode — shared between Player (ThreeScene) and LecternSystem
 export const INTERACT_STATE = {
   mode:         "none" as "none" | "image" | "sound",

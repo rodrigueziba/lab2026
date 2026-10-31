@@ -44,6 +44,8 @@ El shader no pinta sobre las UV de la esfera: trabaja con la **dirección de cad
 | `uCieloAmt` | float | 1.5 | Multiplicador amplitud CIELO |
 | `uLinAmt` | float | 1.5 | Multiplicador amplitud LÍNEAS |
 | `uKickAmt` | float | 1.0 | Multiplicador amplitud kick |
+| `uDawn` | float | 1.0 | W3: progreso amanecer fase 1 (0→1, ease-out cúbico) |
+| `uReveal` | vec4 | (1,1,1,1) | W3: x=MONTAÑAS, y=LÍNEAS, z=SOL, w=CIELO (0→1 fase 2) |
 
 No incluyas `colorspace_fragment`: los colores ya están en sRGB y las texturas no deben convertirse.
 

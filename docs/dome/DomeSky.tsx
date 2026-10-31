@@ -9,7 +9,15 @@ import { domeVert, domeFrag } from "./domeShaders";
 
 export type Bands = { bass: number; lowMid: number; highMid: number; treble: number }; // 0..1
 // W2: energias por grupo (SOL, MONTAÑAS, CIELO, LÍNEAS) + kick impulse
-export type GroupEnergy = { sol: number; mont: number; cielo: number; lin: number; kick: number };
+// W3: dawn (0..1 fase 1) + revMont/revLin/revSol/revCielo (0..1 fase 2)
+export type GroupEnergy = {
+  sol: number; mont: number; cielo: number; lin: number; kick: number;
+  dawn: number;      // W3: progreso amanecer fase 1 (0..1)
+  revMont: number;   // W3: reveal MONTAÑAS strata (0..1)
+  revLin: number;    // W3: reveal LÍNEAS waves (0..1)
+  revSol: number;    // W3: reveal SOL rings (0..1)
+  revCielo: number;  // W3: reveal CIELO stars+warp+confeti (0..1)
+};
 
 type Props = {
   /** Devuelve las 4 bandas ya normalizadas (0..1). Se llama una vez por frame, sin crear estado de React. */
@@ -97,6 +105,9 @@ export default function DomeSky({
           uCieloAmt:    { value: cieloAmt },
           uLinAmt:      { value: linAmt },
           uKickAmt:     { value: kickAmt },
+          // W3: dawn + reveal
+          uDawn:        { value: 1 },  // default 1 = fully visible (dawn skipped)
+          uReveal:      { value: new THREE.Vector4(1, 1, 1, 1) },
         },
       }),
     // los uniformes sueltos se actualizan en useFrame; el material solo se recrea si cambia la calidad
@@ -104,7 +115,7 @@ export default function DomeSky({
     [masks, color, lowQuality]
   );
 
-  const tmp = useMemo(() => ({ F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), b: [0, 0, 0, 0], ge: new THREE.Vector4() }), []);
+  const tmp = useMemo(() => ({ F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), b: [0, 0, 0, 0], ge: new THREE.Vector4(), rv: new THREE.Vector4() }), []);
 
   useFrame((state, dt) => {
     const u = material.uniforms;
@@ -137,6 +148,10 @@ export default function DomeSky({
       tmp.ge.set(ge.sol, ge.mont, ge.cielo, ge.lin);
       u.uGroupEnergy.value.copy(tmp.ge);
       u.uKick.value = ge.kick;
+      // W3: dawn + reveal
+      u.uDawn.value = ge.dawn;
+      tmp.rv.set(ge.revMont, ge.revLin, ge.revSol, ge.revCielo);
+      u.uReveal.value.copy(tmp.rv);
     }
     u.uSolAmt.value   = solAmt;
     u.uMontAmt.value  = montAmt;
