@@ -300,6 +300,12 @@ export const DBG_SILLAS = {
   domePortalAzimuth:      Math.PI,     // portal direction: behind tarima (+Z from audience)
   domePortalElevation:    0.58,        // portal elevation above horizon (rad)
   domePortalHalfFovDeg:   42.0,        // portal half-FOV (degrees) → uPortalTan≈0.90
+  // W2: group energy multipliers (uniforms en DomeSky, default 1.5 → reacción evidente)
+  domeSolAmt:             1.5,         // SOL: sol + anillos dorados
+  domeMontAmt:            1.5,         // MONTAÑAS: máscaras R+G, respiración
+  domeCieloAmt:           1.5,         // CIELO: domain warp, nubes, estrellas, confeti
+  domeLinAmt:             1.5,         // LÍNEAS: máscara B (olas)
+  domeKickAmt:            1.0,         // KICK: destello de rebote
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

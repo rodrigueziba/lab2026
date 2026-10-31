@@ -1167,6 +1167,19 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.domePortalHalfFovDeg = v; setSillas(s => ({ ...s, domePortalHalfFovDeg: v })); }} />
 
           <div style={DIVIDER} />
+          <span style={LABEL}>W2 — Multiplicadores de grupo <span style={NOTE}>(uniforms DomeSky)</span></span>
+          <NumField label="domeSolAmt"   value={sillas.domeSolAmt}   step={0.1} min={0} max={5} note="SOL: sol + anillos (default 1.5)"
+            onChange={v => { DBG_SILLAS.domeSolAmt   = v; setSillas(s => ({ ...s, domeSolAmt:   v })); }} />
+          <NumField label="domeMontAmt"  value={sillas.domeMontAmt}  step={0.1} min={0} max={5} note="MONTAÑAS: máscaras R+G (default 1.5)"
+            onChange={v => { DBG_SILLAS.domeMontAmt  = v; setSillas(s => ({ ...s, domeMontAmt:  v })); }} />
+          <NumField label="domeCieloAmt" value={sillas.domeCieloAmt} step={0.1} min={0} max={5} note="CIELO: warp+nubes+estrellas (default 1.5)"
+            onChange={v => { DBG_SILLAS.domeCieloAmt = v; setSillas(s => ({ ...s, domeCieloAmt: v })); }} />
+          <NumField label="domeLinAmt"   value={sillas.domeLinAmt}   step={0.1} min={0} max={5} note="LÍNEAS: máscara B / olas (default 1.5)"
+            onChange={v => { DBG_SILLAS.domeLinAmt   = v; setSillas(s => ({ ...s, domeLinAmt:   v })); }} />
+          <NumField label="domeKickAmt"  value={sillas.domeKickAmt}  step={0.1} min={0} max={3} note="KICK: destello de rebote (default 1.0)"
+            onChange={v => { DBG_SILLAS.domeKickAmt  = v; setSillas(s => ({ ...s, domeKickAmt:  v })); }} />
+
+          <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
           <NumField label="agcFloorRise"   value={sillas.agcFloorRise}   step={0.1}  min={0}    max={5}     note="live"
             onChange={v => { DBG_SILLAS.agcFloorRise   = v; setSillas(s => ({ ...s, agcFloorRise:   v })); }} />

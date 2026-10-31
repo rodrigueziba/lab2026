@@ -396,18 +396,56 @@ function getMatTex(): THREE.CanvasTexture {
   return _matTex;
 }
 
-// ── W1: DomeSky wrapper — esfera de cielo centrada en la cámara ──────────────
+// ── W1/W2: DomeSky wrapper — esfera de cielo centrada en la cámara ───────────
 const _zeroBands = () => ({ bass: 0, lowMid: 0, highMid: 0, treble: 0 });
+
+// W2: attack/release por grupo (SOL, MONTAÑAS, CIELO, LÍNEAS) en segundos
+const _GRP_ATK = [0.015, 0.120, 0.030, 0.060];
+const _GRP_REL = [0.120, 0.600, 0.300, 0.400];
 
 function DomeSkyAnchor() {
   const groupRef = useRef<THREE.Group>(null);
-  useFrame(({ camera }) => {
+  // W2: estado de energía de grupo sin allocations por frame
+  const _s = useRef({ gp: [0, 0, 0, 0], kick: 0, kickSeen: false });
+
+  const getGroupEnergy = useMemo(() => () => {
+    const s = _s.current;
+    return { sol: s.gp[0], mont: s.gp[1], cielo: s.gp[2], lin: s.gp[3], kick: s.kick };
+  }, []);
+
+  useFrame(({ camera }, dt) => {
     groupRef.current?.position.copy(camera.position);
+
+    const s = _s.current;
+    const assign = BAND_STATE.assignment;
+    const norm   = BAND_STATE.normEnergy;
+
+    // W2: per-group envelope — gated by bandOn, smoothed with group-specific τ
+    for (let i = 0; i < 4; i++) {
+      const raw    = norm[assign[i]] ?? 0;
+      const gated  = getHazBandOn(i) ? raw : 0;
+      const prev   = s.gp[i];
+      const af = 1 - Math.exp(-dt / _GRP_ATK[i]);
+      const rf = 1 - Math.exp(-dt / _GRP_REL[i]);
+      s.gp[i] = gated > prev ? prev + (gated - prev) * af : prev + (gated - prev) * rf;
+    }
+
+    // W2: kick — detecta flanco de subida (BAND_STATE.kick verdadero 1 frame)
+    if (BAND_STATE.kick && !s.kickSeen) { s.kick = 1.0; s.kickSeen = true; }
+    if (!BAND_STATE.kick) s.kickSeen = false;
+    s.kick *= Math.exp(-dt / 0.065); // τ=65ms → ~0.1 a los 150ms
   });
+
   return (
     <group ref={groupRef}>
       <DomeSky
         getBands={_zeroBands}
+        getGroupEnergy={getGroupEnergy}
+        solAmt={DBG_SILLAS.domeSolAmt}
+        montAmt={DBG_SILLAS.domeMontAmt}
+        cieloAmt={DBG_SILLAS.domeCieloAmt}
+        linAmt={DBG_SILLAS.domeLinAmt}
+        kickAmt={DBG_SILLAS.domeKickAmt}
         portalAzimuth={DBG_SILLAS.domePortalAzimuth}
         portalElevation={DBG_SILLAS.domePortalElevation}
         portalHalfFovDeg={DBG_SILLAS.domePortalHalfFovDeg}

@@ -45,6 +45,15 @@ uniform float uRingScale;   // multiplicador del periodo de anillos (1.0)
 uniform vec2  uRingFade;    // (inicio, fin) del desvanecimiento de anillos, en unidades "p". Sugerido (1.0, 1.6)
 uniform float uStarCut;     // umbral de estrellas, 0.93..0.995 (0.965); mas alto = menos estrellas
 
+// W2: energias por grupo y kick (valores suavizados, 0..1)
+uniform vec4  uGroupEnergy; // x=SOL, y=MONTAÑAS, z=CIELO, w=LÍNEAS
+uniform float uKick;        // 0..1, destello de kick (~150ms decay)
+uniform float uSolAmt;      // multiplicador amplitud SOL
+uniform float uMontAmt;     // multiplicador amplitud MONTAÑAS
+uniform float uCieloAmt;    // multiplicador amplitud CIELO
+uniform float uLinAmt;      // multiplicador amplitud LÍNEAS
+uniform float uKickAmt;     // multiplicador amplitud kick
+
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
 const float PORTAL_R = 0.848;
@@ -182,7 +191,12 @@ float ridgeH(float u, float seed) {
 void main() {
   vec3 d = normalize(vDir);
   float t = uTime;
-  float bass = uBands.x, lowm = uBands.y, highm = uBands.z, treb = uBands.w;
+  // W2: group energies replace raw frequency bands
+  float sol   = uGroupEnergy.x * uSolAmt;
+  float mont  = uGroupEnergy.y * uMontAmt;
+  float cielo = uGroupEnergy.z * uCieloAmt;
+  float lin   = uGroupEnergy.w * uLinAmt;
+  float kick  = uKick * uKickAmt;
 
   // ---- coordenadas del portal ----
   float fz = dot(d, uPortalF);
@@ -194,16 +208,16 @@ void main() {
 
   // ---- mundo alrededor ----
   vec3 col = worldSky(d, t);
-  float worldStars = starLayer(d, 58.0, uStarCut - 0.02 * treb, 0.20, t, 0.6 + 0.4 * treb);
-  col += vec3(1.0, 0.92, 0.80) * worldStars * (0.7 + 0.9 * treb) * smoothstep(0.02, 0.45, d.y);
+  float worldStars = starLayer(d, 58.0, uStarCut - 0.02 * cielo, 0.20, t, 0.6 + 0.4 * cielo);
+  col += vec3(1.0, 0.92, 0.80) * worldStars * (0.7 + 0.9 * cielo + 0.5 * kick) * smoothstep(0.02, 0.45, d.y);
 
   // ---- marco de anillos (tunel) ----
   float wob  = fbm4(q * 2.2 + vec2(0.0, t * 0.04));
   float wob2 = fbm4(q * 1.1 + vec2(5.0, t * 0.03));
-  float sw = s + 0.040 * wob * (0.6 + 0.4 * highm);
+  float sw = s + 0.040 * wob * (0.6 + 0.4 * sol);
   float inside = 1.0 - smoothstep(PORTAL_R - 0.012, PORTAL_R + 0.012, sw);
-  float sph = s + 0.050 * wob + 0.130 * wob2 * (0.7 + 0.5 * highm);
-  float ph = sph / (RING_PERIOD * uRingScale) - uRingFlow * t * 12.0 - bass * 0.6;
+  float sph = s + 0.050 * wob + 0.130 * wob2 * (0.7 + 0.5 * sol);
+  float ph = sph / (RING_PERIOD * uRingScale) - uRingFlow * t * 12.0 - sol * 0.6;
   float thick = 0.12 * fbm4(q * 5.0 + vec2(2.0, 7.0));
   float band = smoothstep(0.34 + thick, 0.60 + thick, 0.5 + 0.5 * sin(TAU * ph));
   float hv = 0.5 + 0.5 * fbm4(q * 1.4 + vec2(3.0, 1.0));
@@ -211,7 +225,7 @@ void main() {
   vec3 gold = mix(vec3(0.64, 0.39, 0.18), vec3(0.90, 0.55, 0.18), hv);
   gold = mix(gold, vec3(0.84, 0.31, 0.19), redw);
   vec3 dark = mix(vec3(0.13, 0.07, 0.05), vec3(0.36, 0.18, 0.11), hv);
-  vec3 ringCol = mix(dark, gold, band) * (0.85 + 0.35 * bass * band);
+  vec3 ringCol = mix(dark, gold, band) * (0.85 + 0.35 * sol * band + 0.20 * kick * band);
   float reach = 1.0 - smoothstep(uRingFade.x, uRingFade.y, s);
   float ringA = max(reach, 0.10);
   col = mix(col, ringCol, ringA * (1.0 - inside));
@@ -225,16 +239,16 @@ void main() {
 
   // ---- cielo del portal ----
   if (inside > 0.001) {
-    float amt = uWarp * (0.35 + 0.9 * highm);
-    float f = warpField(p * 1.1, t * (0.6 + highm), amt);
+    float amt = uWarp * (0.35 + 0.9 * cielo);
+    float f = warpField(p * 1.1, t * (0.6 + cielo), amt);
     float yy = p.y + 0.10 * (f - 0.5) * amt;
     vec3 sky = skyRamp(yy);
     sky += (f - 0.5) * 0.14 * amt * vec3(1.0, 0.6, 0.25);
 
     // sol en 3 discos
-    float k = 1.0 + 0.05 * bass;
-    float rs = length(p - SUN_C) / k + 0.010 * highm * fbm4(p * 6.0 + t * 0.2);
-    sky += vec3(0.9, 0.35, 0.1) * 0.22 * (0.5 + bass) * exp(-5.0 * max(rs - RING_R, 0.0));
+    float k = 1.0 + 0.05 * sol + 0.08 * kick;
+    float rs = length(p - SUN_C) / k + 0.010 * cielo * fbm4(p * 6.0 + t * 0.2);
+    sky += vec3(0.9, 0.35, 0.1) * 0.22 * (0.5 + sol + 0.3 * kick) * exp(-5.0 * max(rs - RING_R, 0.0));
     vec3 ringRed = mix(vec3(0.898, 0.361, 0.161), vec3(0.894, 0.196, 0.169), smoothstep(-0.1, 0.4, p.y));
     sky = mix(sky, ringRed, smoothstep(RING_R + 0.004, RING_R - 0.004, rs));
     float ry = length(p - YEL_C) / k;
@@ -244,7 +258,7 @@ void main() {
 
     // nubes (se desplazan con el tiempo y respiran con los medios altos)
     float dr = 0.03 * sin(t * 0.05);
-    float sc = 1.0 + 0.08 * highm;
+    float sc = 1.0 + 0.08 * cielo;
     float ob1 = cloudShape(p, vec2(-0.52 - dr, 0.22), 0.22 * sc, 0.55);
     float ob2 = cloudShape(p, vec2( 0.66 + dr, 0.28), 0.24 * sc, 0.55);
     sky = mix(sky, vec3(0.94, 0.62, 0.20), 0.85 * smoothstep(0.004, -0.004, ob1));
@@ -258,8 +272,8 @@ void main() {
     sky = mix(sky, cloudCol, smoothstep(0.004, -0.004, c3));
 
     // estrellas y destellos fijos de la referencia
-    float tw = 0.75 + 0.25 * sin(t * 3.0) + 0.6 * treb;
-    sky += vec3(1.0, 0.95, 0.85) * starLayer(d, 70.0, uStarCut - 0.03 * treb, 0.22, t, 0.7) * smoothstep(-0.1, 0.5, p.y) * (0.7 + treb);
+    float tw = 0.75 + 0.25 * sin(t * 3.0) + 0.6 * cielo + 0.4 * kick;
+    sky += vec3(1.0, 0.95, 0.85) * starLayer(d, 70.0, uStarCut - 0.03 * cielo, 0.22, t, 0.7) * smoothstep(-0.1, 0.5, p.y) * (0.7 + cielo + 0.5 * kick);
     sky = mix(sky, vec3(0.30, 0.45, 0.83), sparkle4(p - vec2(-0.3740, 0.3651), 0.040 * tw));
     sky = mix(sky, vec3(0.91, 0.32, 0.18), sparkle4(p - vec2( 0.0214, 0.7105), 0.036 * tw));
     sky = mix(sky, vec3(0.96, 0.92, 0.82), disc(p - vec2( 0.3245, 0.4836), 0.022));
@@ -271,19 +285,21 @@ void main() {
   vec2 uv = p * 0.5 + 0.5;
   float inImg = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0) * step(0.02, fz);
   if (inImg > 0.5) {
-    vec3 m = texture2D(uMasks, uv).rgb;
-    float a1 = 0.0015 + 0.010 * lowm;
+    float a1 = 0.0015 + 0.010 * lin;
     vec2 uvw = uv + vec2(a1 * sin(uv.y * 38.0 + t * 1.3) + 0.5 * a1 * sin(uv.y * 71.0 - t * 0.9),
-                         0.0010 * lowm * sin(uv.x * 22.0 + t * 1.1));
+                         0.0010 * lin * sin(uv.x * 22.0 + t * 1.1));
     vec3 waveCol = texture2D(uColor, uvw).rgb;
-    float a2 = 0.0008 + 0.004 * lowm;
+    float a2 = 0.0008 + 0.004 * mont;
     vec2 uvs = uv + vec2(a2 * sin(uv.y * 45.0 + t * 1.1), 0.0);
     vec3 strataCol = texture2D(uColor, uvs).rgb;
-    col = mix(col, waveCol * (1.0 + 0.10 * bass), m.b);
-    col = mix(col, strataCol * (1.0 + 0.08 * bass), m.g);
+    // W2: montañas negras respiran con despl. vertical (~2%) + rebote de kick
+    float blackDispY = 0.020 * mont * sin(uv.x * 9.0 + t * 0.6) + 0.008 * kick;
+    vec3 m = texture2D(uMasks, uv + vec2(0.0, blackDispY)).rgb;
+    col = mix(col, waveCol * (1.0 + 0.10 * lin), m.b);
+    col = mix(col, strataCol * (1.0 + 0.08 * mont), m.g);
     col = mix(col, vec3(0.098, 0.102, 0.133), m.r);
     // destellos sobre las montanas
-    float tw2 = 0.75 + 0.25 * sin(t * 2.3 + 1.0) + 0.7 * treb;
+    float tw2 = 0.75 + 0.25 * sin(t * 2.3 + 1.0) + 0.7 * kick;
     col = mix(col, vec3(0.91, 0.54, 0.18), sparkle4(p - vec2(-0.6800, -0.7830), 0.040 * tw2));
     col = mix(col, vec3(0.99, 0.95, 0.88), sparkle4(p - vec2( 0.8616, -0.3224), 0.040 * tw2));
   }
@@ -292,9 +308,9 @@ void main() {
   vec2 cq = q * 14.0;
   vec2 cid = floor(cq);
   float hh = h21(cid);
-  float show = step(0.89 - 0.05 * treb, hh) * (1.0 - inside) * reach;
+  float show = step(0.89 - 0.05 * cielo, hh) * (1.0 - inside) * reach;
   if (show > 0.5) {
-    float ang = hh * 20.0 + t * (hh - 0.5) * (1.0 + 4.0 * treb);
+    float ang = hh * 20.0 + t * (hh - 0.5) * (1.0 + 4.0 * cielo);
     float ca = cos(ang), sa = sin(ang);
     vec2 cf = fract(cq) - 0.5 - (vec2(h21(cid + 3.3), h21(cid + 8.8)) - 0.5) * 0.3;
     vec2 rp = mat2(ca, -sa, sa, ca) * cf;

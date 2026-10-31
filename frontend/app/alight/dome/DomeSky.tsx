@@ -8,10 +8,20 @@ import * as THREE from "three";
 import { domeVert, domeFrag } from "./domeShaders";
 
 export type Bands = { bass: number; lowMid: number; highMid: number; treble: number }; // 0..1
+// W2: energias por grupo (SOL, MONTAÑAS, CIELO, LÍNEAS) + kick impulse
+export type GroupEnergy = { sol: number; mont: number; cielo: number; lin: number; kick: number };
 
 type Props = {
   /** Devuelve las 4 bandas ya normalizadas (0..1). Se llama una vez por frame, sin crear estado de React. */
   getBands: () => Bands;
+  /** W2: Devuelve las 4 energias de grupo + kick. Si no se pasa, uGroupEnergy queda en cero. */
+  getGroupEnergy?: () => GroupEnergy;
+  /** W2: multiplicadores de amplitud por grupo (default 1.5 para reacción evidente) */
+  solAmt?: number;
+  montAmt?: number;
+  cieloAmt?: number;
+  linAmt?: number;
+  kickAmt?: number;
   /** Giro horizontal del portal en radianes (0 = frente a -Z). */
   portalAzimuth?: number;
   /** Elevacion del centro del portal sobre el horizonte, en radianes. */
@@ -35,6 +45,12 @@ function smooth(prev: number, target: number, dt: number) {
 
 export default function DomeSky({
   getBands,
+  getGroupEnergy,
+  solAmt   = 1.5,
+  montAmt  = 1.5,
+  cieloAmt = 1.5,
+  linAmt   = 1.5,
+  kickAmt  = 1.0,
   portalAzimuth = 0,
   portalElevation = 0.58,
   portalHalfFovDeg = 42,
@@ -73,6 +89,14 @@ export default function DomeSky({
           uRingScale: { value: ringScale },
           uRingFade: { value: new THREE.Vector2(...ringFade) },
           uStarCut: { value: starCut },
+          // W2: group energies + kick + multipliers
+          uGroupEnergy: { value: new THREE.Vector4() },
+          uKick:        { value: 0 },
+          uSolAmt:      { value: solAmt },
+          uMontAmt:     { value: montAmt },
+          uCieloAmt:    { value: cieloAmt },
+          uLinAmt:      { value: linAmt },
+          uKickAmt:     { value: kickAmt },
         },
       }),
     // los uniformes sueltos se actualizan en useFrame; el material solo se recrea si cambia la calidad
@@ -80,7 +104,7 @@ export default function DomeSky({
     [masks, color, lowQuality]
   );
 
-  const tmp = useMemo(() => ({ F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), b: [0, 0, 0, 0] }), []);
+  const tmp = useMemo(() => ({ F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), b: [0, 0, 0, 0], ge: new THREE.Vector4() }), []);
 
   useFrame((state, dt) => {
     const u = material.uniforms;
@@ -107,6 +131,18 @@ export default function DomeSky({
     u.uRingScale.value = ringScale;
     u.uRingFade.value.set(ringFade[0], ringFade[1]);
     u.uStarCut.value = starCut;
+    // W2: group energies + kick + multipliers
+    if (getGroupEnergy) {
+      const ge = getGroupEnergy();
+      tmp.ge.set(ge.sol, ge.mont, ge.cielo, ge.lin);
+      u.uGroupEnergy.value.copy(tmp.ge);
+      u.uKick.value = ge.kick;
+    }
+    u.uSolAmt.value   = solAmt;
+    u.uMontAmt.value  = montAmt;
+    u.uCieloAmt.value = cieloAmt;
+    u.uLinAmt.value   = linAmt;
+    u.uKickAmt.value  = kickAmt;
   });
 
   // La esfera debe estar centrada en el espectador (la camara queda en el origen).

@@ -37,6 +37,13 @@ El shader no pinta sobre las UV de la esfera: trabaja con la **dirección de cad
 | `uRingScale` | float | 1.0 | Periodo de anillos (más alto = franjas más gruesas) |
 | `uRingFade` | vec2 | (1.0, 1.6) | Dónde empiezan y terminan de desvanecerse los anillos |
 | `uStarCut` | float | 0.965 | Más alto = menos estrellas |
+| `uGroupEnergy` | vec4 | 0..1 | x=SOL, y=MONTAÑAS, z=CIELO, w=LÍNEAS (suavizadas por grupo) |
+| `uKick` | float | 0..1 | Destello de kick, decay exponencial ~150 ms |
+| `uSolAmt` | float | 1.5 | Multiplicador amplitud SOL |
+| `uMontAmt` | float | 1.5 | Multiplicador amplitud MONTAÑAS |
+| `uCieloAmt` | float | 1.5 | Multiplicador amplitud CIELO |
+| `uLinAmt` | float | 1.5 | Multiplicador amplitud LÍNEAS |
+| `uKickAmt` | float | 1.0 | Multiplicador amplitud kick |
 
 No incluyas `colorspace_fragment`: los colores ya están en sRGB y las texturas no deben convertirse.
 
