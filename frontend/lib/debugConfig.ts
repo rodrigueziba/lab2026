@@ -241,6 +241,32 @@ export const DBG_SILLAS = {
   amanecerEdgeDeg:     8.0,  // soft edge width (°)
   amanecerP2StaggerS:  1.0,  // stagger between layers in phase 2 (s)
   amanecerP2GrowS:     4.0,  // phase 2 grow duration (s)
+  // U10A: camera parallax per layer
+  parFrenteFact:  0.93,   // frente position factor (lower → more parallax vs fondo)
+  parMediasFact:  0.97,   // medias position factor
+  parPitchFre:    0.04,   // V shift per radian of camera pitch (frente)
+  parPitchMed:    0.02,   // V shift per radian of camera pitch (medias)
+  parYawTau:      0.40,   // yaw-lag decay time constant (s)
+  parYawScale:    0.50,   // yaw delta → UV offset scale
+  // U10B: sound reactions
+  mtWaveAmp:      0.25,   // traveling wave amplitude (UV fraction, ±)
+  mtWaveFreq:     2.0,    // wave cycles across azimuth
+  mtWaveSpd:      1.5,    // wave speed at full energy (cycles/s)
+  mtKickShkFreDeg: 1.5,   // frente kick-shake amplitude (degrees, ±)
+  mtKickShkMedDeg: 1.0,   // medias kick-shake (degrees)
+  mtKickShkFonDeg: 0.5,   // fondo kick-shake (degrees)
+  mtKickSpringK:  120,    // spring stiffness (1/s²)
+  mtKickSpringD:   18,    // spring damping (1/s)
+  mtEdgeGlow:     2.0,    // max edge-glow intensity
+  mtEdgePxH:      3,      // edge-glow detection height (texture pixels / 512)
+  mtEdgeColor:    '#EE8A2B' as string, // edge glow color (warm orange)
+  mtSepAzDeg:     2.0,    // layer-separation max (degrees)
+  mtTintMaxMix:   0.35,   // max tint blend (0–1)
+  mtTintColor:    '#E07030' as string, // tint color (warm orange/red)
+  mtFogFondo:     0.15,   // atmospheric fog for fondo (furthest layer)
+  mtFogMedias:    0.07,   // atmospheric fog for medias
+  mtFogFrente:    0.00,   // atmospheric fog for frente (none)
+  mtFogColor:     '#1b1428' as string, // fog color (dark purple-black)
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

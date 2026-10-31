@@ -36,22 +36,44 @@ const BAND_FRAG = /* glsl */`
   uniform float uReveal;        // -0.1=nothing, 1.1=fully revealed
   uniform float uOpacity;       // global fade (0 until texture loads)
   uniform float uBright;        // audio brightness boost (1.0 = no boost)
-  uniform float uOffset;        // horizontal scroll 0–1 (seamless, for lines)
+  uniform float uOffset;        // horizontal scroll 0–1 (parallax + separation)
   uniform float uMagenta;       // U7: 1.0 = replace with magenta test color
   uniform float uSectorCenter;  // U9: normalized azimuth 0–1 of sector center
-  uniform float uSectorWidth;   // U9: normalized full width (90/360=0.25, >1.0=full circle)
-  uniform float uSectorEdge;    // U9: normalized soft edge (8/360≈0.022)
+  uniform float uSectorWidth;   // U9: normalized full width (>1.0=full circle)
+  uniform float uSectorEdge;    // U9: normalized soft edge
+  // U10A: parallax
+  uniform float uVShift;        // vertical UV shift (pitch parallax + kick spring)
+  // U10B: sound reactions
+  uniform float uWaveAmp;       // traveling wave amplitude (UV fraction, ±)
+  uniform float uWaveFreq;      // wave cycles across azimuth
+  uniform float uWavePhs;       // wave phase (animated)
+  uniform float uEdgeGlow;      // edge glow intensity
+  uniform float uEdgePxH;       // edge detection height (pixels, divided by 512)
+  uniform vec3  uEdgeColor;     // edge glow color
+  uniform vec3  uTintColor;     // dynamic tint color
+  uniform float uTintMix;       // tint blend amount (0–1)
+  uniform float uFogMix;        // atmospheric fog (0–1)
+  uniform vec3  uFogColor;      // horizon fog color
   varying vec2 vUv;
   void main() {
-    vec2 uv = vec2(fract(vUv.x + uOffset), vUv.y);
+    // U10: vertical shift + traveling wave
+    float wave = uWaveAmp * sin(vUv.x * 6.28318 * uWaveFreq + uWavePhs);
+    vec2 uv = vec2(fract(vUv.x + uOffset), clamp(vUv.y + uVShift + wave, 0.0, 1.0));
     vec4 c  = texture2D(uTex, uv);
-    float m = 1.0 - smoothstep(uReveal - 0.06, uReveal + 0.06, uv.y);
+    // Reveal mask uses original vUv.y (independent of parallax shift)
+    float m = 1.0 - smoothstep(uReveal - 0.06, uReveal + 0.06, vUv.y);
     // U9: azimuth sector mask (halfW>0.5 → full circle, no visible seam)
     float delta = abs(fract(vUv.x - uSectorCenter + 0.5) - 0.5);
     float halfW = uSectorWidth * 0.5;
     float sectM = 1.0 - smoothstep(halfW - uSectorEdge, halfW + uSectorEdge, delta);
-    if (uMagenta > 0.5) c = vec4(1.0, 0.0, 1.0, 1.0);
-    gl_FragColor = vec4(c.rgb * uBright, c.a * m * sectM * uOpacity);
+    // U10B: edge glow — detect top edge of mountain silhouette
+    float edgeAlphaUp = texture2D(uTex, vec2(uv.x, clamp(uv.y + uEdgePxH / 512.0, 0.0, 1.0))).a;
+    float edgeVal = max(0.0, c.a - edgeAlphaUp) * uEdgeGlow;
+    // U10B: dynamic tint + atmospheric fog
+    vec3 rgb = mix(c.rgb, uTintColor, c.a * uTintMix);
+    rgb = mix(rgb, uFogColor, uFogMix);
+    if (uMagenta > 0.5) { rgb = vec3(1.0, 0.0, 1.0); edgeVal = 0.0; }
+    gl_FragColor = vec4((rgb + uEdgeColor * edgeVal) * uBright, c.a * m * sectM * uOpacity);
   }
 `;
 
@@ -67,12 +89,33 @@ interface BandUni {
   uSectorCenter: THREE.IUniform<number>;
   uSectorWidth:  THREE.IUniform<number>;
   uSectorEdge:   THREE.IUniform<number>;
+  // U10A
+  uVShift:       THREE.IUniform<number>;
+  // U10B
+  uWaveAmp:      THREE.IUniform<number>;
+  uWaveFreq:     THREE.IUniform<number>;
+  uWavePhs:      THREE.IUniform<number>;
+  uEdgeGlow:     THREE.IUniform<number>;
+  uEdgePxH:      THREE.IUniform<number>;
+  uEdgeColor:    THREE.IUniform<THREE.Color>;
+  uTintColor:    THREE.IUniform<THREE.Color>;
+  uTintMix:      THREE.IUniform<number>;
+  uFogMix:       THREE.IUniform<number>;
+  uFogColor:     THREE.IUniform<THREE.Color>;
 }
 const mkBU = (): BandUni => ({
   uTex: { value: null }, uReveal: { value: -0.1 },
   uOpacity: { value: 0 }, uBright: { value: 1 }, uOffset: { value: 0 },
   uMagenta: { value: 0 },
   uSectorCenter: { value: 0 }, uSectorWidth: { value: 2.0 }, uSectorEdge: { value: 0.022 },
+  uVShift:    { value: 0 },
+  uWaveAmp:   { value: 0 },   uWaveFreq:  { value: 2 },   uWavePhs:  { value: 0 },
+  uEdgeGlow:  { value: 0 },   uEdgePxH:   { value: 3 },
+  uEdgeColor: { value: new THREE.Color('#EE8A2B') },
+  uTintColor: { value: new THREE.Color('#E07030') },
+  uTintMix:   { value: 0 },
+  uFogMix:    { value: 0 },
+  uFogColor:  { value: new THREE.Color('#1b1428') },
 });
 
 // ── U5: liquid psychedelic lines shader ───────────────────────────────────────
@@ -295,6 +338,16 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
   const dawnResetRef = useRef(false);
   const dawnSkipRef  = useRef(false);
 
+  // U10A: camera parallax state (pre-allocated, no per-frame alloc)
+  const _lookDir    = useRef(new THREE.Vector3());
+  const prevYawRef  = useRef(0);
+  const yawOffRef   = useRef(0);   // smoothed yaw-lag offset (UV fraction, decays to 0)
+  // U10B: kick spring dynamics [frente, medias, fondo]
+  const kickSpringD = useRef([0, 0, 0]); // spring displacement (UV.y fraction)
+  const kickSpringV = useRef([0, 0, 0]); // spring velocity
+  const prevKickRef = useRef(false);
+  const wavePhasRef = useRef(0);   // traveling wave phase accumulator (radians)
+
   // U9: dawn debug event listeners
   useEffect(() => {
     const onReset = () => { dawnResetRef.current = true; };
@@ -416,7 +469,7 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
   }, [maxAniso]);
 
   // ── Per-frame updates ─────────────────────────────────────────────────────
-  useFrame(({ clock }, dt) => {
+  useFrame(({ clock, camera }, dt) => {
     const gr   = growRef.current;
     const kick = kickRef.current;
     const t_s  = clock.elapsedTime;    // seconds, for oscillators
@@ -577,6 +630,100 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
       frenteU.uSectorCenter.value = dawnFrC;
       frenteU.uSectorEdge.value   = dawnEdge;
     }
+
+    // ── U10A: camera parallax ────────────────────────────────────────────────
+    _lookDir.current.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    const yaw   = Math.atan2(_lookDir.current.x, _lookDir.current.z);
+    const pitch = Math.asin(Math.min(1, Math.max(-1, _lookDir.current.y)));
+
+    // Lateral displacement (perpendicular to look direction, normalized to DOME_R)
+    const lateral  = camera.position.x * Math.cos(yaw) - camera.position.z * Math.sin(yaw);
+    const latNorm  = lateral / DOME_R;
+
+    // Yaw-velocity inertia: accumulates on turn, decays exponentially
+    let yawDelta = yaw - prevYawRef.current;
+    if (yawDelta >  Math.PI) yawDelta -= 2 * Math.PI;
+    if (yawDelta < -Math.PI) yawDelta += 2 * Math.PI;
+    prevYawRef.current = yaw;
+    yawOffRef.current  = (yawOffRef.current + yawDelta * DBG_SILLAS.parYawScale)
+                         * Math.exp(-dt / DBG_SILLAS.parYawTau);
+
+    const parF  = 1.00 - DBG_SILLAS.parFrenteFact;  // default 0.07
+    const parM  = 1.00 - DBG_SILLAS.parMediasFact;  // default 0.03
+    const hFre  = latNorm * parF + yawOffRef.current * parF;
+    const hMed  = latNorm * parM + yawOffRef.current * parM;
+
+    // ── U10B: kick spring dynamics ───────────────────────────────────────────
+    const kd = kickSpringD.current;
+    const kv = kickSpringV.current;
+    if (BAND_STATE.kick && !prevKickRef.current) {
+      const UV_DEG = 1 / 45;  // 1° in UV.y (band spans 45°)
+      kd[0] += DBG_SILLAS.mtKickShkFreDeg * UV_DEG;
+      kd[1] += DBG_SILLAS.mtKickShkMedDeg * UV_DEG;
+      kd[2] += DBG_SILLAS.mtKickShkFonDeg * UV_DEG;
+    }
+    prevKickRef.current = BAND_STATE.kick;
+    const SK = DBG_SILLAS.mtKickSpringK;
+    const SD = DBG_SILLAS.mtKickSpringD;
+    for (let i = 0; i < 3; i++) {
+      kv[i] += (-kd[i] * SK - kv[i] * SD) * dt;
+      kd[i] += kv[i] * dt;
+    }
+
+    // Vertical shifts: pitch parallax + kick spring
+    const vFre = pitch * DBG_SILLAS.parPitchFre + kd[0];
+    const vMed = pitch * DBG_SILLAS.parPitchMed + kd[1];
+    const vFon = kd[2];  // fondo: no pitch parallax
+
+    // Wave phase accumulation (speed proportional to energy)
+    wavePhasRef.current += dt * DBG_SILLAS.mtWaveSpd * p1 * Math.PI * 2;
+
+    // Layer separation + tint + edge glow (all energy-driven)
+    const sep     = p1 * DBG_SILLAS.mtSepAzDeg / 360;
+    const tintMix = p1 * DBG_SILLAS.mtTintMaxMix;
+    const edgeG   = p1 * DBG_SILLAS.mtEdgeGlow;
+    const wAmp    = p1 * DBG_SILLAS.mtWaveAmp;
+    const wFreq   = DBG_SILLAS.mtWaveFreq;
+
+    // Apply U10 uniforms (per layer, no new objects)
+    frenteU.uOffset.value   = hFre + sep;
+    frenteU.uVShift.value   = vFre;
+    frenteU.uWaveAmp.value  = wAmp;
+    frenteU.uWaveFreq.value = wFreq;
+    frenteU.uWavePhs.value  = wavePhasRef.current;
+    frenteU.uEdgeGlow.value = edgeG;
+    frenteU.uEdgePxH.value  = DBG_SILLAS.mtEdgePxH;
+    frenteU.uEdgeColor.value.set(DBG_SILLAS.mtEdgeColor);
+    frenteU.uTintColor.value.set(DBG_SILLAS.mtTintColor);
+    frenteU.uTintMix.value  = tintMix;
+    frenteU.uFogMix.value   = DBG_SILLAS.mtFogFrente;
+    frenteU.uFogColor.value.set(DBG_SILLAS.mtFogColor);
+
+    mediasU.uOffset.value   = hMed;
+    mediasU.uVShift.value   = vMed;
+    mediasU.uWaveAmp.value  = wAmp;
+    mediasU.uWaveFreq.value = wFreq;
+    mediasU.uWavePhs.value  = wavePhasRef.current + 2.094;  // +120°
+    mediasU.uEdgeGlow.value = edgeG * 0.7;
+    mediasU.uEdgePxH.value  = DBG_SILLAS.mtEdgePxH;
+    mediasU.uEdgeColor.value.set(DBG_SILLAS.mtEdgeColor);
+    mediasU.uTintColor.value.set(DBG_SILLAS.mtTintColor);
+    mediasU.uTintMix.value  = tintMix;
+    mediasU.uFogMix.value   = DBG_SILLAS.mtFogMedias;
+    mediasU.uFogColor.value.set(DBG_SILLAS.mtFogColor);
+
+    fondoU.uOffset.value    = 0 - sep;
+    fondoU.uVShift.value    = vFon;
+    fondoU.uWaveAmp.value   = wAmp;
+    fondoU.uWaveFreq.value  = wFreq;
+    fondoU.uWavePhs.value   = wavePhasRef.current + 4.189;  // +240°
+    fondoU.uEdgeGlow.value  = edgeG * 0.4;
+    fondoU.uEdgePxH.value   = DBG_SILLAS.mtEdgePxH;
+    fondoU.uEdgeColor.value.set(DBG_SILLAS.mtEdgeColor);
+    fondoU.uTintColor.value.set(DBG_SILLAS.mtTintColor);
+    fondoU.uTintMix.value   = tintMix;
+    fondoU.uFogMix.value    = DBG_SILLAS.mtFogFondo;
+    fondoU.uFogColor.value.set(DBG_SILLAS.mtFogColor);
 
     // ── U7: visibility flags and magenta mode ─────────────────────────────
     const mgIdx = DBG_SILLAS.u7MagentaIdx;

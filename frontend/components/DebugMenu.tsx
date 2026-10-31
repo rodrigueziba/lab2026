@@ -1039,6 +1039,50 @@ export default function DebugMenu() {
           </div>
 
           <div style={DIVIDER} />
+          <span style={LABEL}>U10A — Parallax por capa <span style={NOTE}>(live)</span></span>
+          <NumField label="parFrenteFact"  value={sillas.parFrenteFact}  step={0.01} min={0.5} max={1.0}  note="frente position factor (0.93)"
+            onChange={v => { DBG_SILLAS.parFrenteFact  = v; setSillas(s => ({ ...s, parFrenteFact:  v })); }} />
+          <NumField label="parMediasFact"  value={sillas.parMediasFact}  step={0.01} min={0.5} max={1.0}  note="medias position factor (0.97)"
+            onChange={v => { DBG_SILLAS.parMediasFact  = v; setSillas(s => ({ ...s, parMediasFact:  v })); }} />
+          <NumField label="parPitchFre"    value={sillas.parPitchFre}    step={0.01} min={0}   max={0.2}  note="V shift/rad pitch (frente)"
+            onChange={v => { DBG_SILLAS.parPitchFre    = v; setSillas(s => ({ ...s, parPitchFre:    v })); }} />
+          <NumField label="parPitchMed"    value={sillas.parPitchMed}    step={0.01} min={0}   max={0.2}  note="V shift/rad pitch (medias)"
+            onChange={v => { DBG_SILLAS.parPitchMed    = v; setSillas(s => ({ ...s, parPitchMed:    v })); }} />
+          <NumField label="parYawTau"      value={sillas.parYawTau}      step={0.05} min={0.1} max={2}    note="yaw-lag decay τ (s)"
+            onChange={v => { DBG_SILLAS.parYawTau      = v; setSillas(s => ({ ...s, parYawTau:      v })); }} />
+          <NumField label="parYawScale"    value={sillas.parYawScale}    step={0.05} min={0}   max={2}    note="yaw delta → UV offset scale"
+            onChange={v => { DBG_SILLAS.parYawScale    = v; setSillas(s => ({ ...s, parYawScale:    v })); }} />
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>U10B — Reacción al sonido <span style={NOTE}>(live)</span></span>
+          <NumField label="mtWaveAmp"       value={sillas.mtWaveAmp}       step={0.05} min={0}   max={0.5}  note="onda viajera amplitud (UV ±)"
+            onChange={v => { DBG_SILLAS.mtWaveAmp       = v; setSillas(s => ({ ...s, mtWaveAmp:       v })); }} />
+          <NumField label="mtWaveFreq"      value={sillas.mtWaveFreq}      step={0.5}  min={0.5} max={8}    note="ciclos por azimut"
+            onChange={v => { DBG_SILLAS.mtWaveFreq      = v; setSillas(s => ({ ...s, mtWaveFreq:      v })); }} />
+          <NumField label="mtWaveSpd"       value={sillas.mtWaveSpd}       step={0.25} min={0}   max={5}    note="velocidad onda (ciclos/s a energía=1)"
+            onChange={v => { DBG_SILLAS.mtWaveSpd       = v; setSillas(s => ({ ...s, mtWaveSpd:       v })); }} />
+          <NumField label="mtKickShkFreDeg" value={sillas.mtKickShkFreDeg} step={0.5}  min={0}   max={5}    note="sacudida kick frente (°)"
+            onChange={v => { DBG_SILLAS.mtKickShkFreDeg = v; setSillas(s => ({ ...s, mtKickShkFreDeg: v })); }} />
+          <NumField label="mtKickShkMedDeg" value={sillas.mtKickShkMedDeg} step={0.5}  min={0}   max={5}    note="sacudida kick medias (°)"
+            onChange={v => { DBG_SILLAS.mtKickShkMedDeg = v; setSillas(s => ({ ...s, mtKickShkMedDeg: v })); }} />
+          <NumField label="mtKickShkFonDeg" value={sillas.mtKickShkFonDeg} step={0.5}  min={0}   max={5}    note="sacudida kick fondo (°)"
+            onChange={v => { DBG_SILLAS.mtKickShkFonDeg = v; setSillas(s => ({ ...s, mtKickShkFonDeg: v })); }} />
+          <NumField label="mtKickSpringK"   value={sillas.mtKickSpringK}   step={10}   min={10}  max={400}  note="rigidez del resorte (1/s²)"
+            onChange={v => { DBG_SILLAS.mtKickSpringK   = v; setSillas(s => ({ ...s, mtKickSpringK:   v })); }} />
+          <NumField label="mtKickSpringD"   value={sillas.mtKickSpringD}   step={2}    min={1}   max={60}   note="amortiguación del resorte (1/s)"
+            onChange={v => { DBG_SILLAS.mtKickSpringD   = v; setSillas(s => ({ ...s, mtKickSpringD:   v })); }} />
+          <NumField label="mtEdgeGlow"      value={sillas.mtEdgeGlow}      step={0.25} min={0}   max={5}    note="intensidad brillo contorno"
+            onChange={v => { DBG_SILLAS.mtEdgeGlow      = v; setSillas(s => ({ ...s, mtEdgeGlow:      v })); }} />
+          <NumField label="mtSepAzDeg"      value={sillas.mtSepAzDeg}      step={0.5}  min={0}   max={10}   note="separación máx capas (°)"
+            onChange={v => { DBG_SILLAS.mtSepAzDeg      = v; setSillas(s => ({ ...s, mtSepAzDeg:      v })); }} />
+          <NumField label="mtTintMaxMix"    value={sillas.mtTintMaxMix}    step={0.05} min={0}   max={1}    note="tinte máx (0–1)"
+            onChange={v => { DBG_SILLAS.mtTintMaxMix    = v; setSillas(s => ({ ...s, mtTintMaxMix:    v })); }} />
+          <NumField label="mtFogFondo"      value={sillas.mtFogFondo}      step={0.05} min={0}   max={0.5}  note="niebla atmosférica fondo"
+            onChange={v => { DBG_SILLAS.mtFogFondo      = v; setSillas(s => ({ ...s, mtFogFondo:      v })); }} />
+          <NumField label="mtFogMedias"     value={sillas.mtFogMedias}     step={0.05} min={0}   max={0.5}  note="niebla atmosférica medias"
+            onChange={v => { DBG_SILLAS.mtFogMedias     = v; setSillas(s => ({ ...s, mtFogMedias:     v })); }} />
+
+          <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
           <NumField label="agcFloorRise"   value={sillas.agcFloorRise}   step={0.1}  min={0}    max={5}     note="live"
             onChange={v => { DBG_SILLAS.agcFloorRise   = v; setSillas(s => ({ ...s, agcFloorRise:   v })); }} />
