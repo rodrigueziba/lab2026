@@ -4,7 +4,7 @@
 // Covers the entire sky dome without the black-disk artefact of direct sphere UV mapping.
 // Mounted by ExperienceDome only after alight:visualizer-activate fires.
 
-import { useRef, useEffect, useMemo, useState } from "react";
+import { useRef, useEffect, useMemo, useState, Suspense } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SILLAS, DOME_METERS } from "@/lib/debugConfig";
@@ -534,21 +534,24 @@ function DomeSkyAnchor() {
 
   return (
     <group ref={groupRef}>
-      <DomeSky
-        getBands={_zeroBands}
-        getGroupEnergy={getGroupEnergy}
-        getShaderParams={getShaderParams}
-        solAmt={DBG_SILLAS.domeSolAmt}
-        montAmt={DBG_SILLAS.domeMontAmt}
-        cieloAmt={DBG_SILLAS.domeCieloAmt}
-        linAmt={DBG_SILLAS.domeLinAmt}
-        kickAmt={DBG_SILLAS.domeKickAmt}
-        portalAzimuth={DBG_SILLAS.domePortalAzimuth}
-        portalElevation={DBG_SILLAS.domePortalElevation}
-        portalHalfFovDeg={DBG_SILLAS.domePortalHalfFovDeg}
-        radius={100}
-        lowQuality={lowQuality}
-      />
+      {/* X1: Suspense local — aísla la carga de texturas al cielo; el resto del canvas sigue visible */}
+      <Suspense fallback={null}>
+        <DomeSky
+          getBands={_zeroBands}
+          getGroupEnergy={getGroupEnergy}
+          getShaderParams={getShaderParams}
+          solAmt={DBG_SILLAS.domeSolAmt}
+          montAmt={DBG_SILLAS.domeMontAmt}
+          cieloAmt={DBG_SILLAS.domeCieloAmt}
+          linAmt={DBG_SILLAS.domeLinAmt}
+          kickAmt={DBG_SILLAS.domeKickAmt}
+          portalAzimuth={DBG_SILLAS.domePortalAzimuth}
+          portalElevation={DBG_SILLAS.domePortalElevation}
+          portalHalfFovDeg={DBG_SILLAS.domePortalHalfFovDeg}
+          radius={100}
+          lowQuality={lowQuality}
+        />
+      </Suspense>
     </group>
   );
 }

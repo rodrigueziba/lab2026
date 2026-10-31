@@ -5,6 +5,13 @@ import { useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
+
+// X1: pre-carga al importar el módulo → texturas en caché antes del primer mount (evita Suspense negro)
+useTexture.preload([
+  "/portal/portal-masks.png",
+  "/portal/portal-masks-2k.png",
+  "/portal/portal-color.png",
+]);
 import { domeVert, domeFrag } from "./domeShaders";
 
 export type Bands = { bass: number; lowMid: number; highMid: number; treble: number }; // 0..1
