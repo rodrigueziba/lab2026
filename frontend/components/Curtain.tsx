@@ -26,7 +26,7 @@ const ITERS      = 6;
 const FADE_OUT_S = 1.2;
 
 // Velvet sheen colour — allocated once at module level, no per-frame allocation
-const SHEEN_COL = new THREE.Color("#c1001a");
+const SHEEN_COL = new THREE.Color("#cc0000");
 
 // ── Simulation data ───────────────────────────────────────────────────────────
 type SimData = {
@@ -397,7 +397,7 @@ export default function Curtain() {
       {/* Mesh rendered always; geometry is wired imperatively in useEffect */}
       <mesh ref={meshRef}>
         <meshPhysicalMaterial
-          color="#7a0d14"
+          color="#990000"
           roughness={0.9}
           metalness={0}
           sheen={0.6}

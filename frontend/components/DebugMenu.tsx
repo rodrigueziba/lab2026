@@ -632,8 +632,10 @@ export default function DebugMenu() {
           </div>
 
           <div style={DIVIDER} />
-          <span style={LABEL}>Haces N3 R2 <span style={NOTE}>(live salvo origen/radio del cono: reload)</span></span>
-          <NumField label="hazRadiusM" value={sillas.hazRadiusM} step={0.5} min={4} max={20} note="live"
+          <span style={LABEL}>Haces N3 R2 V1 <span style={NOTE}>(live salvo origen/radio del cono: reload)</span></span>
+          <NumField label="hazDistFactor" value={sillas.hazDistFactor} step={0.05} min={0.5} max={3} note="V1: base 12m × factor → hazRadiusM"
+            onChange={v => { DBG_SILLAS.hazDistFactor = v; DBG_SILLAS.hazRadiusM = 12 * v; setSillas(s => ({ ...s, hazDistFactor: v, hazRadiusM: 12 * v })); }} />
+          <NumField label="hazRadiusM" value={sillas.hazRadiusM} step={0.5} min={4} max={30} note="live"
             onChange={v => { DBG_SILLAS.hazRadiusM = v; setSillas(s => ({ ...s, hazRadiusM: v })); }} />
           <NumField label="hazZoneRadiusM" value={sillas.hazZoneRadiusM} step={0.1} min={0.1} max={5} note="live"
             onChange={v => { DBG_SILLAS.hazZoneRadiusM = v; setSillas(s => ({ ...s, hazZoneRadiusM: v })); }} />
@@ -1256,7 +1258,14 @@ export default function DebugMenu() {
           ))}
 
           <div style={DIVIDER} />
-          <span style={LABEL}>Lecterns <span style={NOTE}>(T7)</span></span>
+          <span style={LABEL}>Lecterns <span style={NOTE}>(T7 V1)</span></span>
+          <NumField
+            label="monolitoDistFactor"
+            value={lectern.monolitoDistFactor}
+            step={0.05} min={0.5} max={3}
+            note="V1: base 1.60m × factor = LECTERN_PLACE_X (geometry: reload)"
+            onChange={v => { DBG_LECTERNS.monolitoDistFactor = v; setLectern(l => ({ ...l, monolitoDistFactor: v })); }}
+          />
           <NumField
             label="delayMs (after dome)"
             value={lectern.delayMs}

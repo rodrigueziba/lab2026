@@ -94,7 +94,8 @@ export const DBG_SILLAS = {
   releaseDelayMs: 5000,  // ms after alight:dome-revealed before movement is freed (sala_activa)
   lockLook:       false, // N1: also lock mouse-look during sillas_secuencia (not yet implemented)
   // N3: beams (haces)
-  hazRadiusM:       12.0,   // beam center distance from prism XZ origin (m) — R2: 4→12
+  hazDistFactor:    1.25,   // V1: multiplier applied to base 12 m radius (base×factor=hazRadiusM)
+  hazRadiusM:       15.0,   // beam center distance from prism XZ origin (m) — V1: 12→15 (×1.25)
   hazZoneRadiusM:   1.0,    // "under beam" trigger zone radius (m)
   hazSpotY:         22,     // legacy — no longer used as beam height; kept for reference
   hazOriginHM:      2.4,    // R2: beam origin height (m) above floor — reload to rebuild geometry
@@ -338,7 +339,7 @@ export const DBG_FACE = {
 // J1: timing constants (module-level so alightStore / Audience can import them)
 export const PEOPLE_MIN_DELAY_MS      = 5_000;  // min ms from stars-visible to people-visible
 export const LECTERNS_AFTER_PEOPLE_MS = 10_000; // ms from people-visible to lecterns request
-export const LECTERN_OUTWARD_OFFSET_M = 0.30;   // extra outward offset added to LECTERN_X
+export const LECTERN_OUTWARD_OFFSET_M = 0.70;   // V1: extra outward offset → LECTERN_X(1.3)+0.70=2.0m (×1.25 from 1.60m)
 
 // J4: TARIMA audio-effect tuning constants (exposed in debug menu)
 export const DBG_AUDIO = {
@@ -375,6 +376,7 @@ export const DBG_CAM_SOUND = {
 };
 
 export const DBG_LECTERNS = {
+  monolitoDistFactor: 1.25, // V1: placement factor (base 1.60m × factor = 2.0m) — geometry: reload
   delayMs:          10_000, // legacy — no longer used for trigger (kept for reference)
   lightIntensity:   120,    // SpotLight per lectern (W-equivalent)
   emissiveBrightness: 0.7,  // emissiveIntensity for active buttons/knobs
