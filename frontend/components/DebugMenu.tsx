@@ -733,7 +733,7 @@ export default function DebugMenu() {
           {sillas.showBandOverlay && <BandEnergyOverlay />}
 
           <div style={DIVIDER} />
-          <span style={LABEL}>Monolitos N5 V1/V2 <span style={NOTE}>(live)</span></span>
+          <span style={LABEL}>Monolitos N5 V1/V2/V3 <span style={NOTE}>(live; geometry: reload)</span></span>
           <NumField label="monolitoDistFactor" value={sillas.monolitoDistFactor}  step={0.05} min={0.5} max={3}   note="V1: base 3.0m × factor → monolithDistM"
             onChange={v => { DBG_SILLAS.monolitoDistFactor = v; DBG_SILLAS.monolithDistM = 3 * v; setSillas(s => ({ ...s, monolitoDistFactor: v, monolithDistM: 3 * v })); }} />
           <NumField label="monolithDistM"      value={sillas.monolithDistM}       step={0.1} min={0.5} max={10}   note="live"
@@ -787,6 +787,31 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.monolithRimV2Intensity = v; setSillas(s => ({ ...s, monolithRimV2Intensity: v })); }} />
           <NumField label="monolithDesaturation"   value={sillas.monolithDesaturation}   step={0.05} min={0} max={1}   note="V2 light desaturation"
             onChange={v => { DBG_SILLAS.monolithDesaturation   = v; setSillas(s => ({ ...s, monolithDesaturation:   v })); }} />
+          {/* V3: twisted obelisk */}
+          <NumField label="monolithTwistDeg"    value={sillas.monolithTwistDeg}    step={5}    min={0}   max={180} note="V3 reload"
+            onChange={v => { DBG_SILLAS.monolithTwistDeg    = v; setSillas(s => ({ ...s, monolithTwistDeg:    v })); }} />
+          <NumField label="monolithTwistInicio" value={sillas.monolithTwistInicio} step={0.05} min={0}   max={1}   note="V3 reload"
+            onChange={v => { DBG_SILLAS.monolithTwistInicio = v; setSillas(s => ({ ...s, monolithTwistInicio: v })); }} />
+          <NumField label="monolithTaper"       value={sillas.monolithTaper}       step={0.01} min={0.5} max={1}   note="V3 reload"
+            onChange={v => { DBG_SILLAS.monolithTaper       = v; setSillas(s => ({ ...s, monolithTaper:       v })); }} />
+          <NumField label="monolithTopTilt"     value={sillas.monolithTopTilt}     step={0.01} min={0}   max={0.5} note="V3 reload"
+            onChange={v => { DBG_SILLAS.monolithTopTilt     = v; setSillas(s => ({ ...s, monolithTopTilt:     v })); }} />
+          <div style={ROW}>
+            <span>monolithLucesPropias <span style={NOTE}>V3 off=bloom fix</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.monolithLucesPropias;
+              DBG_SILLAS.monolithLucesPropias = v;
+              setSillas(s => ({ ...s, monolithLucesPropias: v }));
+            }}>{sillas.monolithLucesPropias ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>monolithUseConchoidal <span style={NOTE}>V3 flag → V2 geom</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.monolithUseConchoidal;
+              DBG_SILLAS.monolithUseConchoidal = v;
+              setSillas(s => ({ ...s, monolithUseConchoidal: v }));
+            }}>{sillas.monolithUseConchoidal ? "ON" : "off"}</button>
+          </div>
 
           <div style={DIVIDER} />
           <span style={LABEL}>Telón N6 <span style={NOTE}>(live excepto distancia/tamaño/gather)</span></span>

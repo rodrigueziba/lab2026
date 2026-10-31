@@ -138,11 +138,18 @@ export const DBG_SILLAS = {
   monolithForceShow: false,    // debug: force monoliths visible regardless of state
   // V2: obsidian material
   monolithEnvIntensity:   1.4,  // PMREM envMapIntensity
-  monolithWarmLightI:    60,    // warm PointLight intensity per monolith
-  monolithColdLightI:    28,    // cold PointLight intensity per monolith
-  monolithVeinBright:     0.40, // golden vein brightness (shader)
+  monolithWarmLightI:    60,    // warm PointLight intensity per monolith (V3: only when lucesPropias)
+  monolithColdLightI:    28,    // cold PointLight intensity per monolith (V3: only when lucesPropias)
+  monolithVeinBright:     0.02, // V3: lowered to near-zero (golden veins cause bloom sparkles)
   monolithRimV2Intensity: 0.75, // purple-brown fresnel rim (replaces S1 cyan)
   monolithDesaturation:   0.60, // 60 % desaturation of reflected light
+  // V3: twisted obelisk geometry + light fix
+  monolithTwistDeg:      90.0, // total twist angle of column (degrees) — reload to change geometry
+  monolithTwistInicio:   0.35, // fraction of column height where twist begins (0 = all, 1 = none)
+  monolithTaper:         0.92, // top side scale factor (1.0 = no taper, 0.9 = 10% narrower at top)
+  monolithTopTilt:       0.06, // top cut inclination (fraction of column side per unit X)
+  monolithLucesPropias:  false, // V3: enable point lights (default off — they cause bloom artifacts)
+  monolithUseConchoidal: false, // V3: use V2 conchoidal fracture geometry instead of twisted obelisk
   debugOverlays:       false, // R1: show prism/audio/effects debug overlays — off by default
   // N6: red velvet curtain (reload to reposition; wind/gravity/damping/light are live)
   curtainDistM:          3.0,           // distance from player spawn to curtain plane (m)
