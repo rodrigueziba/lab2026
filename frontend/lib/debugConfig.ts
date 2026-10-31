@@ -136,6 +136,13 @@ export const DBG_SILLAS = {
   monolithRimPow: 3,           // rim exponent (higher = tighter edge)
   monolithGlowOpacity: 0.10,   // floor glow disc alpha
   monolithForceShow: false,    // debug: force monoliths visible regardless of state
+  // V2: obsidian material
+  monolithEnvIntensity:   1.4,  // PMREM envMapIntensity
+  monolithWarmLightI:    60,    // warm PointLight intensity per monolith
+  monolithColdLightI:    28,    // cold PointLight intensity per monolith
+  monolithVeinBright:     0.40, // golden vein brightness (shader)
+  monolithRimV2Intensity: 0.75, // purple-brown fresnel rim (replaces S1 cyan)
+  monolithDesaturation:   0.60, // 60 % desaturation of reflected light
   debugOverlays:       false, // R1: show prism/audio/effects debug overlays — off by default
   // N6: red velvet curtain (reload to reposition; wind/gravity/damping/light are live)
   curtainDistM:          3.0,           // distance from player spawn to curtain plane (m)

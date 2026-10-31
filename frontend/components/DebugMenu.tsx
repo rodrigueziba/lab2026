@@ -733,7 +733,7 @@ export default function DebugMenu() {
           {sillas.showBandOverlay && <BandEnergyOverlay />}
 
           <div style={DIVIDER} />
-          <span style={LABEL}>Monolitos N5 V1 <span style={NOTE}>(live)</span></span>
+          <span style={LABEL}>Monolitos N5 V1/V2 <span style={NOTE}>(live)</span></span>
           <NumField label="monolitoDistFactor" value={sillas.monolitoDistFactor}  step={0.05} min={0.5} max={3}   note="V1: base 3.0m × factor → monolithDistM"
             onChange={v => { DBG_SILLAS.monolitoDistFactor = v; DBG_SILLAS.monolithDistM = 3 * v; setSillas(s => ({ ...s, monolitoDistFactor: v, monolithDistM: 3 * v })); }} />
           <NumField label="monolithDistM"      value={sillas.monolithDistM}       step={0.1} min={0.5} max={10}   note="live"
@@ -774,6 +774,19 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.monolithRimPow         = v; setSillas(s => ({ ...s, monolithRimPow:         v })); }} />
           <NumField label="monolithGlowOpacity"    value={sillas.monolithGlowOpacity}    step={0.01} min={0} max={0.5} note="live"
             onChange={v => { DBG_SILLAS.monolithGlowOpacity    = v; setSillas(s => ({ ...s, monolithGlowOpacity:    v })); }} />
+          {/* V2: obsidian material */}
+          <NumField label="monolithEnvIntensity"   value={sillas.monolithEnvIntensity}   step={0.1}  min={0} max={5}   note="V2 PMREM intensity"
+            onChange={v => { DBG_SILLAS.monolithEnvIntensity   = v; setSillas(s => ({ ...s, monolithEnvIntensity:   v })); }} />
+          <NumField label="monolithWarmLightI"     value={sillas.monolithWarmLightI}     step={5}    min={0} max={300} note="V2 warm point light"
+            onChange={v => { DBG_SILLAS.monolithWarmLightI     = v; setSillas(s => ({ ...s, monolithWarmLightI:     v })); }} />
+          <NumField label="monolithColdLightI"     value={sillas.monolithColdLightI}     step={5}    min={0} max={150} note="V2 cold point light"
+            onChange={v => { DBG_SILLAS.monolithColdLightI     = v; setSillas(s => ({ ...s, monolithColdLightI:     v })); }} />
+          <NumField label="monolithVeinBright"     value={sillas.monolithVeinBright}     step={0.05} min={0} max={2}   note="V2 golden veins"
+            onChange={v => { DBG_SILLAS.monolithVeinBright     = v; setSillas(s => ({ ...s, monolithVeinBright:     v })); }} />
+          <NumField label="monolithRimV2Intensity" value={sillas.monolithRimV2Intensity} step={0.05} min={0} max={3}   note="V2 purple-brown rim"
+            onChange={v => { DBG_SILLAS.monolithRimV2Intensity = v; setSillas(s => ({ ...s, monolithRimV2Intensity: v })); }} />
+          <NumField label="monolithDesaturation"   value={sillas.monolithDesaturation}   step={0.05} min={0} max={1}   note="V2 light desaturation"
+            onChange={v => { DBG_SILLAS.monolithDesaturation   = v; setSillas(s => ({ ...s, monolithDesaturation:   v })); }} />
 
           <div style={DIVIDER} />
           <span style={LABEL}>Telón N6 <span style={NOTE}>(live excepto distancia/tamaño/gather)</span></span>
