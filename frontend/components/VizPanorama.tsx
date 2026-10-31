@@ -59,6 +59,96 @@ const mkBU = (): BandUni => ({
   uOpacity: { value: 0 }, uBright: { value: 1 }, uOffset: { value: 0 },
 });
 
+// ── U5: liquid psychedelic lines shader ───────────────────────────────────────
+const LINE_FRAG = /* glsl */`
+  uniform sampler2D uTex;
+  uniform float uReveal;
+  uniform float uOpacity;
+  uniform float uBright;
+  uniform float uOffset;
+  uniform float uEnergy;   // smoothed group-3 normEnergy (0–1)
+  uniform float uTime;     // clock.elapsedTime
+  uniform float uPsyMix;   // palette blend factor (0.15 quiet → 0.95 loud)
+  uniform float uPsyMode;  // 1.0 = on, 0.0 = pass-through
+  uniform float uWaveAmp;  // vertical wave amplitude (UV fraction)
+  uniform float uWaveFreq; // wave cycles across azimuth
+  uniform float uWaveSpd;  // wave temporal speed
+  uniform float uFbmSpd;   // FBM animation speed multiplier
+  varying vec2 vUv;
+
+  vec2 hash22(vec2 p) {
+    p = fract(p * vec2(127.1, 311.7));
+    p += dot(p, p.yx + 19.19);
+    return fract(vec2(p.x * p.y * 95.4307, p.x * p.y * 97.597));
+  }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p); vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(dot(hash22(i)           * 2.0 - 1.0, f),
+                   dot(hash22(i+vec2(1,0)) * 2.0 - 1.0, f - vec2(1,0)), u.x),
+               mix(dot(hash22(i+vec2(0,1)) * 2.0 - 1.0, f - vec2(0,1)),
+                   dot(hash22(i+vec2(1,1)) * 2.0 - 1.0, f - vec2(1,1)), u.x), u.y);
+  }
+  float fbm3(vec2 p) {
+    return vnoise(p)*0.5 + vnoise(p*2.1)*0.25 + vnoise(p*4.3)*0.125;
+  }
+  // Cosine palette — retro warm (amber/rust/crema tones)
+  vec3 cosPalette(float t) {
+    vec3 a = vec3(0.60, 0.40, 0.25);
+    vec3 b = vec3(0.45, 0.40, 0.30);
+    vec3 c = vec3(1.00, 0.80, 0.85);
+    vec3 d = vec3(0.00, 0.20, 0.55);
+    return clamp(a + b * cos(6.28318 * (c * t + d)), 0.0, 1.0);
+  }
+  void main() {
+    // Paso 3: vertical wave deformation before UV sampling
+    float wave = uEnergy * uWaveAmp * sin(vUv.x * 6.28318 * uWaveFreq + uTime * uWaveSpd);
+    vec2  uv   = vec2(fract(vUv.x + uOffset), clamp(vUv.y + wave, 0.0, 1.0));
+    vec4  orig = texture2D(uTex, uv);
+    float m    = 1.0 - smoothstep(uReveal - 0.06, uReveal + 0.06, uv.y);
+    if (uPsyMode < 0.5) {
+      gl_FragColor = vec4(orig.rgb * uBright, orig.a * m * uOpacity);
+      return;
+    }
+    // Paso 2: domain-warped FBM + cosine palette
+    float st = uTime * uFbmSpd;
+    vec2  wp = uv * vec2(3.0, 1.5);
+    vec2  q  = vec2(fbm3(wp + vec2(0.0, st)),
+                    fbm3(wp + vec2(3.7, 1.9) + st * 0.7));
+    float f  = fbm3(wp + 2.5 * q + vec2(st * 0.3, 0.0));
+    vec3  pal = cosPalette(f * 0.5 + 0.5 + st * 0.05);
+    vec3  rgb = mix(orig.rgb * uBright, pal * uBright, uPsyMix);
+    // Paso 3: sharpen alpha → thinner dark outlines at high energy
+    float aSharp = 1.0 + uEnergy * 2.5;
+    float a      = pow(clamp(orig.a, 0.0, 1.0), 1.0 / aSharp);
+    gl_FragColor = vec4(rgb, a * m * uOpacity);
+  }
+`;
+interface LineUni {
+  [k: string]: THREE.IUniform;
+  uTex:      THREE.IUniform<THREE.Texture | null>;
+  uReveal:   THREE.IUniform<number>;
+  uOpacity:  THREE.IUniform<number>;
+  uBright:   THREE.IUniform<number>;
+  uOffset:   THREE.IUniform<number>;
+  uEnergy:   THREE.IUniform<number>;
+  uTime:     THREE.IUniform<number>;
+  uPsyMix:   THREE.IUniform<number>;
+  uPsyMode:  THREE.IUniform<number>;
+  uWaveAmp:  THREE.IUniform<number>;
+  uWaveFreq: THREE.IUniform<number>;
+  uWaveSpd:  THREE.IUniform<number>;
+  uFbmSpd:   THREE.IUniform<number>;
+}
+const mkLU = (): LineUni => ({
+  uTex:     { value: null }, uReveal:  { value: -0.1 },
+  uOpacity: { value: 0 },   uBright:  { value: 1 },   uOffset:  { value: 0 },
+  uEnergy:  { value: 0 },   uTime:    { value: 0 },
+  uPsyMix:  { value: 0.15 }, uPsyMode: { value: 1 },
+  uWaveAmp: { value: 0.08 }, uWaveFreq: { value: 3.0 },
+  uWaveSpd: { value: 1.5 },  uFbmSpd:  { value: 0.08 },
+});
+
 // ── Seeded deterministic RNG ──────────────────────────────────────────────────
 function mkRng(seed: number) {
   let v = (seed >>> 0) || 1;
@@ -159,11 +249,11 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
   const fondoURef  = useRef<BandUni | null>(null);
   const mediasURef = useRef<BandUni | null>(null);
   const frenteURef = useRef<BandUni | null>(null);
-  const lineURef   = useRef<BandUni | null>(null);
+  const lineURef   = useRef<LineUni | null>(null);
   if (fondoURef.current == null)  fondoURef.current  = mkBU();
   if (mediasURef.current == null) mediasURef.current = mkBU();
   if (frenteURef.current == null) frenteURef.current = mkBU();
-  if (lineURef.current == null)   lineURef.current   = mkBU();
+  if (lineURef.current == null)   lineURef.current   = mkLU();
   const fondoU  = fondoURef.current;
   const mediasU = mediasURef.current;
   const frenteU = frenteURef.current;
@@ -375,10 +465,18 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
     if (mediasMeshRef.current) { mediasMeshRef.current.scale.y = mt1Sc; mediasMeshRef.current.rotation.y = azPar * 0.7; }
     if (frenteMeshRef.current) { frenteMeshRef.current.scale.y = mt2Sc; frenteMeshRef.current.rotation.y = azPar; }
 
-    // ── LÍNEAS (group 3) — scroll + amplitude (U5 will expand this) ───────
-    lineU.uReveal.value  = g3 * 1.2 - 0.1;
-    lineU.uBright.value  = 1 + p3 * DBG_SILLAS.lineAmpBoost + kick * DBG_SILLAS.kickExtraBoost;
-    lineU.uOffset.value  = flowRef.current / (Math.PI * 2);
+    // ── LÍNEAS (group 3) — U5: liquid shader + wave deformation ────────────
+    lineU.uReveal.value   = g3 * 1.2 - 0.1;
+    lineU.uBright.value   = 1 + p3 * DBG_SILLAS.lineAmpBoost + kick * DBG_SILLAS.kickExtraBoost;
+    lineU.uOffset.value   = flowRef.current / (Math.PI * 2);
+    lineU.uEnergy.value   = p3;
+    lineU.uTime.value     = t_s;
+    lineU.uPsyMix.value   = DBG_SILLAS.u5PsyMixMin + p3 * (DBG_SILLAS.u5PsyMixMax - DBG_SILLAS.u5PsyMixMin);
+    lineU.uPsyMode.value  = DBG_SILLAS.u5PsyMode ? 1.0 : 0.0;
+    lineU.uWaveAmp.value  = DBG_SILLAS.u5WaveAmp;
+    lineU.uWaveFreq.value = DBG_SILLAS.u5WaveFreq;
+    lineU.uWaveSpd.value  = DBG_SILLAS.u5WaveSpd;
+    lineU.uFbmSpd.value   = DBG_SILLAS.u5FbmSpd;
 
     // ── CIELO stars (group 2) — centelleo con fase propia ────────────────
     const twFq  = DBG_SILLAS.starTwinkleFq;
@@ -480,10 +578,10 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
           side={THREE.BackSide} transparent depthTest={true} depthWrite={false} toneMapped={false} />
       </mesh>
 
-      {/* Lines band */}
+      {/* Lines band — U5: liquid psychedelic shader */}
       <mesh frustumCulled={false} renderOrder={7}>
         <sphereGeometry args={[DOME_R * 0.98, 256, 16, 0, Math.PI * 2, LN_T0, LN_TL]} />
-        <shaderMaterial vertexShader={BAND_VERT} fragmentShader={BAND_FRAG}
+        <shaderMaterial vertexShader={BAND_VERT} fragmentShader={LINE_FRAG}
           uniforms={lineU}
           side={THREE.BackSide} transparent depthTest={true} depthWrite={false} toneMapped={false} />
       </mesh>

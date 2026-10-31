@@ -647,7 +647,7 @@ export default function DomeVisualizer() {
     SU.uKick.value = kickRef.current;
 
     // LÍNEAS flow accumulation: idle at idleFlow, energetic at 1 + lineSpeedBoost
-    const FLOW_BASE = 1.5; // radians per second at full energy
+    const FLOW_BASE = Math.PI * 2; // U5: idleFlow + lineSpeedBoost are in rev/s; ×2π → rad/s
     flowRef.current += dt * FLOW_BASE * (DBG_SILLAS.idleFlow + pulseSmoRef.current[3] * DBG_SILLAS.lineSpeedBoost);
     SU.uFlow3.value = flowRef.current;
 

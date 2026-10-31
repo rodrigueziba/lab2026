@@ -913,11 +913,33 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.starTwinkleFq  = v; setSillas(s => ({ ...s, starTwinkleFq:  v })); }} />
 
           <div style={DIVIDER} />
-          <span style={LABEL}>U4 — LÍNEAS <span style={NOTE}>(ver U5)</span></span>
+          <span style={LABEL}>U4 — LÍNEAS <span style={NOTE}>(envelope)</span></span>
           <NumField label="grp3AtkMs" value={sillas.grp3AtkMs} step={5}  min={5}  max={500}  note="live"
             onChange={v => { DBG_SILLAS.grp3AtkMs = v; setSillas(s => ({ ...s, grp3AtkMs: v })); }} />
           <NumField label="grp3RelMs" value={sillas.grp3RelMs} step={10} min={10} max={2000} note="live"
             onChange={v => { DBG_SILLAS.grp3RelMs = v; setSillas(s => ({ ...s, grp3RelMs: v })); }} />
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>U5 — LÍNEAS líquidas <span style={NOTE}>(psico shader)</span></span>
+          <div style={ROW}>
+            <span>u5PsyMode</span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.u5PsyMode;
+              DBG_SILLAS.u5PsyMode = v; setSillas(s => ({ ...s, u5PsyMode: v }));
+            }}>{sillas.u5PsyMode ? "ON" : "off"}</button>
+          </div>
+          <NumField label="u5PsyMixMin" value={sillas.u5PsyMixMin} step={0.05} min={0} max={1} note="live"
+            onChange={v => { DBG_SILLAS.u5PsyMixMin = v; setSillas(s => ({ ...s, u5PsyMixMin: v })); }} />
+          <NumField label="u5PsyMixMax" value={sillas.u5PsyMixMax} step={0.05} min={0} max={1} note="live"
+            onChange={v => { DBG_SILLAS.u5PsyMixMax = v; setSillas(s => ({ ...s, u5PsyMixMax: v })); }} />
+          <NumField label="u5WaveAmp"   value={sillas.u5WaveAmp}   step={0.01} min={0} max={0.6} note="live"
+            onChange={v => { DBG_SILLAS.u5WaveAmp   = v; setSillas(s => ({ ...s, u5WaveAmp:   v })); }} />
+          <NumField label="u5WaveFreq"  value={sillas.u5WaveFreq}  step={0.5}  min={0} max={20}  note="live"
+            onChange={v => { DBG_SILLAS.u5WaveFreq  = v; setSillas(s => ({ ...s, u5WaveFreq:  v })); }} />
+          <NumField label="u5WaveSpd"   value={sillas.u5WaveSpd}   step={0.1}  min={0} max={10}  note="live"
+            onChange={v => { DBG_SILLAS.u5WaveSpd   = v; setSillas(s => ({ ...s, u5WaveSpd:   v })); }} />
+          <NumField label="u5FbmSpd"    value={sillas.u5FbmSpd}    step={0.01} min={0} max={0.5} note="live"
+            onChange={v => { DBG_SILLAS.u5FbmSpd    = v; setSillas(s => ({ ...s, u5FbmSpd:    v })); }} />
 
           <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>

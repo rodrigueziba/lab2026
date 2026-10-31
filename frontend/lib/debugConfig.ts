@@ -155,7 +155,7 @@ export const DBG_SILLAS = {
   pulseAttackMs:  300,  // gate-open ramp (ms)
   pulseDecayMs:   600,  // gate-close decay (ms)
   pulseSmoothMs:   80,  // extra energy smoothing after gating (ms)
-  idleFlow:        0.15,// LÍNEAS idle flow fraction (× base speed) when gate off
+  idleFlow:        0.015,// LÍNEAS idle base speed (rev/s) when gate off — U5: FLOW_BASE=2π so units match
   // T3: debug pulse simulators (0 = off; >0 = override energy)
   simPulse0:       0 as number,
   simPulse1:       0 as number,
@@ -168,7 +168,7 @@ export const DBG_SILLAS = {
   skyBrightBoost:  0.40,  // CIELO brightness boost
   sunBrightBoost:  0.40,  // SOL overall brightness boost
   lineAmpBoost:    1.60,  // LÍNEAS amplitude boost
-  lineSpeedBoost:  3.00,  // LÍNEAS phase speed boost factor
+  lineSpeedBoost:  0.045, // LÍNEAS max extra speed at full energy (rev/s) — U5: 0.015+0.045=0.06 rev/s max
   kickDecayMs:     150,   // kick impulse decay (ms)
   showReactionOverlay: false, // T3: show haz→group→band assignment in corner
   // U2: AGC normalization (live)
@@ -202,6 +202,14 @@ export const DBG_SILLAS = {
   // U4: CIELO — star twinkle
   starTwinkleAmp:  0.70,  // scale amplitude (max scale = 1 + amp ≈ 2.4× with energy)
   starTwinkleFq:   2.20,  // twinkle base frequency (rad/s)
+  // U5: liquid psychedelic lines shader
+  u5PsyMode:     true,   // enable domain-warp FBM + cosine palette on lines band
+  u5PsyMixMin:   0.15,   // palette blend at silence
+  u5PsyMixMax:   0.95,   // palette blend at full energy
+  u5WaveAmp:     0.08,   // vertical wave amplitude (fraction of band height, ±)
+  u5WaveFreq:    3.0,    // wave cycles across full azimuth (0–1 U)
+  u5WaveSpd:     1.5,    // wave temporal speed (rad/s)
+  u5FbmSpd:      0.08,   // FBM animation speed multiplier
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────
