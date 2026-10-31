@@ -8,6 +8,12 @@ import * as THREE from "three";
 import { domeVert, domeFrag } from "./domeShaders";
 
 export type Bands = { bass: number; lowMid: number; highMid: number; treble: number }; // 0..1
+// W4: parámetros de ajuste del shader (leídos cada frame vía callback — sin recrear material)
+export type ShaderParams = {
+  warp: number; ringFlow: number; ringScale: number;
+  ringFade0: number; ringFade1: number; starCut: number;
+};
+
 // W2: energias por grupo (SOL, MONTAÑAS, CIELO, LÍNEAS) + kick impulse
 // W3: dawn (0..1 fase 1) + revMont/revLin/revSol/revCielo (0..1 fase 2)
 export type GroupEnergy = {
@@ -24,6 +30,8 @@ type Props = {
   getBands: () => Bands;
   /** W2: Devuelve las 4 energias de grupo + kick. Si no se pasa, uGroupEnergy queda en cero. */
   getGroupEnergy?: () => GroupEnergy;
+  /** W4: Devuelve warp/ringFlow/ringScale/ringFade/starCut live (sin re-crear material). */
+  getShaderParams?: () => ShaderParams;
   /** W2: multiplicadores de amplitud por grupo (default 1.5 para reacción evidente) */
   solAmt?: number;
   montAmt?: number;
@@ -54,6 +62,7 @@ function smooth(prev: number, target: number, dt: number) {
 export default function DomeSky({
   getBands,
   getGroupEnergy,
+  getShaderParams,
   solAmt   = 1.5,
   montAmt  = 1.5,
   cieloAmt = 1.5,
@@ -158,6 +167,15 @@ export default function DomeSky({
     u.uCieloAmt.value = cieloAmt;
     u.uLinAmt.value   = linAmt;
     u.uKickAmt.value  = kickAmt;
+    // W4: parámetros de shader live — sobreescriben los props si se provee el callback
+    if (getShaderParams) {
+      const p = getShaderParams();
+      u.uWarp.value     = p.warp;
+      u.uRingFlow.value = p.ringFlow;
+      u.uRingScale.value = p.ringScale;
+      u.uRingFade.value.set(p.ringFade0, p.ringFade1);
+      u.uStarCut.value  = p.starCut;
+    }
   });
 
   // La esfera debe estar centrada en el espectador (la camara queda en el origen).

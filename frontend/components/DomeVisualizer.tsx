@@ -4,16 +4,16 @@
 // Covers the entire sky dome without the black-disk artefact of direct sphere UV mapping.
 // Mounted by ExperienceDome only after alight:visualizer-activate fires.
 
-import { useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS } from "@/lib/debugConfig";
+import { DBG_SILLAS, DOME_METERS } from "@/lib/debugConfig";
 import { prepareVizAudio, stopVizAudio, getVizBands, BAND_STATE, N5_STATE } from "@/lib/vizAudio";
 import { getDawnState, getDomeDawnState, startDomeDawn, finishDomeDawnPhase1, resetDomeDawnState, skipDomeDawnState } from "@/lib/alightStore";
 import { getHazEnteredOnce, getHazBandOn } from "@/lib/haz";
 import { VIZ_SUN_AZ_DEG, VIZ_SUN_EL_DEG } from "@/lib/vizSunState";
 import VizPanorama from "./VizPanorama";
-import DomeSky from "@/app/alight/dome/DomeSky";
+import DomeSky, { type ShaderParams } from "@/app/alight/dome/DomeSky";
 
 const DOME_R = 28;
 const LOGIN_VISUALIZER_ENABLED = false; // N3: sky + sun replace /login FBO on dome sphere
@@ -422,15 +422,36 @@ function DomeSkyAnchor() {
   // W3: flags de reset/skip desde DebugMenu (seteados en evento, leídos en useFrame con acceso al clock)
   const _dawnReset = useRef(false);
   const _dawnSkip  = useRef(false);
+  // W4: lowQuality como estado local para que un toggle en DebugMenu re-monte el material
+  const [lowQuality, setLowQuality] = useState(DBG_SILLAS.domeLowQuality);
+  // W4: objeto pre-asignado para ShaderParams — sin allocations por frame
+  const _sp = useRef<ShaderParams>({
+    warp: DBG_SILLAS.domeWarp, ringFlow: DBG_SILLAS.domeRingFlow,
+    ringScale: DBG_SILLAS.domeRingScale, ringFade0: DBG_SILLAS.domeRingFade0,
+    ringFade1: DBG_SILLAS.domeRingFade1, starCut: DBG_SILLAS.domeStarCut,
+  });
+  const getShaderParams = useMemo<() => ShaderParams>(() => {
+    const sp = _sp;
+    return () => {
+      const p = sp.current;
+      p.warp = DBG_SILLAS.domeWarp; p.ringFlow = DBG_SILLAS.domeRingFlow;
+      p.ringScale = DBG_SILLAS.domeRingScale; p.ringFade0 = DBG_SILLAS.domeRingFade0;
+      p.ringFade1 = DBG_SILLAS.domeRingFade1; p.starCut = DBG_SILLAS.domeStarCut;
+      return p;
+    };
+  }, []);
 
   useEffect(() => {
     const onReset = () => { _dawnReset.current = true; };
     const onSkip  = () => { _dawnSkip.current  = true; };
+    const onLQ    = () => { setLowQuality(DBG_SILLAS.domeLowQuality); };
     window.addEventListener('alight:dome-dawn-reset', onReset);
     window.addEventListener('alight:dome-dawn-skip',  onSkip);
+    window.addEventListener('alight:dome-lq-change',  onLQ);
     return () => {
       window.removeEventListener('alight:dome-dawn-reset', onReset);
       window.removeEventListener('alight:dome-dawn-skip',  onSkip);
+      window.removeEventListener('alight:dome-lq-change',  onLQ);
     };
   }, []);
 
@@ -486,6 +507,12 @@ function DomeSkyAnchor() {
     }
     // inactivo: dawn=0, reveal=0 (defaults)
 
+    // W4: escribir medidores para el panel de debug (sin allocations — mutación directa)
+    DOME_METERS.sol = s.gp[0]; DOME_METERS.mont  = s.gp[1];
+    DOME_METERS.cielo = s.gp[2]; DOME_METERS.lin = s.gp[3];
+    DOME_METERS.kick = s.kick; DOME_METERS.dawn = s.dawn;
+    DOME_METERS.phase = domeDawn.phase;
+
     // W2: per-group envelope — gated by bandOn, smoothed with group-specific τ
     for (let i = 0; i < 4; i++) {
       const raw    = norm[assign[i]] ?? 0;
@@ -507,6 +534,7 @@ function DomeSkyAnchor() {
       <DomeSky
         getBands={_zeroBands}
         getGroupEnergy={getGroupEnergy}
+        getShaderParams={getShaderParams}
         solAmt={DBG_SILLAS.domeSolAmt}
         montAmt={DBG_SILLAS.domeMontAmt}
         cieloAmt={DBG_SILLAS.domeCieloAmt}
@@ -516,6 +544,7 @@ function DomeSkyAnchor() {
         portalElevation={DBG_SILLAS.domePortalElevation}
         portalHalfFovDeg={DBG_SILLAS.domePortalHalfFovDeg}
         radius={100}
+        lowQuality={lowQuality}
       />
     </group>
   );

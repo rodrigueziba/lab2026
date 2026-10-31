@@ -313,6 +313,15 @@ export const DBG_SILLAS = {
   domeRevDelaySolS:        3.0,        // delay SOL rings (s)
   domeRevDelayCieloS:      4.0,        // delay CIELO stars+warp+confeti (s)
   domeRevDurS:             3.0,        // duración de cada reveal (s)
+  // W4: ajuste fino de shader (live vía getShaderParams — sin recrear material)
+  domeWarp:               1.0,         // intensidad del domain warp (0–2)
+  domeRingFlow:           0.03,        // velocidad de flujo de los anillos
+  domeRingScale:          1.0,         // multiplicador del periodo de anillos
+  domeRingFade0:          1.0,         // ringFade inicio (unidades p)
+  domeRingFade1:          1.6,         // ringFade fin
+  domeStarCut:            0.965,       // umbral de estrellas (más alto = menos)
+  domeLowQuality:         false,       // menos octavas fbm (requiere remount del material)
+  showDomeMeters:         false,       // W4: panel de medidores oculto por defecto
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────
@@ -346,6 +355,13 @@ export const DBG_FLOOR = {
   s1Type:      -1,
   s2Type:      -1,
   s3Type:      -1,
+};
+
+// W4: medidores del domo — DomeSkyAnchor escribe aquí cada frame; DebugMenu lee con poll
+export const DOME_METERS = {
+  sol: 0, mont: 0, cielo: 0, lin: 0,
+  kick: 0, dawn: 0,
+  phase: 'inactivo' as string,
 };
 
 // ── TARIMA path ───────────────────────────────────────────────────────────────

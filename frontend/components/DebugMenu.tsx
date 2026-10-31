@@ -20,6 +20,7 @@ import {
   DBG_EFFECTS,
   DBG_CAM_IMAGE,
   DBG_CAM_SOUND,
+  DOME_METERS,
 } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
@@ -294,6 +295,13 @@ export default function DebugMenu() {
   const [camSnd,   setCamSnd]   = useState({ ...DBG_CAM_SOUND });
   const [audioVol, setAudioVol] = useState(STORE.audio.volume);
   const focusRef                = useRef(false);
+  // W4: medidores del domo — se pollea a 10fps solo cuando showDomeMeters está activo
+  const [domeM, setDomeM] = useState({ sol: 0, mont: 0, cielo: 0, lin: 0, kick: 0, dawn: 0, phase: 'inactivo' });
+  useEffect(() => {
+    if (!sillas.showDomeMeters) return;
+    const id = setInterval(() => setDomeM({ ...DOME_METERS }), 100);
+    return () => clearInterval(id);
+  }, [sillas.showDomeMeters]);
 
   // Sync audio volume from STORE changes
   useEffect(() => storeSubscribe(() => setAudioVol(STORE.audio.volume)), []);
@@ -1203,6 +1211,60 @@ export default function DebugMenu() {
               Saltar al final
             </button>
           </div>
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>W4 — DomeSky ajuste de shader <span style={NOTE}>(live sin recrear material)</span></span>
+          <NumField label="domeWarp"      value={sillas.domeWarp}      step={0.1}  min={0}     max={2}     note="warp intensidad (0–2)"
+            onChange={v => { DBG_SILLAS.domeWarp      = v; setSillas(s => ({ ...s, domeWarp:      v })); }} />
+          <NumField label="domeRingFlow"  value={sillas.domeRingFlow}  step={0.005} min={0}    max={0.5}   note="velocidad flujo anillos"
+            onChange={v => { DBG_SILLAS.domeRingFlow  = v; setSillas(s => ({ ...s, domeRingFlow:  v })); }} />
+          <NumField label="domeRingScale" value={sillas.domeRingScale} step={0.1}  min={0.1}   max={5}     note="periodo de anillos"
+            onChange={v => { DBG_SILLAS.domeRingScale = v; setSillas(s => ({ ...s, domeRingScale: v })); }} />
+          <NumField label="domeRingFade0" value={sillas.domeRingFade0} step={0.1}  min={0}     max={3}     note="ringFade inicio (unidades p)"
+            onChange={v => { DBG_SILLAS.domeRingFade0 = v; setSillas(s => ({ ...s, domeRingFade0: v })); }} />
+          <NumField label="domeRingFade1" value={sillas.domeRingFade1} step={0.1}  min={0}     max={3}     note="ringFade fin"
+            onChange={v => { DBG_SILLAS.domeRingFade1 = v; setSillas(s => ({ ...s, domeRingFade1: v })); }} />
+          <NumField label="domeStarCut"   value={sillas.domeStarCut}   step={0.002} min={0.9}  max={0.999} note="umbral estrellas (más alto = menos)"
+            onChange={v => { DBG_SILLAS.domeStarCut   = v; setSillas(s => ({ ...s, domeStarCut:   v })); }} />
+          <div style={ROW}>
+            <span>domeLowQuality</span>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer", marginLeft: "auto" }}
+              onClick={() => {
+                DBG_SILLAS.domeLowQuality = !sillas.domeLowQuality;
+                setSillas(s => ({ ...s, domeLowQuality: DBG_SILLAS.domeLowQuality }));
+                window.dispatchEvent(new CustomEvent('alight:dome-lq-change'));
+              }}>
+              {sillas.domeLowQuality ? "ON" : "off"} <span style={NOTE}>(remonta material)</span>
+            </button>
+          </div>
+          <div style={ROW}>
+            <span>showDomeMeters</span>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer", marginLeft: "auto" }}
+              onClick={() => { DBG_SILLAS.showDomeMeters = !sillas.showDomeMeters; setSillas(s => ({ ...s, showDomeMeters: DBG_SILLAS.showDomeMeters })); }}>
+              {sillas.showDomeMeters ? "ON" : "off"}
+            </button>
+          </div>
+          {sillas.showDomeMeters && (
+            <div style={{ paddingTop: 6, paddingBottom: 4 }}>
+              {([
+                ['SOL',   domeM.sol,   '#f3b230'],
+                ['MONT',  domeM.mont,  '#2E9E5B'],
+                ['CIELO', domeM.cielo, '#1F7FB8'],
+                ['LIN',   domeM.lin,   '#E5322B'],
+                ['KICK',  domeM.kick,  '#FF9A1F'],
+                ['DAWN',  domeM.dawn,  '#e0d0b0'],
+              ] as [string, number, string][]).map(([label, val, color]) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{ ...NOTE, width: 40, textAlign: 'right', flexShrink: 0 }}>{label}</span>
+                  <div style={{ flex: 1, background: '#2a2a2a', height: 8, borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.min(val * 100, 100).toFixed(1)}%`, height: '100%', background: color, transition: 'width 0.1s' }} />
+                  </div>
+                  <span style={{ ...NOTE, width: 32 }}>{val.toFixed(2)}</span>
+                </div>
+              ))}
+              <div style={{ ...NOTE, marginTop: 4 }}>estado: <b>{domeM.phase}</b></div>
+            </div>
+          )}
 
           <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
