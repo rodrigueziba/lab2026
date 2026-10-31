@@ -295,6 +295,11 @@ export const DBG_SILLAS = {
   u11GlareRadiusFr: 0.40,  // radial glow radius as fraction of screen height
   u11StreakLenFr:   1.10,  // anamorphic streak length as fraction of screen width
   u11StreakHFr:     0.012, // anamorphic streak height as fraction of screen height
+  // W1: dome shader sky (replaces VizPanorama when true)
+  usarDomoShader:         true,        // W1: replace panorama layers with DomeSky shader
+  domePortalAzimuth:      Math.PI,     // portal direction: behind tarima (+Z from audience)
+  domePortalElevation:    0.58,        // portal elevation above horizon (rad)
+  domePortalHalfFovDeg:   42.0,        // portal half-FOV (degrees) → uPortalTan≈0.90
 };
 
 // ── Sector audio effects (SILLAS path, H3) ────────────────────────────────────

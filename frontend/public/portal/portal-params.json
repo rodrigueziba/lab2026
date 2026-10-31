@@ -1,0 +1,28 @@
+{
+  "source": "reference.png (607x608). Espacio p: x derecha, y arriba, imagen completa = [-1,1]. p.x = 2*px/607-1 ; p.y = 1-2*py/608",
+  "portal_circle": { "center_p": [0.0461, -0.0609], "radius_p": 0.848, "center_px": [317.5, 322.5], "radius_px": 257.5 },
+  "sun": {
+    "center_p": [0.0082, -0.0822],
+    "cream_radius_p": 0.3443, "red_ring_outer_radius_p": 0.4547,
+    "yellow_disc": { "center_p": [0.0082, -0.1678], "radius_p": 0.2109 },
+    "colors": { "cream": "#f8ead8", "beige_gradient": "#e5c7a3", "yellow": "#febd17", "ring_top": "#e4322b", "ring_side": "#e55c29" }
+  },
+  "sky_ramp_p_y": [
+    [0.78, "#7a3a35"], [0.57, "#8f423c"], [0.44, "#bf5037"], [0.29, "#d55d2f"],
+    [0.23, "#e88b2e"], [0.08, "#ec8a28"], [-0.05, "#eba22e"], [-0.22, "#f3b230"]
+  ],
+  "clouds_p": [
+    { "center": [-0.5585, 0.1579], "half_width": 0.125, "color": "#f4e9d4" },
+    { "center": [0.677, 0.1382], "half_width": 0.208, "color": "#f4e9d4" },
+    { "center": [0.4596, 0.3487], "half_width": 0.053, "color": "#f4e9d4" }
+  ],
+  "sparkles_p": [
+    { "pos": [-0.374, 0.3651], "color": "#4d73d4", "note": "estrella azul de 4 puntas" },
+    { "pos": [0.0214, 0.7105], "color": "#e8512e", "note": "destello rojo superior" },
+    { "pos": [-0.68, -0.783], "color": "#e88a2e", "note": "sobre la montana negra izquierda" },
+    { "pos": [0.8616, -0.3224], "color": "#fcf2e0", "note": "sobre la montana negra derecha" }
+  ],
+  "rings": { "period_p": 0.0264, "palette": { "dark": ["#22120d", "#5b2f1b"], "gold": ["#a4642d", "#e58c2e"], "red": "#d54f30" } },
+  "mountain_colors": { "black": "#191a22", "strata": ["#657c6f", "#334c4e", "#22303a"] },
+  "masks_png": { "R": "montanas negras", "G": "montana de estratos verdes/azules", "B": "zona de olas (franjas rojas/naranjas y olas azules inferiores)" }
+}

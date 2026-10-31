@@ -13,6 +13,7 @@ import { getDawnState } from "@/lib/alightStore";
 import { getHazEnteredOnce, getHazBandOn } from "@/lib/haz";
 import { VIZ_SUN_AZ_DEG, VIZ_SUN_EL_DEG } from "@/lib/vizSunState";
 import VizPanorama from "./VizPanorama";
+import DomeSky from "@/app/alight/dome/DomeSky";
 
 const DOME_R = 28;
 const LOGIN_VISUALIZER_ENABLED = false; // N3: sky + sun replace /login FBO on dome sphere
@@ -395,6 +396,27 @@ function getMatTex(): THREE.CanvasTexture {
   return _matTex;
 }
 
+// ── W1: DomeSky wrapper — esfera de cielo centrada en la cámara ──────────────
+const _zeroBands = () => ({ bass: 0, lowMid: 0, highMid: 0, treble: 0 });
+
+function DomeSkyAnchor() {
+  const groupRef = useRef<THREE.Group>(null);
+  useFrame(({ camera }) => {
+    groupRef.current?.position.copy(camera.position);
+  });
+  return (
+    <group ref={groupRef}>
+      <DomeSky
+        getBands={_zeroBands}
+        portalAzimuth={DBG_SILLAS.domePortalAzimuth}
+        portalElevation={DBG_SILLAS.domePortalElevation}
+        portalHalfFovDeg={DBG_SILLAS.domePortalHalfFovDeg}
+        radius={100}
+      />
+    </group>
+  );
+}
+
 // ── DomeVisualizer component ─────────────────────────────────────────────────
 export default function DomeVisualizer() {
   // Offscreen render target — captures login shader output at vizTexSize resolution
@@ -726,13 +748,11 @@ export default function DomeVisualizer() {
           />
         </sprite>
       )}
-      {/* U1: SVG panorama layers — mountains, lines, stars, clouds, sun sprites */}
-      <VizPanorama
-        growRef={growRef}
-        pulseRef={pulseSmoRef}
-        flowRef={flowRef}
-        kickRef={kickRef}
-      />
+      {/* U1/W1: panorama — VizPanorama (SVG layers) or DomeSky shader depending on flag */}
+      {DBG_SILLAS.usarDomoShader
+        ? <DomeSkyAnchor />
+        : <VizPanorama growRef={growRef} pulseRef={pulseSmoRef} flowRef={flowRef} kickRef={kickRef} />
+      }
     </>
   );
 }

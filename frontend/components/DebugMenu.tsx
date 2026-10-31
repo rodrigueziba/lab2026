@@ -1150,6 +1150,23 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.u11StreakHFr     = v; setSillas(s => ({ ...s, u11StreakHFr:     v })); }} />
 
           <div style={DIVIDER} />
+          <span style={LABEL}>W1 — Domo de shader <span style={NOTE}>(reemplaza VizPanorama)</span></span>
+          <div style={ROW}>
+            <span>usarDomoShader</span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.usarDomoShader;
+              DBG_SILLAS.usarDomoShader = v;
+              setSillas(s => ({ ...s, usarDomoShader: v }));
+            }}>{sillas.usarDomoShader ? "ON" : "off"}</button>
+          </div>
+          <NumField label="domePortalAzimuth"    value={sillas.domePortalAzimuth}    step={0.1}  min={0}    max={6.28} note="azimut del portal (rad)"
+            onChange={v => { DBG_SILLAS.domePortalAzimuth    = v; setSillas(s => ({ ...s, domePortalAzimuth:    v })); }} />
+          <NumField label="domePortalElevation"  value={sillas.domePortalElevation}  step={0.05} min={0}    max={1.5}  note="elevación del portal (rad)"
+            onChange={v => { DBG_SILLAS.domePortalElevation  = v; setSillas(s => ({ ...s, domePortalElevation:  v })); }} />
+          <NumField label="domePortalHalfFovDeg" value={sillas.domePortalHalfFovDeg} step={1}    min={5}    max={90}   note="semi-FOV del portal (°)"
+            onChange={v => { DBG_SILLAS.domePortalHalfFovDeg = v; setSillas(s => ({ ...s, domePortalHalfFovDeg: v })); }} />
+
+          <div style={DIVIDER} />
           <span style={LABEL}>U2 — AGC + amplitudes <span style={NOTE}>(live)</span></span>
           <NumField label="agcFloorRise"   value={sillas.agcFloorRise}   step={0.1}  min={0}    max={5}     note="live"
             onChange={v => { DBG_SILLAS.agcFloorRise   = v; setSillas(s => ({ ...s, agcFloorRise:   v })); }} />
