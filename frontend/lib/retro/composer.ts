@@ -1,4 +1,3 @@
-"use client";
 // R4: Global retro post-processing for the /alight Canvas.
 // Uses three/addons EffectComposer (already bundled with three.js).
 // Integrates with R3F by overriding gl.render so R3F's frame loop
@@ -15,8 +14,6 @@ import { OutputPass }      from "three/addons/postprocessing/OutputPass.js";
 import { RetroCRTShader, CRT_UNIFORMS } from "./retroCRT";
 import { DBG_RETRO_FX } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "./retroFlags";
-
-export { RETRO_FLAGS };
 
 // Bloom resolution scale per quality level
 const QUALITY_BLOOM_SCALE: Record<string, number> = {

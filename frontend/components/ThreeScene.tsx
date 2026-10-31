@@ -21,7 +21,7 @@ import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETR
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
 import dynamic from "next/dynamic";
-const RetroPostFX = dynamic(() => import("@/lib/retro/composer"), { ssr: false });
+const RetroPostFX = dynamic(() => import("@/components/RetroPostFX"), { ssr: false });
 
 const ZONA_LUZ    = new THREE.Vector3(0, 1.6,  0);
 const ZONA_SILLAS = new THREE.Vector3(0, 1.6, -6); // G2: 1 m further
