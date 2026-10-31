@@ -24,6 +24,7 @@ export default function RetroPostFX() {
 
   const composerRef  = useRef<EffectComposer | null>(null);
   const crtPassRef   = useRef<ShaderPass | null>(null);
+  const bloomRef     = useRef<UnrealBloomPass | null>(null);
   const curveBaseRef = useRef(0.06);
   const curveTarget  = useRef(0.06);
   const curveStart   = useRef(0.06);
@@ -40,9 +41,10 @@ export default function RetroPostFX() {
 
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(w * bloomScale, h * bloomScale),
-      0.45, 0.5, 0.85,
+      DBG_RETRO_FX.bloomIntensity, 0.5, DBG_RETRO_FX.bloomThreshold,
     );
     composer.addPass(bloom);
+    bloomRef.current = bloom;
 
     const crt = new ShaderPass({
       uniforms: {
@@ -87,6 +89,7 @@ export default function RetroPostFX() {
       composer.dispose();
       composerRef.current = null;
       crtPassRef.current  = null;
+      bloomRef.current    = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gl, scene, camera]);
@@ -115,6 +118,7 @@ export default function RetroPostFX() {
     CRT_UNIFORMS.uTime.value = clock.elapsedTime;
     CRT_UNIFORMS.uComfort.value = RETRO_FLAGS.comfortMode ? 1 : 0;
     renderer.toneMappingExposure = DBG_RETRO_FX.toneExposure;
+    if (bloomRef.current) bloomRef.current.threshold = DBG_RETRO_FX.bloomThreshold;
 
     if (curveAnimT0.current >= 0) {
       const t = Math.min(1, (performance.now() - curveAnimT0.current) / CURVE_ANIM_MS);

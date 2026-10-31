@@ -873,6 +873,8 @@ export default function DebugMenu() {
             onChange={v => { DBG_RETRO_FX.hazStripeSpeed = v; setRetroFx(r => ({ ...r, hazStripeSpeed: v })); }} />
           <NumField label="hazStripeBoost" value={retroFx.hazStripeBoost} step={0.1}   min={0}    max={10}   note="live"
             onChange={v => { DBG_RETRO_FX.hazStripeBoost = v; setRetroFx(r => ({ ...r, hazStripeBoost: v })); }} />
+          <NumField label="bloomThreshold" value={retroFx.bloomThreshold} step={0.01} min={0}    max={1}    note="live"
+            onChange={v => { DBG_RETRO_FX.bloomThreshold = v; setRetroFx(r => ({ ...r, bloomThreshold: v })); }} />
         </>
       )}
 

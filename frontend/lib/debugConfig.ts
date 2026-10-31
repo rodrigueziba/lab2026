@@ -29,8 +29,9 @@ export const DBG_RETRO_FX = {
   crtVig:           0.38,
   crtWobble:        0.0006,
   crtLift:          0.015,
-  // Bloom
+  // Bloom — U1: threshold raised to 0.92 to keep flat SVG sky colors clean
   bloomIntensity:   0.45,
+  bloomThreshold:   0.92,
   // Scene atmosphere
   toneExposure:     0.8,
   hemiSkyColor:     "#1a2330" as string,

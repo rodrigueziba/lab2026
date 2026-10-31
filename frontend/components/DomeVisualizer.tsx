@@ -10,6 +10,8 @@ import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { prepareVizAudio, stopVizAudio, getVizBands, BAND_STATE, N5_STATE } from "@/lib/vizAudio";
 import { getHazEnteredOnce, getHazBandOn } from "@/lib/haz";
+import { VIZ_SUN_AZ_DEG, VIZ_SUN_EL_DEG } from "@/lib/vizSunState";
+import VizPanorama from "./VizPanorama";
 
 const DOME_R = 28;
 const LOGIN_VISUALIZER_ENABLED = false; // N3: sky + sun replace /login FBO on dome sphere
@@ -18,10 +20,10 @@ const SUN_SPHERE_ENABLED = false;       // T2: old emissive sphere + halo — di
 // T2: cubic ease-out — module level, no per-frame allocation
 const _easeOut3 = (t: number): number => 1 - (1 - t) ** 3;
 
-// N3: Sun azimuth/elevation randomised once at module-load — stable for the session.
-// Moved outside the component to avoid Math.random() inside useMemo (purity rule).
-const _SUN_AZ_DEG = Math.random() * 360;
-const _SUN_EL_DEG = 25 + Math.random() * 45;
+// N3: Sun azimuth/elevation — imported from vizSunState for session stability.
+// U1: elevation range updated to 8°–20° (VIZ_SUN_EL_DEG).
+const _SUN_AZ_DEG = VIZ_SUN_AZ_DEG;
+const _SUN_EL_DEG = VIZ_SUN_EL_DEG;
 
 // ── Login GLSL rendered to offscreen FBO ─────────────────────────────────────
 // Renders to a flat quad (PlaneGeometry 2×2) with an orthographic camera.
@@ -253,9 +255,9 @@ const SPHERE_FRAG = /* glsl */`
   }
 `;
 
-// ── T2+T3: Panoramic illustrated sky — kept as main shader. ──────────────────
-// Groups: 0=SOL, 1=MONTAÑAS, 2=CIELO, 3=LÍNEAS; each grows 0→1 as user visits its beam.
-// T3: uPulse[i] = gate-filtered audio energy; uFlow3 = accumulated phase (CPU); uKick = kick impulse.
+// ── U1: Sky gradient shader — SOL/MONTAÑAS/LÍNEAS moved to VizPanorama. ──────
+// Groups kept in uniforms for compat (unused ones compiled out by GLSL).
+// CIELO: warm 3-stop gradient #B5432A → #E2702A → #F5B83A (U1 spec).
 const PANORAMA_FRAG = /* glsl */`
   uniform float uFade;
   uniform float uTime;
@@ -264,20 +266,12 @@ const PANORAMA_FRAG = /* glsl */`
   uniform float uSunIntensity;
   uniform float uRemoteMix;
   uniform float uStaticMix;
-  // T2: grow
   uniform float uGrow0, uGrow1, uGrow2, uGrow3;
-  // T3: audio
   uniform float uPulse0, uPulse1, uPulse2, uPulse3;
-  uniform float uFlow3;
-  uniform float uKick;
-  // T3: intensities
-  uniform float uMtH, uMtB, uMtK;
-  uniform float uSkyB;
-  uniform float uSunB;
-  uniform float uLineA;
+  uniform float uFlow3, uKick;
+  uniform float uMtH, uMtB, uMtK, uSkyB, uSunB, uLineA;
   varying vec3 vWorldPos;
 
-  float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float hash31(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 
   void main() {
@@ -286,105 +280,34 @@ const PANORAMA_FRAG = /* glsl */`
 
     vec3  dir  = normalize(vWorldPos);
     float elev = dir.y;
-    float az   = atan(dir.z, dir.x);
 
-    // ── Base dark sky (always — identical to N3/R4) ─────────────────────────
+    // ── Base dark sky (always — N3/R4 reference) ─────────────────────────────
     vec3 zenith    = vec3(0.03922, 0.03137, 0.07059);
     vec3 horiz     = vec3(0.10588, 0.07843, 0.14902);
     vec3 sky       = mix(horiz, zenith, smoothstep(-0.30, 0.80, elev));
     vec3 horizGlow = vec3(0.16471, 0.07843, 0.0);
     sky = mix(sky, horizGlow, 0.15 * smoothstep(0.25, 0.0, abs(elev)));
 
-    // Idle breath ±2% at 0.2 Hz — non-reactive cosmetic movement
     float breath = 1.0 + 0.02 * sin(uTime * 1.2566);
 
-    // ── Grupo 2: CIELO ───────────────────────────────────────────────────────
+    // ── Grupo 2: CIELO — warm 3-stop gradient ────────────────────────────────
+    // U1 palette: zenith #B5432A, mid #E2702A, horizon #F5B83A
     if (uGrow2 > 0.001) {
       float skyEdge  = mix(1.20, -0.50, uGrow2);
       float skyMask  = smoothstep(skyEdge + 0.10, skyEdge - 0.10, elev);
       float skyBrght = breath * (1.0 + uPulse2 * uSkyB);
-      vec3  warmBot  = vec3(0.784, 0.251, 0.165);
-      vec3  warmTop  = vec3(0.969, 0.761, 0.227);
-      sky = mix(sky, mix(warmBot, warmTop, smoothstep(-0.30, 0.80, elev)) * skyBrght, skyMask * uGrow2);
-
-      if (elev > 0.15 && uGrow2 > 0.25) {
-        float sFade   = (uGrow2 - 0.25) / 0.75;
-        float sBoost  = 1.0 + uPulse2 * 0.60;
-        vec3  sd      = floor(dir * 38.0);
-        float isStar  = step(0.97 - uPulse2 * 0.025, hash31(sd));
-        float sBright = hash31(sd + vec3(3.7)) * 0.6 + 0.4;
-        float twinkle = 0.7 + 0.3 * sin(uTime * (2.5 + hash31(sd) * 5.0));
-        sky += vec3(1.0, 0.96, 0.88) * isStar * sBright * twinkle * sBoost * sFade;
-      }
+      vec3 top = vec3(0.710, 0.263, 0.165); // #B5432A (zenith)
+      vec3 mid = vec3(0.886, 0.439, 0.165); // #E2702A (mid)
+      vec3 bot = vec3(0.961, 0.722, 0.227); // #F5B83A (horizon)
+      float t  = smoothstep(-0.30, 0.80, elev);
+      vec3 warmSky = mix(bot, mix(mid, top, smoothstep(0.35, 0.80, t)), t) * skyBrght;
+      sky = mix(sky, warmSky, skyMask * uGrow2);
     }
 
-    // ── Grupo 0: SOL ─────────────────────────────────────────────────────────
-    if (uGrow0 > 0.001) {
-      float cosA    = dot(dir, normalize(uSunDir));
-      float angDist = acos(clamp(cosA, -1.0, 1.0));
-      float r       = uSunAngularRad * uGrow0;
-      float breathS = 1.0 + 0.10 * sin(uTime * 0.6283);
-      float pS      = uPulse0;
-
-      float core  = smoothstep(r * (1.0 + pS * 0.10), r * 0.65, angDist);
-      float ring1 = smoothstep(r * 2.2 * (1.0 + pS * 0.07), r * 1.5, angDist);
-      ring1       = max(0.0, ring1 - core);
-      float ring2 = smoothstep(r * 3.5 * (1.0 + pS * 0.05), r * 2.4, angDist);
-      ring2       = max(0.0, ring2 - core - ring1);
-      float glow  = pow(max(0.0, cosA), 24.0) * 0.30;
-
-      float sunBrght = breathS * (1.0 + pS * uSunB) * uSunIntensity;
-      sky += vec3(0.976, 0.725, 0.118) * core  * sunBrght;
-      sky += vec3(0.984, 0.937, 0.851) * ring1 * sunBrght;
-      sky += vec3(0.890, 0.220, 0.169) * ring2 * sunBrght;
-      sky += vec3(1.0,   0.604, 0.122) * glow  * sunBrght;
-    }
-
-    // ── Grupo 1: MONTAÑAS ────────────────────────────────────────────────────
-    if (uGrow1 > 0.001) {
-      float mtCeil = mix(-0.30, 0.50, uGrow1);
-      float mtMask = smoothstep(mtCeil + 0.06, mtCeil - 0.06, elev);
-      float hMult  = 1.0 + uPulse1 * uMtH + uKick * uMtK;
-      float bMult  = breath * (1.0 + uPulse1 * uMtB);
-
-      float mtA = hMult * (0.05 + 0.08*(0.5*sin(az*3.1)+0.3*sin(az*7.3)+0.2*sin(az*1.7)));
-      float inA = step(elev, mtA);
-
-      float mtB2 = hMult * (0.03 + 0.07*(0.5*sin(az*5.2+0.4)+0.3*sin(az*11.0)+0.2*sin(az*2.3)));
-      float inB  = step(elev, mtB2) * (1.0 - inA);
-      vec3  midC = mix(vec3(0.122, 0.478, 0.420), vec3(0.059, 0.298, 0.290),
-                       hash21(vec2(az * 0.159 + 0.5, 0.5))) * bMult;
-
-      float mtC = hMult * (0.01 + 0.05*(0.5*sin(az*8.7+1.0)+0.3*sin(az*15.0)+0.2*sin(az*3.8)));
-      float inC = step(elev, mtC) * (1.0 - inA) * (1.0 - inB);
-
-      sky = mix(sky, vec3(0.078, 0.075, 0.102) * breath, inA * mtMask);
-      sky = mix(sky, midC,                                inB * mtMask);
-      sky = mix(sky, vec3(0.106, 0.165, 0.290) * bMult,  inC * mtMask);
-    }
-
-    // ── Grupo 3: LÍNEAS ONDULANTES ───────────────────────────────────────────
-    if (uGrow3 > 0.001) {
-      float linesCeil = mix(-0.30, 0.30, uGrow3);
-      float linesMask = smoothstep(linesCeil + 0.06, linesCeil - 0.06, elev);
-      float warpElev  = elev + 0.05 * sin(az * 2.0 + uTime * 0.25);
-      float warpAz    = az   + 0.08 * sin(elev * 3.5 + uTime * 0.18);
-      float amp = 0.10 * (1.0 + uPulse3 * uLineA);
-
-      float w0 = -0.10 + amp * sin(warpAz * 3.0 + uFlow3);
-      sky += vec3(0.851, 0.263, 0.165) * smoothstep(0.025, 0.0, abs(warpElev - w0)) * linesMask;
-
-      float w1 = 0.00 + amp * sin(warpAz * 4.0 + uFlow3 + 1.2);
-      sky += vec3(0.933, 0.541, 0.169) * smoothstep(0.025, 0.0, abs(warpElev - w1)) * linesMask;
-
-      float w2 = 0.10 + amp * sin(warpAz * 5.0 + uFlow3 + 2.4);
-      sky += vec3(0.961, 0.761, 0.259) * smoothstep(0.025, 0.0, abs(warpElev - w2)) * linesMask;
-    }
-
-    // ── N5: static interference (preserved) ─────────────────────────────────
+    // ── N5: static interference (preserved) ──────────────────────────────────
     if (uStaticMix > 0.001) {
-      float t = floor(uTime * 15.0);
-      float n = hash31(floor(dir * 12.0) + vec3(t * 0.11, t * 0.07, 0.0));
+      float nt = floor(uTime * 15.0);
+      float n  = hash31(floor(dir * 12.0) + vec3(nt * 0.11, nt * 0.07, 0.0));
       sky = mix(sky, vec3(n * 0.7 + 0.08) * vec3(1.05, 0.88, 0.55), uStaticMix * 0.38);
     }
 
@@ -787,6 +710,13 @@ export default function DomeVisualizer() {
           />
         </sprite>
       )}
+      {/* U1: SVG panorama layers — mountains, lines, stars, clouds, sun sprites */}
+      <VizPanorama
+        growRef={growRef}
+        pulseRef={pulseSmoRef}
+        flowRef={flowRef}
+        kickRef={kickRef}
+      />
     </>
   );
 }
