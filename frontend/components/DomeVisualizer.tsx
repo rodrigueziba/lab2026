@@ -627,7 +627,7 @@ export default function DomeVisualizer() {
     const sims = [DBG_SILLAS.simPulse0, DBG_SILLAS.simPulse1, DBG_SILLAS.simPulse2, DBG_SILLAS.simPulse3];
     for (let i = 0; i < 4; i++) {
       const bandIdx  = BAND_STATE.assignment[i];
-      const rawE     = BAND_STATE.energy[bandIdx] ?? 0;
+      const rawE     = BAND_STATE.normEnergy[bandIdx] ?? 0; // U2: AGC-normalized
       const sim      = sims[i];
       const energy   = sim > 0 ? sim : rawE;
       const gate     = getHazBandOn(i);
@@ -641,8 +641,8 @@ export default function DomeVisualizer() {
     SU.uPulse2.value = pulseSmoRef.current[2];
     SU.uPulse3.value = pulseSmoRef.current[3];
 
-    // Kick impulse — fires only if MONTAÑAS (group 1) is assigned the kick band (band 1)
-    if (BAND_STATE.kick && BAND_STATE.assignment[1] === 1) kickRef.current = 1.0;
+    // Kick impulse — U2: fires on any kick detection (all active groups flash)
+    if (BAND_STATE.kick) kickRef.current = 1.0;
     kickRef.current = Math.max(0, kickRef.current - dt / (DBG_SILLAS.kickDecayMs / 1000));
     SU.uKick.value = kickRef.current;
 
