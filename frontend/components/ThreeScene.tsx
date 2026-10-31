@@ -450,29 +450,32 @@ function NearLecternHUD() {
     };
   }, []);
 
+  // R5: amber terminal style — VT323 via --font-vt323 CSS var (set by alight/layout.tsx)
   const hudStyle: React.CSSProperties = {
     position: "fixed", bottom: 60, left: "50%", transform: "translateX(-50%)",
-    background: "rgba(10,10,20,0.78)", color: "#c8c8e0",
-    fontFamily: "monospace", fontSize: 13, padding: "7px 18px",
-    borderRadius: 4, border: "1px solid rgba(100,120,180,0.3)",
-    pointerEvents: "none", zIndex: 1000, letterSpacing: "0.06em",
+    background: "rgba(42,20,0,0.82)", color: "#FF9A1F",
+    fontFamily: "var(--font-vt323), monospace", fontSize: 18,
+    padding: "6px 20px", letterSpacing: "0.08em",
+    borderRadius: 0, border: "1px solid rgba(255,154,31,0.40)",
+    pointerEvents: "none", zIndex: 1000, textTransform: "uppercase",
   };
 
   return (
     <>
       {nearMsg && <div style={hudStyle}>{nearMsg}</div>}
-      {modeMsg && <div style={{ ...hudStyle, color: "#e0d8ff", border: "1px solid rgba(160,120,255,0.4)" }}>{modeMsg}</div>}
+      {modeMsg && <div style={hudStyle}>{modeMsg}</div>}
       {showRetake && (
         <div
           onClick={() => { setShowRetake(false); document.querySelector("canvas")?.requestPointerLock(); }}
           style={{
             position: "fixed", top: "50%", left: "50%",
             transform: "translate(-50%,-50%)",
-            background: "rgba(10,10,20,0.90)", color: "#e8e0ff",
-            fontFamily: "monospace", fontSize: 15, padding: "14px 28px",
-            borderRadius: 6, border: "1px solid rgba(140,100,255,0.5)",
-            cursor: "pointer", zIndex: 1100, letterSpacing: "0.05em",
-            userSelect: "none",
+            background: "rgba(42,20,0,0.92)", color: "#FF9A1F",
+            fontFamily: "var(--font-vt323), monospace", fontSize: 22,
+            padding: "14px 32px", letterSpacing: "0.07em",
+            borderRadius: 0, border: "1px solid rgba(255,154,31,0.40)",
+            cursor: "pointer", zIndex: 1100,
+            userSelect: "none", textTransform: "uppercase",
           }}
         >
           Hacé clic para retomar la cámara
@@ -503,11 +506,12 @@ function AudioGestureHUD() {
       onClick={retry}
       style={{
         position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)",
-        background: "rgba(10,10,25,0.88)", color: "#a8d0ff",
-        fontFamily: "monospace", fontSize: 13, padding: "8px 20px",
-        borderRadius: 4, border: "1px solid rgba(80,140,255,0.4)",
-        cursor: "pointer", zIndex: 1050, letterSpacing: "0.06em",
-        userSelect: "none",
+        background: "rgba(42,20,0,0.88)", color: "#FF9A1F",
+        fontFamily: "var(--font-vt323), monospace", fontSize: 18,
+        padding: "6px 20px", letterSpacing: "0.08em",
+        borderRadius: 0, border: "1px solid rgba(255,154,31,0.40)",
+        cursor: "pointer", zIndex: 1050,
+        userSelect: "none", textTransform: "uppercase",
       }}
     >
       Hacé clic para activar el sonido

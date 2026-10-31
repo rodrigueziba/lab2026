@@ -9,11 +9,18 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { setMonolithProximity } from "@/lib/vizAudio";
+import { createBasePlateTex } from "@/lib/retro/decals";
 
 // ── Geometry constants ────────────────────────────────────────────────────────
 const W = 0.9;   // width  (m)
 const H = 3.2;   // height (m)
 const D = 0.35;  // depth  (m)
+
+// R5: base plate dimensions
+const PLATE_W = W * 0.90;
+const PLATE_H = 0.025;  // 2.5 cm height
+const PLATE_D = D * 0.90;
+const R5_MONOLITH_RETRO = true; // flag to disable plate
 
 // ── TV-static screen shader ───────────────────────────────────────────────────
 const SCREEN_VERT = /* glsl */`
@@ -158,6 +165,19 @@ export default function Monoliths() {
   const dist = DBG_SILLAS.monolithDistM;
   const cy   = H / 2;
 
+  // R5: base plate texture — created once, shared between both monoliths
+  const plateTex = useMemo(() => {
+    if (!R5_MONOLITH_RETRO) return null;
+    return createBasePlateTex("AUSTRAL ELECTRIC / KX-07M", "UNIT-07", 512, 64);
+  }, []);
+
+  const plateMat = useMemo(() => {
+    if (!plateTex) return null;
+    return new THREE.MeshStandardMaterial({
+      map: plateTex, roughness: 0.8, metalness: 0.05,
+    });
+  }, [plateTex]);
+
   return (
     <>
       {/* Left monolith — image channel */}
@@ -165,6 +185,13 @@ export default function Monoliths() {
         <boxGeometry args={[W, H, D]} />
         <meshStandardMaterial color="#050505" roughness={0.95} metalness={0.05} />
       </mesh>
+      {/* R5: left base plate — brand text facing −Z (toward chairs) */}
+      {R5_MONOLITH_RETRO && plateMat && (
+        <mesh position={[-dist, PLATE_H / 2, -(D / 2) + 0.001]}>
+          <boxGeometry args={[PLATE_W, PLATE_H, PLATE_D]} />
+          <primitive object={plateMat} attach="material" />
+        </mesh>
+      )}
       {/* Left screen — TV static facing −Z (toward chairs) */}
       <mesh ref={leftScreenRef} position={[-dist, cy, -(D / 2) - 0.002]} rotation={[0, 0, 0]}>
         <planeGeometry args={[W * 0.84, H * 0.72]} />
@@ -183,6 +210,13 @@ export default function Monoliths() {
         <boxGeometry args={[W, H, D]} />
         <meshStandardMaterial color="#050505" roughness={0.95} metalness={0.05} />
       </mesh>
+      {/* R5: right base plate */}
+      {R5_MONOLITH_RETRO && plateMat && (
+        <mesh position={[dist, PLATE_H / 2, -(D / 2) + 0.001]}>
+          <boxGeometry args={[PLATE_W, PLATE_H, PLATE_D]} />
+          <primitive object={plateMat} attach="material" />
+        </mesh>
+      )}
       {/* Right screen — audio-reactive glow */}
       <mesh ref={rightScreenRef} position={[dist, cy, -(D / 2) - 0.002]} rotation={[0, 0, 0]}>
         <planeGeometry args={[W * 0.84, H * 0.72]} />

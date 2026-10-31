@@ -29,6 +29,24 @@ const BASE: Omit<Brand, "modelCode" | "descriptor" | "spec" | "checks"> = {
   inkLight:  "#F2EBDD",
 };
 
+// R5: AUSTRAL ELECTRIC — fictional brand for physical set equipment
+const AUSTRAL_BASE: Omit<Brand, "modelCode" | "descriptor" | "spec" | "checks" | "unitId"> = {
+  brandName: "AUSTRAL ELECTRIC",
+  secondary: "INSTALACIÓN INTERACTIVA",
+  owner:     "PROPERTY OF ECHO-BASE",
+  stripes:   ["#E5322B", "#F0742A", "#F4B62E", "#2E9E5B", "#1F7FB8"],
+  paper:     "#E8DCC4",
+  ink:       "#1A1614",
+  inkLight:  "#F2EBDD",
+};
+
+export const EQUIPMENT_BRANDS: Record<"tarima" | "chair" | "monolith" | "luminaria", Brand> = {
+  tarima:    { ...AUSTRAL_BASE, unitId: "UNIT-01", modelCode: "KX-45V", descriptor: "PRISM STAGE",       spec: "LOAD: 400 KG · SZ: 3.2×3.2",    checks: ["STRUCT", "LEVEL", "SAFE", "OK"] },
+  chair:     { ...AUSTRAL_BASE, unitId: "UNIT-02", modelCode: "KX-12C", descriptor: "AUDIENCE SEATING",  spec: "FIRE RETARDANT · CLASS B",       checks: ["SAFE",   "LOCK",  "OK",   "—"] },
+  monolith:  { ...AUSTRAL_BASE, unitId: "UNIT-07", modelCode: "KX-07M", descriptor: "SIGNAL COLUMN",     spec: "INPUT: 10–440 V / OUTPUT: CRT",  checks: ["SIG",    "POWER", "GND",  "OK"] },
+  luminaria: { ...AUSTRAL_BASE, unitId: "UNIT-03", modelCode: "KX-33L", descriptor: "STAGE LUMINAIRE",   spec: "BEAM: 2400W · SPOT · SCAN",      checks: ["LAMP",   "FOCUS", "DMX",  "GO"] },
+};
+
 export const LECTERN_BRANDS: Record<"left" | "right", Brand> = {
   left:  { ...BASE, modelCode: "KX-45V", descriptor: "VISUAL CONTROL DECK", spec: "DOME FX · 7 CH · RGB",  checks: ["COLOR", "PSYCHO", "REACT", "CAM"] },
   right: { ...BASE, modelCode: "KX-45A", descriptor: "AUDIO CONTROL DECK",  spec: "FREQ RANGE: 20-20K HZ", checks: ["STEREO", "LO-FI", "LOOP", "N.R."] },
@@ -103,6 +121,118 @@ export function createDecalTexture(b: Brand, w = 1024, h = 256): THREE.CanvasTex
     ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
     ctx.font = `700 ${h * 0.06}px ${MONO}`;
     ctx.fillText(`${b.unitId}  ·  ${b.owner}`, w * 0.03, h * 0.97);
+  });
+}
+
+/**
+ * Small monolith/equipment base plate: dark background, bone text.
+ * w × h in pixels (default 512 × 64).
+ */
+export function createBasePlateTex(
+  label: string,
+  unitId = "UNIT-01",
+  w = 512,
+  h = 64,
+): THREE.CanvasTexture {
+  return canvasTex(w, h, ctx => {
+    ctx.fillStyle = "#12101A";
+    ctx.fillRect(0, 0, w, h);
+    // thin stripes on left
+    const bw = h * 0.09;
+    ["#E5322B", "#F0742A", "#F4B62E", "#2E9E5B", "#1F7FB8"].forEach((c, i) => {
+      ctx.fillStyle = c;
+      ctx.fillRect(w * 0.01 + i * bw, h * 0.22, bw * 0.9, h * 0.56);
+    });
+    ctx.fillStyle = "#F2EBDD";
+    ctx.textBaseline = "middle";
+    ctx.font = `700 ${h * 0.34}px ${SANS}`;
+    ctx.letterSpacing = `${h * 0.03}px`;
+    ctx.fillText(label, w * 0.18, h * 0.42);
+    ctx.font = `400 ${h * 0.26}px ${MONO}`;
+    ctx.letterSpacing = "0px";
+    ctx.fillStyle = "#A89880";
+    ctx.fillText(unitId, w * 0.18, h * 0.74);
+  });
+}
+
+/** Worn-paint canvas texture: base color + edge wear + scratches (2D approximation). */
+export function createWornPaintTex(
+  paintHex: string,
+  stencilLines: string[],
+  w = 1024,
+  h = 1024,
+): THREE.CanvasTexture {
+  return canvasTex(w, h, ctx => {
+    ctx.fillStyle = paintHex;
+    ctx.fillRect(0, 0, w, h);
+
+    // Edge wear gradient (darken at edges)
+    const gEdge = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.28, w / 2, h / 2, Math.min(w, h) * 0.72);
+    gEdge.addColorStop(0,   "rgba(0,0,0,0)");
+    gEdge.addColorStop(0.7, "rgba(0,0,0,0)");
+    gEdge.addColorStop(1,   "rgba(0,0,0,0.52)");
+    ctx.fillStyle = gEdge;
+    ctx.fillRect(0, 0, w, h);
+
+    // Random scratches
+    ctx.strokeStyle = "rgba(0,0,0,0.30)";
+    for (let s = 0; s < 14; s++) {
+      const x0 = Math.random() * w, y0 = Math.random() * h;
+      const len = 30 + Math.random() * 200;
+      const ang = Math.random() * Math.PI;
+      ctx.lineWidth = 0.8 + Math.random() * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x0 + Math.cos(ang) * len, y0 + Math.sin(ang) * len);
+      ctx.stroke();
+    }
+    // Light scratches
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    for (let s = 0; s < 8; s++) {
+      const x0 = Math.random() * w, y0 = Math.random() * h;
+      const len = 20 + Math.random() * 120;
+      const ang = Math.random() * Math.PI;
+      ctx.lineWidth = 0.5 + Math.random() * 0.8;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x0 + Math.cos(ang) * len, y0 + Math.sin(ang) * len);
+      ctx.stroke();
+    }
+
+    // Stencil text lines
+    if (stencilLines.length) {
+      ctx.save();
+      ctx.globalAlpha = 0.72;
+      ctx.fillStyle = "#F2EBDD";
+      const fontSize = h * 0.065;
+      ctx.font = `700 ${fontSize}px ${MONO}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const lineH = fontSize * 1.4;
+      const startY = h * 0.5 - (stencilLines.length - 1) * lineH / 2;
+      stencilLines.forEach((line, i) => ctx.fillText(line, w * 0.5, startY + i * lineH));
+      ctx.restore();
+    }
+  });
+}
+
+/** Diagonal stripe band canvas (5 hard-edge stripes at ~35°). */
+export function createStripeBandTex(stripes = ["#E5322B", "#F0742A", "#F4B62E", "#2E9E5B", "#1F7FB8"], w = 512, h = 64): THREE.CanvasTexture {
+  return canvasTex(w, h, ctx => {
+    ctx.fillStyle = "#3A3B3C";
+    ctx.fillRect(0, 0, w, h);
+    const sw = w / stripes.length;
+    const slant = h * 1.1; // diagonal offset
+    stripes.forEach((c, i) => {
+      ctx.fillStyle = c;
+      ctx.beginPath();
+      ctx.moveTo(i * sw - slant, 0);
+      ctx.lineTo((i + 1) * sw - slant, 0);
+      ctx.lineTo((i + 1) * sw + slant, h);
+      ctx.lineTo(i * sw + slant, h);
+      ctx.closePath();
+      ctx.fill();
+    });
   });
 }
 

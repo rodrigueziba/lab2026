@@ -5,6 +5,10 @@
 export {
   type Brand,
   LECTERN_BRANDS,
+  EQUIPMENT_BRANDS,
   createDecalTexture,
   createStripeStripTexture,
+  createBasePlateTex,
+  createWornPaintTex,
+  createStripeBandTex,
 } from "./brandDecal";

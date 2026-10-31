@@ -10,6 +10,9 @@ import * as THREE from "three";
 import { DBG_SILLAS, DBG_RETRO_FX } from "@/lib/debugConfig";
 import { getHazUnderUser, getHazPositionsXZ } from "@/lib/haz";
 import { startVizAudio, openGate, closeGate, isPlaying } from "@/lib/vizAudio";
+import { createStripeBandTex } from "@/lib/retro/decals";
+
+const R5_HAZ_RETRO = true; // R5: retro housing color + stripe decal + amber LED
 
 const COLOR_KEYS = [
   "hazColor0", "hazColor1", "hazColor2", "hazColor3",
@@ -72,6 +75,7 @@ export default function HazSystem() {
   const boxesRef      = useRef<THREE.Mesh[]>([]);
   const cablesRef     = useRef<THREE.Mesh[]>([]);
   const ledsRef       = useRef<LedEntry[]>([]);
+  const stripeDecalsRef = useRef<THREE.Mesh[]>([]);
   const gateStateRef  = useRef([false, false, false, false]);
   // Pre-allocated Color objects — reused each frame (no per-frame allocs)
   const colorObjs     = useRef(INITIAL_COLORS.map(c => new THREE.Color(c)));
@@ -117,8 +121,21 @@ export default function HazSystem() {
     const cableGeo = new THREE.CylinderGeometry(0.004, 0.004, CABLE_LEN, 4, 1);
     const ledGeo   = new THREE.PlaneGeometry(0.03, 0.03);
 
-    const boxMat   = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.9, metalness: 0.1 });
+    // R5: housing — carbon gray #3A3B3C; legacy was 0x2a2a2a
+    const boxColor  = R5_HAZ_RETRO ? 0x3A3B3C : 0x2a2a2a;
+    const boxMat   = new THREE.MeshStandardMaterial({ color: boxColor, roughness: 0.85, metalness: 0.15 });
     const cableMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0a });
+
+    // R5: stripe decal — one shared texture for all four housings
+    const stripeTex = R5_HAZ_RETRO ? createStripeBandTex(undefined, 256, 32) : null;
+    const stripeMat = stripeTex
+      ? new THREE.MeshBasicMaterial({
+          map: stripeTex, transparent: false,
+          polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+        })
+      : null;
+    const stripeGeo = R5_HAZ_RETRO ? new THREE.PlaneGeometry(0.26, 0.012) : null;
+    const stripeDecals: THREE.Mesh[] = [];
 
     const lights: THREE.SpotLight[] = [];
     const cones:  ConeEntry[]       = [];
@@ -171,18 +188,27 @@ export default function HazSystem() {
       scene.add(cable);
       cables.push(cable);
 
-      // LED state indicator
-      const ledMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+      // R5: stripe decal on front face of housing
+      if (R5_HAZ_RETRO && stripeMat && stripeGeo) {
+        const sd = new THREE.Mesh(stripeGeo, stripeMat);
+        // position at housing centre — offset set in useFrame
+        scene.add(sd);
+        stripeDecals.push(sd);
+      }
+
+      // LED state indicator (R5: amber; legacy: dark gray 0x111111)
+      const ledMat = new THREE.MeshBasicMaterial({ color: R5_HAZ_RETRO ? 0x3A2800 : 0x111111 });
       const led    = new THREE.Mesh(ledGeo, ledMat);
       scene.add(led);
       leds.push({ mesh: led, mat: ledMat });
     }
 
-    lightsRef.current  = lights;
-    conesRef.current   = cones;
-    boxesRef.current   = boxes;
-    cablesRef.current  = cables;
-    ledsRef.current    = leds;
+    lightsRef.current       = lights;
+    conesRef.current        = cones;
+    boxesRef.current        = boxes;
+    cablesRef.current       = cables;
+    ledsRef.current         = leds;
+    stripeDecalsRef.current = stripeDecals;
 
     return () => {
       lights.forEach(l => { scene.remove(l); scene.remove(l.target); });
@@ -190,8 +216,10 @@ export default function HazSystem() {
       boxes.forEach(b => scene.remove(b));
       cables.forEach(c => scene.remove(c));
       leds.forEach(({ mesh, mat }) => { scene.remove(mesh); mat.dispose(); });
+      stripeDecals.forEach(sd => { scene.remove(sd); });
       coneGeo.dispose(); boxGeo.dispose(); cableGeo.dispose(); ledGeo.dispose();
-      boxMat.dispose();  cableMat.dispose();
+      boxMat.dispose(); cableMat.dispose();
+      stripeTex?.dispose(); stripeMat?.dispose(); stripeGeo?.dispose();
     };
   }, [scene]);
 
@@ -249,7 +277,18 @@ export default function HazSystem() {
       led.position.set(bx + nx * 0.141, originH, bz + nz * 0.141);
       ledLookTarget.current.set(bx + nx * 2, originH, bz + nz * 2);
       led.lookAt(ledLookTarget.current);
-      ledMat.color.set(gateStateRef.current[i] ? DBG_SILLAS[COLOR_KEYS[i]] : '#111111');
+      // R5: amber LED — on: #F4B62E full; off: dim #3A2800; legacy: beam color / dark
+      ledMat.color.set(gateStateRef.current[i]
+        ? (R5_HAZ_RETRO ? '#F4B62E' : DBG_SILLAS[COLOR_KEYS[i]])
+        : (R5_HAZ_RETRO ? '#3A2800' : '#111111'));
+
+      // R5: stripe decal — positioned on the front face of the box (facing scene centre)
+      const sd = stripeDecalsRef.current[i];
+      if (sd) {
+        sd.position.set(bx + nx * 0.141, originH, bz + nz * 0.141);
+        ledLookTarget.current.set(bx + nx * 2, originH, bz + nz * 2);
+        sd.lookAt(ledLookTarget.current);
+      }
     }
   });
 

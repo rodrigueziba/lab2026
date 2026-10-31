@@ -126,6 +126,7 @@ const RAINBOW_GLSL = /* glsl */`
 // ── Panel shaders ──────────────────────────────────────────────────────────────
 // Texture is only visible where a rainbow beam illuminates the panel.
 // Dark everywhere else — creating a Pink Floyd-style projector effect.
+// R5: CRT bezel (cream border 4% UV), scanline overlay, amber terminal header bar.
 const VERT = /* glsl */`
   varying vec2 vUv;
   varying vec3 vWorldPos;
@@ -137,7 +138,41 @@ const VERT = /* glsl */`
   }
 `;
 
-const FRAG = RAINBOW_GLSL + /* glsl */`
+// R5: flag — set false to revert to original shader (no bezel)
+const R5_PANEL_BEZEL = true;
+
+// R5 bezel GLSL constants
+const BEZEL_GLSL = R5_PANEL_BEZEL ? /* glsl */`
+  // CRT bezel helper — cream border + header bar + scanlines
+  vec3 applyBezel(vec2 uv, vec3 content, float gate) {
+    float bz = 0.040;   // bezel thickness in UV
+    float hdr = 0.115;  // header zone height in UV (top)
+    vec3  cream  = vec3(0.910, 0.863, 0.769); // #E8DCC4
+    vec3  hdrBg  = vec3(0.165, 0.078, 0.0);   // #2A1400
+    vec3  amber  = vec3(1.0, 0.604, 0.122);   // #FF9A1F
+    // Is this pixel in the bezel border?
+    bool inBez = uv.x < bz || uv.x > 1.0 - bz || uv.y < bz || uv.y > 1.0 - bz;
+    if (inBez) return cream * gate;
+    // Remap to inner screen UV
+    vec2 suv = (uv - bz) / (1.0 - 2.0 * bz);
+    // Header bar (top hdr of screen height)
+    if (suv.y > 1.0 - hdr) {
+      // Scanline pattern
+      float scan = 0.80 + 0.20 * sin(suv.y * 320.0 * 6.2831);
+      // Blinking "STATUS" bar — 8 amber rectangles
+      float segW = 1.0 / 8.0;
+      float seg  = floor(suv.x / segW);
+      float sOn  = step(0.05, fract(suv.x / segW)) * step(0.08, fract(suv.y / hdr));
+      vec3 hdrCol = mix(hdrBg, amber * 0.75, sOn * 0.6) * scan;
+      return hdrCol * gate;
+    }
+    // Scanline overlay on content
+    float sl   = 0.88 + 0.12 * sin(suv.y * 420.0 * 6.2831);
+    return content * sl;
+  }
+` : "";
+
+const FRAG = RAINBOW_GLSL + BEZEL_GLSL + /* glsl */`
   uniform sampler2D uMap;
   uniform float     uReveal;
   uniform vec3      uPrismPos;
@@ -189,6 +224,8 @@ const FRAG = RAINBOW_GLSL + /* glsl */`
       }
     }
 
+    // R5: apply CRT bezel (cream frame + scanlines + header)
+    ${R5_PANEL_BEZEL ? "col = applyBezel(vUv, col, gate);" : ""}
     gl_FragColor = vec4(col, 1.0);
   }
 `;
