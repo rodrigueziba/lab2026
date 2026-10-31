@@ -3,6 +3,7 @@
 // Appear on alight:visualizer-activate. Left = image channel, Right = sound channel.
 // Proximity to each monolith drives left → uRemoteMix/uStaticMix (dome), right → audio crossfade.
 // Sizes and distances in DBG_SILLAS (N5 block).
+// S1: fog=false, rim fresnel, dedicated SpotLight (not globalLightScale), floor glow.
 
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -10,6 +11,28 @@ import * as THREE from "three";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { setMonolithProximity } from "@/lib/vizAudio";
 import { createBasePlateTex } from "@/lib/retro/decals";
+
+// ── S1: rim fresnel via onBeforeCompile ───────────────────────────────────────
+// Injects a view-space rim term (cian #7FEFE6) into MeshStandardMaterial.
+function addRimToMat(mat: THREE.MeshStandardMaterial) {
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uRimColor     = { value: new THREE.Color(0x7FEFE6) };
+    shader.uniforms.uRimIntensity = { value: DBG_SILLAS.monolithRimIntensity };
+    shader.uniforms.uRimPow       = { value: DBG_SILLAS.monolithRimPow };
+    shader.fragmentShader =
+      `uniform vec3  uRimColor;\nuniform float uRimIntensity;\nuniform float uRimPow;\n` +
+      shader.fragmentShader.replace(
+        "#include <dithering_fragment>",
+        `#include <dithering_fragment>
+        {
+          // vNormal and -vViewPosition are view-space — standard three.js varyings
+          float rim = pow(max(0.0, 1.0 - abs(dot(normalize(vNormal), normalize(-vViewPosition)))), uRimPow);
+          gl_FragColor.rgb += uRimColor * rim * uRimIntensity;
+        }`
+      );
+    mat.userData.shader = shader;
+  };
+}
 
 // ── Geometry constants ────────────────────────────────────────────────────────
 const W = 0.9;   // width  (m)
@@ -92,13 +115,48 @@ export default function Monoliths() {
   const rightBodyRef   = useRef<THREE.Mesh>(null);
   const leftScreenRef  = useRef<THREE.Mesh>(null);
   const rightScreenRef = useRef<THREE.Mesh>(null);
+  const leftLightRef   = useRef<THREE.SpotLight>(null);
+  const rightLightRef  = useRef<THREE.SpotLight>(null);
+  const leftGlowRef    = useRef<THREE.Mesh>(null);
+  const rightGlowRef   = useRef<THREE.Mesh>(null);
 
   const activeRef  = useRef(false);
   const opacityRef = useRef(0);
 
+  // S1: body materials — fog:false + rim fresnel
+  const leftBodyMat = useMemo(() => {
+    const mat = new THREE.MeshStandardMaterial({ color: "#050505", roughness: 0.95, metalness: 0.05, fog: false });
+    addRimToMat(mat);
+    return mat;
+  }, []);
+  const rightBodyMat = useMemo(() => {
+    const mat = new THREE.MeshStandardMaterial({ color: "#050505", roughness: 0.95, metalness: 0.05, fog: false });
+    addRimToMat(mat);
+    return mat;
+  }, []);
+
+  // S1: floor glow material — shared (opacity set per-frame)
+  const glowMat = useMemo(() => new THREE.MeshBasicMaterial({
+    color: 0x7FEFE6, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+  }), []);
+
+  // S1: SpotLight targets positioned at each monolith base
+  const leftTarget  = useMemo(() => new THREE.Object3D(), []);
+  const rightTarget = useMemo(() => new THREE.Object3D(), []);
+
   // useMemo uniforms — same pattern as SymbolSystem / DomeVisualizer loginUniforms
   const leftUniforms  = useMemo(() => ({ uTime: { value: 0 }, uReveal: { value: 0 }, uAudio: { value: 0 }, uMode: { value: 0 } }), []);
   const rightUniforms = useMemo(() => ({ uTime: { value: 0 }, uReveal: { value: 0 }, uAudio: { value: 0 }, uMode: { value: 1 } }), []);
+
+  // S1: position SpotLight targets at monolith bases
+  useEffect(() => {
+    const dist = DBG_SILLAS.monolithDistM;
+    leftTarget.position.set(-dist, 0, 0);
+    rightTarget.position.set(dist, 0, 0);
+    leftTarget.updateMatrixWorld();
+    rightTarget.updateMatrixWorld();
+  }, [leftTarget, rightTarget]);
 
   // Listen for visualizer-activate / deactivate
   useEffect(() => {
@@ -116,8 +174,8 @@ export default function Monoliths() {
   useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime;
 
-    // Fade opacity in/out
-    const target = activeRef.current ? 1 : 0;
+    // Fade opacity in/out — S1: forceShow overrides
+    const target = (activeRef.current || DBG_SILLAS.monolithForceShow) ? 1 : 0;
     const speed  = 1000 / DBG_SILLAS.monolithFadeMs;
     opacityRef.current = THREE.MathUtils.clamp(
       opacityRef.current + (target - opacityRef.current) * Math.min(1, dt * speed),
@@ -126,21 +184,39 @@ export default function Monoliths() {
     const op = opacityRef.current;
 
     // Body opacity
-    const setOp = (mesh: THREE.Mesh | null, o: number) => {
+    const setOp = (mesh: THREE.Mesh | null, mat: THREE.MeshStandardMaterial, o: number) => {
       if (!mesh) return;
-      const mat = mesh.material as THREE.MeshStandardMaterial;
       mat.opacity = o;
       mat.transparent = o < 0.999;
     };
-    setOp(leftBodyRef.current,  op);
-    setOp(rightBodyRef.current, op);
+    setOp(leftBodyRef.current,  leftBodyMat,  op);
+    setOp(rightBodyRef.current, rightBodyMat, op);
+
+    // S1: update rim uniforms (live debug values)
+    const updateRim = (mat: THREE.MeshStandardMaterial) => {
+      const s = mat.userData.shader;
+      if (!s) return;
+      s.uniforms.uRimIntensity.value = DBG_SILLAS.monolithRimIntensity;
+      s.uniforms.uRimPow.value       = DBG_SILLAS.monolithRimPow;
+    };
+    updateRim(leftBodyMat);
+    updateRim(rightBodyMat);
+
+    // S1: dedicated SpotLight (not globalLightScale)
+    if (leftLightRef.current)  leftLightRef.current.intensity  = op * DBG_SILLAS.monolithLightIntensity;
+    if (rightLightRef.current) rightLightRef.current.intensity = op * DBG_SILLAS.monolithLightIntensity;
+
+    // S1: floor glow
+    const gop = op * DBG_SILLAS.monolithGlowOpacity;
+    if (leftGlowRef.current)  (leftGlowRef.current.material as THREE.MeshBasicMaterial).opacity  = gop;
+    if (rightGlowRef.current) (rightGlowRef.current.material as THREE.MeshBasicMaterial).opacity = gop;
 
     leftUniforms.uTime.value   = t;
     leftUniforms.uReveal.value = op;
     rightUniforms.uTime.value   = t;
     rightUniforms.uReveal.value = op;
 
-    if (!activeRef.current && op < 0.001) {
+    if (!activeRef.current && !DBG_SILLAS.monolithForceShow && op < 0.001) {
       setMonolithProximity(0, 0);
       return;
     }
@@ -164,26 +240,53 @@ export default function Monoliths() {
 
   const dist = DBG_SILLAS.monolithDistM;
   const cy   = H / 2;
+  const lightY = H + 2; // SpotLight height above floor
 
   // R5: base plate texture — created once, shared between both monoliths
+  // S1: wrapped in try/catch so a decal failure never hides the monolith
   const plateTex = useMemo(() => {
     if (!R5_MONOLITH_RETRO) return null;
-    return createBasePlateTex("AUSTRAL ELECTRIC / KX-07M", "UNIT-07", 512, 64);
+    try { return createBasePlateTex("AUSTRAL ELECTRIC / KX-07M", "UNIT-07", 512, 64); }
+    catch { return null; }
   }, []);
 
   const plateMat = useMemo(() => {
     if (!plateTex) return null;
-    return new THREE.MeshStandardMaterial({
-      map: plateTex, roughness: 0.8, metalness: 0.05,
-    });
+    return new THREE.MeshStandardMaterial({ map: plateTex, roughness: 0.8, metalness: 0.05 });
   }, [plateTex]);
 
   return (
     <>
+      {/* S1: SpotLight targets (no geometry, just positioning anchors) */}
+      <primitive object={leftTarget} />
+      <primitive object={rightTarget} />
+
+      {/* S1: dedicated SpotLights — NOT subject to globalLightScale */}
+      <spotLight
+        ref={leftLightRef}
+        position={[-dist, lightY, 0]}
+        target={leftTarget}
+        intensity={0}
+        color="#9fe6ff"
+        angle={0.32}
+        penumbra={0.6}
+        castShadow={false}
+      />
+      <spotLight
+        ref={rightLightRef}
+        position={[dist, lightY, 0]}
+        target={rightTarget}
+        intensity={0}
+        color="#9fe6ff"
+        angle={0.32}
+        penumbra={0.6}
+        castShadow={false}
+      />
+
       {/* Left monolith — image channel */}
       <mesh ref={leftBodyRef} position={[-dist, cy, 0]}>
         <boxGeometry args={[W, H, D]} />
-        <meshStandardMaterial color="#050505" roughness={0.95} metalness={0.05} />
+        <primitive object={leftBodyMat} attach="material" />
       </mesh>
       {/* R5: left base plate — brand text facing −Z (toward chairs) */}
       {R5_MONOLITH_RETRO && plateMat && (
@@ -193,22 +296,20 @@ export default function Monoliths() {
         </mesh>
       )}
       {/* Left screen — TV static facing −Z (toward chairs) */}
-      <mesh ref={leftScreenRef} position={[-dist, cy, -(D / 2) - 0.002]} rotation={[0, 0, 0]}>
+      <mesh ref={leftScreenRef} position={[-dist, cy, -(D / 2) - 0.002]}>
         <planeGeometry args={[W * 0.84, H * 0.72]} />
-        <shaderMaterial
-          uniforms={leftUniforms}
-          vertexShader={SCREEN_VERT}
-          fragmentShader={SCREEN_FRAG}
-          transparent
-          depthWrite={false}
-          side={THREE.FrontSide}
-        />
+        <shaderMaterial uniforms={leftUniforms} vertexShader={SCREEN_VERT} fragmentShader={SCREEN_FRAG} transparent depthWrite={false} side={THREE.FrontSide} />
+      </mesh>
+      {/* S1: left floor glow disc — additive cian anchor */}
+      <mesh ref={leftGlowRef} position={[-dist, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[1.2, 32]} />
+        <primitive object={glowMat} attach="material" />
       </mesh>
 
       {/* Right monolith — sound channel */}
       <mesh ref={rightBodyRef} position={[dist, cy, 0]}>
         <boxGeometry args={[W, H, D]} />
-        <meshStandardMaterial color="#050505" roughness={0.95} metalness={0.05} />
+        <primitive object={rightBodyMat} attach="material" />
       </mesh>
       {/* R5: right base plate */}
       {R5_MONOLITH_RETRO && plateMat && (
@@ -218,16 +319,14 @@ export default function Monoliths() {
         </mesh>
       )}
       {/* Right screen — audio-reactive glow */}
-      <mesh ref={rightScreenRef} position={[dist, cy, -(D / 2) - 0.002]} rotation={[0, 0, 0]}>
+      <mesh ref={rightScreenRef} position={[dist, cy, -(D / 2) - 0.002]}>
         <planeGeometry args={[W * 0.84, H * 0.72]} />
-        <shaderMaterial
-          uniforms={rightUniforms}
-          vertexShader={SCREEN_VERT}
-          fragmentShader={SCREEN_FRAG}
-          transparent
-          depthWrite={false}
-          side={THREE.FrontSide}
-        />
+        <shaderMaterial uniforms={rightUniforms} vertexShader={SCREEN_VERT} fragmentShader={SCREEN_FRAG} transparent depthWrite={false} side={THREE.FrontSide} />
+      </mesh>
+      {/* S1: right floor glow disc */}
+      <mesh ref={rightGlowRef} position={[dist, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[1.2, 32]} />
+        <primitive object={glowMat} attach="material" />
       </mesh>
     </>
   );

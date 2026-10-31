@@ -127,6 +127,12 @@ export const DBG_SILLAS = {
   noiseGain:           0.5,   // white noise max gain (right monolith proximity)
   staticMixMax:        0.35,  // max uStaticMix value on dome (left monolith proximity)
   watcherEyeEnabled:   true,  // N5: show watcher eye disc when watchers > 0
+  // S1: monolith visibility
+  monolithLightIntensity: 150, // SpotLight NOT scaled by globalLightScale
+  monolithRimIntensity: 0.25,  // fresnel rim brightness
+  monolithRimPow: 3,           // rim exponent (higher = tighter edge)
+  monolithGlowOpacity: 0.10,   // floor glow disc alpha
+  monolithForceShow: false,    // debug: force monoliths visible regardless of state
   debugOverlays:       false, // R1: show prism/audio/effects debug overlays — off by default
   // N6: red velvet curtain (reload to reposition; wind/gravity/damping/light are live)
   curtainDistM:          3.0,           // distance from player spawn to curtain plane (m)

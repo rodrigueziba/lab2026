@@ -689,6 +689,23 @@ export default function DebugMenu() {
               setSillas(s => ({ ...s, watcherEyeEnabled: v }));
             }}>{sillas.watcherEyeEnabled ? "ON" : "off"}</button>
           </div>
+          {/* S1: monolith visibility controls */}
+          <div style={ROW}>
+            <span>monolithForceShow</span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.monolithForceShow;
+              DBG_SILLAS.monolithForceShow = v;
+              setSillas(s => ({ ...s, monolithForceShow: v }));
+            }}>{sillas.monolithForceShow ? "ON" : "off"}</button>
+          </div>
+          <NumField label="monolithLightIntensity" value={sillas.monolithLightIntensity} step={10} min={0} max={600} note="live"
+            onChange={v => { DBG_SILLAS.monolithLightIntensity = v; setSillas(s => ({ ...s, monolithLightIntensity: v })); }} />
+          <NumField label="monolithRimIntensity"   value={sillas.monolithRimIntensity}   step={0.05} min={0} max={2} note="live"
+            onChange={v => { DBG_SILLAS.monolithRimIntensity   = v; setSillas(s => ({ ...s, monolithRimIntensity:   v })); }} />
+          <NumField label="monolithRimPow"         value={sillas.monolithRimPow}         step={0.5}  min={1} max={10} note="live"
+            onChange={v => { DBG_SILLAS.monolithRimPow         = v; setSillas(s => ({ ...s, monolithRimPow:         v })); }} />
+          <NumField label="monolithGlowOpacity"    value={sillas.monolithGlowOpacity}    step={0.01} min={0} max={0.5} note="live"
+            onChange={v => { DBG_SILLAS.monolithGlowOpacity    = v; setSillas(s => ({ ...s, monolithGlowOpacity:    v })); }} />
 
           <div style={DIVIDER} />
           <span style={LABEL}>Telón N6 <span style={NOTE}>(live excepto distancia/tamaño/gather)</span></span>
