@@ -689,9 +689,9 @@ export default function ThreeScene() {
       <DebugMenu />
       <NearLecternHUD />
       <AudioGestureHUD />
-      {DEBUG_ENABLED && <PrismDebugOverlay />}
-      {DEBUG_ENABLED && <AudioDebugOverlay />}
-      {DEBUG_ENABLED && <EffectsDebugOverlay />}
+      {DEBUG_ENABLED && DBG_SILLAS.debugOverlays && <PrismDebugOverlay />}
+      {DEBUG_ENABLED && DBG_SILLAS.debugOverlays && <AudioDebugOverlay />}
+      {DEBUG_ENABLED && DBG_SILLAS.debugOverlays && <EffectsDebugOverlay />}
       {DEBUG_ENABLED && <LecternDebugOverlay />}
       <KnobTooltip />
       <LecternHUD />

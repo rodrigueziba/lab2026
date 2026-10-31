@@ -92,6 +92,7 @@ export const DBG_SILLAS = {
   noiseGain:           0.5,   // white noise max gain (right monolith proximity)
   staticMixMax:        0.35,  // max uStaticMix value on dome (left monolith proximity)
   watcherEyeEnabled:   true,  // N5: show watcher eye disc when watchers > 0
+  debugOverlays:       false, // R1: show prism/audio/effects debug overlays — off by default
   // N6: red velvet curtain (reload to reposition; wind/gravity/damping/light are live)
   curtainDistM:          3.0,           // distance from player spawn to curtain plane (m)
   curtainWidthM:         14,            // curtain width (m)
@@ -100,7 +101,7 @@ export const DBG_SILLAS = {
   curtainWind:           0.6,           // wind amplitude (m/s²) — live
   curtainGravity:       -9.8,           // gravity Y (m/s²) — live
   curtainDamping:        0.985,         // velocity damping per substep — live
-  curtainLightIntensity: 8000,          // SpotLight intensity — live
+  curtainLightIntensity: 2400,          // SpotLight intensity — live
   curtainLightColor:     '#fff1dc' as string, // SpotLight color — live
 };
 

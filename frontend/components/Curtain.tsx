@@ -1,8 +1,8 @@
 "use client";
 // N6: Telón rojo de inicio — cloth simulation (PBD) with SpotLight.
 // Mounted in ThreeScene while experienceState === 'cortina'.
-// Player spawns at (-10, 1.6, -7) facing -Z; curtain hangs at z = -10 (3 m ahead).
-// Dispatches 'alight:curtain-passed' when camera crosses CROSS_THRESH.
+// R1: Curtain plane computed from camera.getWorldDirection() at mount time.
+// Dispatches 'alight:curtain-passed' when camera crosses the computed plane.
 // Dispatches 'alight:curtain-done' after fade-out so Scene can unmount it.
 
 import { useRef, useEffect } from "react";
@@ -14,18 +14,6 @@ import { DBG_SILLAS } from "@/lib/debugConfig";
 const COLS = 48;
 const ROWS = 32;
 const N    = COLS * ROWS;
-
-// ── World constants (player spawn from ThreeScene, camera faces -Z by default) ─
-const SPAWN_X   = -10;
-const SPAWN_Z   = -7;
-// Curtain plane 3 m ahead in -Z direction; reload required to reposition
-const CURTAIN_Z  = SPAWN_Z - 3;       // -10
-const CURTAIN_CX = SPAWN_X;           // -10 (center X)
-const CROSS_THRESH = CURTAIN_Z - 0.25; // -10.25: 0.25 m past the curtain plane
-
-// SpotLight: user side (+Z of curtain), ~45° elevation above curtain centre
-const LIGHT_POS_ARR    = [-10, 9, -5]          as [number, number, number];
-const LIGHT_TARGET_POS = [-10, 4, CURTAIN_Z]   as [number, number, number];
 
 // Capsule (player body) dimensions
 const CAP_R = 0.35;
@@ -56,13 +44,24 @@ type SimData = {
   normAttr:   THREE.BufferAttribute | null;
   curtainW:   number;
   curtainH:   number;
+  // R1: plane params computed from camera direction at build time
+  fwdX:         number;   // horizontal forward unit vector X
+  fwdZ:         number;   // horizontal forward unit vector Z
+  centerX:      number;   // curtain center world X
+  centerZ:      number;   // curtain center world Z
+  curtainPlaneD: number;  // dot(center, fwd) — crossing when dot(cam.pos, fwd) > planeD + 0.25
   passed:     boolean;
   fadingOut:  boolean;
   fadeStart:  number;
   opacity:    number;
 };
 
-function buildSim(curtainW: number, curtainH: number): SimData {
+function buildSim(
+  curtainW: number, curtainH: number,
+  centerX: number, centerZ: number,
+  fwdX: number, fwdZ: number,
+  rightX: number, rightZ: number,
+): SimData {
   const pos     = new Float32Array(N * 3);
   const vel     = new Float32Array(N * 3);
   const oldPos  = new Float32Array(N * 3);
@@ -78,13 +77,13 @@ function buildSim(curtainW: number, curtainH: number): SimData {
     const vt = j / (ROWS - 1);
     const y  = curtainH * (1 - vt) + FLOOR_Y * vt;
     for (let i = 0; i < COLS; i++) {
-      const ut  = i / (COLS - 1);
-      const x   = CURTAIN_CX + (-halfW + ut * curtainW) * gatherX;
-      const z   = CURTAIN_Z  + Math.sin(ut * nPleats * Math.PI * 2) * pleatD;
-      const idx = (j * COLS + i) * 3;
-      pos[idx]   = x;
+      const ut   = i / (COLS - 1);
+      const span = (-halfW + ut * curtainW) * gatherX;
+      const pleat = Math.sin(ut * nPleats * Math.PI * 2) * pleatD;
+      const idx  = (j * COLS + i) * 3;
+      pos[idx]   = centerX + rightX * span + fwdX * pleat;
       pos[idx+1] = y;
-      pos[idx+2] = z;
+      pos[idx+2] = centerZ + rightZ * span + fwdZ * pleat;
     }
   }
 
@@ -134,6 +133,8 @@ function buildSim(curtainW: number, curtainH: number): SimData {
     normals,
     posAttr: null, normAttr: null,
     curtainW, curtainH,
+    fwdX, fwdZ, centerX, centerZ,
+    curtainPlaneD: centerX * fwdX + centerZ * fwdZ,
     passed: false, fadingOut: false, fadeStart: 0, opacity: 1,
   };
 }
@@ -184,11 +185,13 @@ function stepSim(sim: SimData, elapsedTime: number, camX: number, camZ: number):
     oldPos.set(pos);
 
     // Integrate: forces → velocity → position
+    // Wind pushes curtain toward audience (−fwd direction)
     for (let i = 0; i < N; i++) {
       if (pin[i]) continue;
       const i3 = i * 3;
       vel[i3+1] += gravity * dt;
-      vel[i3+2] += windF   * dt;
+      vel[i3]   -= windF * sim.fwdX * dt;
+      vel[i3+2] -= windF * sim.fwdZ * dt;
       vel[i3]   *= damping; vel[i3+1] *= damping; vel[i3+2] *= damping;
       pos[i3]   += vel[i3]   * dt;
       pos[i3+1] += vel[i3+1] * dt;
@@ -265,10 +268,30 @@ export default function Curtain() {
   const simRef   = useRef<SimData | null>(null);
   const geoRef   = useRef<THREE.BufferGeometry | null>(null);
 
-  // Build simulation + geometry imperatively in useEffect;
-  // wire geometry to the mesh imperatively (avoids setGeo/setState-in-effect)
+  // R1: Build simulation + geometry + spotlight imperatively from camera direction.
+  // Combined into one effect so camera forward is read once and shared.
   useEffect(() => {
-    const s = buildSim(DBG_SILLAS.curtainWidthM, DBG_SILLAS.curtainHeightM);
+    // Compute forward direction from camera (horizontal projection)
+    const fwdVec = new THREE.Vector3();
+    camera.getWorldDirection(fwdVec);
+    fwdVec.y = 0;
+    const fwdLen = Math.sqrt(fwdVec.x * fwdVec.x + fwdVec.z * fwdVec.z);
+    if (fwdLen > 1e-5) { fwdVec.x /= fwdLen; fwdVec.z /= fwdLen; }
+    else               { fwdVec.x  = 0;       fwdVec.z  = -1; }
+
+    const fwdX   = fwdVec.x;
+    const fwdZ   = fwdVec.z;
+    const rightX = -fwdZ;  // 90° CW in XZ plane
+    const rightZ =  fwdX;
+
+    const distM   = DBG_SILLAS.curtainDistM;
+    const centerX = camera.position.x + fwdX * distM;
+    const centerZ = camera.position.z + fwdZ * distM;
+
+    const s = buildSim(
+      DBG_SILLAS.curtainWidthM, DBG_SILLAS.curtainHeightM,
+      centerX, centerZ, fwdX, fwdZ, rightX, rightZ,
+    );
     recomputeNormals(s);
 
     const posAttr  = new THREE.BufferAttribute(s.pos,     3);
@@ -305,21 +328,24 @@ export default function Curtain() {
     geoRef.current = g;
     if (meshRef.current) meshRef.current.geometry = g;
 
+    // SpotLight: on player's side of curtain (-fwd), 9 m high, target at curtain center 4 m up
+    const lightX = centerX - fwdX * 5;
+    const lightZ = centerZ - fwdZ * 5;
+    const target = new THREE.Object3D();
+    target.position.set(centerX, 4, centerZ);
+    scene.add(target);
+    if (lightRef.current) {
+      lightRef.current.position.set(lightX, 9, lightZ);
+      lightRef.current.target = target;
+    }
+
     return () => {
       g.dispose();
       simRef.current = null;
       geoRef.current = null;
+      scene.remove(target);
     };
-  }, []); // build once on mount
-
-  // SpotLight target: imperative Object3D added to scene
-  useEffect(() => {
-    const target = new THREE.Object3D();
-    target.position.set(LIGHT_TARGET_POS[0], LIGHT_TARGET_POS[1], LIGHT_TARGET_POS[2]);
-    scene.add(target);
-    if (lightRef.current) lightRef.current.target = target;
-    return () => { scene.remove(target); };
-  }, [scene]);
+  }, [scene, camera]); // stable in R3F — runs once on mount
 
   useFrame(({ clock: cl }) => {
     const sim = simRef.current;
@@ -344,8 +370,9 @@ export default function Curtain() {
       lightRef.current.color.set(DBG_SILLAS.curtainLightColor);
     }
 
-    // Crossing detection
-    if (!sim.passed && camZ < CROSS_THRESH) {
+    // Crossing detection: camera has moved 0.25 m past the curtain plane
+    const camDot = camera.position.x * sim.fwdX + camera.position.z * sim.fwdZ;
+    if (!sim.passed && camDot > sim.curtainPlaneD + 0.25) {
       sim.passed    = true;
       sim.fadingOut = true;
       sim.fadeStart = cl.elapsedTime;
@@ -370,10 +397,10 @@ export default function Curtain() {
       {/* Mesh rendered always; geometry is wired imperatively in useEffect */}
       <mesh ref={meshRef}>
         <meshPhysicalMaterial
-          color="#8a0b12"
-          roughness={0.97}
+          color="#7a0d14"
+          roughness={0.9}
           metalness={0}
-          sheen={1.0}
+          sheen={0.6}
           sheenColor={SHEEN_COL}
           sheenRoughness={0.7}
           side={THREE.DoubleSide}
@@ -382,13 +409,14 @@ export default function Curtain() {
           depthWrite={false}
         />
       </mesh>
+      {/* R1: position overridden imperatively in useEffect from camera direction */}
       <spotLight
         ref={lightRef}
-        position={LIGHT_POS_ARR}
+        position={[0, 9, 0]}
         intensity={DBG_SILLAS.curtainLightIntensity}
         color={DBG_SILLAS.curtainLightColor}
         angle={0.6}
-        penumbra={0.3}
+        penumbra={0.7}
         distance={30}
         decay={2}
         castShadow={false}
