@@ -31,6 +31,7 @@ import { setHazBandOn } from "@/lib/haz";
 import { DBG_STAR_MAT, DBG_DOME_MAT } from "./FaceDome";
 import { STORE, storeSubscribe, activateVisualizerOnce, resetVizActivated } from "@/lib/alightStore";
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
+import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 
 type Tab = "SILLAS" | "TARIMA";
 
@@ -313,6 +314,15 @@ export default function DebugMenu() {
     return () => clearInterval(id);
   }, [sillas.showDomeX2]);
 
+  // Z2: Meshes grandes — se pollea a 2fps solo cuando showBigMeshes está activo
+  const [bigMeshList, setBigMeshList] = useState<typeof BIG_MESH_DATA>([]);
+  const [meshHidden, setMeshHidden] = useState<Record<number, boolean>>({});
+  useEffect(() => {
+    if (!sillas.showBigMeshes) return;
+    const id = setInterval(() => { if (BIG_MESH_DATA.length) setBigMeshList([...BIG_MESH_DATA]); }, 500);
+    return () => clearInterval(id);
+  }, [sillas.showBigMeshes]);
+
   // Sync audio volume from STORE changes
   useEffect(() => storeSubscribe(() => setAudioVol(STORE.audio.volume)), []);
 
@@ -480,6 +490,41 @@ export default function DebugMenu() {
               }}
             >{sillas.vizHideShell ? "ON" : "OFF"}</button>
           </div>
+          {/* Z2: Meshes grandes — lista meshes con bbox >20m para diagnóstico de formas negras */}
+          <div style={ROW}>
+            <span style={LABEL}>Z2 Meshes grandes <span style={NOTE}>(bbox &gt; 20m)</span></span>
+            <button style={{ ...INPUT, width: 56, textAlign: "center", cursor: "pointer",
+              background: sillas.showBigMeshes ? "rgba(160,80,0,0.7)" : "rgba(40,40,60,0.5)" }}
+              onClick={() => {
+                const v = !DBG_SILLAS.showBigMeshes;
+                DBG_SILLAS.showBigMeshes = v;
+                setBigMeshList([]);
+                setMeshHidden({});
+                setSillas(s => ({ ...s, showBigMeshes: v }));
+              }}>{sillas.showBigMeshes ? "ON" : "off"}</button>
+          </div>
+          {sillas.showBigMeshes && bigMeshList.map((e, i) => (
+            <div key={i} style={{ ...ROW, flexDirection: "column", alignItems: "flex-start", padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                <span style={{ fontSize: 10, color: meshHidden[i] ? "#888" : "#ffcc88", fontFamily: "monospace" }}>{e.name}</span>
+                <button style={{ ...INPUT, width: 40, fontSize: 9, cursor: "pointer",
+                  background: meshHidden[i] ? "rgba(120,30,30,0.7)" : "rgba(30,80,30,0.7)" }}
+                  onClick={() => {
+                    e.obj.visible = meshHidden[i] ? true : false;
+                    setMeshHidden(h => ({ ...h, [i]: !h[i] }));
+                  }}>{meshHidden[i] ? "show" : "hide"}</button>
+              </div>
+              <span style={{ fontSize: 9, color: "#aaa", fontFamily: "monospace" }}>
+                {e.geoType} {e.sX.toFixed(0)}×{e.sY.toFixed(0)}×{e.sZ.toFixed(0)}m
+                @ ({e.pX.toFixed(1)},{e.pY.toFixed(1)},{e.pZ.toFixed(1)})
+                side={e.side} ro={e.renderOrder} dw={e.depthWrite ? "T" : "F"} transp={e.transparent ? "T" : "F"} {e.colorHex}
+              </span>
+            </div>
+          ))}
+          {sillas.showBigMeshes && bigMeshList.length === 0 && (
+            <div style={{ ...ROW, color: "#888", fontSize: 10 }}>esperando escaneo...</div>
+          )}
+
           <div style={ROW}>
             <span>vizSolidTest <span style={NOTE}>H1 Prueba A</span></span>
             <button

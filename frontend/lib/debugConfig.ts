@@ -81,6 +81,7 @@ export const DBG_SILLAS = {
   vizTestPattern:  false, // show θ/φ test grid instead of login shader
   vizSolidTest:    false, // Prueba A: solid magenta + depthTest=false + DoubleSide + renderOrder=10
   vizHideShell:    false, // force-hide dome shell (debug)
+  showBigMeshes:   false, // Z2: escanear y mostrar meshes con bbox > 20m (diagnóstico)
   // visualizer shader params (live)
   vizIntensity:    0.72,  // R2: was 1.2 (×0.6 = −40%)
   vizGhost:        1.0,

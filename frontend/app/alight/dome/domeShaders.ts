@@ -248,8 +248,8 @@ void main() {
   float az = atan(d.x, -d.z) / TAU;
   float hFar = 1.25 * ridgeH(az, 0.31) * uDawn;
   float hNear = 0.70 * ridgeH(az + 0.17, 0.77) * uDawn;
-  col = mix(col, vec3(0.133, 0.188, 0.227), smoothstep(0.0015, -0.0015, d.y - hFar) * (1.0 - inside));
-  col = mix(col, vec3(0.098, 0.102, 0.133), smoothstep(0.0015, -0.0015, d.y - hNear) * (1.0 - inside));
+  col = mix(col, vec3(0.133, 0.188, 0.227), smoothstep(0.0015, -0.0015, d.y - hFar)  * (1.0 - inside) * uDawn);
+  col = mix(col, vec3(0.098, 0.102, 0.133), smoothstep(0.0015, -0.0015, d.y - hNear) * (1.0 - inside) * uDawn);
 
   // ---- cielo del portal ----
   if (inside > 0.001) {
@@ -321,13 +321,13 @@ void main() {
     // W3: olas (LÍNEAS) y estratos (MONTAÑAS) aparecen en fase 2
     col = mix(col, waveCol * (1.0 + 0.10 * lin), m.b * uReveal.y);
     col = mix(col, strataCol * (1.0 + 0.08 * mont), m.g * uReveal.x);
-    col = mix(col, vec3(0.098, 0.102, 0.133), m.r);
+    col = mix(col, vec3(0.098, 0.102, 0.133), m.r * uDawn);
     // X2b: debug — mostrar canales de máscara como colores de prueba (bypasa uReveal/uDawn)
     if (uDebugMasks > 0.5) { col = m; }
     // destellos sobre las montanas
     float tw2 = 0.75 + 0.25 * sin(t * 2.3 + 1.0) + 0.7 * kick;
-    col = mix(col, vec3(0.91, 0.54, 0.18), sparkle4(p - vec2(-0.6800, -0.7830), 0.040 * tw2));
-    col = mix(col, vec3(0.99, 0.95, 0.88), sparkle4(p - vec2( 0.8616, -0.3224), 0.040 * tw2));
+    col = mix(col, vec3(0.91, 0.54, 0.18), sparkle4(p - vec2(-0.6800, -0.7830), 0.040 * tw2) * uDawn);
+    col = mix(col, vec3(0.99, 0.95, 0.88), sparkle4(p - vec2( 0.8616, -0.3224), 0.040 * tw2) * uDawn);
   }
 
   // ---- confeti en el marco ----

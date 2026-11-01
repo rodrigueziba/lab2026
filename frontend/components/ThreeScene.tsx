@@ -18,6 +18,7 @@ import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
 import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
 import CameraFeedback from "./CameraFeedback";
@@ -31,13 +32,66 @@ const ZONA_SILLAS = new THREE.Vector3(0, 1.6, -6); // G2: 1 m further
 // _vizActivated / activateVisualizer / deactivateVisualizer were here; removed in T1.
 const _D = { path: "none", prismLanded: false, vizActive: false, d: 999, minD: 999 };
 
+// ── Z2: BigMeshScanner — escanea meshes con bbox > 20m y rellena BIG_MESH_DATA ─
+function BigMeshScanner() {
+  const { scene, camera } = useThree();
+  const _bb = useMemo(() => new THREE.Box3(), []);
+  const _sz = useMemo(() => new THREE.Vector3(), []);
+  const _wp = useMemo(() => new THREE.Vector3(), []);
+  const prevFlag = useRef(false);
+
+  useFrame(() => {
+    const flag = DBG_SILLAS.showBigMeshes;
+    if (flag === prevFlag.current) return;
+    prevFlag.current = flag;
+    BIG_MESH_DATA.length = 0;
+    if (!flag) return;
+
+    const cam = camera as THREE.PerspectiveCamera;
+    console.log(
+      `[BigMesh] cam pos=(${cam.position.x.toFixed(2)},${cam.position.y.toFixed(2)},${cam.position.z.toFixed(2)})` +
+      ` fov=${cam.fov} near=${cam.near} far=${cam.far}`,
+    );
+    scene.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      _bb.setFromObject(obj);
+      _bb.getSize(_sz);
+      if (Math.max(_sz.x, _sz.y, _sz.z) < 20) return;
+      obj.getWorldPosition(_wp);
+      const mat = obj.material as THREE.Material & { color?: THREE.Color; transparent?: boolean; depthWrite?: boolean; side?: number };
+      const colorHex = mat.color ? "#" + mat.color.getHexString() : "—";
+      const sideStr  = mat.side === THREE.BackSide ? "Back" : mat.side === THREE.DoubleSide ? "Double" : "Front";
+      BIG_MESH_DATA.push({
+        name: obj.name || `(${obj.geometry?.type ?? "?"})`,
+        geoType: obj.geometry?.type ?? "?",
+        sX: _sz.x, sY: _sz.y, sZ: _sz.z,
+        pX: _wp.x, pY: _wp.y, pZ: _wp.z,
+        side: sideStr,
+        transparent: !!mat.transparent,
+        renderOrder: obj.renderOrder,
+        depthWrite: mat.depthWrite !== false,
+        colorHex,
+        obj,
+      });
+    });
+    console.log(`[BigMesh] ${BIG_MESH_DATA.length} meshes > 20m:`, BIG_MESH_DATA.map(e =>
+      `${e.name} ${e.geoType} ${e.sX.toFixed(0)}×${e.sY.toFixed(0)}×${e.sZ.toFixed(0)} @ (${e.pX.toFixed(1)},${e.pY.toFixed(1)},${e.pZ.toFixed(1)}) side=${e.side} transparent=${e.transparent} depthWrite=${e.depthWrite} color=${e.colorHex} ro=${e.renderOrder} visible=${e.obj.visible}`,
+    ).join("\n  "));
+  });
+
+  return null;
+}
+
 // ── Room ──────────────────────────────────────────────────────────────────────
 function Room() {
-  const ceilRef = useRef<THREE.Mesh>(null);
+  const ceilRef  = useRef<THREE.Mesh>(null);
+  const wallsRef = useRef<THREE.Group>(null);
   // H1.1 fix: ceiling at y=22 blocks DomeVisualizer sphere (y=28) via depth test.
-  // Hide it while the visualizer is active so the sky is visible.
+  // Z2 fix: walls (80×22m) at ±40m were visible through DomeSky (opaque, depthWrite=false)
+  // after Y1 made the PANORAMA_FRAG sphere transparent. Hide both when visualizer active.
   useFrame(() => {
-    if (ceilRef.current) ceilRef.current.visible = !_D.vizActive;
+    if (ceilRef.current)  ceilRef.current.visible  = !_D.vizActive;
+    if (wallsRef.current) wallsRef.current.visible = !_D.vizActive;
   });
   return (
     <group>
@@ -45,22 +99,25 @@ function Room() {
         <planeGeometry args={[80, 80]} />
         <meshStandardMaterial color="#0d0d0f" roughness={0.95} />
       </mesh>
-      <mesh position={[0, 11, -40]}>
-        <planeGeometry args={[80, 22]} />
-        <meshStandardMaterial color="#080809" roughness={1} />
-      </mesh>
-      <mesh position={[0, 11, 40]} rotation={[0, Math.PI, 0]}>
-        <planeGeometry args={[80, 22]} />
-        <meshStandardMaterial color="#080809" roughness={1} />
-      </mesh>
-      <mesh position={[-40, 11, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[80, 22]} />
-        <meshStandardMaterial color="#080809" roughness={1} />
-      </mesh>
-      <mesh position={[40, 11, 0]} rotation={[0, -Math.PI / 2, 0]}>
-        <planeGeometry args={[80, 22]} />
-        <meshStandardMaterial color="#080809" roughness={1} />
-      </mesh>
+      {/* Z2: walls wrapped in a group — hidden when visualizer active (like ceiling) */}
+      <group ref={wallsRef}>
+        <mesh position={[0, 11, -40]}>
+          <planeGeometry args={[80, 22]} />
+          <meshStandardMaterial color="#080809" roughness={1} />
+        </mesh>
+        <mesh position={[0, 11, 40]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[80, 22]} />
+          <meshStandardMaterial color="#080809" roughness={1} />
+        </mesh>
+        <mesh position={[-40, 11, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <planeGeometry args={[80, 22]} />
+          <meshStandardMaterial color="#080809" roughness={1} />
+        </mesh>
+        <mesh position={[40, 11, 0]} rotation={[0, -Math.PI / 2, 0]}>
+          <planeGeometry args={[80, 22]} />
+          <meshStandardMaterial color="#080809" roughness={1} />
+        </mesh>
+      </group>
       {/* H1.1: ref tracked; hidden when visualizer active (it would block the sky sphere) */}
       <mesh ref={ceilRef} name="room-ceiling" position={[0, 22, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[80, 80]} />
@@ -401,6 +458,7 @@ function Scene() {
       {path !== "sillas" && <LecternSystem />}
       {path !== "sillas" && <DynamicLights />}
       <Player />
+      <BigMeshScanner />
       <PointerLockControls />
     </>
   );
