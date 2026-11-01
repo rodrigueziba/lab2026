@@ -1183,6 +1183,9 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.domePortalElevation  = v; setSillas(s => ({ ...s, domePortalElevation:  v })); }} />
           <NumField label="domePortalHalfFovDeg" value={sillas.domePortalHalfFovDeg} step={1}    min={5}    max={90}   note="semi-FOV del portal (°)"
             onChange={v => { DBG_SILLAS.domePortalHalfFovDeg = v; setSillas(s => ({ ...s, domePortalHalfFovDeg: v })); }} />
+          {/* Z1: radio de esfera DomeSky — W1 usó 100 (muy grande); correcto es DOME_R=28. Requiere reload. */}
+          <NumField label="domeSkySphereR" value={sillas.domeSkySphereR} step={1} min={10} max={150} note="Z1: radio esfera DomeSky (W1=100 → correcto=28) — reload"
+            onChange={v => { DBG_SILLAS.domeSkySphereR = v; setSillas(s => ({ ...s, domeSkySphereR: v })); }} />
 
           <div style={DIVIDER} />
           <span style={LABEL}>W2 — Multiplicadores de grupo <span style={NOTE}>(uniforms DomeSky)</span></span>

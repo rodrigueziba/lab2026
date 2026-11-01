@@ -549,7 +549,7 @@ function DomeSkyAnchor() {
           portalAzimuth={DBG_SILLAS.domePortalAzimuth}
           portalElevation={DBG_SILLAS.domePortalElevation}
           portalHalfFovDeg={DBG_SILLAS.domePortalHalfFovDeg}
-          radius={100}
+          radius={DBG_SILLAS.domeSkySphereR}
           lowQuality={lowQuality}
         />
       </Suspense>

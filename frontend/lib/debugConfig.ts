@@ -297,6 +297,9 @@ export const DBG_SILLAS = {
   u11StreakHFr:     0.012, // anamorphic streak height as fraction of screen height
   // W1: dome shader sky (replaces VizPanorama when true)
   usarDomoShader:         true,        // W1: replace panorama layers with DomeSky shader
+  // Z1: radio de la esfera de DomeSky. W1 usó 100 (demasiado grande — objetos se veían chicos);
+  // correcto es DOME_R=28 para igualar el tamaño del domo interior. Requiere reload para surtir efecto.
+  domeSkySphereR:         28,          // Z1: DomeSky sphere radius (was 100 in W1; DOME_R=28 is correct)
   domePortalAzimuth:      Math.PI,     // portal direction: behind tarima (+Z from audience)
   domePortalElevation:    0.58,        // portal elevation above horizon (rad)
   domePortalHalfFovDeg:   42.0,        // portal half-FOV (degrees) → uPortalTan≈0.90
