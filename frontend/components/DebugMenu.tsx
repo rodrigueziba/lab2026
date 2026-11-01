@@ -1213,6 +1213,16 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.u11StreakHFr     = v; setSillas(s => ({ ...s, u11StreakHFr:     v })); }} />
 
           <div style={DIVIDER} />
+          <span style={LABEL}>AA1 — Domo original <span style={NOTE}>(pre-W1: VizPanorama + esfera panorama)</span></span>
+          <div style={ROW}>
+            <span>domoOriginal</span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.domoOriginal;
+              DBG_SILLAS.domoOriginal = v;
+              setSillas(s => ({ ...s, domoOriginal: v }));
+            }}>{sillas.domoOriginal ? "ON" : "off"}</button>
+          </div>
+          <div style={DIVIDER} />
           <span style={LABEL}>W1 — Domo de shader <span style={NOTE}>(reemplaza VizPanorama)</span></span>
           <div style={ROW}>
             <span>usarDomoShader</span>

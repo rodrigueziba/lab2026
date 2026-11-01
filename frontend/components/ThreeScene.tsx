@@ -86,16 +86,18 @@ function BigMeshScanner() {
 function Room() {
   const ceilRef  = useRef<THREE.Mesh>(null);
   const wallsRef = useRef<THREE.Group>(null);
-  // H1.1 fix: ceiling at y=22 blocks DomeVisualizer sphere (y=28) via depth test.
-  // Z2 fix: walls (80×22m) at ±40m were visible through DomeSky (opaque, depthWrite=false)
-  // after Y1 made the PANORAMA_FRAG sphere transparent. Hide both when visualizer active.
+  const floorRef = useRef<THREE.Mesh>(null);
+  // H1.1: ceiling hidden in vizActive (blocks DomeVisualizer sphere via depth test).
+  // Z2: walls hidden in vizActive (visible through DomeSky after Y1 made sky sphere transparent).
+  // AA1: floor hidden in vizActive (80×80m black square visible under DomeSky lavender shader).
   useFrame(() => {
     if (ceilRef.current)  ceilRef.current.visible  = !_D.vizActive;
     if (wallsRef.current) wallsRef.current.visible = !_D.vizActive;
+    if (floorRef.current) floorRef.current.visible = !_D.vizActive;
   });
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh ref={floorRef} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[80, 80]} />
         <meshStandardMaterial color="#0d0d0f" roughness={0.95} />
       </mesh>

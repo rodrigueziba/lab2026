@@ -296,6 +296,8 @@ export const DBG_SILLAS = {
   u11GlareRadiusFr: 0.40,  // radial glow radius as fraction of screen height
   u11StreakLenFr:   1.10,  // anamorphic streak length as fraction of screen width
   u11StreakHFr:     0.012, // anamorphic streak height as fraction of screen height
+  // AA1: modo domo original — fuerza usarDomoShader=false y oculta piso en vizActive
+  domoOriginal:           false,       // AA1: true = recuperar domo pre-W1 (VizPanorama + esfera PANORAMA_FRAG)
   // W1: dome shader sky (replaces VizPanorama when true)
   usarDomoShader:         true,        // W1: replace panorama layers with DomeSky shader
   // Z1: radio de la esfera de DomeSky. W1 usó 100 (demasiado grande — objetos se veían chicos);

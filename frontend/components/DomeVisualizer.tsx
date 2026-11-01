@@ -760,10 +760,9 @@ export default function DomeVisualizer() {
 
     // ── Update sky uniforms (N3 base + T2 grow + T3 audio) ───────────────────
     const SU = skyUniforms;
-    // X3: cuando DomeSky está activo, la esfera de panorama (r=28) se mantiene transparente
-    // para no tapar DomeSky (r=100). Ambas tienen renderOrder=-1, y en Three.js los transparentes
-    // se pintan de lejos a cerca — la esfera de r=28 quedaría ENCIMA de DomeSky (r=100).
-    SU.uFade.value = DBG_SILLAS.usarDomoShader
+    // X3/AA1: cuando DomeSky está activo (y domoOriginal=false), la esfera de panorama se mantiene
+    // transparente para no tapar DomeSky. Con domoOriginal=true se usa el path VizPanorama original.
+    SU.uFade.value = (DBG_SILLAS.usarDomoShader && !DBG_SILLAS.domoOriginal)
       ? 0
       : Math.min(1, SU.uFade.value + dt / (DBG_SILLAS.vizFadeMs / 1000));
     SU.uTime.value      = clock.elapsedTime;
@@ -893,8 +892,8 @@ export default function DomeVisualizer() {
           />
         </sprite>
       )}
-      {/* U1/W1: panorama — VizPanorama (SVG layers) or DomeSky shader depending on flag */}
-      {DBG_SILLAS.usarDomoShader
+      {/* U1/W1/AA1: panorama — VizPanorama (SVG) o DomeSky shader. domoOriginal fuerza VizPanorama. */}
+      {(DBG_SILLAS.usarDomoShader && !DBG_SILLAS.domoOriginal)
         ? <DomeSkyAnchor />
         : <VizPanorama growRef={growRef} pulseRef={pulseSmoRef} flowRef={flowRef} kickRef={kickRef} />
       }
