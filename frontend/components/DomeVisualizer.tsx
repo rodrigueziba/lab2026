@@ -760,7 +760,12 @@ export default function DomeVisualizer() {
 
     // ── Update sky uniforms (N3 base + T2 grow + T3 audio) ───────────────────
     const SU = skyUniforms;
-    SU.uFade.value      = Math.min(1, SU.uFade.value + dt / (DBG_SILLAS.vizFadeMs / 1000));
+    // X3: cuando DomeSky está activo, la esfera de panorama (r=28) se mantiene transparente
+    // para no tapar DomeSky (r=100). Ambas tienen renderOrder=-1, y en Three.js los transparentes
+    // se pintan de lejos a cerca — la esfera de r=28 quedaría ENCIMA de DomeSky (r=100).
+    SU.uFade.value = DBG_SILLAS.usarDomoShader
+      ? 0
+      : Math.min(1, SU.uFade.value + dt / (DBG_SILLAS.vizFadeMs / 1000));
     SU.uTime.value      = clock.elapsedTime;
     SU.uSunIntensity.value  = DBG_SILLAS.sunIntensity; // breathing now in shader
     SU.uSunAngularRad.value = DBG_SILLAS.sunAngularDeg * Math.PI / 360;
