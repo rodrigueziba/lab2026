@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, Briefcase, Mail, Phone, Globe, MapPin, Camera, Save, Loader2, ArrowLeft, Palette } from 'lucide-react';
@@ -11,7 +11,7 @@ export default function EditarPerfilPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   const [formData, setFormData] = useState({
     nombre: '',

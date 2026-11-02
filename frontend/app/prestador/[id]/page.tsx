@@ -70,7 +70,7 @@ export default function DetallePrestadorPage({ params }: { params: Promise<{ id:
     backgroundSize: "100% 2px, 3px 100%", 
     pointerEvents: "none" as const 
   };
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   const prestadorVisit = usePrestadorVisit();
 
   useEffect(() => {

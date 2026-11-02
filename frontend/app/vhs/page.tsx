@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
@@ -139,7 +139,7 @@ export default function Proyectos3DPage() {
   useEffect(() => {
     const fetchProyectos = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/proyecto`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/proyecto`);
         const data = await res.json();
         setProyectos(Array.isArray(data) ? (data as VhsProyecto[]) : []);
       } catch (error) {

@@ -43,7 +43,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
   const [proyecto, setProyecto] = useState<any>(null);
   const [candidatos, setCandidatos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   const [misPostulaciones, setMisPostulaciones] = useState<number[]>([]);
   const [misPerfiles, setMisPerfiles] = useState<Array<{ id: number; nombre: string; rubro: string }>>([]);
   const [perfilElegidoId, setPerfilElegidoId] = useState<number | null>(null);

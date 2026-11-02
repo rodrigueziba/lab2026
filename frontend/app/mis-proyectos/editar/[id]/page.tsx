@@ -38,7 +38,7 @@ export default function EditarProyectoPage({ params }: { params: Promise<{ id: s
 
   const [referencias, setReferencias] = useState(['']);
   const [puestos, setPuestos] = useState([{ id: null, nombre: '', descripcion: '' }]);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   
   // Imágenes
   const [archivo, setArchivo] = useState<File | null>(null);

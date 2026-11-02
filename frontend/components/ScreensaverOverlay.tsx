@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
@@ -8,7 +8,7 @@ import type { GalleryItem } from './Depthgallery';
 
 const DepthGallery = dynamic(() => import('@/components/Depthgallery'), { ssr: false });
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface Prestador {
   id: number;

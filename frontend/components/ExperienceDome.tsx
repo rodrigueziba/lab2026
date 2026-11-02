@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -19,7 +19,7 @@ import { resetEffects } from "@/lib/vizAudio";
 const LEGACY_FLOOR_TEXTURES_ENABLED = false;
 const LEGACY_SECTOR_AUDIO_ENABLED   = false;
 
-const API_URL    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+const API_URL    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 const DOME_R     = 28;
 const MAX_PANELS = 60;
 const PANEL_SCALE = 1.5; // G4: multiply panel dimensions by this factor

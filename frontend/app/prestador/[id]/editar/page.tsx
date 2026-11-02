@@ -44,7 +44,7 @@ export default function EditarPrestadorPage() {
   });
 
   const [nuevoArchivo, setNuevoArchivo] = useState<File | null>(null);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
     const token = localStorage.getItem('token');

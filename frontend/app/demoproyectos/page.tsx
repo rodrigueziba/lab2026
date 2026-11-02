@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -14,7 +14,7 @@ import type { Proyecto, Puesto } from '@/types/proyecto';
 
 const AnycolourBackground = dynamic(() => import('@/components/anycolour'), { ssr: false });
 const CinemaScene = dynamic(() => import('@/components/demoproyectos/CinemaScene'), { ssr: false });
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 const TIPOS = ['Todos', 'Cortometraje', 'Largometraje', 'Documental', 'Videoclip', 'Publicidad'];
 

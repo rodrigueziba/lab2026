@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -7,7 +7,7 @@ import { Bell, ArrowLeft } from 'lucide-react';
 import TdfFilmLoader from '@/components/TdfFilmLoader';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function NotificacionesPage() {
   const router = useRouter();

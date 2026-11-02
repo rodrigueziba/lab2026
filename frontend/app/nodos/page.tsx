@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from 'react';
 import dynamic from 'next/dynamic';
 import * as THREE from 'three';
@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 
 const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), { ssr: false });
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 /* ═══════════════════════════════════════════════════════════════
    CONFIGURACIÓN GLOBAL

@@ -1,6 +1,6 @@
-import type { Proyecto } from '@/types/proyecto';
+﻿import type { Proyecto } from '@/types/proyecto';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 /** URL absoluta para textura WebGL (CORS según el backend). */
 export function proyectoImageUrl(p: Proyecto): string {

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -81,7 +81,7 @@ export default function GuiaPage() {
   const lastScrollY = useRef(0);
   const filtersRef = useRef<HTMLDivElement>(null);
   const dataLoadedRef = useRef(false);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   const [disable3D, setDisable3D] = useState(false);
 
   useEffect(() => {

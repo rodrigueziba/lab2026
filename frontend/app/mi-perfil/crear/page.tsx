@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
@@ -72,7 +72,7 @@ export default function CrearPerfilPage() {
   const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [formacion, setFormacion] = useState('');
   const [experiencias, setExperiencias] = useState([{ proyecto: '', anio: '', rol: '' }]);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   const [archivoPrincipal, setArchivoPrincipal] = useState<File | null>(null);
   const [previewPrincipal, setPreviewPrincipal] = useState<string | null>(null);

@@ -13,7 +13,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'; 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'; 
 
 const CATEGORIAS_TDF: Record<string, string[]> = {
   "Paisaje Natural": ["Montañas", "Bosques", "Costas", "Lagos y lagunas", "Glaciares", "Turberas"],
