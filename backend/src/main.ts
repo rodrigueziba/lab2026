@@ -19,8 +19,15 @@ async function bootstrap() {
 
   const httpAdapter = app.getHttpAdapter().getInstance();
   httpAdapter.set('trust proxy', 1);
+  const LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
   app.enableCors({
-    origin: ['https://lab2026.vercel.app', 'http://localhost:3000', 'http://localhost:3001'],
+    origin: (origin, cb) => {
+      if (!origin || origin === 'https://lab2026.vercel.app' || LOCAL.test(origin)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`CORS: origin not allowed — ${origin}`));
+      }
+    },
     credentials: true,
   });
 
