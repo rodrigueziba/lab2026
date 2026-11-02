@@ -8,7 +8,7 @@ export default function GestionCandidatosPage({ params }: { params: Promise<{ id
   const resolvedParams = use(params);
   const id = resolvedParams.id;
   const router = useRouter();
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   const [candidatos, setCandidatos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

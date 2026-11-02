@@ -21,7 +21,7 @@ const getYoutubeId = (url: string) => {
   const match = url?.match(regExp);
   return (match && match[2].length === 11) ? match[2] : null;
 };
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 const TIPOS = ['Todos', 'Cortometraje', 'Largometraje', 'Documental', 'Videoclip', 'Publicidad'];
 

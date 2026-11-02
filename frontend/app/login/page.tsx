@@ -116,7 +116,7 @@ function LoginForm({ onMobilePlay }: { onMobilePlay?: () => void | Promise<void>
   const [formData, setFormData] = useState({ email:'', password:'' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   useEffect(() => {
     const token = searchParams.get('token');

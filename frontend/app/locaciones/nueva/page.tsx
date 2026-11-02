@@ -13,7 +13,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'; 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'; 
 
 const CATEGORIAS_TDF = {
   "Paisaje Natural": ["Montañas", "Bosques", "Costas", "Lagos y lagunas", "Glaciares", "Turberas"],

@@ -65,7 +65,7 @@ export default function CatalogoLocacionesPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const filtersRef = useRef<HTMLDivElement>(null);
   const dataLoadedRef = useRef(false);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   const [disable3D, setDisable3D] = useState(false);
 
   useEffect(() => {

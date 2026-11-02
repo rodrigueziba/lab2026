@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), { ssr: false });
- const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'; 
+ const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'; 
 
 
 
