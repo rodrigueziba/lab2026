@@ -1222,6 +1222,14 @@ export default function DebugMenu() {
               setSillas(s => ({ ...s, domoOriginal: v }));
             }}>{sillas.domoOriginal ? "ON" : "off"}</button>
           </div>
+          <div style={ROW}>
+            <span>domoShaderEnMalla</span>
+            <button style={INPUT} onClick={() => {
+              const v = !sillas.domoShaderEnMalla;
+              DBG_SILLAS.domoShaderEnMalla = v;
+              setSillas(s => ({ ...s, domoShaderEnMalla: v }));
+            }}>{sillas.domoShaderEnMalla ? "ON" : "off"}</button>
+          </div>
           <div style={DIVIDER} />
           <span style={LABEL}>W1 — Domo de shader <span style={NOTE}>(reemplaza VizPanorama)</span></span>
           <div style={ROW}>

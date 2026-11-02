@@ -298,14 +298,16 @@ export const DBG_SILLAS = {
   u11StreakHFr:     0.012, // anamorphic streak height as fraction of screen height
   // AA1: modo domo original — fuerza usarDomoShader=false y oculta piso en vizActive
   domoOriginal:           false,       // AA1: true = recuperar domo pre-W1 (VizPanorama + esfera PANORAMA_FRAG)
+  // AA2: shader en la malla del domo (vs esfera aparte); requiere domoOriginal=false
+  domoShaderEnMalla:      true,        // AA2: true = DomeSky en el mesh del domo; false = esfera DomeSkyAnchor
   // W1: dome shader sky (replaces VizPanorama when true)
   usarDomoShader:         true,        // W1: replace panorama layers with DomeSky shader
   // Z1: radio de la esfera de DomeSky. W1 usó 100 (demasiado grande — objetos se veían chicos);
   // correcto es DOME_R=28 para igualar el tamaño del domo interior. Requiere reload para surtir efecto.
   domeSkySphereR:         28,          // Z1: DomeSky sphere radius (was 100 in W1; DOME_R=28 is correct)
   domePortalAzimuth:      Math.PI,     // portal direction: behind tarima (+Z from audience)
-  domePortalElevation:    0.58,        // portal elevation above horizon (rad)
-  domePortalHalfFovDeg:   42.0,        // portal half-FOV (degrees) → uPortalTan≈0.90
+  domePortalElevation:    0.40,        // portal elevation above horizon (rad) — AA3: 0.58→0.40
+  domePortalHalfFovDeg:   28.0,        // portal half-FOV (degrees) — AA3: 42→28 (tan≈0.53)
   // W2: group energy multipliers (uniforms en DomeSky)
   // W5-P1: SOL y CIELO son los más visibles; MONTAÑAS y LÍNEAS tienen efectos sutiles → mult más alto
   domeSolAmt:             1.5,         // SOL: anillos pulsantes + halo del sol (ya muy visible)

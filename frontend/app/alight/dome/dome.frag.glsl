@@ -338,8 +338,7 @@ void main() {
     col = mix(col, cc, smoothstep(0.03, -0.03, sdf));
   }
 
-  // suelo oscuro bajo el horizonte (tu escena ya tiene su propio suelo, esto solo evita ver el fondo del domo)
-  col = mix(vec3(0.043, 0.039, 0.063), col, smoothstep(-0.004, 0.004, d.y));
-
-  gl_FragColor = vec4(col, 1.0);
+  // AA2: alpha=0 bajo el horizonte — el piso real del escenario es visible a traves del domo
+  float a = smoothstep(-0.015, 0.015, d.y);
+  gl_FragColor = vec4(col, a);
 }

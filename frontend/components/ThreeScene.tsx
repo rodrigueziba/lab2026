@@ -87,18 +87,27 @@ function Room() {
   const ceilRef  = useRef<THREE.Mesh>(null);
   const wallsRef = useRef<THREE.Group>(null);
   const floorRef = useRef<THREE.Mesh>(null);
+  const diskRef  = useRef<THREE.Mesh>(null);
   // H1.1: ceiling hidden in vizActive (blocks DomeVisualizer sphere via depth test).
   // Z2: walls hidden in vizActive (visible through DomeSky after Y1 made sky sphere transparent).
-  // AA1: floor hidden in vizActive (80×80m black square visible under DomeSky lavender shader).
+  // AA1: floor (80×80 square) hidden in vizActive.
+  // AA2: disco circular (r=28) visible en vizActive cuando domoShaderEnMalla=true (shader en malla).
   useFrame(() => {
     if (ceilRef.current)  ceilRef.current.visible  = !_D.vizActive;
     if (wallsRef.current) wallsRef.current.visible = !_D.vizActive;
     if (floorRef.current) floorRef.current.visible = !_D.vizActive;
+    if (diskRef.current)  diskRef.current.visible  =
+      _D.vizActive && DBG_SILLAS.domoShaderEnMalla && !DBG_SILLAS.domoOriginal;
   });
   return (
     <group>
       <mesh ref={floorRef} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[80, 80]} />
+        <meshStandardMaterial color="#0d0d0f" roughness={0.95} />
+      </mesh>
+      {/* AA2: piso circular del radio del domo — reemplaza al cuadrado en vizActive+domoShaderEnMalla */}
+      <mesh ref={diskRef} rotation={[-Math.PI / 2, 0, 0]} receiveShadow visible={false}>
+        <circleGeometry args={[28, 128]} />
         <meshStandardMaterial color="#0d0d0f" roughness={0.95} />
       </mesh>
       {/* Z2: walls wrapped in a group — hidden when visualizer active (like ceiling) */}

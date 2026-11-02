@@ -1,7 +1,7 @@
 "use client";
 // DomeSky.tsx — domo 360 con portal de atardecer, tunel de anillos y cordillera.
 // Cargar con dynamic(() => import("./DomeSky"), { ssr: false }) o dentro de un <Canvas> ya en cliente.
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
@@ -60,8 +60,13 @@ type Props = {
   ringScale?: number;  // multiplicador del periodo de anillos
   ringFade?: [number, number];
   starCut?: number;    // 0.93..0.995, mas alto = menos estrellas
+  /** AA2: false = solo actualiza uniforms (ExperienceDome aplica el material al mesh del domo). */
+  renderSphere?: boolean;
   lowQuality?: boolean;
 };
+
+// AA2: ref module-level para que ExperienceDome acceda al material sin prop drilling
+export const DOME_SKY_MAT_EXPORT: { mat: THREE.ShaderMaterial | null } = { mat: null };
 
 // Suavizado con ataque rapido y caida lenta (se siente mejor que seguir la señal cruda).
 function smooth(prev: number, target: number, dt: number) {
@@ -87,6 +92,7 @@ export default function DomeSky({
   ringScale = 1,
   ringFade = [1.0, 1.6],
   starCut = 0.965,
+  renderSphere = true,
   lowQuality = false,
 }: Props) {
   // W5: carga ambas resoluciones; getShaderParams() decide cuál usar en useFrame
@@ -103,9 +109,11 @@ export default function DomeSky({
         fragmentShader: domeFrag,
         side: THREE.BackSide,
         depthWrite: false,
+        transparent: true,
         defines: lowQuality ? { LOW_QUALITY: "" } : {},
         uniforms: {
           uTime: { value: 0 },
+          uCameraPos: { value: new THREE.Vector3() },
           uBands: { value: new THREE.Vector4() },
           uMasks: { value: masks },
           uColor: { value: color },
@@ -142,6 +150,12 @@ export default function DomeSky({
 
   const tmp = useMemo(() => ({ F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), b: [0, 0, 0, 0], ge: new THREE.Vector4(), rv: new THREE.Vector4() }), []);
 
+  // AA2: exponer el material para que ExperienceDome lo aplique al mesh del domo
+  useEffect(() => {
+    DOME_SKY_MAT_EXPORT.mat = material;
+    return () => { if (DOME_SKY_MAT_EXPORT.mat === material) DOME_SKY_MAT_EXPORT.mat = null; };
+  }, [material]);
+
   useFrame((state, dt) => {
     const u = material.uniforms;
     const raw = getBands();
@@ -152,6 +166,7 @@ export default function DomeSky({
     b[3] = smooth(b[3], raw.treble, dt);
     u.uBands.value.set(b[0], b[1], b[2], b[3]);
     u.uTime.value = state.clock.elapsedTime;
+    u.uCameraPos.value.copy(state.camera.position);
 
     const { F, R, U } = tmp;
     const ce = Math.cos(portalElevation), se = Math.sin(portalElevation);
@@ -240,6 +255,8 @@ export default function DomeSky({
     }
   });
 
+  // AA2: renderSphere=false → solo actualiza uniforms; ExperienceDome aplica al mesh del domo.
+  if (!renderSphere) return null;
   // La esfera debe estar centrada en el espectador (la camara queda en el origen).
   return (
     <mesh material={material} renderOrder={-1} frustumCulled={false}>

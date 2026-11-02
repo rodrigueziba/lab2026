@@ -1,11 +1,14 @@
 // Generado desde dome.vert.glsl / dome.frag.glsl (importable sin configurar el bundler).
 export const domeVert = `// dome.vert.glsl
 // Vertex shader del domo. Se usa sobre una esfera/hemisferio con side: BackSide.
-// vDir = direccion desde el centro del domo (el espectador esta en el centro).
+// AA2: vDir = normalize(worldPos - cameraPos) — correcto tanto en esfera centrada en camara
+// como en la malla fija del domo (DOME_R+2 centrada en el origen).
 varying vec3 vDir;
+uniform vec3 uCameraPos;
 
 void main() {
-  vDir = normalize(position);
+  vec4 wp4 = modelMatrix * vec4(position, 1.0);
+  vDir = normalize(wp4.xyz - uCameraPos);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 `;
@@ -347,9 +350,8 @@ void main() {
     col = mix(col, cc, smoothstep(0.03, -0.03, sdf));
   }
 
-  // suelo oscuro bajo el horizonte (tu escena ya tiene su propio suelo, esto solo evita ver el fondo del domo)
-  col = mix(vec3(0.043, 0.039, 0.063), col, smoothstep(-0.004, 0.004, d.y));
-
-  gl_FragColor = vec4(col, 1.0);
+  // AA2: alpha=0 bajo el horizonte — el piso real del escenario es visible a traves del domo
+  float a = smoothstep(-0.015, 0.015, d.y);
+  gl_FragColor = vec4(col, a);
 }
 `;

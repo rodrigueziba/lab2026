@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
 import DomeVisualizer from "./DomeVisualizer";
+import { DOME_SKY_MAT_EXPORT } from "@/app/alight/dome/DomeSky";
 import FloorVisualizer from "./FloorVisualizer";
 import SectorAudioFX from "./SectorAudioFX";
 import HazSystem from "./HazSystem";
@@ -446,9 +447,10 @@ export default function ExperienceDome() {
     };
   }, []);
 
-  const shellRef = useRef<THREE.Mesh>(null);
+  const shellRef    = useRef<THREE.Mesh>(null);
+  const skyShellRef = useRef<THREE.Mesh>(null);
 
-  // G1: animate shell opacity in both directions; hide shell when vizHideShell debug flag set
+  // G1/AA2: animate shell opacity; sky shell uses DomeSky material when vizActive+domoShaderEnMalla
   useFrame((_, dt) => {
     if (shellRef.current) {
       shellRef.current.visible = !DBG_SILLAS.vizHideShell;
@@ -457,6 +459,14 @@ export default function ExperienceDome() {
     const cur    = DOME_SHELL_UNIFORMS.uShellOpacity.value;
     if (Math.abs(cur - target) > 0.001) {
       DOME_SHELL_UNIFORMS.uShellOpacity.value = THREE.MathUtils.lerp(cur, target, dt * 5);
+    }
+    // AA2: sky shell — aplica material de DomeSky al mismo mesh del domo
+    const skyShell = skyShellRef.current;
+    if (skyShell) {
+      const useDomeSky = vizActiveRef.current && DBG_SILLAS.domoShaderEnMalla && !DBG_SILLAS.domoOriginal;
+      const dmat = DOME_SKY_MAT_EXPORT.mat;
+      skyShell.visible = useDomeSky && dmat !== null;
+      if (dmat && skyShell.material !== dmat) skyShell.material = dmat;
     }
   });
 
@@ -493,6 +503,10 @@ export default function ExperienceDome() {
           transparent
           depthWrite={false}
         />
+      </mesh>
+      {/* AA2: sky shader mesh — misma geometría; DomeSky material aplicado imperativo en useFrame */}
+      <mesh ref={skyShellRef} renderOrder={-1} frustumCulled={false} visible={false}>
+        <sphereGeometry args={[DOME_R + 2, 48, 32, 0, Math.PI * 2, 0, Math.PI * 0.52]} />
       </mesh>
 
       {orbits.map((orb, i) => (
