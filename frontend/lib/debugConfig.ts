@@ -59,6 +59,10 @@ export const DBG_FLASH = {
   FLASH_TOPE_MS:         4000,   // tope del sostenido extendido (aviso en consola si se alcanza)
   FLASH_RM_PICO_MULT:    0.6,    // prefers-reduced-motion: pico × este valor
   FLASH_RM_SUBIDA_MS:    400,    // prefers-reduced-motion: subida mínima
+  // F2: destello diegético dentro del CRT
+  FLASH_OVERLAY_DOM:     false,  // true = overlay HTML anterior (F1) encima del canvas, sin CRT
+  FLASH_CRT_MAX:         0.97,   // tope de uFlash (deja ver 3 % de escena + todo el CRT encima)
+  FLASH_GLOW:            0.35,   // resplandor central extra del blanco (uFlashGlow)
 };
 
 export const DBG_PRISM = {

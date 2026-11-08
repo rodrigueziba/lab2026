@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import FooterWrapper from '../components/FooterWrapper';
 import PageTransitionWrapper from '../components/PageTransitionWrapper';
 import WelcomeTour from '../components/WelcomeTour';
+import HideOnAlight from '../components/HideOnAlight';
 import { Toaster } from 'sonner';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ThemeUnlockedProvider } from '@/contexts/ThemeUnlockedContext';
@@ -45,16 +46,18 @@ export default function RootLayout({
             <ScreensaverProvider>
             <Navbar />
             <ScreensaverOverlay />
-            <WelcomeTour />
+            <HideOnAlight><WelcomeTour /></HideOnAlight>
             <main className="flex-1 flex flex-col min-h-0 bg-slate-950 relative">
               <ThemeUnlockedContent>
                 <PageTransitionWrapper>{children}</PageTransitionWrapper>
               </ThemeUnlockedContent>
               <Toaster position="bottom-right" richColors />
             </main>
-            <div className="relative z-20 shrink-0">
-              <FooterWrapper />
-            </div>
+            <HideOnAlight>
+              <div className="relative z-20 shrink-0">
+                <FooterWrapper />
+              </div>
+            </HideOnAlight>
             </ScreensaverProvider>
             </PrestadorVisitProvider>
           </ThemeUnlockedProvider>

@@ -318,12 +318,13 @@ export default function DebugMenu() {
 
   // F1: destello del telón — constantes + estado en vivo (poll 10fps solo con el menú abierto)
   const [flash, setFlash] = useState({ ...DBG_FLASH });
-  const [flashLive, setFlashLive] = useState({ fase: FLASH_STATE.fase, luz: 0, visible: false });
+  const [flashLive, setFlashLive] = useState({ fase: FLASH_STATE.fase, luz: 0, visible: false, uFlash: 0 });
   useEffect(() => {
     if (!visible) return;
     const id = setInterval(() => setFlashLive({
       fase: FLASH_STATE.fase, luz: FLASH_STATE.luzTelon,
       visible: FLASH_STATE.telonMontado && FLASH_STATE.telonVisible,
+      uFlash: CRT_UNIFORMS.uFlash.value, // F2
     }), 100);
     return () => clearInterval(id);
   }, [visible]);
@@ -944,8 +945,20 @@ export default function DebugMenu() {
           <NumField label="FLASH_RM_SUBIDA_MS" value={flash.FLASH_RM_SUBIDA_MS} step={50} min={0} max={2000} note="reduced-motion"
             onChange={v => { DBG_FLASH.FLASH_RM_SUBIDA_MS = v; setFlash(f => ({ ...f, FLASH_RM_SUBIDA_MS: v })); }} />
           <div style={ROW}>
-            <span>estado <span style={NOTE}>{flashLive.fase} · luz {flashLive.luz.toFixed(1)} · telón {flashLive.visible ? "visible" : "oculto"}</span></span>
+            <span>estado <span style={NOTE}>{flashLive.fase} · luz {flashLive.luz.toFixed(1)} · telón {flashLive.visible ? "visible" : "oculto"} · uFlash {flashLive.uFlash.toFixed(3)}</span></span>
           </div>
+          <div style={ROW}>
+            <span>FLASH_OVERLAY_DOM <span style={NOTE}>F2 on=overlay HTML sin CRT</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !flash.FLASH_OVERLAY_DOM;
+              DBG_FLASH.FLASH_OVERLAY_DOM = v;
+              setFlash(f => ({ ...f, FLASH_OVERLAY_DOM: v }));
+            }}>{flash.FLASH_OVERLAY_DOM ? "ON" : "off"}</button>
+          </div>
+          <NumField label="FLASH_CRT_MAX" value={flash.FLASH_CRT_MAX} step={0.01} min={0} max={1} note="F2 tope uFlash"
+            onChange={v => { DBG_FLASH.FLASH_CRT_MAX = v; setFlash(f => ({ ...f, FLASH_CRT_MAX: v })); }} />
+          <NumField label="FLASH_GLOW" value={flash.FLASH_GLOW} step={0.05} min={0} max={2} note="F2 núcleo"
+            onChange={v => { DBG_FLASH.FLASH_GLOW = v; setFlash(f => ({ ...f, FLASH_GLOW: v })); }} />
           <div style={ROW}>
             <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
               onClick={() => window.dispatchEvent(new CustomEvent("alight:debug-curtain-flash"))}>

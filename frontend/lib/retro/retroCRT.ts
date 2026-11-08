@@ -18,6 +18,10 @@ export const RetroCRTShader = {
     uTint:      { value: new THREE.Color(1.0, 0.96, 0.88) }, // creamy whites
     uLift:      { value: 0.015 },   // raised blacks
     uComfort:   { value: 0 },       // 1 = comfort mode (kill wobble + CA)
+    // F2: destello de cortina diegético — se mezcla ANTES de scanlines/grano/viñeta
+    uFlash:      { value: 0 },                             // 0–1 (escrito por RetroPostFX desde FLASH_STATE)
+    uFlashColor: { value: new THREE.Color("#FFF3DC") },    // blanco cálido (lineal, ColorManagement)
+    uFlashGlow:  { value: 0.35 },                          // resplandor extra en el centro
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -32,6 +36,8 @@ export const RetroCRTShader = {
     uniform float uTime, uCurve, uScan, uScanCount, uCA, uGrain, uVig, uWobble, uLift;
     uniform float uComfort;
     uniform vec3  uTint;
+    uniform float uFlash, uFlashGlow;
+    uniform vec3  uFlashColor;
     varying vec2  vUv;
 
     float hash(vec2 p) {
@@ -63,6 +69,14 @@ export const RetroCRTShader = {
       col.r = texture2D(tDiffuse, uv + d * effCA * 2.0).r;
       col.g = texture2D(tDiffuse, uv).g;
       col.b = texture2D(tDiffuse, uv - d * effCA * 2.0).b;
+
+      // F2: destello de cortina — blanco cálido + núcleo radial, antes del resto del CRT.
+      // uFlash = 0 → rama no tomada, imagen idéntica a la anterior.
+      if (uFlash > 0.0) {
+        float r = length(d);
+        vec3 flashCol = uFlashColor * (1.0 + uFlashGlow * (1.0 - smoothstep(0.0, 0.7, r)));
+        col = mix(col, flashCol, uFlash);
+      }
 
       // Scanlines
       float s = 0.5 - 0.5 * cos(uv.y * uScanCount * 6.28318);

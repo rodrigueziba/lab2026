@@ -62,6 +62,9 @@ export default function RetroPostFX() {
         uTint:      CRT_UNIFORMS.uTint,
         uLift:      CRT_UNIFORMS.uLift,
         uComfort:   CRT_UNIFORMS.uComfort,
+        uFlash:      CRT_UNIFORMS.uFlash,      // F2
+        uFlashColor: CRT_UNIFORMS.uFlashColor, // F2
+        uFlashGlow:  CRT_UNIFORMS.uFlashGlow,  // F2
       },
       vertexShader:   RetroCRTShader.vertexShader,
       fragmentShader: RetroCRTShader.fragmentShader,
@@ -120,6 +123,9 @@ export default function RetroPostFX() {
     CRT_UNIFORMS.uComfort.value = RETRO_FLAGS.comfortMode ? 1 : 0;
     // F1: boost temporal de exposición + bloom durante el destello del telón (b=0 → valores normales)
     const b = flashBoost();
+    // F2: destello diegético dentro del CRT (tope < 1 para que se vea grano/scanlines sobre el blanco)
+    CRT_UNIFORMS.uFlash.value     = DBG_FLASH.FLASH_OVERLAY_DOM ? 0 : Math.min(b, DBG_FLASH.FLASH_CRT_MAX);
+    CRT_UNIFORMS.uFlashGlow.value = DBG_FLASH.FLASH_GLOW;
     renderer.toneMappingExposure = DBG_RETRO_FX.toneExposure * (1 + (DBG_FLASH.FLASH_EXPOSICION_MULT - 1) * b);
     if (bloomRef.current) {
       bloomRef.current.threshold = DBG_RETRO_FX.bloomThreshold;

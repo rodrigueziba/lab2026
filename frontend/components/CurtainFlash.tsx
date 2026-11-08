@@ -7,6 +7,8 @@
 
 import { useEffect, useRef } from "react";
 import { FLASH_STATE, triggerCurtainFlash, tickCurtainFlash } from "@/lib/curtainFlash";
+import { DBG_FLASH } from "@/lib/debugConfig";
+import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 
 export default function CurtainFlash() {
   const divRef = useRef<HTMLDivElement>(null);
@@ -18,7 +20,10 @@ export default function CurtainFlash() {
       tickCurtainFlash(performance.now());
       const el = divRef.current;
       if (el) {
-        const on = FLASH_STATE.fase !== "inactivo";
+        // F2: por defecto el blanco va dentro del CRT (RetroPostFX → uFlash); el overlay DOM
+        // solo con FLASH_OVERLAY_DOM o si el postproceso retro está apagado (fallback).
+        const dom = DBG_FLASH.FLASH_OVERLAY_DOM || !RETRO_FLAGS.enabled;
+        const on = dom && FLASH_STATE.fase !== "inactivo";
         el.style.display = on ? "block" : "none";
         el.style.opacity = on ? FLASH_STATE.opacidad.toFixed(4) : "0";
       }
