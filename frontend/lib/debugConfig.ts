@@ -50,8 +50,8 @@ export const DBG_RETRO_FX = {
 export const DBG_FLASH = {
   FLASH_ACTIVO:          true,   // false = sin destello; el telón vuelve al fade original de 1,2 s
   FLASH_SUBIDA_MS:       150,    // subida a blanco total
-  FLASH_SOSTENIDO_MS:    1800,   // F3 (era 850) sostenido mínimo en blanco total (se extiende si el telón no está apagado)
-  FLASH_BAJADA_MS:       2000,   // F3 (era 1000) bajada ease-out hasta ver la escena
+  FLASH_SOSTENIDO_MS:    2000,   // G1 (era 1800) sostenido mínimo en blanco total (se extiende si el telón no está apagado)
+  FLASH_BAJADA_MS:       450,    // G1 (era 2000) bajada exponencial hasta ver la escena
   FLASH_PICO:            1.0,    // opacidad máxima del overlay (0–1)
   FLASH_BLOOM_MULT:      5.0,    // F3 (era 3) — bloom en el pico = bloomIntensity × este valor
   FLASH_EXPOSICION_MULT: 3.0,    // F3 (era 2) — exposición en el pico = toneExposure × este valor
@@ -67,6 +67,15 @@ export const DBG_FLASH = {
   FLASH_SCAN_MAX:        0.06,   // scanlines restan como máximo esto en el pico (normal uScan 0.18)
   FLASH_VIG_ATEN:        0.6,    // la viñeta se atenúa este porcentaje en el pico
   FLASH_TOPE_LUM:        1.0,    // tope de luminancia del CRT en el pico (normal 0.92)
+  // G1: caída exponencial + glare residual
+  FLASH_BAJADA_EXP_K:    5.0,    // curvatura de la caída exponencial (0 = lineal)
+  FLASH_GLARE_INICIO:    0.35,   // uGlare al terminar la caída
+  FLASH_GLARE_MS:        2500,   // duración del glare hasta 0
+  FLASH_GLARE_EXP_K:     4.0,    // curvatura del decaimiento del glare
+  FLASH_GLARE_BLOOM:     0.6,    // bloom/exposición al empezar el glare = este % del boost de pico
+  FLASH_GLARE_ABERRACION: 0.003, // aberración cromática extra con uGlare=1 (base uCA 0.0012)
+  FLASH_RM_BAJADA_MS:    900,    // prefers-reduced-motion: caída mínima
+  FLASH_RM_GLARE_MULT:   0.5,    // prefers-reduced-motion: glare inicio × este valor
 };
 
 // ── P1: paneles orbitantes del camino SILLAS (ExperienceDome) — live ───────────

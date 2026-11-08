@@ -26,6 +26,9 @@ export const RetroCRTShader = {
     uFlashScanMax: { value: 0.06 },  // scanlines restan como máximo esto con uFlash=1
     uFlashVigAten: { value: 0.6 },   // atenuación de la viñeta con uFlash=1
     uFlashCapMax:  { value: 1.0 },   // tope de luminancia con uFlash=1 (normal 0.92)
+    // G1: glare residual tras el destello (uGlare=0 → imagen idéntica)
+    uGlare:        { value: 0 },     // 0–1, velo aditivo de blanco cálido con núcleo central
+    uGlareCA:      { value: 0.003 }, // aberración cromática extra con uGlare=1
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -42,6 +45,7 @@ export const RetroCRTShader = {
     uniform vec3  uTint;
     uniform float uFlash, uFlashGlow;
     uniform float uFlashScanMax, uFlashVigAten, uFlashCapMax;
+    uniform float uGlare, uGlareCA;
     uniform vec3  uFlashColor;
     varying vec2  vUv;
 
@@ -69,7 +73,8 @@ export const RetroCRTShader = {
 
       // Chromatic aberration (comfort mode: disabled)
       vec2  d   = uv - 0.5;
-      float effCA = uCA * (1.0 - uComfort);
+      // G1: + aberración extra que decae con el glare (comfort mode: desactivada)
+      float effCA = (uCA + uGlareCA * uGlare) * (1.0 - uComfort);
       vec3 col;
       col.r = texture2D(tDiffuse, uv + d * effCA * 2.0).r;
       col.g = texture2D(tDiffuse, uv).g;
@@ -81,6 +86,12 @@ export const RetroCRTShader = {
         float r = length(d);
         vec3 flashCol = uFlashColor * (1.0 + uFlashGlow * (1.0 - smoothstep(0.0, 0.7, r)));
         col = mix(col, flashCol, uFlash);
+      }
+      // G1: glare residual — velo ADITIVO (nunca oscurece), más fuerte en el centro
+      if (uGlare > 0.0) {
+        float rg = length(d);
+        float w  = mix(0.30, 1.0, 1.0 - smoothstep(0.0, 0.75, rg));
+        col += uFlashColor * (uGlare * w);
       }
 
       // Scanlines

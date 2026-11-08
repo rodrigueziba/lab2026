@@ -12,7 +12,7 @@ import { ShaderPass }      from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass }      from "three/addons/postprocessing/OutputPass.js";
 import { RetroCRTShader, CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { DBG_RETRO_FX, DBG_FLASH } from "@/lib/debugConfig";
-import { flashBoost } from "@/lib/curtainFlash";
+import { flashBoost, FLASH_STATE } from "@/lib/curtainFlash";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 
 const QUALITY_BLOOM_SCALE: Record<string, number> = {
@@ -68,6 +68,8 @@ export default function RetroPostFX() {
         uFlashScanMax: CRT_UNIFORMS.uFlashScanMax, // F3
         uFlashVigAten: CRT_UNIFORMS.uFlashVigAten, // F3
         uFlashCapMax:  CRT_UNIFORMS.uFlashCapMax,  // F3
+        uGlare:        CRT_UNIFORMS.uGlare,        // G1
+        uGlareCA:      CRT_UNIFORMS.uGlareCA,      // G1
       },
       vertexShader:   RetroCRTShader.vertexShader,
       fragmentShader: RetroCRTShader.fragmentShader,
@@ -127,7 +129,11 @@ export default function RetroPostFX() {
     // F1: boost temporal de exposición + bloom durante el destello del telón (b=0 → valores normales)
     const b = flashBoost();
     // F2: destello diegético dentro del CRT (tope < 1 para que se vea grano/scanlines sobre el blanco)
-    CRT_UNIFORMS.uFlash.value     = DBG_FLASH.FLASH_OVERLAY_DOM ? 0 : Math.min(b, DBG_FLASH.FLASH_CRT_MAX);
+    // G1: uFlash sale de la opacidad (el boost de bloom/exposición ya no es igual a ella)
+    const op = FLASH_STATE.fase === "inactivo" ? 0 : FLASH_STATE.opacidad;
+    CRT_UNIFORMS.uFlash.value     = DBG_FLASH.FLASH_OVERLAY_DOM ? 0 : Math.min(op, DBG_FLASH.FLASH_CRT_MAX);
+    CRT_UNIFORMS.uGlare.value     = DBG_FLASH.FLASH_OVERLAY_DOM ? 0 : FLASH_STATE.glare; // G1
+    CRT_UNIFORMS.uGlareCA.value   = DBG_FLASH.FLASH_GLARE_ABERRACION;                   // G1
     CRT_UNIFORMS.uFlashGlow.value = DBG_FLASH.FLASH_GLOW;
     CRT_UNIFORMS.uFlashScanMax.value = DBG_FLASH.FLASH_SCAN_MAX;  // F3
     CRT_UNIFORMS.uFlashVigAten.value = DBG_FLASH.FLASH_VIG_ATEN;  // F3

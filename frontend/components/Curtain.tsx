@@ -409,7 +409,7 @@ export default function Curtain() {
     // F1: detrás del blanco total → ocultar tela; con luz en 0 exacto → pedir desmontaje
     // ('alight:curtain-done'), así la recompilación por cambio de luces cae en el blanco.
     if (sim.flashDriven) {
-      if (meshRef.current.visible && (FLASH_STATE.fase === "sostenido" || FLASH_STATE.fase === "bajada" || FLASH_STATE.fase === "inactivo")) {
+      if (meshRef.current.visible && FLASH_STATE.fase !== "subida") {
         meshRef.current.visible = false;
       }
       if (!sim.doneSent && !meshRef.current.visible && FLASH_STATE.luzTelon === 0) {

@@ -319,7 +319,7 @@ export default function DebugMenu() {
 
   // F1: destello del telón — constantes + estado en vivo (poll 10fps solo con el menú abierto)
   const [flash, setFlash] = useState({ ...DBG_FLASH });
-  const [flashLive, setFlashLive] = useState({ fase: FLASH_STATE.fase, luz: 0, visible: false, uFlash: 0, lum: 0 });
+  const [flashLive, setFlashLive] = useState({ fase: FLASH_STATE.fase as string, luz: 0, visible: false, uFlash: 0, uGlare: 0, lum: 0 });
   // P1: paneles SILLAS — constantes + estado en vivo (mismo poll)
   const [paneles, setPaneles] = useState({ ...DBG_PANELES, forzado: false });
   const [panelesFase, setPanelesFase] = useState(PANELES_SILLAS.fase as string);
@@ -329,9 +329,10 @@ export default function DebugMenu() {
       fase: FLASH_STATE.fase, luz: FLASH_STATE.luzTelon,
       visible: FLASH_STATE.telonMontado && FLASH_STATE.telonVisible,
       uFlash: CRT_UNIFORMS.uFlash.value, // F2
+      uGlare: CRT_UNIFORMS.uGlare.value, // G1
       // F3: luminancia final estimada en el centro en el pico (fórmula CRT + ACES + sRGB)
       lum: estimarLuminanciaPico(CRT_UNIFORMS.uFlashColor.value, CRT_UNIFORMS.uTint.value,
-        CRT_UNIFORMS.uScan.value, CRT_UNIFORMS.uLift.value, DBG_RETRO_FX.toneExposure),
+        CRT_UNIFORMS.uScan.value, CRT_UNIFORMS.uLift.value, DBG_RETRO_FX.toneExposure, CRT_UNIFORMS.uGrain.value),
     }), 100);
     const idP = setInterval(() => setPanelesFase(PANELES_SILLAS.fase), 100); // P1
     return () => { clearInterval(id); clearInterval(idP); };
@@ -979,7 +980,7 @@ export default function DebugMenu() {
           <NumField label="FLASH_RM_SUBIDA_MS" value={flash.FLASH_RM_SUBIDA_MS} step={50} min={0} max={2000} note="reduced-motion"
             onChange={v => { DBG_FLASH.FLASH_RM_SUBIDA_MS = v; setFlash(f => ({ ...f, FLASH_RM_SUBIDA_MS: v })); }} />
           <div style={ROW}>
-            <span>estado <span style={NOTE}>{flashLive.fase} · luz {flashLive.luz.toFixed(1)} · telón {flashLive.visible ? "visible" : "oculto"} · uFlash {flashLive.uFlash.toFixed(3)}</span></span>
+            <span>estado <span style={NOTE}>{flashLive.fase} · luz {flashLive.luz.toFixed(1)} · telón {flashLive.visible ? "visible" : "oculto"} · uFlash {flashLive.uFlash.toFixed(3)} · uGlare {flashLive.uGlare.toFixed(3)}</span></span>
           </div>
           <div style={ROW}>
             <span>FLASH_OVERLAY_DOM <span style={NOTE}>F2 on=overlay HTML sin CRT</span></span>
@@ -993,6 +994,22 @@ export default function DebugMenu() {
             onChange={v => { DBG_FLASH.FLASH_CRT_MAX = v; setFlash(f => ({ ...f, FLASH_CRT_MAX: v })); }} />
           <NumField label="FLASH_GLOW" value={flash.FLASH_GLOW} step={0.05} min={0} max={2} note="F2 núcleo"
             onChange={v => { DBG_FLASH.FLASH_GLOW = v; setFlash(f => ({ ...f, FLASH_GLOW: v })); }} />
+          <NumField label="FLASH_BAJADA_EXP_K" value={flash.FLASH_BAJADA_EXP_K} step={0.5} min={0} max={12} note="G1 curva caída"
+            onChange={v => { DBG_FLASH.FLASH_BAJADA_EXP_K = v; setFlash(f => ({ ...f, FLASH_BAJADA_EXP_K: v })); }} />
+          <NumField label="FLASH_GLARE_INICIO" value={flash.FLASH_GLARE_INICIO} step={0.05} min={0} max={1} note="G1"
+            onChange={v => { DBG_FLASH.FLASH_GLARE_INICIO = v; setFlash(f => ({ ...f, FLASH_GLARE_INICIO: v })); }} />
+          <NumField label="FLASH_GLARE_MS" value={flash.FLASH_GLARE_MS} step={100} min={0} max={10000} note="G1"
+            onChange={v => { DBG_FLASH.FLASH_GLARE_MS = v; setFlash(f => ({ ...f, FLASH_GLARE_MS: v })); }} />
+          <NumField label="FLASH_GLARE_EXP_K" value={flash.FLASH_GLARE_EXP_K} step={0.5} min={0} max={12} note="G1 curva glare"
+            onChange={v => { DBG_FLASH.FLASH_GLARE_EXP_K = v; setFlash(f => ({ ...f, FLASH_GLARE_EXP_K: v })); }} />
+          <NumField label="FLASH_GLARE_BLOOM" value={flash.FLASH_GLARE_BLOOM} step={0.05} min={0} max={1} note="G1 % del pico"
+            onChange={v => { DBG_FLASH.FLASH_GLARE_BLOOM = v; setFlash(f => ({ ...f, FLASH_GLARE_BLOOM: v })); }} />
+          <NumField label="FLASH_GLARE_ABERRACION" value={flash.FLASH_GLARE_ABERRACION} step={0.0005} min={0} max={0.02} note="G1 CA extra"
+            onChange={v => { DBG_FLASH.FLASH_GLARE_ABERRACION = v; setFlash(f => ({ ...f, FLASH_GLARE_ABERRACION: v })); }} />
+          <NumField label="FLASH_RM_BAJADA_MS" value={flash.FLASH_RM_BAJADA_MS} step={50} min={0} max={3000} note="reduced-motion"
+            onChange={v => { DBG_FLASH.FLASH_RM_BAJADA_MS = v; setFlash(f => ({ ...f, FLASH_RM_BAJADA_MS: v })); }} />
+          <NumField label="FLASH_RM_GLARE_MULT" value={flash.FLASH_RM_GLARE_MULT} step={0.05} min={0} max={1} note="reduced-motion"
+            onChange={v => { DBG_FLASH.FLASH_RM_GLARE_MULT = v; setFlash(f => ({ ...f, FLASH_RM_GLARE_MULT: v })); }} />
           <NumField label="FLASH_SCAN_MAX" value={flash.FLASH_SCAN_MAX} step={0.01} min={0} max={0.5} note="F3 scan pico"
             onChange={v => { DBG_FLASH.FLASH_SCAN_MAX = v; setFlash(f => ({ ...f, FLASH_SCAN_MAX: v })); }} />
           <NumField label="FLASH_VIG_ATEN" value={flash.FLASH_VIG_ATEN} step={0.05} min={0} max={1} note="F3 viñeta"
@@ -1000,7 +1017,7 @@ export default function DebugMenu() {
           <NumField label="FLASH_TOPE_LUM" value={flash.FLASH_TOPE_LUM} step={0.01} min={0.92} max={1.5} note="F3 tope lum."
             onChange={v => { DBG_FLASH.FLASH_TOPE_LUM = v; setFlash(f => ({ ...f, FLASH_TOPE_LUM: v })); }} />
           <div style={ROW}>
-            <span>luminancia pico estimada <span style={NOTE}>{flashLive.lum.toFixed(3)} {flashLive.lum > 0.95 ? "✓ > 0,95" : "✗ ≤ 0,95"}</span></span>
+            <span>luminancia pico estimada <span style={NOTE}>(valle scanline + grano) {flashLive.lum.toFixed(3)} {flashLive.lum > 0.95 ? "✓ > 0,95" : "✗ ≤ 0,95"}</span></span>
           </div>
           <div style={ROW}>
             <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}

@@ -5,7 +5,7 @@
 
 import { DBG_FLASH } from "@/lib/debugConfig";
 
-export type FlashFase = "inactivo" | "subida" | "sostenido" | "bajada";
+export type FlashFase = "inactivo" | "subida" | "sostenido" | "bajada" | "glare"; // G1: + glare residual
 
 export const FLASH_STATE = {
   fase:          "inactivo" as FlashFase,
@@ -15,6 +15,12 @@ export const FLASH_STATE = {
   tBajada:       0,      // performance.now() en que empezó la bajada
   pico:          1,      // pico efectivo (reduced-motion aplicado)
   subidaMs:      150,    // subida efectiva (reduced-motion aplicado)
+  bajadaMs:      450,    // G1: bajada efectiva (reduced-motion aplicado)
+  // G1: glare residual + boost de postproceso desacoplado de la opacidad
+  glare:         0,      // uGlare actual (0–1)
+  glareInicio:   0.35,   // uGlare al terminar la bajada (reduced-motion aplicado)
+  tGlare:        0,      // performance.now() en que empezó el glare
+  boost:         0,      // factor 0–1 (× pico) para bloom/exposición
   disparado:     false,  // ya se disparó por la cortina en esta sesión
   esperaTelon:   false,  // true = la bajada espera a que el telón esté apagado y oculto
   // Reportado por Curtain cada frame (y en su cleanup)
@@ -36,6 +42,11 @@ export function triggerCurtainFlash(origen: "cortina" | "debug"): boolean {
   try { reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* sin matchMedia */ }
   FLASH_STATE.pico     = Math.max(0, Math.min(1, DBG_FLASH.FLASH_PICO)) * (reduce ? DBG_FLASH.FLASH_RM_PICO_MULT : 1);
   FLASH_STATE.subidaMs = reduce ? Math.max(DBG_FLASH.FLASH_SUBIDA_MS, DBG_FLASH.FLASH_RM_SUBIDA_MS) : DBG_FLASH.FLASH_SUBIDA_MS;
+  // G1: reduced-motion → caída más lenta y glare a la mitad
+  FLASH_STATE.bajadaMs    = reduce ? Math.max(DBG_FLASH.FLASH_BAJADA_MS, DBG_FLASH.FLASH_RM_BAJADA_MS) : DBG_FLASH.FLASH_BAJADA_MS;
+  FLASH_STATE.glareInicio = Math.max(0, Math.min(1, DBG_FLASH.FLASH_GLARE_INICIO)) * (reduce ? DBG_FLASH.FLASH_RM_GLARE_MULT : 1);
+  FLASH_STATE.glare       = 0;
+  FLASH_STATE.tGlare      = 0;
   FLASH_STATE.t0          = performance.now();
   FLASH_STATE.tBajada     = 0;
   FLASH_STATE.esperaTelon = origen === "cortina";
@@ -85,18 +96,53 @@ export function tickCurtainFlash(now: number): void {
   }
 
   if (s.fase === "bajada") {
-    const d = DBG_FLASH.FLASH_BAJADA_MS;
+    const d = s.bajadaMs;
     const k = d > 0 ? Math.min(1, (now - s.tBajada) / d) : 1;
-    // ease-out cúbica: cae rápido al principio y se asienta suave
-    s.valor = Math.pow(1 - k, 3);
+    // G1: exponencial normalizada — cae fuerte al principio, se asienta rápido, 0 exacto en k=1
+    s.valor = expDecay(k, DBG_FLASH.FLASH_BAJADA_EXP_K);
+    // G1: el glare entra mientras cae el blanco (sin escalón al terminar la bajada)
+    s.glare = s.glareInicio * (1 - s.valor);
     if (k >= 1) {
-      s.valor = 0;
+      s.valor  = 0;
+      s.glare  = s.glareInicio;
+      s.fase   = s.glareInicio > 0 && DBG_FLASH.FLASH_GLARE_MS > 0 ? "glare" : "inactivo";
+      s.tGlare = now;
+      if (s.fase === "inactivo") { s.glare = 0; s.esperaTelon = false; }
+    }
+  }
+
+  if (s.fase === "glare") {
+    const d = DBG_FLASH.FLASH_GLARE_MS;
+    const k = d > 0 ? Math.min(1, (now - s.tGlare) / d) : 1;
+    s.glare = s.glareInicio * expDecay(k, DBG_FLASH.FLASH_GLARE_EXP_K);
+    if (k >= 1) {
+      s.glare = 0;
       s.fase = "inactivo";
       s.esperaTelon = false;
     }
   }
 
   s.opacidad = s.valor * s.pico;
+
+  // G1: boost de bloom/exposición: pico plano en subida/sostenido, baja hasta
+  // FLASH_GLARE_BLOOM durante la caída y de ahí a 0 con el mismo decaimiento del glare.
+  const gb = DBG_FLASH.FLASH_GLARE_BLOOM;
+  if (s.fase === "subida" || s.fase === "sostenido") s.boost = s.valor * s.pico;
+  else if (s.fase === "bajada") {
+    // sin glare (inicio 0 o duración 0) → baja directo a 0, sin salto al terminar
+    const conGlare = s.glareInicio > 0 && DBG_FLASH.FLASH_GLARE_MS > 0;
+    s.boost = s.pico * (conGlare ? gb + (1 - gb) * s.valor : s.valor);
+  }
+  else if (s.fase === "glare")  s.boost = s.pico * gb * (s.glareInicio > 0 ? s.glare / s.glareInicio : 0);
+  else                          s.boost = 0;
+  if (s.fase === "inactivo") { s.opacidad = 0; s.glare = 0; }
+}
+
+/** G1: decaimiento exponencial normalizado: 1 en t=0, 0 exacto en t=1. */
+function expDecay(t: number, k: number): number {
+  if (k <= 0.0001) return 1 - t;
+  const e = Math.exp(-k);
+  return (Math.exp(-k * t) - e) / (1 - e);
 }
 
 // ── F3: luminancia final estimada en el centro de la pantalla en el pico ──────
@@ -116,7 +162,7 @@ function lin2srgb(c: number): number {
 export function estimarLuminanciaPico(
   flashColor: { r: number; g: number; b: number },
   tint: { r: number; g: number; b: number },
-  uScan: number, uLift: number, toneExposure: number,
+  uScan: number, uLift: number, toneExposure: number, uGrain = 0,
 ): number {
   let reduce = false;
   try { reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* ok */ }
@@ -124,9 +170,10 @@ export function estimarLuminanciaPico(
   const f    = Math.min(pico, DBG_FLASH.FLASH_CRT_MAX);              // uFlash en el pico
   const glow = 1 + DBG_FLASH.FLASH_GLOW;                             // r = 0
   const effScan = uScan + (Math.min(uScan, DBG_FLASH.FLASH_SCAN_MAX) - uScan) * f;
-  const scanK   = 1 - effScan * 0.5;                                 // scanline media
+  const scanK   = 1 - effScan;                                       // G1: valle de la scanline (peor caso)
   const cap     = 0.92 + (DBG_FLASH.FLASH_TOPE_LUM - 0.92) * f;
-  const crt = (c: number, t: number) => Math.min((f * c * glow * scanK) * t + uLift, cap);
+  // G1: peor caso también para el grano (−uGrain/2)
+  const crt = (c: number, t: number) => Math.min((f * c * glow * scanK - uGrain * 0.5) * t + uLift, cap);
   const k = toneExposure * (1 + (DBG_FLASH.FLASH_EXPOSICION_MULT - 1) * pico) / 0.6;
   const r = crt(flashColor.r, tint.r) * k, g = crt(flashColor.g, tint.g) * k, b = crt(flashColor.b, tint.b) * k;
   // ACESInputMat (columnas) · v
@@ -141,7 +188,7 @@ export function estimarLuminanciaPico(
   return 0.2126 * lin2srgb(or) + 0.7152 * lin2srgb(og) + 0.0722 * lin2srgb(ob);
 }
 
-/** F1: factor 0–1 para el boost de postproceso (proporcional al pico efectivo). */
+/** F1/G1: factor 0–1 para el boost de postproceso (proporcional al pico efectivo). */
 export function flashBoost(): number {
-  return FLASH_STATE.fase === "inactivo" ? 0 : FLASH_STATE.opacidad;
+  return FLASH_STATE.fase === "inactivo" ? 0 : FLASH_STATE.boost;
 }
