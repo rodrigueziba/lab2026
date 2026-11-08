@@ -46,6 +46,21 @@ export const DBG_RETRO_FX = {
   hazStripeBoost:   2.5,     // brightness multiplier vs cone base
 };
 
+// ── F1: destello enceguecedor al atravesar el telón (CurtainFlash) — todo live ─
+export const DBG_FLASH = {
+  FLASH_ACTIVO:          true,   // false = sin destello; el telón vuelve al fade original de 1,2 s
+  FLASH_SUBIDA_MS:       150,    // subida a blanco total
+  FLASH_SOSTENIDO_MS:    850,    // sostenido mínimo en blanco total (se extiende si el telón no está apagado)
+  FLASH_BAJADA_MS:       1000,   // bajada ease-out hasta ver la escena
+  FLASH_PICO:            1.0,    // opacidad máxima del overlay (0–1)
+  FLASH_BLOOM_MULT:      3.0,    // bloom en el pico = bloomIntensity × este valor
+  FLASH_EXPOSICION_MULT: 2.0,    // exposición en el pico = toneExposure × este valor
+  FLASH_LUZ_FADE_MS:     600,    // la luz del telón baja a 0 en este tiempo desde el disparo
+  FLASH_TOPE_MS:         4000,   // tope del sostenido extendido (aviso en consola si se alcanza)
+  FLASH_RM_PICO_MULT:    0.6,    // prefers-reduced-motion: pico × este valor
+  FLASH_RM_SUBIDA_MS:    400,    // prefers-reduced-motion: subida mínima
+};
+
 export const DBG_PRISM = {
   landOffset:  0.09, // C3 hover gap (read-only, changes require code edit + reload)
   // S1

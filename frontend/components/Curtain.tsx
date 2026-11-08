@@ -8,7 +8,8 @@
 import { useRef, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_FLASH } from "@/lib/debugConfig";
+import { FLASH_STATE, flashDrivesCurtain } from "@/lib/curtainFlash";
 
 // ── Grid dimensions ───────────────────────────────────────────────────────────
 const COLS = 48;
@@ -54,6 +55,9 @@ type SimData = {
   fadingOut:  boolean;
   fadeStart:  number;
   opacity:    number;
+  // F1: el destello controla la luz y la visibilidad tras el cruce
+  flashDriven: boolean;
+  doneSent:    boolean;
 };
 
 function buildSim(
@@ -136,6 +140,7 @@ function buildSim(
     fwdX, fwdZ, centerX, centerZ,
     curtainPlaneD: centerX * fwdX + centerZ * fwdZ,
     passed: false, fadingOut: false, fadeStart: 0, opacity: 1,
+    flashDriven: false, doneSent: false,
   };
 }
 
@@ -326,6 +331,9 @@ export default function Curtain() {
 
     simRef.current = s;
     geoRef.current = g;
+    // F1: reportar estado del telón al destello / DebugMenu
+    FLASH_STATE.telonMontado = true;
+    FLASH_STATE.telonVisible = true;
     if (meshRef.current) meshRef.current.geometry = g;
 
     // SpotLight: on player's side of curtain (-fwd), 9 m high, target at curtain center 4 m up
@@ -344,6 +352,10 @@ export default function Curtain() {
       simRef.current = null;
       geoRef.current = null;
       scene.remove(target);
+      // F1: al desmontar, la spotLight sale de la escena
+      FLASH_STATE.telonMontado = false;
+      FLASH_STATE.telonVisible = false;
+      FLASH_STATE.luzTelon     = 0;
     };
   }, [scene, camera]); // stable in R3F — runs once on mount
 
@@ -359,15 +371,28 @@ export default function Curtain() {
     const camX = camera.position.x;
     const camZ = camera.position.z;
 
-    stepSim(sim, cl.elapsedTime, camX, camZ);
-    recomputeNormals(sim);
-    sim.posAttr!.needsUpdate  = true;
-    sim.normAttr!.needsUpdate = true;
+    // F1: una vez oculto por el destello no hace falta seguir simulando la tela
+    if (meshRef.current.visible) {
+      stepSim(sim, cl.elapsedTime, camX, camZ);
+      recomputeNormals(sim);
+      sim.posAttr!.needsUpdate  = true;
+      sim.normAttr!.needsUpdate = true;
+    }
 
     // Live spotlight updates (R2: global scale applied)
     if (lightRef.current) {
-      lightRef.current.intensity = DBG_SILLAS.curtainLightIntensity * DBG_SILLAS.globalLightScale;
+      const base = DBG_SILLAS.curtainLightIntensity * DBG_SILLAS.globalLightScale;
+      if (sim.flashDriven) {
+        // F1: rampa lineal a 0 en FLASH_LUZ_FADE_MS desde el disparo; 0 exacto al final.
+        // La luz queda en la escena (visible) para no cambiar la cantidad de luces.
+        const d = DBG_FLASH.FLASH_LUZ_FADE_MS;
+        const k = d > 0 ? Math.min(1, (performance.now() - FLASH_STATE.t0) / d) : 1;
+        lightRef.current.intensity = k >= 1 ? 0 : base * (1 - k);
+      } else {
+        lightRef.current.intensity = base;
+      }
       lightRef.current.color.set(DBG_SILLAS.curtainLightColor);
+      FLASH_STATE.luzTelon = lightRef.current.intensity;
     }
 
     // Crossing detection: camera has moved 0.25 m past the curtain plane
@@ -377,7 +402,22 @@ export default function Curtain() {
       sim.fadingOut = true;
       sim.fadeStart = cl.elapsedTime;
       window.dispatchEvent(new CustomEvent("alight:curtain-passed"));
+      // F1: el listener de CurtainFlash corre síncrono dentro del dispatch
+      if (flashDrivesCurtain()) { sim.flashDriven = true; sim.fadingOut = false; }
     }
+
+    // F1: detrás del blanco total → ocultar tela; con luz en 0 exacto → pedir desmontaje
+    // ('alight:curtain-done'), así la recompilación por cambio de luces cae en el blanco.
+    if (sim.flashDriven) {
+      if (meshRef.current.visible && (FLASH_STATE.fase === "sostenido" || FLASH_STATE.fase === "bajada" || FLASH_STATE.fase === "inactivo")) {
+        meshRef.current.visible = false;
+      }
+      if (!sim.doneSent && !meshRef.current.visible && FLASH_STATE.luzTelon === 0) {
+        sim.doneSent = true;
+        window.dispatchEvent(new CustomEvent("alight:curtain-done"));
+      }
+    }
+    FLASH_STATE.telonVisible = meshRef.current.visible;
 
     // Fade out after crossing
     if (sim.fadingOut) {

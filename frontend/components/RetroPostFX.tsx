@@ -11,7 +11,8 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { ShaderPass }      from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass }      from "three/addons/postprocessing/OutputPass.js";
 import { RetroCRTShader, CRT_UNIFORMS } from "@/lib/retro/retroCRT";
-import { DBG_RETRO_FX } from "@/lib/debugConfig";
+import { DBG_RETRO_FX, DBG_FLASH } from "@/lib/debugConfig";
+import { flashBoost } from "@/lib/curtainFlash";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 
 const QUALITY_BLOOM_SCALE: Record<string, number> = {
@@ -117,8 +118,13 @@ export default function RetroPostFX() {
     if (!RETRO_FLAGS.enabled) return;
     CRT_UNIFORMS.uTime.value = clock.elapsedTime;
     CRT_UNIFORMS.uComfort.value = RETRO_FLAGS.comfortMode ? 1 : 0;
-    renderer.toneMappingExposure = DBG_RETRO_FX.toneExposure;
-    if (bloomRef.current) bloomRef.current.threshold = DBG_RETRO_FX.bloomThreshold;
+    // F1: boost temporal de exposición + bloom durante el destello del telón (b=0 → valores normales)
+    const b = flashBoost();
+    renderer.toneMappingExposure = DBG_RETRO_FX.toneExposure * (1 + (DBG_FLASH.FLASH_EXPOSICION_MULT - 1) * b);
+    if (bloomRef.current) {
+      bloomRef.current.threshold = DBG_RETRO_FX.bloomThreshold;
+      bloomRef.current.strength  = DBG_RETRO_FX.bloomIntensity * (1 + (DBG_FLASH.FLASH_BLOOM_MULT - 1) * b);
+    }
 
     if (curveAnimT0.current >= 0) {
       const t = Math.min(1, (performance.now() - curveAnimT0.current) / CURVE_ANIM_MS);

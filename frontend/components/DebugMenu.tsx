@@ -23,7 +23,9 @@ import {
   DOME_METERS,
   DBG_DOME_LIVE,
   DBG_DOME_FORCE,
+  DBG_FLASH,
 } from "@/lib/debugConfig";
+import { FLASH_STATE } from "@/lib/curtainFlash";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { setVizVolume, restartVizAudio, BAND_STATE, BAND_U2_DEBUG, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
@@ -313,6 +315,18 @@ export default function DebugMenu() {
     const id = setInterval(() => setDomeX2({ ...DBG_DOME_LIVE }), 100);
     return () => clearInterval(id);
   }, [sillas.showDomeX2]);
+
+  // F1: destello del telón — constantes + estado en vivo (poll 10fps solo con el menú abierto)
+  const [flash, setFlash] = useState({ ...DBG_FLASH });
+  const [flashLive, setFlashLive] = useState({ fase: FLASH_STATE.fase, luz: 0, visible: false });
+  useEffect(() => {
+    if (!visible) return;
+    const id = setInterval(() => setFlashLive({
+      fase: FLASH_STATE.fase, luz: FLASH_STATE.luzTelon,
+      visible: FLASH_STATE.telonMontado && FLASH_STATE.telonVisible,
+    }), 100);
+    return () => clearInterval(id);
+  }, [visible]);
 
   // Z2: Meshes grandes — se pollea a 2fps solo cuando showBigMeshes está activo
   const [bigMeshList, setBigMeshList] = useState<typeof BIG_MESH_DATA>([]);
@@ -896,6 +910,46 @@ export default function DebugMenu() {
             <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
               onClick={() => window.dispatchEvent(new CustomEvent("alight:debug-reset-curtain"))}>
               Reaparecer telón
+            </button>
+          </div>
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Destello de cortina F1 <span style={NOTE}>(live)</span></span>
+          <div style={ROW}>
+            <span>FLASH_ACTIVO</span>
+            <button style={INPUT} onClick={() => {
+              const v = !flash.FLASH_ACTIVO;
+              DBG_FLASH.FLASH_ACTIVO = v;
+              setFlash(f => ({ ...f, FLASH_ACTIVO: v }));
+            }}>{flash.FLASH_ACTIVO ? "ON" : "off"}</button>
+          </div>
+          <NumField label="FLASH_SUBIDA_MS" value={flash.FLASH_SUBIDA_MS} step={10} min={0} max={2000} note="live"
+            onChange={v => { DBG_FLASH.FLASH_SUBIDA_MS = v; setFlash(f => ({ ...f, FLASH_SUBIDA_MS: v })); }} />
+          <NumField label="FLASH_SOSTENIDO_MS" value={flash.FLASH_SOSTENIDO_MS} step={50} min={0} max={4000} note="mín."
+            onChange={v => { DBG_FLASH.FLASH_SOSTENIDO_MS = v; setFlash(f => ({ ...f, FLASH_SOSTENIDO_MS: v })); }} />
+          <NumField label="FLASH_BAJADA_MS" value={flash.FLASH_BAJADA_MS} step={50} min={0} max={5000} note="ease-out"
+            onChange={v => { DBG_FLASH.FLASH_BAJADA_MS = v; setFlash(f => ({ ...f, FLASH_BAJADA_MS: v })); }} />
+          <NumField label="FLASH_PICO" value={flash.FLASH_PICO} step={0.05} min={0} max={1} note="opacidad"
+            onChange={v => { DBG_FLASH.FLASH_PICO = v; setFlash(f => ({ ...f, FLASH_PICO: v })); }} />
+          <NumField label="FLASH_BLOOM_MULT" value={flash.FLASH_BLOOM_MULT} step={0.1} min={1} max={6} note="× bloom"
+            onChange={v => { DBG_FLASH.FLASH_BLOOM_MULT = v; setFlash(f => ({ ...f, FLASH_BLOOM_MULT: v })); }} />
+          <NumField label="FLASH_EXPOSICION_MULT" value={flash.FLASH_EXPOSICION_MULT} step={0.1} min={1} max={6} note="× exposición"
+            onChange={v => { DBG_FLASH.FLASH_EXPOSICION_MULT = v; setFlash(f => ({ ...f, FLASH_EXPOSICION_MULT: v })); }} />
+          <NumField label="FLASH_LUZ_FADE_MS" value={flash.FLASH_LUZ_FADE_MS} step={50} min={0} max={4000} note="luz telón → 0"
+            onChange={v => { DBG_FLASH.FLASH_LUZ_FADE_MS = v; setFlash(f => ({ ...f, FLASH_LUZ_FADE_MS: v })); }} />
+          <NumField label="FLASH_TOPE_MS" value={flash.FLASH_TOPE_MS} step={100} min={500} max={10000} note="tope sostenido"
+            onChange={v => { DBG_FLASH.FLASH_TOPE_MS = v; setFlash(f => ({ ...f, FLASH_TOPE_MS: v })); }} />
+          <NumField label="FLASH_RM_PICO_MULT" value={flash.FLASH_RM_PICO_MULT} step={0.05} min={0} max={1} note="reduced-motion"
+            onChange={v => { DBG_FLASH.FLASH_RM_PICO_MULT = v; setFlash(f => ({ ...f, FLASH_RM_PICO_MULT: v })); }} />
+          <NumField label="FLASH_RM_SUBIDA_MS" value={flash.FLASH_RM_SUBIDA_MS} step={50} min={0} max={2000} note="reduced-motion"
+            onChange={v => { DBG_FLASH.FLASH_RM_SUBIDA_MS = v; setFlash(f => ({ ...f, FLASH_RM_SUBIDA_MS: v })); }} />
+          <div style={ROW}>
+            <span>estado <span style={NOTE}>{flashLive.fase} · luz {flashLive.luz.toFixed(1)} · telón {flashLive.visible ? "visible" : "oculto"}</span></span>
+          </div>
+          <div style={ROW}>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
+              onClick={() => window.dispatchEvent(new CustomEvent("alight:debug-curtain-flash"))}>
+              Disparar destello de cortina
             </button>
           </div>
 
