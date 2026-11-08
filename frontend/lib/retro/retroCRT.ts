@@ -22,6 +22,10 @@ export const RetroCRTShader = {
     uFlash:      { value: 0 },                             // 0–1 (escrito por RetroPostFX desde FLASH_STATE)
     uFlashColor: { value: new THREE.Color("#FFF3DC") },    // blanco cálido (lineal, ColorManagement)
     uFlashGlow:  { value: 0.35 },                          // resplandor extra en el centro
+    // F3: límites del CRT escalados con uFlash (uFlash=0 → valores originales exactos)
+    uFlashScanMax: { value: 0.06 },  // scanlines restan como máximo esto con uFlash=1
+    uFlashVigAten: { value: 0.6 },   // atenuación de la viñeta con uFlash=1
+    uFlashCapMax:  { value: 1.0 },   // tope de luminancia con uFlash=1 (normal 0.92)
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -37,6 +41,7 @@ export const RetroCRTShader = {
     uniform float uComfort;
     uniform vec3  uTint;
     uniform float uFlash, uFlashGlow;
+    uniform float uFlashScanMax, uFlashVigAten, uFlashCapMax;
     uniform vec3  uFlashColor;
     varying vec2  vUv;
 
@@ -80,18 +85,23 @@ export const RetroCRTShader = {
 
       // Scanlines
       float s = 0.5 - 0.5 * cos(uv.y * uScanCount * 6.28318);
-      col *= 1.0 - uScan * s;
+      // F3: con destello las scanlines restan como máximo uFlashScanMax
+      float effScan = mix(uScan, min(uScan, uFlashScanMax), uFlash);
+      col *= 1.0 - effScan * s;
 
       // Film grain
       col += (hash(uv * uRes + uTime) - 0.5) * uGrain;
 
       // Vignette (uses pre-barrel UV)
       vec2 vc = vUv * 2.0 - 1.0;
-      col *= 1.0 - uVig * smoothstep(0.4, 1.4, dot(vc, vc));
+      // F3: viñeta atenuada durante el destello
+      float effVig = uVig * (1.0 - uFlashVigAten * uFlash);
+      col *= 1.0 - effVig * smoothstep(0.4, 1.4, dot(vc, vc));
 
       // Creamy whites + raised blacks — cap luminance at 0.92
       col = col * uTint + uLift;
-      col = min(col, 0.92);
+      // F3: el tope sube hacia uFlashCapMax con el destello
+      col = min(col, mix(0.92, uFlashCapMax, uFlash));
 
       gl_FragColor = vec4(col, 1.0);
     }

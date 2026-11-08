@@ -24,14 +24,15 @@ import {
   DBG_DOME_LIVE,
   DBG_DOME_FORCE,
   DBG_FLASH,
+  DBG_PANELES,
 } from "@/lib/debugConfig";
-import { FLASH_STATE } from "@/lib/curtainFlash";
+import { FLASH_STATE, estimarLuminanciaPico } from "@/lib/curtainFlash";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { setVizVolume, restartVizAudio, BAND_STATE, BAND_U2_DEBUG, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
 import { setHazBandOn } from "@/lib/haz";
 import { DBG_STAR_MAT, DBG_DOME_MAT } from "./FaceDome";
-import { STORE, storeSubscribe, activateVisualizerOnce, resetVizActivated } from "@/lib/alightStore";
+import { STORE, storeSubscribe, activateVisualizerOnce, resetVizActivated, PANELES_SILLAS } from "@/lib/alightStore";
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 
@@ -318,15 +319,22 @@ export default function DebugMenu() {
 
   // F1: destello del telón — constantes + estado en vivo (poll 10fps solo con el menú abierto)
   const [flash, setFlash] = useState({ ...DBG_FLASH });
-  const [flashLive, setFlashLive] = useState({ fase: FLASH_STATE.fase, luz: 0, visible: false, uFlash: 0 });
+  const [flashLive, setFlashLive] = useState({ fase: FLASH_STATE.fase, luz: 0, visible: false, uFlash: 0, lum: 0 });
+  // P1: paneles SILLAS — constantes + estado en vivo (mismo poll)
+  const [paneles, setPaneles] = useState({ ...DBG_PANELES, forzado: false });
+  const [panelesFase, setPanelesFase] = useState(PANELES_SILLAS.fase as string);
   useEffect(() => {
     if (!visible) return;
     const id = setInterval(() => setFlashLive({
       fase: FLASH_STATE.fase, luz: FLASH_STATE.luzTelon,
       visible: FLASH_STATE.telonMontado && FLASH_STATE.telonVisible,
       uFlash: CRT_UNIFORMS.uFlash.value, // F2
+      // F3: luminancia final estimada en el centro en el pico (fórmula CRT + ACES + sRGB)
+      lum: estimarLuminanciaPico(CRT_UNIFORMS.uFlashColor.value, CRT_UNIFORMS.uTint.value,
+        CRT_UNIFORMS.uScan.value, CRT_UNIFORMS.uLift.value, DBG_RETRO_FX.toneExposure),
     }), 100);
-    return () => clearInterval(id);
+    const idP = setInterval(() => setPanelesFase(PANELES_SILLAS.fase), 100); // P1
+    return () => { clearInterval(id); clearInterval(idP); };
   }, [visible]);
 
   // Z2: Meshes grandes — se pollea a 2fps solo cuando showBigMeshes está activo
@@ -915,6 +923,32 @@ export default function DebugMenu() {
           </div>
 
           <div style={DIVIDER} />
+          <span style={LABEL}>Paneles SILLAS P1 <span style={NOTE}>(live)</span></span>
+          <div style={ROW}>
+            <span>PANELES_AUTO <span style={NOTE}>off = siempre visibles</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !paneles.PANELES_AUTO;
+              DBG_PANELES.PANELES_AUTO = v;
+              setPaneles(p => ({ ...p, PANELES_AUTO: v }));
+            }}>{paneles.PANELES_AUTO ? "ON" : "off"}</button>
+          </div>
+          <NumField label="PANELES_FADE_IN_MS" value={paneles.PANELES_FADE_IN_MS} step={50} min={0} max={5000} note="live"
+            onChange={v => { DBG_PANELES.PANELES_FADE_IN_MS = v; setPaneles(p => ({ ...p, PANELES_FADE_IN_MS: v })); }} />
+          <NumField label="PANELES_FADE_OUT_MS" value={paneles.PANELES_FADE_OUT_MS} step={50} min={0} max={5000} note="live"
+            onChange={v => { DBG_PANELES.PANELES_FADE_OUT_MS = v; setPaneles(p => ({ ...p, PANELES_FADE_OUT_MS: v })); }} />
+          <div style={ROW}>
+            <span>estado <span style={NOTE}>{panelesFase}</span></span>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
+              onClick={() => {
+                const v = !PANELES_SILLAS.forzado;
+                PANELES_SILLAS.forzado = v;
+                setPaneles(p => ({ ...p, forzado: v }));
+              }}>
+              {paneles.forzado ? "Soltar paneles SILLAS" : "Forzar paneles SILLAS"}
+            </button>
+          </div>
+
+          <div style={DIVIDER} />
           <span style={LABEL}>Destello de cortina F1 <span style={NOTE}>(live)</span></span>
           <div style={ROW}>
             <span>FLASH_ACTIVO</span>
@@ -959,6 +993,15 @@ export default function DebugMenu() {
             onChange={v => { DBG_FLASH.FLASH_CRT_MAX = v; setFlash(f => ({ ...f, FLASH_CRT_MAX: v })); }} />
           <NumField label="FLASH_GLOW" value={flash.FLASH_GLOW} step={0.05} min={0} max={2} note="F2 núcleo"
             onChange={v => { DBG_FLASH.FLASH_GLOW = v; setFlash(f => ({ ...f, FLASH_GLOW: v })); }} />
+          <NumField label="FLASH_SCAN_MAX" value={flash.FLASH_SCAN_MAX} step={0.01} min={0} max={0.5} note="F3 scan pico"
+            onChange={v => { DBG_FLASH.FLASH_SCAN_MAX = v; setFlash(f => ({ ...f, FLASH_SCAN_MAX: v })); }} />
+          <NumField label="FLASH_VIG_ATEN" value={flash.FLASH_VIG_ATEN} step={0.05} min={0} max={1} note="F3 viñeta"
+            onChange={v => { DBG_FLASH.FLASH_VIG_ATEN = v; setFlash(f => ({ ...f, FLASH_VIG_ATEN: v })); }} />
+          <NumField label="FLASH_TOPE_LUM" value={flash.FLASH_TOPE_LUM} step={0.01} min={0.92} max={1.5} note="F3 tope lum."
+            onChange={v => { DBG_FLASH.FLASH_TOPE_LUM = v; setFlash(f => ({ ...f, FLASH_TOPE_LUM: v })); }} />
+          <div style={ROW}>
+            <span>luminancia pico estimada <span style={NOTE}>{flashLive.lum.toFixed(3)} {flashLive.lum > 0.95 ? "✓ > 0,95" : "✗ ≤ 0,95"}</span></span>
+          </div>
           <div style={ROW}>
             <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
               onClick={() => window.dispatchEvent(new CustomEvent("alight:debug-curtain-flash"))}>

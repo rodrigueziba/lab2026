@@ -50,11 +50,11 @@ export const DBG_RETRO_FX = {
 export const DBG_FLASH = {
   FLASH_ACTIVO:          true,   // false = sin destello; el telón vuelve al fade original de 1,2 s
   FLASH_SUBIDA_MS:       150,    // subida a blanco total
-  FLASH_SOSTENIDO_MS:    850,    // sostenido mínimo en blanco total (se extiende si el telón no está apagado)
-  FLASH_BAJADA_MS:       1000,   // bajada ease-out hasta ver la escena
+  FLASH_SOSTENIDO_MS:    1800,   // F3 (era 850) sostenido mínimo en blanco total (se extiende si el telón no está apagado)
+  FLASH_BAJADA_MS:       2000,   // F3 (era 1000) bajada ease-out hasta ver la escena
   FLASH_PICO:            1.0,    // opacidad máxima del overlay (0–1)
-  FLASH_BLOOM_MULT:      3.0,    // bloom en el pico = bloomIntensity × este valor
-  FLASH_EXPOSICION_MULT: 2.0,    // exposición en el pico = toneExposure × este valor
+  FLASH_BLOOM_MULT:      5.0,    // F3 (era 3) — bloom en el pico = bloomIntensity × este valor
+  FLASH_EXPOSICION_MULT: 3.0,    // F3 (era 2) — exposición en el pico = toneExposure × este valor
   FLASH_LUZ_FADE_MS:     600,    // la luz del telón baja a 0 en este tiempo desde el disparo
   FLASH_TOPE_MS:         4000,   // tope del sostenido extendido (aviso en consola si se alcanza)
   FLASH_RM_PICO_MULT:    0.6,    // prefers-reduced-motion: pico × este valor
@@ -62,7 +62,18 @@ export const DBG_FLASH = {
   // F2: destello diegético dentro del CRT
   FLASH_OVERLAY_DOM:     false,  // true = overlay HTML anterior (F1) encima del canvas, sin CRT
   FLASH_CRT_MAX:         0.97,   // tope de uFlash (deja ver 3 % de escena + todo el CRT encima)
-  FLASH_GLOW:            0.35,   // resplandor central extra del blanco (uFlashGlow)
+  FLASH_GLOW:            0.6,    // F3 (era 0.35) — resplandor central extra del blanco (uFlashGlow)
+  // F3: límites del CRT escalados con uFlash
+  FLASH_SCAN_MAX:        0.06,   // scanlines restan como máximo esto en el pico (normal uScan 0.18)
+  FLASH_VIG_ATEN:        0.6,    // la viñeta se atenúa este porcentaje en el pico
+  FLASH_TOPE_LUM:        1.0,    // tope de luminancia del CRT en el pico (normal 0.92)
+};
+
+// ── P1: paneles orbitantes del camino SILLAS (ExperienceDome) — live ───────────
+export const DBG_PANELES = {
+  PANELES_AUTO:        true,  // false = paneles siempre visibles (comportamiento anterior)
+  PANELES_FADE_IN_MS:  600,   // fade de aparición (alpha)
+  PANELES_FADE_OUT_MS: 600,   // fade de desaparición (alpha)
 };
 
 export const DBG_PRISM = {

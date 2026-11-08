@@ -2,6 +2,8 @@
 // No Zustand — plain objects mutated in place so useFrame can read without re-renders.
 // React components that need to re-render use storeSubscribe.
 
+import { DBG_PANELES } from "@/lib/debugConfig";
+
 export type OscType   = "sine" | "square" | "sawtooth" | "triangle";
 export type LFOTarget = "volume" | "cutoff" | "pitch";
 
@@ -155,3 +157,81 @@ export const INTERACT_STATE = {
   experienceState: 'cortina' as 'cortina' | 'exploracion' | 'sillas_secuencia' | 'sala_activa',
   movementLocked: false,
 };
+
+// ── P1: paneles orbitantes del camino SILLAS (ExperienceDome) ─────────────────
+// Única fuente de verdad. Los eventos de la narrativa actualizan los hechos
+// (camino, prisma aterrizado, interacción con el prisma); la visibilidad se
+// DERIVA en panelesSillasVisibles() junto con experienceState. tickPanelesSillas()
+// (llamado por ExperienceDome en useFrame) anima el fade sin allocations.
+export type PanelesFase = 'oculto' | 'apareciendo' | 'visible' | 'desapareciendo';
+
+export const PANELES_SILLAS = {
+  camino:       'none' as 'none' | 'sillas' | 'tarima',
+  prismaBajo:   false,   // alight:prism-landed recibido
+  interactuado: false,   // E sobre el prisma → alight:visualizer-activate
+  forzado:      false,   // botón de debug "Forzar paneles SILLAS"
+  fase:         'oculto' as PanelesFase,
+  alpha:        0,
+  alphaDesde:   0,
+  t0:           0,
+};
+
+/** P1: visibilidad derivada (no un flag suelto). */
+export function panelesSillasVisibles(): boolean {
+  const p = PANELES_SILLAS;
+  if (p.forzado || !DBG_PANELES.PANELES_AUTO) return true;
+  const st = INTERACT_STATE.experienceState;
+  return p.camino === 'sillas' && p.prismaBajo && !p.interactuado
+      && (st === 'sillas_secuencia' || st === 'sala_activa');
+}
+
+/** P1: avanza el fade. Devuelve alpha actual (0–1). */
+export function tickPanelesSillas(now: number): number {
+  const p = PANELES_SILLAS;
+  const want = panelesSillasVisibles();
+  const inMs  = Math.max(1, DBG_PANELES.PANELES_FADE_IN_MS);
+  const outMs = Math.max(1, DBG_PANELES.PANELES_FADE_OUT_MS);
+  if (want && (p.fase === 'oculto' || p.fase === 'desapareciendo')) {
+    p.fase = 'apareciendo'; p.alphaDesde = p.alpha; p.t0 = now;
+  } else if (!want && (p.fase === 'visible' || p.fase === 'apareciendo')) {
+    p.fase = 'desapareciendo'; p.alphaDesde = p.alpha; p.t0 = now;
+  }
+  if (p.fase === 'apareciendo') {
+    p.alpha = Math.min(1, p.alphaDesde + (now - p.t0) / inMs);
+    if (p.alpha >= 1) p.fase = 'visible';
+  } else if (p.fase === 'desapareciendo') {
+    p.alpha = Math.max(0, p.alphaDesde - (now - p.t0) / outMs);
+    if (p.alpha <= 0) p.fase = 'oculto';
+  }
+  return p.alpha;
+}
+
+/** P1: reinicio de la experiencia (debug reset sillas / reaparecer telón). */
+export function resetPanelesSillas(): void {
+  const p = PANELES_SILLAS;
+  p.camino = 'none'; p.prismaBajo = false; p.interactuado = false;
+}
+
+/** P1: conecta los eventos de la narrativa. Devuelve la función de limpieza. */
+export function installPanelesSillasListeners(): () => void {
+  const p = PANELES_SILLAS;
+  const onChairs = () => { p.camino = 'sillas'; };
+  const onLight  = () => { p.camino = 'tarima'; };
+  const onLanded = () => { p.prismaBajo = true; };
+  const onViz    = () => { p.interactuado = true; };
+  const onReset  = () => resetPanelesSillas();
+  window.addEventListener('alight:chose-chairs',         onChairs);
+  window.addEventListener('alight:chose-light',          onLight);
+  window.addEventListener('alight:prism-landed',         onLanded);
+  window.addEventListener('alight:visualizer-activate',  onViz);
+  window.addEventListener('alight:debug-reset-sillas',   onReset);
+  window.addEventListener('alight:debug-reset-curtain',  onReset);
+  return () => {
+    window.removeEventListener('alight:chose-chairs',        onChairs);
+    window.removeEventListener('alight:chose-light',         onLight);
+    window.removeEventListener('alight:prism-landed',        onLanded);
+    window.removeEventListener('alight:visualizer-activate', onViz);
+    window.removeEventListener('alight:debug-reset-sillas',  onReset);
+    window.removeEventListener('alight:debug-reset-curtain', onReset);
+  };
+}

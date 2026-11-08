@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState, useMemo } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
 import DomeVisualizer from "./DomeVisualizer";
@@ -14,6 +14,7 @@ import SymbolSystem from "./SymbolSystem";
 import Monoliths from "./Monoliths";
 import { DBG_SILLAS } from "@/lib/debugConfig";
 import { resetEffects } from "@/lib/vizAudio";
+import { PANELES_SILLAS, tickPanelesSillas, installPanelesSillasListeners } from "@/lib/alightStore";
 
 // N2: disable legacy floor textures and sector audio
 const LEGACY_FLOOR_TEXTURES_ENABLED = false;
@@ -298,7 +299,9 @@ interface PanelProps {
 const texLoader = new THREE.TextureLoader();
 
 function PanelMesh({ position, url, staggerSec, activatedRef }: PanelProps) {
-  const matRef = useRef<THREE.ShaderMaterial>(null);
+  const matRef  = useRef<THREE.ShaderMaterial>(null);
+  const meshRef = useRef<THREE.Mesh>(null);   // P1: escala del fade
+  const gl      = useThree((s) => s.gl);
 
   // Rotate PlaneGeometry's +Z normal so the panel face points toward [0,0,0]
   const quaternion = useMemo(() => {
@@ -320,16 +323,29 @@ function PanelMesh({ position, url, staggerSec, activatedRef }: PanelProps) {
   // Async texture load — only touches the uniform, never touches React state
   useEffect(() => {
     let live = true;
+    let loaded: THREE.Texture | null = null; // P1: para liberar en el cleanup
     texLoader.load(url, (tex) => {
-      if (!live || !matRef.current) return;
+      if (!live || !matRef.current) { tex.dispose(); return; }
+      loaded = tex;
       tex.colorSpace = THREE.SRGBColorSpace;
+      // P1: subir la textura a la GPU al cargar (cortina/exploración), no al aparecer
+      gl.initTexture(tex);
       matRef.current.uniforms.uMap.value = tex;
     });
-    return () => { live = false; };
-  }, [url]);
+    return () => {
+      live = false;
+      // P1: liberar la textura al desmontar
+      loaded?.dispose();
+    };
+  }, [url, gl]);
 
   // Reveal is driven purely in useFrame — no state, no re-renders
   useFrame(() => {
+    // P1: oculto → no se actualiza nada
+    if (PANELES_SILLAS.fase === "oculto") return;
+    // P1: fade por escala (smoothstep) — sin transparencia ni cambio de materiales
+    const a = PANELES_SILLAS.alpha;
+    if (meshRef.current) meshRef.current.scale.setScalar(Math.max(0.0001, a * a * (3 - 2 * a)));
     const mat = matRef.current;
     if (!mat || activatedRef.current === null) return;
     const elapsed = (Date.now() - activatedRef.current) / 1000 - staggerSec;
@@ -339,7 +355,7 @@ function PanelMesh({ position, url, staggerSec, activatedRef }: PanelProps) {
   });
 
   return (
-    <mesh position={position} quaternion={quaternion}>
+    <mesh ref={meshRef} position={position} quaternion={quaternion}>
       <planeGeometry args={[3.6 * PANEL_SCALE, 2.4 * PANEL_SCALE]} />
       <shaderMaterial
         ref={matRef}
@@ -367,6 +383,7 @@ function OrbitRing({
   const groupRef = useRef<THREE.Group>(null!);
 
   useFrame(() => {
+    if (PANELES_SILLAS.fase === "oculto") return; // P1
     if (groupRef.current) groupRef.current.rotation.y += data.speed;
   });
 
@@ -449,9 +466,17 @@ export default function ExperienceDome() {
 
   const shellRef    = useRef<THREE.Mesh>(null);
   const skyShellRef = useRef<THREE.Mesh>(null);
+  const panelsRef   = useRef<THREE.Group>(null); // P1: contenedor de los paneles SILLAS
+  const { gl, scene, camera } = useThree();
+
+  // P1: eventos de la narrativa → PANELES_SILLAS (store)
+  useEffect(() => installPanelesSillasListeners(), []);
 
   // G1/AA2: animate shell opacity; sky shell uses DomeSky material when vizActive+domoShaderEnMalla
   useFrame((_, dt) => {
+    // P1: fade y visibilidad de los paneles SILLAS, derivados del store
+    tickPanelesSillas(performance.now());
+    if (panelsRef.current) panelsRef.current.visible = PANELES_SILLAS.fase !== "oculto";
     if (shellRef.current) {
       shellRef.current.visible = !DBG_SILLAS.vizHideShell;
     }
@@ -473,6 +498,17 @@ export default function ExperienceDome() {
   // Build orbital layout once per URL set — Math.random() inside ensures each
   // page load gets a unique arrangement of orbits, speeds, and directions.
   const orbits = useMemo(() => buildOrbits(urls.slice(0, MAX_PANELS)), [urls]);
+
+  // P1: precompilar el shader de los paneles apenas se montan (oculto), para que su
+  // aparición no compile programas. compile() solo recorre objetos visibles.
+  useEffect(() => {
+    const g = panelsRef.current;
+    if (!g || orbits.length === 0) return;
+    const prev = g.visible;
+    g.visible = true;
+    try { gl.compile(scene, camera); } catch { /* ok */ }
+    g.visible = prev;
+  }, [orbits, gl, scene, camera]);
 
   return (
     <group>
@@ -509,9 +545,12 @@ export default function ExperienceDome() {
         <sphereGeometry args={[DOME_R + 2, 48, 32, 0, Math.PI * 2, 0, Math.PI * 0.52]} />
       </mesh>
 
-      {orbits.map((orb, i) => (
-        <OrbitRing key={i} data={orb} activatedRef={activatedRef} />
-      ))}
+      {/* P1: paneles del camino SILLAS — visibles solo entre prism-landed y la E sobre el prisma */}
+      <group ref={panelsRef} visible={false}>
+        {orbits.map((orb, i) => (
+          <OrbitRing key={i} data={orb} activatedRef={activatedRef} />
+        ))}
+      </group>
     </group>
   );
 }
