@@ -12,6 +12,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import OpalBackground, { type OpalBackgroundParams } from '@/components/OpalBackground';
 import TdfFilmLoader from '@/components/TdfFilmLoader';
 import { isProfileHealth100 } from '@/lib/profileHealth';
+import { formatFechaAR, getYoutubeId } from '@/lib/proyectoDetalle'; // Z3: helpers compartidos con el panel abierto de /alight
 
 const DepthGallery = dynamic(() => import('@/components/Depthgallery'), { ssr: false });
 
@@ -29,12 +30,6 @@ const DEFAULT_TV_OPACITY = 0.92;
 
 const ECHOES_FIRST_RIPPLE_KEY = 'tdffilm_echoes_first_ripple_played';
 
-const getYoutubeId = (url: string) => {
-  if (!url) return null;
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-  const match = url.match(regExp);
-  return (match && match[2].length === 11) ? match[2] : null;
-};
 
 export default function DetalleProyectoPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params); 
@@ -174,7 +169,7 @@ export default function DetalleProyectoPage({ params }: { params: Promise<{ id: 
 
   const videoRef = proyecto.referencias?.find((r: string) => r && (r.includes('youtu') || r.includes('vimeo')));
   const youtubeId = videoRef ? getYoutubeId(videoRef) : null;
-  const formatDate = (d: string | Date | null) => d ? new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+  const formatDate = formatFechaAR; // Z3: mismo formato, ahora en lib/proyectoDetalle.ts
   const galeria = Array.isArray(proyecto.galeria) ? proyecto.galeria : [];
   const referencias = Array.isArray(proyecto.referencias) ? proyecto.referencias : [];
 

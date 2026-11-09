@@ -31,14 +31,14 @@ const API_URL    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 const DOME_R     = 28;
 const MAX_PANELS = 60;
 const PANEL_SCALE = 1.5; // G4: multiply panel dimensions by this factor
-const CACHE_KEY  = "alight:media-items-v2"; // Z1: era "alight:media-urls" (solo URLs, sin título)
+const CACHE_KEY  = "alight:media-items-v3"; // Z3: + proyectoId (Z1: v2 con título; antes "alight:media-urls")
 
 // ── Minimal shapes from the project's data layer ──────────────────────────────
-interface Proyecto  { titulo?: string; foto?: string | null; galeria?: string[]; referencias?: string[] }
+interface Proyecto  { id?: number; titulo?: string; foto?: string | null; galeria?: string[]; referencias?: string[] }
 interface Prestador { nombre?: string; foto?: string | null }
 
 // Z1: cada panel lleva la URL (o null si no hay foto) y el título para el placeholder
-interface PanelItem { url: string | null; titulo: string }
+interface PanelItem { url: string | null; titulo: string; proyectoId: number | null } // Z3: id para useProyectoDetalle (null = prestador)
 
 // ── Data helpers ──────────────────────────────────────────────────────────────
 function getYoutubeId(url: string): string | null {
@@ -51,24 +51,25 @@ function getYoutubeId(url: string): string | null {
 function extractItems(ps: Proyecto[], pr: Prestador[]): PanelItem[] {
   const seen  = new Set<string>();
   const items: PanelItem[] = [];
-  const add = (u: string | null | undefined, titulo: string) => {
+  const add = (u: string | null | undefined, titulo: string, proyectoId: number | null) => {
     const url = u?.trim();
     if (!url || seen.has(url)) return false;
     seen.add(url);
-    items.push({ url, titulo });
+    items.push({ url, titulo, proyectoId });
     return true;
   };
   ps.forEach(p => {
     const titulo = p.titulo ?? "SIN TÍTULO";
-    let alguna = add(p.foto, titulo);
-    p.galeria?.forEach(g => { alguna = add(g, titulo) || alguna; });
+    const pid = typeof p.id === "number" ? p.id : null;
+    let alguna = add(p.foto, titulo, pid);
+    p.galeria?.forEach(g => { alguna = add(g, titulo, pid) || alguna; });
     p.referencias?.forEach(r => {
       const id = getYoutubeId(r);
-      if (id) alguna = add(`https://img.youtube.com/vi/${id}/hqdefault.jpg`, titulo) || alguna;
+      if (id) alguna = add(`https://img.youtube.com/vi/${id}/hqdefault.jpg`, titulo, pid) || alguna;
     });
-    if (!alguna && !p.foto && !(p.galeria?.length)) items.push({ url: null, titulo });
+    if (!alguna && !p.foto && !(p.galeria?.length)) items.push({ url: null, titulo, proyectoId: pid });
   });
-  pr.forEach(p => { add(p.foto, p.nombre ?? "PRESTADOR"); });
+  pr.forEach(p => { add(p.foto, p.nombre ?? "PRESTADOR", null); });
   return items;
 }
 
@@ -126,7 +127,7 @@ function buildOrbits(urls: PanelItem[]): OrbitData[] {
           0,
           radius * Math.sin(angle),
         ),
-        item:       urls[urlIdx++] ?? { url: null, titulo: "" },
+        item:       urls[urlIdx++] ?? { url: null, titulo: "", proyectoId: null },
         staggerSec: staggerIdx++ * 0.12,
       };
     });
@@ -429,7 +430,7 @@ function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, staggerSec, 
     const entry: PanelLinterna = {
       pivot: pivotRef.current, mesh: meshRef.current, uLit: uniforms.uLit,
       fase: 0, velocidad: speed, azimut: azimuth,
-      indice, titulo: item.titulo, url: item.url, angulo: 180,
+      indice, titulo: item.titulo, url: item.url, proyectoId: item.proyectoId, angulo: 180,
     };
     return registrarPanelLinterna(entry);
   }, [uniforms, speed, azimuth, indice, item]);

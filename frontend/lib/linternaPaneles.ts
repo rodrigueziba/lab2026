@@ -18,6 +18,7 @@ export interface PanelLinterna {
   indice:   number;
   titulo:   string;
   url:      string | null;
+  proyectoId: number | null;         // Z3: para useProyectoDetalle (null = prestador)
   angulo:   number;                  // último ángulo al centro del cono (grados)
 }
 
@@ -47,7 +48,7 @@ export function registrarPanelLinterna(p: PanelLinterna): () => void {
 }
 
 // ── eventos para Z4 (subpaneles) ──────────────────────────────────────────────
-// alight:panel-abierto  { indice, titulo, url }  → tras ABRIR_MS de luz sostenida
+// alight:panel-abierto  { indice, titulo, url, proyectoId }  → tras ABRIR_MS de luz sostenida
 // alight:panel-cerrado  { indice }               → la luz deja el panel abierto o se apaga
 function emitir(nombre: string, detail: object) {
   window.dispatchEvent(new CustomEvent(nombre, { detail }));
@@ -146,7 +147,7 @@ export function tickLinterna(camera: THREE.Camera, dt: number, now: number, acti
     if (s.progreso >= 1 && s.abiertoIdx < 0) {
       s.abiertoIdx = s.sel.indice;
       s.fase = "abierto";
-      emitir("alight:panel-abierto", { indice: s.sel.indice, titulo: s.sel.titulo, url: s.sel.url });
+      emitir("alight:panel-abierto", { indice: s.sel.indice, titulo: s.sel.titulo, url: s.sel.url, proyectoId: s.sel.proyectoId });
     }
   }
   s.selAlpha += ((s.sel ? 1 : 0) - s.selAlpha) * kSel;
