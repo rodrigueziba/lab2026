@@ -121,6 +121,7 @@ export const DBG_ACERC = {
   ACERC_AJUSTE_S:   6,       // Z9: velocidad (1/s) con la que el panel acercado sigue un cambio de layout (resize)
   // Z12: selección latcheada — durante el viaje no cuenta el cono; el cierre se decide en pantalla
   CIERRE_MARGEN:    0.06,    // margen extra de la caja de cierre (fracción del semiviewport)
+  CIERRE_MARGEN_DEG: 8,      // Z14: margen angular (yaw/pitch) de la región de cierre del conjunto cóncavo
   CIERRE_GRACIA_MS: 1200,    // fuera de la caja durante este tiempo (contado desde 'abierto') → cierra
   ESPERA_DATOS_MS:  5000,    // si los subpaneles no aparecen (datos que no llegan), se da por abierto igual
 };
@@ -148,13 +149,19 @@ export const DBG_SUBPANELES = {
   SUB_M_POR_PX:      0.0135, // escala mockup → metros (tamaño de los subpaneles)
   SUB_GAP_LATERAL_M: 1.28,   // separación HISTORIA/GALERÍA ↔ panel (mockup 95 px)
   SUB_GAP_ABAJO_M:   0.95,   // separación panel ↔ FICHA (mockup 70 px)
-  SUB_ANIM_MS:       400,    // salida desde el panel (escala + desplazamiento) y cierre inverso
+  SUB_ANIM_MS:       500,    // Z14 (era 400): salida desde el panel (escala + desplazamiento) y cierre inverso
   SUB_ADELANTE_M:    0.15,   // los subpaneles se adelantan hacia la cámara (evita cruzar el panel)
   SUB_AJUSTE_PANTALLA: true, // Z8: escala HISTORIA/GALERÍA/FICHA (y separaciones) para que entren en pantalla
   SUB_MARGEN_PANTALLA: 0.04, // Z8: margen a cada borde del viewport (fracción)
   SUB_AJUSTE_BLOQUE: true,   // Z9: bloque panel+subpaneles centrado y ajustado (incl. curvatura CRT); off = ajuste Z8
   SUB_MARGEN_SEGURIDAD: 0.06, // Z9: margen de seguridad por lado (fracción del viewport)
   SUB_ESCALA_MIN:    0.55,   // Z9: escala mínima legible de los subpaneles; por debajo se aleja el bloque
+  // Z14: disposición cóncava alrededor del ojo (se gira la cámara, no hace falta A/D)
+  SUB_CONCAVO:       true,   // false = bloque plano de Z9
+  SUB_YAW_DEG:       34,     // yaw de HISTORIA (−) / GALERÍA (+) respecto del panel; se agranda si se superponen
+  SUB_YAW_MAX_DEG:   60,     // el borde exterior de los laterales no pasa de este yaw (si no, se reduce la escala)
+  SUB_PITCH_FICHA_DEG: -24,  // pitch de FICHA respecto del panel; se agranda si se superpone
+  SUB_DIST_FACTOR:   1.0,    // distancia al ojo de los subpaneles = distancia del panel × esto
   SUB_RETENER_PAD_M: 0.25,   // Z5 (era 1.0 sobre el conjunto): margen alrededor de cada subpanel y del panel
   SUB_LINEAS:        true,   // líneas guía punteadas ámbar hacia el panel
   SUB_PUNTERO:       true,   // Z5: retícula clara en el centro de pantalla con el panel abierto

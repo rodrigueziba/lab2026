@@ -7,7 +7,7 @@
 
 import * as THREE from "three";
 import { DBG_LINTERNA, DBG_ORBITAS, DBG_ACERC, DBG_SUBPANELES, DBG_PRIORIDAD, DBG_LOG_PANEL } from "@/lib/debugConfig";
-import { calcularLayoutBloque, type LayoutBloque } from "@/lib/subpanelLayout";
+import { calcularLayoutBloque, calcularLayoutConcavo, type LayoutBloque } from "@/lib/subpanelLayout";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 
@@ -108,11 +108,15 @@ function calcularDestino(camera: THREE.Camera): void {
   ACERC.aspect = aspect;
   if (DBG_SUBPANELES.SUB_AJUSTE_BLOQUE && ACERC.conSubpaneles) { // Z12: prestadores sin bloque
     const curva = RETRO_FLAGS.enabled ? (CRT_UNIFORMS.uCurve.value as number) : 0;
-    calcularLayoutBloque(ACERC.ancho, ACERC.alto, fov, aspect, curva, ACERC.layout);
+    if (DBG_SUBPANELES.SUB_CONCAVO)  // Z14: conjunto cóncavo alrededor del ojo
+      calcularLayoutConcavo(ACERC.ancho, ACERC.alto, fov, aspect, curva, Math.asin(THREE.MathUtils.clamp(ACERC.fwd0.y, -1, 1)), ACERC.layout);
+    else
+      calcularLayoutBloque(ACERC.ancho, ACERC.alto, fov, aspect, curva, ACERC.layout);
   } else {
     // Z8: panel centrado en la mira, sin desplazamiento (el ajuste lo hace Z4)
     ACERC.layout.d = distanciaAcercamiento(camera, ACERC.ancho, ACERC.alto);
     ACERC.layout.up = 0; ACERC.layout.k = 1; ACERC.layout.alejado = false; ACERC.layout.entra = true;
+    ACERC.layout.concavo = false; // Z14
     // Z10: sin el cálculo de bloque se toma todo el viewport como zona del conjunto
     const t = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
     ACERC.layout.medioAlto = ACERC.layout.d * t; ACERC.layout.medioAncho = ACERC.layout.medioAlto * aspect;
@@ -423,6 +427,15 @@ function cierrePorPantalla(camera: THREE.Camera, now: number): boolean {
   const L = ACERC.layout;
   camera.getWorldPosition(_cam);
   camera.getWorldDirection(_cf);
+  // Z14: conjunto cóncavo → región ANGULAR en el mundo (yaw sobre la vertical, elevación),
+  // así girar hacia HISTORIA / GALERÍA o bajar a FICHA nunca cierra.
+  if (L.concavo) {
+    const dentroAng = enRegionConcava(_cf, 0, DBG_ACERC.CIERRE_MARGEN_DEG * Math.PI / 180);
+    ACERC.miraDentro = dentroAng;
+    if (dentroAng) { ACERC.tFuera = 0; return false; }
+    if (ACERC.tFuera === 0) ACERC.tFuera = now;
+    return now - ACERC.tFuera >= DBG_ACERC.CIERRE_GRACIA_MS;
+  }
   _cc.copy(ACERC.camPos0).addScaledVector(ACERC.fwd0, L.d);       // centro del bloque
   const den = _cf.dot(ACERC.fwd0);
   let dentro = false;
@@ -446,6 +459,19 @@ function cierrePorPantalla(camera: THREE.Camera, now: number): boolean {
   if (dentro) { ACERC.tFuera = 0; return false; }
   if (ACERC.tFuera === 0) ACERC.tFuera = now;
   return now - ACERC.tFuera >= DBG_ACERC.CIERRE_GRACIA_MS;
+}
+
+/** Z14: ¿la dirección `dir` (unitaria, mundo) cae en la región angular del conjunto cóncavo?
+ *  yaw relativo a la mira del disparo sobre la vertical; elevación relativa a la de la mira.
+ *  `extra` agranda la región (p. ej. el semiángulo de otro panel). */
+function enRegionConcava(dir: THREE.Vector3, extra: number, margen: number): boolean {
+  const L = ACERC.layout, f = ACERC.fwd0;
+  const yawRel = Math.atan2(f.x * dir.z - f.z * dir.x, f.x * dir.x + f.z * dir.z);
+  const elevRel = Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1)) - Math.asin(THREE.MathUtils.clamp(f.y, -1, 1));
+  const ext = (L.yawExt ?? 0) + margen + extra;
+  return Math.abs(yawRel) <= ext
+    && elevRel <= (L.angTop ?? 0) + margen + extra
+    && elevRel >= (L.angBot ?? 0) - margen - extra;
 }
 
 // ── Z10: prioridad visual del conjunto abierto ────────────────────────────────
@@ -474,7 +500,16 @@ function tickPrioridad(dt: number, camera: THREE.Camera): void {
     let atenua = 1, oculta = 1;
     if (activo && p !== ACERC.panel) {
       atenua = THREE.MathUtils.clamp(P.ATENUAR_BRILLO, 0, 1);
-      if (P.OCULTAR_SOLAPADOS && p.mesh) {
+      if (P.OCULTAR_SOLAPADOS && p.mesh && L.concavo) {
+        // Z14: región angular del conjunto cóncavo (incluye los laterales a ±yaw)
+        p.mesh.getWorldPosition(_pv).sub(ACERC.camPos0);
+        const dist = _pv.length();
+        if (dist > 0.1 && dist < Math.max(L.d, L.dLat ?? L.d) + P.OCULTAR_PROF_M) {
+          _pv.multiplyScalar(1 / dist);
+          const semi = Math.atan((ACERC.ancho / 2) / dist);           // semiángulo del otro panel
+          if (enRegionConcava(_pv, semi, P.OCULTAR_MARGEN)) oculta = 0;
+        }
+      } else if (P.OCULTAR_SOLAPADOS && p.mesh) {
         p.mesh.getWorldPosition(_pv).sub(ACERC.camPos0);
         const z = _pv.dot(ACERC.fwd0);
         // solo los que están a la profundidad del conjunto o delante (los de atrás quedan tapados y dan espacio)

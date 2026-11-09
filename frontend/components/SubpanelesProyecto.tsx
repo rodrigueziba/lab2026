@@ -100,8 +100,49 @@ const LINEA_FRAG = /* glsl */`
 const _rInv = new THREE.Matrix4();
 const _rO = new THREE.Vector3();
 const _rD = new THREE.Vector3();
-const _hit = { u: 0, v: 0, cx: 0, cy: 0, dentro: false };
+const _hit = { u: 0, v: 0, cx: 0, cy: 0, dentro: false, t: 0 }; // Z14: t = distancia al impacto (m)
 const _q = new THREE.Quaternion(); // Z9: pose del panel acercado (reutilizado)
+// Z14: poses cóncavas (reutilizados, sin allocations por frame)
+const _Y = new THREE.Vector3(0, 1, 0);
+const _Z = new THREE.Vector3(0, 0, 1);
+const _cV = new THREE.Vector3();      // panel − ojo
+const _rH = new THREE.Vector3();      // eje horizontal derecho del panel (para el pitch de FICHA)
+const _tp = new THREE.Vector3();      // posición objetivo (mundo)
+const _tq = new THREE.Quaternion();   // orientación objetivo (mundo)
+const _gqi = new THREE.Quaternion();  // inversa de la orientación del grupo
+const _ax = new THREE.Vector3(), _ay = new THREE.Vector3(), _az = new THREE.Vector3();
+const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _ojoL = new THREE.Vector3();
+const _mb = new THREE.Matrix4();
+const _PI2 = Math.PI / 2;
+
+/** Z14: lleva `mesh` (hijo del grupo `g`, sin padre transformado) a una pose de mundo
+ *  interpolada entre la del panel (inicio) y la objetivo, con escala w×h·s. */
+function posarDesdePanel(
+  mesh: THREE.Object3D, g: THREE.Object3D, pPos: THREE.Vector3, pQuat: THREE.Quaternion,
+  tPos: THREE.Vector3, tQuat: THREE.Quaternion, e: number, w: number, h: number, s: number,
+): void {
+  mesh.position.lerpVectors(pPos, tPos, e);
+  g.worldToLocal(mesh.position);
+  mesh.quaternion.slerpQuaternions(pQuat, tQuat, e).premultiply(_gqi);
+  mesh.scale.set(w * s, h * s, 1);
+}
+
+/** Z14: línea guía (plano fino) entre dos puntos de MUNDO, mirando al ojo. */
+function ponerLinea(mesh: THREE.Object3D, g: THREE.Object3D, aW: THREE.Vector3, bW: THREE.Vector3, ojoW: THREE.Vector3, grosor: number): void {
+  _la.copy(aW); g.worldToLocal(_la);
+  _lb.copy(bW); g.worldToLocal(_lb);
+  _ojoL.copy(ojoW); g.worldToLocal(_ojoL);
+  _ax.subVectors(_lb, _la);
+  const len = Math.max(1e-4, _ax.length());
+  _ax.multiplyScalar(1 / len);
+  mesh.position.addVectors(_la, _lb).multiplyScalar(0.5);
+  _az.subVectors(_ojoL, mesh.position);
+  _az.addScaledVector(_ax, -_ax.dot(_az)).normalize();   // normal hacia el ojo, ⟂ a la línea
+  _ay.crossVectors(_az, _ax);
+  _mb.makeBasis(_ax, _ay, _az);
+  mesh.quaternion.setFromRotationMatrix(_mb);
+  mesh.scale.set(len, grosor, 1);
+}
 function rayoUV(
   mesh: THREE.Object3D | null, w: number, h: number,
   origen: THREE.Vector3, dir: THREE.Vector3, out: typeof _hit, margenU: number,
@@ -116,7 +157,7 @@ function rayoUV(
   const u = (_rO.x + _rD.x * t) / w + 0.5;
   const v = (_rO.y + _rD.y * t) / h + 0.5;
   const mv = margenU * w / h;
-  out.u = u; out.v = v;
+  out.u = u; out.v = v; out.t = t;  // t: parámetro afín → distancia en mundo sobre `dir` unitario
   out.dentro = u >= 0 && u <= 1 && v >= 0 && v <= 1;
   return u >= -margenU && u <= 1 + margenU && v >= -mv && v <= 1 + mv;
 }
@@ -411,18 +452,75 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     const s = Math.max(0.001, e);
 
     const hist = historiaRef.current, gal = galeriaRef.current, fic = fichaRef.current;
-    if (hist) { hist.position.set(-(px + gapL + hw / 2) * e, 0, 0); hist.scale.set(hw * s, hh * s, 1); }
-    if (gal)  { gal.position.set((px + gapL + gw / 2) * e, 0, 0);   gal.scale.set(gw * s, gh * s, 1); }
-    if (fic)  { fic.position.set(0, -(py + gapA + fh / 2) * e, 0);  fic.scale.set(fw * s, fh * s, 1); }
-
+    const li = lineaIzq.current, ld = lineaDer.current, lb = lineaAbajo.current;
     // líneas guía (aparecen en la segunda mitad de la animación)
     const la = D.SUB_LINEAS ? Math.max(0, (e - 0.5) * 2) : 0;
     const lm = lineaMatRef.current;
-    if (lm) { lm.uniforms.uAlpha.value = la; lm.uniforms.uLen.value = Math.max(gapL, gapA); }
-    const li = lineaIzq.current, ld = lineaDer.current, lb = lineaAbajo.current;
-    if (li) { li.visible = la > 0.01; li.position.set(-(px + gapL / 2), 0, 0.01); li.scale.set(gapL, LINEA_GROSOR_M, 1); }
-    if (ld) { ld.visible = la > 0.01; ld.position.set(px + gapL / 2, 0, 0.01);    ld.scale.set(gapL, LINEA_GROSOR_M, 1); }
-    if (lb) { lb.visible = la > 0.01; lb.position.set(0, -(py + gapA / 2), 0.01); lb.scale.set(gapA, LINEA_GROSOR_M, 1); }
+    // Z14: conjunto cóncavo alrededor del ojo del disparo (solo con el panel acercado)
+    const concavo = bloque && D.SUB_CONCAVO && !!ACERC.layout.concavo;
+    if (concavo) {
+      const Lc = ACERC.layout, ojo = ACERC.camPos0, fac = Math.max(0.3, D.SUB_DIST_FACTOR);
+      const yaw = Lc.yaw ?? 0, pitch = Lc.pitch ?? 0;
+      g.updateMatrixWorld(true);
+      _gqi.copy(g.quaternion).invert();
+      _cV.subVectors(_v.pos, ojo);                                   // panel − ojo
+      // HISTORIA: +yaw (izquierda) sobre la vertical del mundo, mirando al ojo
+      if (hist) {
+        _tp.copy(_cV).applyAxisAngle(_Y, yaw).multiplyScalar(fac).add(ojo);
+        _tq.setFromRotationMatrix(_mb.lookAt(ojo, _tp, _Y));          // normal (+Z) exacta hacia el ojo, sin rolido
+        posarDesdePanel(hist, g, _v.pos, _q, _tp, _tq, e, hw, hh, s);
+      }
+      if (gal) {
+        _tp.copy(_cV).applyAxisAngle(_Y, -yaw).multiplyScalar(fac).add(ojo);
+        _tq.setFromRotationMatrix(_mb.lookAt(ojo, _tp, _Y));
+        posarDesdePanel(gal, g, _v.pos, _q, _tp, _tq, e, gw, gh, s);
+      }
+      // FICHA: pitch alrededor del eje horizontal derecho del panel
+      if (fic) {
+        _rH.crossVectors(_cV, _Y).normalize();
+        _tp.copy(_cV).applyAxisAngle(_rH, pitch).multiplyScalar(fac).add(ojo);
+        _tq.setFromRotationMatrix(_mb.lookAt(ojo, _tp, _Y));
+        posarDesdePanel(fic, g, _v.pos, _q, _tp, _tq, e, fw, fh, s);
+      }
+      // líneas guía: del borde del panel al borde interior de cada subpanel (cuerda del arco)
+      if (lm) { lm.uniforms.uAlpha.value = la; lm.uniforms.uLen.value = Math.max(gapL, gapA); }
+      const vis = la > 0.01;
+      if (li) li.visible = vis;
+      if (ld) ld.visible = vis;
+      if (lb) lb.visible = vis;
+      if (vis) {
+        _ax.set(1, 0, 0).applyQuaternion(_q);                        // derecha del panel (mundo)
+        if (li && hist) {
+          _tp.copy(_v.pos).addScaledVector(_ax, -px);
+          hist.getWorldPosition(_cV); _ay.set(1, 0, 0).applyQuaternion(hist.getWorldQuaternion(_tq));
+          _cV.addScaledVector(_ay, hw * s / 2);
+          ponerLinea(li, g, _tp, _cV, ojo, LINEA_GROSOR_M);
+        }
+        if (ld && gal) {
+          _ax.set(1, 0, 0).applyQuaternion(_q);
+          _tp.copy(_v.pos).addScaledVector(_ax, px);
+          gal.getWorldPosition(_cV); _ay.set(1, 0, 0).applyQuaternion(gal.getWorldQuaternion(_tq));
+          _cV.addScaledVector(_ay, -gw * s / 2);
+          ponerLinea(ld, g, _tp, _cV, ojo, LINEA_GROSOR_M);
+        }
+        if (lb && fic) {
+          _ay.set(0, 1, 0).applyQuaternion(_q);                      // arriba del panel
+          _tp.copy(_v.pos).addScaledVector(_ay, -py);
+          fic.getWorldPosition(_cV); _az.set(0, 1, 0).applyQuaternion(fic.getWorldQuaternion(_tq));
+          _cV.addScaledVector(_az, fh * s / 2);
+          ponerLinea(lb, g, _tp, _cV, ojo, LINEA_GROSOR_M);
+        }
+      }
+    } else {
+      // Z9 / Z8: bloque plano (orientaciones planas restauradas por si antes estuvo cóncavo)
+      if (hist) { hist.position.set(-(px + gapL + hw / 2) * e, 0, 0); hist.quaternion.identity(); hist.scale.set(hw * s, hh * s, 1); }
+      if (gal)  { gal.position.set((px + gapL + gw / 2) * e, 0, 0);   gal.quaternion.identity();  gal.scale.set(gw * s, gh * s, 1); }
+      if (fic)  { fic.position.set(0, -(py + gapA + fh / 2) * e, 0);  fic.quaternion.identity();  fic.scale.set(fw * s, fh * s, 1); }
+      if (lm) { lm.uniforms.uAlpha.value = la; lm.uniforms.uLen.value = Math.max(gapL, gapA); }
+      if (li) { li.visible = la > 0.01; li.position.set(-(px + gapL / 2), 0, 0.01); li.quaternion.identity(); li.scale.set(gapL, LINEA_GROSOR_M, 1); }
+      if (ld) { ld.visible = la > 0.01; ld.position.set(px + gapL / 2, 0, 0.01);    ld.quaternion.identity(); ld.scale.set(gapL, LINEA_GROSOR_M, 1); }
+      if (lb) { lb.visible = la > 0.01; lb.position.set(0, -(py + gapA / 2), 0.01); lb.quaternion.setFromAxisAngle(_Z, _PI2); lb.scale.set(gapA, LINEA_GROSOR_M, 1); }
+    }
 
     // pantalla CRT
     const pm = pantMatRef.current;
@@ -437,18 +535,19 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     let sobre: "historia" | "galeria" | "ficha" | null = null;
     let hover: string | null = null;
     let dentroAlgo = false;
+    let tMin = 1e9;                                   // Z14: distancia al primer impacto (retícula)
     const pad = Math.max(0, D.SUB_RETENER_PAD_M);
     // subpaneles: planos unitarios escalados → UV directo (con margen `pad` solo para retener)
     if (rayoUV(hist, 1, 1, _v.cam, _v.fwd, _hit, pad / Math.max(0.001, hw))) {
-      dentroAlgo = true;
+      dentroAlgo = true; if (_hit.dentro) tMin = Math.min(tMin, _hit.t);
       if (listo && _hit.dentro) { sobre = "historia"; _hit.cx = _hit.u * HISTORIA_SIZE.w; _hit.cy = (1 - _hit.v) * HISTORIA_SIZE.h; }
     }
     if (!sobre && rayoUV(gal, 1, 1, _v.cam, _v.fwd, _hit, pad / Math.max(0.001, gw))) {
-      dentroAlgo = true;
+      dentroAlgo = true; if (_hit.dentro) tMin = Math.min(tMin, _hit.t);
       if (listo && _hit.dentro) { sobre = "galeria"; _hit.cx = _hit.u * GALERIA_SIZE.w; _hit.cy = (1 - _hit.v) * GALERIA_SIZE.h; }
     }
     if (!sobre && rayoUV(fic, 1, 1, _v.cam, _v.fwd, _hit, pad / Math.max(0.001, fw))) {
-      dentroAlgo = true;
+      dentroAlgo = true; if (_hit.dentro) tMin = Math.min(tMin, _hit.t);
       if (listo && _hit.dentro) sobre = "ficha";
     }
     // el panel abierto también cuenta como "dentro" (su geometría mide panelAncho × panelAlto)
@@ -489,7 +588,20 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     const pt = punteroRef.current;
     if (pt) {
       let ver = D.SUB_PUNTERO && A.abierto && A.t > 0.5;
-      if (ver) {
+      if (ver && concavo) {
+        // Z14: retícula en el centro de pantalla, justo delante de lo que se mira, de frente a la cámara
+        const dist = tMin < 1e8 ? tMin * 0.97 : (ACERC.layout.dLat ?? ACERC.layout.d) * 0.97;
+        pt.position.copy(_v.cam).addScaledVector(_v.fwd, dist);
+        g.worldToLocal(pt.position);
+        camera.getWorldQuaternion(_tq);
+        pt.quaternion.copy(_tq).premultiply(_gqi);
+        const pulso = now - u.tClic < D.PUNTERO_PULSO_MS;
+        const objetivo = pulso ? D.PUNTERO_ESCALA_CLIC : hover ? D.PUNTERO_ESCALA_HOVER : 1;
+        u.escalaPuntero += (objetivo - u.escalaPuntero) * (1 - Math.exp(-Math.max(0.1, D.PUNTERO_SUAVIZADO_S) * dt));
+        const r = D.PUNTERO_RADIO_M / 0.21 * u.escalaPuntero * (dist / Math.max(0.1, ACERC.layout.d)); // tamaño en pantalla constante
+        pt.scale.set(r, r, 1);
+      } else if (ver) {
+        pt.quaternion.identity();
         _v.inv.copy(g.matrixWorld).invert();
         _v.o.copy(_v.cam).applyMatrix4(_v.inv);
         _v.d.copy(_v.cam).add(_v.fwd).applyMatrix4(_v.inv).sub(_v.o);

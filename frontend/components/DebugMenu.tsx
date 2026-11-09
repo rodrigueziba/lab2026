@@ -361,7 +361,8 @@ export default function DebugMenu() {
       }
       { // Z8
         const L = ACERC.layout;
-        const txt = `${ACERC.fase}${ACERC.fase === "abierto" ? (ACERC.miraDentro ? " · mira dentro" : ` · fuera ${ACERC.tFuera ? Math.round(performance.now() - ACERC.tFuera) : 0} ms`) : ""}${ACERC.panel ? ` · panel ${ACERC.panel.indice} · d ${ACERC.distancia.toFixed(2)} m · sube ${L.up.toFixed(2)} m${L.alejado ? " · alejado" : ""}${L.entra ? "" : " · ✗ no entra"}` : ""} · subpaneles ${(ACERC.escalaSub * 100).toFixed(0)} %`;
+        const conc = L.concavo ? ` · cóncavo yaw ${((L.yaw ?? 0) * 180 / Math.PI).toFixed(0)}° (borde ${((L.yawExt ?? 0) * 180 / Math.PI).toFixed(0)}°) · FICHA ${((L.pitch ?? 0) * 180 / Math.PI).toFixed(0)}°` : "";
+        const txt = `${ACERC.fase}${conc}${ACERC.fase === "abierto" ? (ACERC.miraDentro ? " · mira dentro" : ` · fuera ${ACERC.tFuera ? Math.round(performance.now() - ACERC.tFuera) : 0} ms`) : ""}${ACERC.panel ? ` · panel ${ACERC.panel.indice} · d ${ACERC.distancia.toFixed(2)} m · sube ${L.up.toFixed(2)} m${L.alejado ? " · alejado" : ""}${L.entra ? "" : " · ✗ no entra"}` : ""} · subpaneles ${(ACERC.escalaSub * 100).toFixed(0)} %`;
         setAcercLive(prev => (prev === txt ? prev : txt));
       }
       { // Z7
@@ -1166,6 +1167,24 @@ export default function DebugMenu() {
               setSubp(x => ({ ...x, SUB_AJUSTE_BLOQUE: v }));
             }}>{subp.SUB_AJUSTE_BLOQUE ? "ON" : "off"}</button>
           </div>
+          <div style={ROW}>
+            <span>SUB_CONCAVO <span style={NOTE}>Z14 arco alrededor del ojo</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.SUB_CONCAVO;
+              DBG_SUBPANELES.SUB_CONCAVO = v;
+              setSubp(x => ({ ...x, SUB_CONCAVO: v }));
+            }}>{subp.SUB_CONCAVO ? "ON" : "off"}</button>
+          </div>
+          <NumField label="SUB_YAW_DEG" value={subp.SUB_YAW_DEG} step={1} min={10} max={80} note="Z14 laterales (mín.)"
+            onChange={v => { DBG_SUBPANELES.SUB_YAW_DEG = v; setSubp(x => ({ ...x, SUB_YAW_DEG: v })); }} />
+          <NumField label="SUB_YAW_MAX_DEG" value={subp.SUB_YAW_MAX_DEG} step={1} min={20} max={90} note="Z14 borde exterior"
+            onChange={v => { DBG_SUBPANELES.SUB_YAW_MAX_DEG = v; setSubp(x => ({ ...x, SUB_YAW_MAX_DEG: v })); }} />
+          <NumField label="SUB_PITCH_FICHA_DEG" value={subp.SUB_PITCH_FICHA_DEG} step={1} min={-80} max={-5} note="Z14 FICHA (mín.)"
+            onChange={v => { DBG_SUBPANELES.SUB_PITCH_FICHA_DEG = v; setSubp(x => ({ ...x, SUB_PITCH_FICHA_DEG: v })); }} />
+          <NumField label="SUB_DIST_FACTOR" value={subp.SUB_DIST_FACTOR} step={0.05} min={0.5} max={2} note="Z14 × distancia del panel"
+            onChange={v => { DBG_SUBPANELES.SUB_DIST_FACTOR = v; setSubp(x => ({ ...x, SUB_DIST_FACTOR: v })); }} />
+          <NumField label="CIERRE_MARGEN_DEG" value={acerc.CIERRE_MARGEN_DEG} step={1} min={0} max={45} note="Z14 región de cierre"
+            onChange={v => { DBG_ACERC.CIERRE_MARGEN_DEG = v; setAcerc(o => ({ ...o, CIERRE_MARGEN_DEG: v })); }} />
           <NumField label="SUB_MARGEN_SEGURIDAD" value={subp.SUB_MARGEN_SEGURIDAD} step={0.01} min={0} max={0.3} note="Z9 por lado"
             onChange={v => { DBG_SUBPANELES.SUB_MARGEN_SEGURIDAD = v; setSubp(x => ({ ...x, SUB_MARGEN_SEGURIDAD: v })); }} />
           <NumField label="SUB_ESCALA_MIN" value={subp.SUB_ESCALA_MIN} step={0.05} min={0.1} max={1} note="Z9 legibilidad"
