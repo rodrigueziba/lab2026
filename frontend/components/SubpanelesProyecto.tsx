@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SUBPANELES } from "@/lib/debugConfig";
-import { LINTERNA_STATE } from "@/lib/linternaPaneles";
+import { LINTERNA_STATE, ACERC } from "@/lib/linternaPaneles";
 import { INTERACT_STATE } from "@/lib/alightStore";
 import { playUIClick } from "@/lib/audioEngine";
 import { useProyectoDetalle, type ProyectoDetalle } from "@/lib/proyectoDetalle";
@@ -139,7 +139,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
   const lineaMatRef = useRef<THREE.ShaderMaterial>(null);
 
   // estado de animación / interacción (refs: sin re-render por frame)
-  const anim = useRef({ t: 0, abierto: false, tDentro: 0 }); // Z5: tDentro = último instante con el puntero dentro
+  const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false }); // Z5: tDentro; Z8: escala de ajuste
   const ui = useRef({
     pagina: 0, paginas: [[""]] as string[][], indice: 0,
     hover: null as string | null, sobre: null as "historia" | "galeria" | "ficha" | null,
@@ -181,6 +181,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       }
       anim.current.abierto = true;
       anim.current.tDentro = performance.now(); // Z5: la gracia arranca al abrir
+      anim.current.avisoEscala = false;         // Z8
       setEst(prev => ({ proyectoId: det.proyectoId as number, abierto: true, n: (prev?.n ?? 0) + 1 }));
     };
     const onCerrado = () => {
@@ -330,12 +331,36 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     const e = 1 - Math.pow(1 - A.t, 3);
 
     // medidas (en vivo desde debug)
-    const m = D.SUB_M_POR_PX;
+    // Z8: relativas al tamaño del panel (SUB_M_POR_PX y las separaciones están calibradas para 5,4 m)
+    const rel = panelAncho / 5.4;
+    let m = D.SUB_M_POR_PX * rel;
+    let gapL = D.SUB_GAP_LATERAL_M * rel, gapA = D.SUB_GAP_ABAJO_M * rel;
+    const px = panelAncho / 2, py = panelAlto / 2;
+    // Z8: si el conjunto no entra en el viewport a esta distancia, se reduce todo
+    // (subpaneles + separaciones) en la misma proporción; el panel no cambia.
+    let k = 1;
+    const pc = camera as THREE.PerspectiveCamera;
+    if (D.SUB_AJUSTE_PANTALLA && pc.isPerspectiveCamera) {
+      camera.getWorldPosition(_v.cam);
+      const dist = Math.max(0.1, _v.cam.distanceTo(g.position));
+      const marg = 1 - 2 * THREE.MathUtils.clamp(D.SUB_MARGEN_PANTALLA, 0, 0.3);
+      const hy = dist * Math.tan(THREE.MathUtils.degToRad(pc.fov) / 2) * marg;
+      const hx = hy * pc.aspect;
+      const kx  = (hx - px) / (gapL + Math.max(MOCK.historia.w, MOCK.galeria.w) * m);
+      const ky1 = (hy - py) / (gapA + MOCK.ficha.h * m);
+      const ky2 = hy / (Math.max(MOCK.historia.h, MOCK.galeria.h) * m / 2);
+      k = THREE.MathUtils.clamp(Math.min(1, kx, ky1, ky2), 0.15, 1);
+      m *= k; gapL *= k; gapA *= k;
+    }
+    if (k < 0.999 && !A.avisoEscala && A.t >= 1) {
+      A.avisoEscala = true;
+      console.info(`[Subpaneles] Z8: HISTORIA/GALERÍA/FICHA reducidos a ${(k * 100).toFixed(0)} % para entrar en pantalla`);
+    }
+    A.escala = k;
+    ACERC.escalaSub = k; // Z8: para el menú de debug
     const hw = MOCK.historia.w * m, hh = MOCK.historia.h * m;
     const gw = MOCK.galeria.w * m,  gh = MOCK.galeria.h * m;
     const fw = MOCK.ficha.w * m,    fh = MOCK.ficha.h * m;
-    const px = panelAncho / 2, py = panelAlto / 2;
-    const gapL = D.SUB_GAP_LATERAL_M, gapA = D.SUB_GAP_ABAJO_M;
     const s = Math.max(0.001, e);
 
     const hist = historiaRef.current, gal = galeriaRef.current, fic = fichaRef.current;

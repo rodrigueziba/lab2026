@@ -109,6 +109,16 @@ export const DBG_LINTERNA = {
   MARCO_PAD_M:       0.3,   // separación de las esquinas ámbar respecto del panel (m)
 };
 
+// ── Z8: acercamiento del panel seleccionado hacia la cámara — live ──────────────
+export const DBG_ACERC = {
+  ACERC_ACTIVO:     true,    // false = el panel se abre en su órbita (Z2/Z4 sin acercamiento)
+  ACERC_PANTALLA:   0.30,    // fracción máxima del ancho Y del alto del viewport que ocupa el panel
+  ACERC_MS:         900,     // duración del acercamiento
+  ACERC_VUELTA_MS:  900,     // duración de la vuelta a la órbita
+  ACERC_EASING:     "seno" as "seno" | "suave" | "cubica", // in-out sin rebote (seno / smootherstep / cúbica)
+  ACERC_ESPERA_CIERRE: true, // la vuelta empieza cuando terminaron de cerrarse los subpaneles
+};
+
 // ── Z4: subpaneles del panel abierto (HISTORIA / GALERÍA / FICHA) — live ──────
 // Medidas tomadas del mockup en px y convertidas con SUB_M_POR_PX (400 px = ancho del panel 5,4 m).
 export const DBG_SUBPANELES = {
@@ -118,6 +128,8 @@ export const DBG_SUBPANELES = {
   SUB_GAP_ABAJO_M:   0.95,   // separación panel ↔ FICHA (mockup 70 px)
   SUB_ANIM_MS:       400,    // salida desde el panel (escala + desplazamiento) y cierre inverso
   SUB_ADELANTE_M:    0.15,   // los subpaneles se adelantan hacia la cámara (evita cruzar el panel)
+  SUB_AJUSTE_PANTALLA: true, // Z8: escala HISTORIA/GALERÍA/FICHA (y separaciones) para que entren en pantalla
+  SUB_MARGEN_PANTALLA: 0.04, // Z8: margen a cada borde del viewport (fracción)
   SUB_RETENER_PAD_M: 0.25,   // Z5 (era 1.0 sobre el conjunto): margen alrededor de cada subpanel y del panel
   SUB_LINEAS:        true,   // líneas guía punteadas ámbar hacia el panel
   SUB_PUNTERO:       true,   // Z5: retícula clara en el centro de pantalla con el panel abierto

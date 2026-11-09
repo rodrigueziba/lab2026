@@ -28,9 +28,10 @@ import {
   DBG_LINTERNA,
   DBG_SUBPANELES,
   DBG_ORBITAS,
+  DBG_ACERC,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
-import { LINTERNA_STATE, ORBITAS_INFO } from "@/lib/linternaPaneles";
+import { LINTERNA_STATE, ORBITAS_INFO, ACERC } from "@/lib/linternaPaneles";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { setVizVolume, restartVizAudio, BAND_STATE, BAND_U2_DEBUG, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
@@ -330,6 +331,8 @@ export default function DebugMenu() {
   const [linternaLive, setLinternaLive] = useState("inactiva");
   const [subp, setSubp] = useState({ ...DBG_SUBPANELES }); // Z4
   const [orb, setOrb] = useState({ ...DBG_ORBITAS });       // Z7
+  const [acerc, setAcerc] = useState({ ...DBG_ACERC });     // Z8
+  const [acercLive, setAcercLive] = useState("orbita");     // Z8
   const [orbInfo, setOrbInfo] = useState("");               // Z7: tabla de anillos
   // P1: paneles SILLAS — constantes + estado en vivo (mismo poll)
   const [paneles, setPaneles] = useState({ ...DBG_PANELES, forzado: false });
@@ -351,6 +354,10 @@ export default function DebugMenu() {
         const L = LINTERNA_STATE;
         const txt = `${L.fase}${L.sel ? ` · panel ${L.sel.indice} · ${L.sel.angulo.toFixed(1)}° · ${Math.round(L.progreso * 100)}%` : ""}${L.apagada ? " · apagada" : ""}`;
         setLinternaLive(prev => (prev === txt ? prev : txt));
+      }
+      { // Z8
+        const txt = `${ACERC.fase}${ACERC.panel ? ` · panel ${ACERC.panel.indice} · d ${ACERC.distancia.toFixed(2)} m` : ""} · subpaneles ${(ACERC.escalaSub * 100).toFixed(0)} %`;
+        setAcercLive(prev => (prev === txt ? prev : txt));
       }
       { // Z7
         const I = ORBITAS_INFO;
@@ -1090,6 +1097,56 @@ export default function DebugMenu() {
             onChange={v => { DBG_LINTERNA.MARCO_PAD_M = v; setLinterna(l => ({ ...l, MARCO_PAD_M: v })); }} />
           <div style={ROW}>
             <span>estado <span style={NOTE}>{linternaLive}</span></span>
+          </div>
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Acercamiento Z8 <span style={NOTE}>(live)</span></span>
+          <div style={ROW}>
+            <span>ACERC_ACTIVO <span style={NOTE}>off = abre en órbita</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !acerc.ACERC_ACTIVO;
+              DBG_ACERC.ACERC_ACTIVO = v;
+              setAcerc(o => ({ ...o, ACERC_ACTIVO: v }));
+            }}>{acerc.ACERC_ACTIVO ? "ON" : "off"}</button>
+          </div>
+          <NumField label="ACERC_PANTALLA" value={acerc.ACERC_PANTALLA} step={0.01} min={0.05} max={1} note="fracción ancho/alto"
+            onChange={v => { DBG_ACERC.ACERC_PANTALLA = v; setAcerc(o => ({ ...o, ACERC_PANTALLA: v })); }} />
+          <NumField label="ACERC_MS" value={acerc.ACERC_MS} step={50} min={100} max={5000} note="ms ida"
+            onChange={v => { DBG_ACERC.ACERC_MS = v; setAcerc(o => ({ ...o, ACERC_MS: v })); }} />
+          <NumField label="ACERC_VUELTA_MS" value={acerc.ACERC_VUELTA_MS} step={50} min={100} max={5000} note="ms vuelta"
+            onChange={v => { DBG_ACERC.ACERC_VUELTA_MS = v; setAcerc(o => ({ ...o, ACERC_VUELTA_MS: v })); }} />
+          <div style={ROW}>
+            <span>ACERC_EASING <span style={NOTE}>sin rebote</span></span>
+            <select style={{ ...INPUT, width: 90 }} value={acerc.ACERC_EASING} onChange={e => {
+              const v = e.target.value as typeof DBG_ACERC.ACERC_EASING;
+              DBG_ACERC.ACERC_EASING = v;
+              setAcerc(o => ({ ...o, ACERC_EASING: v }));
+            }}>
+              <option value="seno">seno</option>
+              <option value="suave">suave</option>
+              <option value="cubica">cúbica</option>
+            </select>
+          </div>
+          <div style={ROW}>
+            <span>ACERC_ESPERA_CIERRE <span style={NOTE}>vuelve tras cerrar Z4</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !acerc.ACERC_ESPERA_CIERRE;
+              DBG_ACERC.ACERC_ESPERA_CIERRE = v;
+              setAcerc(o => ({ ...o, ACERC_ESPERA_CIERRE: v }));
+            }}>{acerc.ACERC_ESPERA_CIERRE ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>SUB_AJUSTE_PANTALLA <span style={NOTE}>Z8 escala a pantalla</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.SUB_AJUSTE_PANTALLA;
+              DBG_SUBPANELES.SUB_AJUSTE_PANTALLA = v;
+              setSubp(x => ({ ...x, SUB_AJUSTE_PANTALLA: v }));
+            }}>{subp.SUB_AJUSTE_PANTALLA ? "ON" : "off"}</button>
+          </div>
+          <NumField label="SUB_MARGEN_PANTALLA" value={subp.SUB_MARGEN_PANTALLA} step={0.01} min={0} max={0.3} note="Z8 bordes"
+            onChange={v => { DBG_SUBPANELES.SUB_MARGEN_PANTALLA = v; setSubp(x => ({ ...x, SUB_MARGEN_PANTALLA: v })); }} />
+          <div style={ROW}>
+            <span>estado <span style={NOTE}>{acercLive}</span></span>
           </div>
 
           <div style={DIVIDER} />
