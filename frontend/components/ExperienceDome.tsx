@@ -12,11 +12,12 @@ import HazSystem from "./HazSystem";
 import HazRings from "./HazRings";
 import SymbolSystem from "./SymbolSystem";
 import Monoliths from "./Monoliths";
-import { DBG_SILLAS, DBG_PANELES } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_PANELES, DBG_ORBITAS } from "@/lib/debugConfig";
+import { PRISM_CENTER_Y } from "./Prism"; // Z7: altura del origen de los haces
 import { resetEffects } from "@/lib/vizAudio";
 import { PANELES_SILLAS, tickPanelesSillas, installPanelesSillasListeners, panelesSillasVisibles } from "@/lib/alightStore";
 import { createPanelPlaceholder } from "@/lib/retro/panelPlaceholder";
-import { registrarPanelLinterna, tickLinterna, apagarLinterna, resetLinterna, type PanelLinterna } from "@/lib/linternaPaneles";
+import { registrarPanelLinterna, tickLinterna, apagarLinterna, resetLinterna, type PanelLinterna, ORBITAS_INFO, type AnilloInfo } from "@/lib/linternaPaneles";
 import PanelSelMarco from "./PanelSelMarco";
 import SubpanelesProyecto from "./SubpanelesProyecto"; // Z4
 
@@ -30,8 +31,8 @@ const LEGACY_SECTOR_AUDIO_ENABLED   = false;
 
 const API_URL    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 const DOME_R     = 28;
-const MAX_PANELS = 60;
-const PANEL_SCALE = 1.5; // G4: multiply panel dimensions by this factor
+const MAX_PANELS = 60; // G5 (sin Z7); con Z7 manda DBG_ORBITAS.PANELES_MAX
+// G4: PANEL_SCALE = 1.5 → Z7: ahora DBG_ORBITAS.PANEL_ESCALA (panelAncho()/panelAlto())
 const CACHE_KEY  = "alight:media-items-v3"; // Z3: + proyectoId (Z1: v2 con título; antes "alight:media-urls")
 
 // ── Minimal shapes from the project's data layer ──────────────────────────────
@@ -85,7 +86,7 @@ interface OrbitData {
   tiltZ:   number;
   azimuth: number;
   speed:   number;
-  panels:  { pos: THREE.Vector3; item: PanelItem; staggerSec: number }[];
+  panels:  { pos: THREE.Vector3; item: PanelItem; staggerSec: number; bobAmp?: number; bobSemilla?: number }[];
 }
 
 interface OrbitBand { count: number; centerY: number; rFactor: number; }
@@ -135,6 +136,82 @@ function buildOrbits(urls: PanelItem[]): OrbitData[] {
 
     return { centerY, tiltX, tiltZ, azimuth, speed, panels } as OrbitData;
   }).filter((d): d is OrbitData => d !== null);
+}
+
+// ── Z7: órbitas ordenadas ─────────────────────────────────────────────────────
+// Causa del caos de G5: 9 anillos con inclinación X al azar de hasta asin((y−1)/r)
+// (≈15–26°) + Z ±7°, radios 23–27 m pegados al domo y alturas fijas 7/10/13 m sin
+// relación con los haces → paneles superpuestos, fuera de la luz y muy inclinados.
+// Ahora: anillos horizontales (sin inclinación) concéntricos, cada uno con su altura
+// dentro de la banda vertical que barre el abanico del prisma a ese radio.
+const Z7_ORBITAS_ORDENADAS_DEFAULT = true; // el flag vivo es DBG_ORBITAS.ORB_ORDENADAS
+const HAZ_ELEV_RAD = 0.32;                 // elevación del abanico (igual que el shader del domo)
+
+function panelAncho(): number { return 3.6 * DBG_ORBITAS.PANEL_ESCALA; }
+function panelAlto():  number { return 2.4 * DBG_ORBITAS.PANEL_ESCALA; }
+
+function buildOrbitsZ7(items: PanelItem[], version: number): OrbitData[] {
+  const O = DBG_ORBITAS;
+  const W = panelAncho(), H = panelAlto();
+  const n = Math.max(1, Math.round(O.ORB_ANILLOS));
+  // banda útil del haz: hasta donde da ≥ ORB_LUZ_MIN de luz (smoothstep del shader)
+  const cosBorde = DBG_PANELES.PANEL_HAZ_COS, suave = DBG_PANELES.PANEL_HAZ_SUAVE;
+  const f = THREE.MathUtils.clamp(O.ORB_LUZ_MIN, 0, 1);
+  // inversa de smoothstep: t con 3t² − 2t³ = f
+  const tInv = 0.5 - Math.sin(Math.asin(1 - 2 * f) / 3);
+  const cosUtil = Math.min(0.999999, cosBorde + suave * tInv);
+  const theta = Math.acos(cosUtil);
+  const y0 = PRISM_CENTER_Y;
+  const varM = Math.max(0, O.ORB_VAR_M);
+
+  const anillos: AnilloInfo[] = [];
+  for (let i = 0; i < n; i++) {
+    const r = n === 1 ? O.ORB_RADIO_MIN_M : O.ORB_RADIO_MIN_M + (O.ORB_RADIO_MAX_M - O.ORB_RADIO_MIN_M) * (i / (n - 1));
+    const yMin = y0 + r * Math.tan(HAZ_ELEV_RAD - theta);
+    const yMax = y0 + r * Math.tan(HAZ_ELEV_RAD + theta);
+    const cLo = yMin + H / 2 + varM, cHi = yMax - H / 2 - varM;
+    const entra = cLo <= cHi;
+    const mid = entra ? (cLo + cHi) / 2 : (yMin + yMax) / 2;
+    const signo = i % 2 === 0 ? -1 : 1;                       // abajo / arriba alternados
+    const altura = entra ? mid + signo * O.ORB_ALTURA_ALTERNA * (cHi - cLo) / 2 : mid;
+    const wAng = 2 * Math.atan(W / 2 / r);
+    const capacidad = Math.max(1, Math.floor((Math.PI * 2) / (Math.max(1, O.ORB_SEP_MIN) * wAng)));
+    const vel = O.ORB_VEL_BASE * (1 + O.ORB_VEL_PASO * i) * (i % 2 === 0 ? 1 : -1);
+    anillos.push({ radio: r, altura, yMin, yMax, vel, cantidad: 0, capacidad, entra });
+  }
+
+  // reparto proporcional a la capacidad (el anillo interior recibe los más recientes)
+  const capTotal = anillos.reduce((a, b) => a + b.capacidad, 0);
+  const N = Math.min(Math.max(0, Math.round(O.PANELES_MAX)), items.length, capTotal);
+  let asignados = 0;
+  for (const a of anillos) { a.cantidad = Math.min(a.capacidad, Math.floor(N * a.capacidad / capTotal)); asignados += a.cantidad; }
+  while (asignados < N) {
+    const libre = anillos.filter(a => a.cantidad < a.capacidad).sort((x, y) => (y.capacidad - y.cantidad) - (x.capacidad - x.cantidad))[0];
+    if (!libre) break;
+    libre.cantidad++; asignados++;
+  }
+
+  ORBITAS_INFO.anillos = anillos; ORBITAS_INFO.total = asignados;
+  ORBITAS_INFO.pedidos = Math.min(Math.round(O.PANELES_MAX), items.length); ORBITAS_INFO.yHaz = y0;
+  ORBITAS_INFO.version = version;
+  if (anillos.some(a => !a.entra)) console.warn("[ExperienceDome] Z7: algún anillo no entra en la banda de los haces con este tamaño de panel");
+  if (asignados < ORBITAS_INFO.pedidos) console.warn(`[ExperienceDome] Z7: entran ${asignados} de ${ORBITAS_INFO.pedidos} paneles con ORB_SEP_MIN=${O.ORB_SEP_MIN}`);
+
+  let idx = 0, stagger = 0;
+  return anillos.filter(a => a.cantidad > 0).map((a, i) => {
+    const desfase = (i * 0.61803398875 * Math.PI * 2) % (Math.PI * 2); // intercalado entre anillos
+    const panels = Array.from({ length: a.cantidad }, (_, k) => {
+      const ang = (k / a.cantidad) * Math.PI * 2;
+      return {
+        pos: new THREE.Vector3(a.radio * Math.cos(ang), 0, a.radio * Math.sin(ang)),
+        item: items[idx++] ?? { url: null, titulo: "", proyectoId: null },
+        staggerSec: stagger++ * 0.12,
+        bobAmp: varM,
+        bobSemilla: k * 2.399963,                                   // ángulo áureo: fases distintas
+      };
+    });
+    return { centerY: a.altura, tiltX: 0, tiltZ: 0, azimuth: desfase, speed: a.vel, panels } as OrbitData;
+  });
 }
 
 // ── GLSL helpers shared by panel + dome-shell shaders ─────────────────────────
@@ -484,13 +561,15 @@ interface PanelProps {
   azimuth:     number;        // Z2: ángulo base del anillo (va en el pivot del panel)
   tiltZ:       number;        // Z2: inclinación Z del anillo (va en el pivot del panel)
   speed:       number;        // Z2: velocidad de órbita (rad/frame a 60 fps)
+  bobAmp?:     number;        // Z7: variación vertical suave (± m)
+  bobSemilla?: number;        // Z7: fase propia de esa variación
   staggerSec:  number;
   activatedRef: { current: number | null };
 }
 
 const texLoader = new THREE.TextureLoader();
 
-function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, staggerSec, activatedRef }: PanelProps) {
+function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, bobAmp = 0, bobSemilla = 0, staggerSec, activatedRef }: PanelProps) {
   const url = item.url;
   const matRef  = useRef<THREE.ShaderMaterial>(null);
   const meshRef = useRef<THREE.Mesh>(null);   // P1: escala del fade
@@ -527,11 +606,11 @@ function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, staggerSec, 
     if (!Z2_FASE_POR_PANEL) return;
     const entry: PanelLinterna = {
       pivot: pivotRef.current, mesh: meshRef.current, uLit: uniforms.uLit,
-      fase: 0, velocidad: speed, azimut: azimuth,
+      fase: 0, velocidad: speed, azimut: azimuth, bobAmp, bobSemilla, // Z7
       indice, titulo: item.titulo, url: item.url, proyectoId: item.proyectoId, angulo: 180,
     };
     return registrarPanelLinterna(entry);
-  }, [uniforms, speed, azimuth, indice, item]);
+  }, [uniforms, speed, azimuth, indice, item, bobAmp, bobSemilla]);
 
   // Z1: foto cargada (o null) + placeholder (creado solo si hace falta) + estado
   const fotoRef = useRef<{ tex: THREE.Texture | null; aspect: number; estado: "cargando" | "ok" | "sin-foto" | "error" }>(
@@ -615,7 +694,7 @@ function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, staggerSec, 
   return (
     <group ref={pivotRef} rotation={Z2_FASE_POR_PANEL ? [0, azimuth, tiltZ] : [0, 0, 0]}>
       <mesh ref={meshRef} position={position} quaternion={quaternion}>
-        <planeGeometry args={[3.6 * PANEL_SCALE, 2.4 * PANEL_SCALE]} />
+        <planeGeometry args={[panelAncho(), panelAlto()]} /> {/* Z7: escala desde debug */}
         <shaderMaterial
           ref={matRef}
           vertexShader={VERT}
@@ -665,6 +744,8 @@ function OrbitRing({
           azimuth={data.azimuth}
           tiltZ={data.tiltZ}
           speed={data.speed}
+          bobAmp={p.bobAmp}
+          bobSemilla={p.bobSemilla}
           staggerSec={p.staggerSec}
           activatedRef={activatedRef}
         />
@@ -782,7 +863,17 @@ export default function ExperienceDome() {
 
   // Build orbital layout once per URL set — Math.random() inside ensures each
   // page load gets a unique arrangement of orbits, speeds, and directions.
-  const orbits = useMemo(() => buildOrbits(urls.slice(0, MAX_PANELS)), [urls]);
+  // Z7: órbitas ordenadas (flag ORB_ORDENADAS); "Regenerar órbitas" en debug recalcula todo
+  const [regen, setRegen] = useState(0);
+  useEffect(() => {
+    const on = () => setRegen(n => n + 1);
+    window.addEventListener("alight:debug-regenerar-orbitas", on);
+    return () => window.removeEventListener("alight:debug-regenerar-orbitas", on);
+  }, []);
+  const orbits = useMemo(
+    () => (DBG_ORBITAS.ORB_ORDENADAS && Z7_ORBITAS_ORDENADAS_DEFAULT ? buildOrbitsZ7(urls, regen) : buildOrbits(urls.slice(0, MAX_PANELS))),
+    // regen fuerza el recálculo con los valores actuales de DBG_ORBITAS
+    [urls, regen]);
 
   // P1: precompilar el shader de los paneles apenas se montan (oculto), para que su
   // aparición no compile programas. compile() solo recorre objetos visibles.
@@ -831,9 +922,9 @@ export default function ExperienceDome() {
       </mesh>
 
       {/* Z2: marco de selección de la linterna (un solo plano compartido) */}
-      {Z2_FASE_POR_PANEL && <PanelSelMarco ancho={3.6 * PANEL_SCALE} alto={2.4 * PANEL_SCALE} />}
+      {Z2_FASE_POR_PANEL && <PanelSelMarco ancho={panelAncho()} alto={panelAlto()} />}
       {/* Z4: HISTORIA / GALERÍA / FICHA alrededor del panel abierto */}
-      {Z2_FASE_POR_PANEL && <SubpanelesProyecto panelAncho={3.6 * PANEL_SCALE} panelAlto={2.4 * PANEL_SCALE} />}
+      {Z2_FASE_POR_PANEL && <SubpanelesProyecto panelAncho={panelAncho()} panelAlto={panelAlto()} />}
       {/* P1: paneles del camino SILLAS — visibles solo entre prism-landed y la E sobre el prisma */}
       <group ref={panelsRef} visible={false}>
         {orbits.map((orb, i) => (

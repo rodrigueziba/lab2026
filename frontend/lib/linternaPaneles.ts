@@ -6,7 +6,7 @@
 // allocations por frame (vectores reutilizados).
 
 import * as THREE from "three";
-import { DBG_LINTERNA } from "@/lib/debugConfig";
+import { DBG_LINTERNA, DBG_ORBITAS } from "@/lib/debugConfig";
 
 export interface PanelLinterna {
   pivot:    THREE.Object3D | null;   // grupo que gira con la fase propia del panel
@@ -15,6 +15,8 @@ export interface PanelLinterna {
   fase:     number;                  // ángulo de órbita propio (rad), se congela con la luz
   velocidad: number;                 // rad por frame a 60 fps (misma escala que antes)
   azimut:   number;                  // ángulo base del anillo
+  bobAmp:   number;                  // Z7: variación vertical suave (± m), 0 = sin variación
+  bobSemilla: number;                // Z7: fase propia de la variación
   indice:   number;
   titulo:   string;
   url:      string | null;
@@ -37,6 +39,14 @@ export const LINTERNA_STATE = {
 };
 
 export const PANELES_LINTERNA: PanelLinterna[] = [];
+
+// Z7: último layout de órbitas calculado por ExperienceDome (para el menú de debug)
+export interface AnilloInfo {
+  radio: number; altura: number; yMin: number; yMax: number;
+  vel: number; cantidad: number; capacidad: number; entra: boolean;
+}
+export const ORBITAS_INFO: { anillos: AnilloInfo[]; total: number; pedidos: number; yHaz: number; version: number } =
+  { anillos: [], total: 0, pedidos: 0, yHaz: 0, version: 0 };
 
 export function registrarPanelLinterna(p: PanelLinterna): () => void {
   PANELES_LINTERNA.push(p);
@@ -78,6 +88,12 @@ export function resetLinterna(): void {
   soltar();
 }
 
+/** Z7: variación vertical suave ligada a la fase de órbita (se congela con el panel). */
+function moverVertical(p: PanelLinterna): void {
+  if (!p.mesh || p.bobAmp === 0) return;
+  p.mesh.position.y = p.bobAmp * Math.sin(p.fase * DBG_ORBITAS.ORB_VAR_FREQ + p.bobSemilla);
+}
+
 const _fwd = new THREE.Vector3();
 const _cam = new THREE.Vector3();
 const _pos = new THREE.Vector3();
@@ -104,6 +120,7 @@ export function tickLinterna(camera: THREE.Camera, dt: number, now: number, acti
       // las órbitas siguen avanzando igual que antes (solo si los paneles se ven)
       if (orbitan) p.fase += p.velocidad * D.ORBITA_VEL_MULT * pasos;
       if (p.pivot) p.pivot.rotation.y = p.azimut + p.fase;
+      moverVertical(p);
       p.uLit.value += (0 - p.uLit.value) * kLit;
     }
     s.selAlpha += (0 - s.selAlpha) * kSel;
@@ -159,5 +176,6 @@ export function tickLinterna(camera: THREE.Camera, dt: number, now: number, acti
   for (const p of PANELES_LINTERNA) {
     if (p !== s.sel) p.fase += p.velocidad * D.ORBITA_VEL_MULT * pasos;
     if (p.pivot) p.pivot.rotation.y = p.azimut + p.fase;
+    moverVertical(p);
   }
 }

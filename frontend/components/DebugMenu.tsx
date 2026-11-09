@@ -27,9 +27,10 @@ import {
   DBG_PANELES,
   DBG_LINTERNA,
   DBG_SUBPANELES,
+  DBG_ORBITAS,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
-import { LINTERNA_STATE } from "@/lib/linternaPaneles";
+import { LINTERNA_STATE, ORBITAS_INFO } from "@/lib/linternaPaneles";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { setVizVolume, restartVizAudio, BAND_STATE, BAND_U2_DEBUG, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
@@ -328,6 +329,8 @@ export default function DebugMenu() {
   const [linterna, setLinterna] = useState({ ...DBG_LINTERNA });
   const [linternaLive, setLinternaLive] = useState("inactiva");
   const [subp, setSubp] = useState({ ...DBG_SUBPANELES }); // Z4
+  const [orb, setOrb] = useState({ ...DBG_ORBITAS });       // Z7
+  const [orbInfo, setOrbInfo] = useState("");               // Z7: tabla de anillos
   // P1: paneles SILLAS — constantes + estado en vivo (mismo poll)
   const [paneles, setPaneles] = useState({ ...DBG_PANELES, forzado: false });
   const [panelesFase, setPanelesFase] = useState(PANELES_SILLAS.fase as string);
@@ -348,6 +351,12 @@ export default function DebugMenu() {
         const L = LINTERNA_STATE;
         const txt = `${L.fase}${L.sel ? ` · panel ${L.sel.indice} · ${L.sel.angulo.toFixed(1)}° · ${Math.round(L.progreso * 100)}%` : ""}${L.apagada ? " · apagada" : ""}`;
         setLinternaLive(prev => (prev === txt ? prev : txt));
+      }
+      { // Z7
+        const I = ORBITAS_INFO;
+        const txt = I.anillos.map((a, i) => `A${i}: r ${a.radio.toFixed(1)} · y ${a.altura.toFixed(2)} [${a.yMin.toFixed(1)}–${a.yMax.toFixed(1)}] · v ${(a.vel * 60).toFixed(4)} rad/s · ${a.cantidad}/${a.capacidad}${a.entra ? "" : " ✗ no entra"}`).join("\n")
+          + `\nTOTAL ${I.total} de ${I.pedidos} · origen haces y ${I.yHaz.toFixed(2)} · regeneración ${I.version}`;
+        setOrbInfo(prev => (prev === txt ? prev : txt));
       }
       setMedicion(m => (m.estado === FLASH_MEDICION.estado && m.centro === FLASH_MEDICION.centro ? m : { ...FLASH_MEDICION })); // G2
     }, 100);
@@ -1008,6 +1017,48 @@ export default function DebugMenu() {
               {paneles.forzado ? "Soltar paneles SILLAS" : "Forzar paneles SILLAS"}
             </button>
           </div>
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Órbitas Z7 — paneles SILLAS <span style={NOTE}>(aplicar con Regenerar)</span></span>
+          <div style={ROW}>
+            <span>ORB_ORDENADAS <span style={NOTE}>off = anillos G5</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !orb.ORB_ORDENADAS;
+              DBG_ORBITAS.ORB_ORDENADAS = v;
+              setOrb(o => ({ ...o, ORB_ORDENADAS: v }));
+            }}>{orb.ORB_ORDENADAS ? "ON" : "off"}</button>
+          </div>
+          <NumField label="PANELES_MAX" value={orb.PANELES_MAX} step={1} min={1} max={120} note="más recientes"
+            onChange={v => { DBG_ORBITAS.PANELES_MAX = v; setOrb(o => ({ ...o, PANELES_MAX: v })); }} />
+          <NumField label="ORB_ANILLOS" value={orb.ORB_ANILLOS} step={1} min={1} max={8} note="anillos"
+            onChange={v => { DBG_ORBITAS.ORB_ANILLOS = v; setOrb(o => ({ ...o, ORB_ANILLOS: v })); }} />
+          <NumField label="ORB_RADIO_MIN_M" value={orb.ORB_RADIO_MIN_M} step={0.5} min={8} max={27} note="m"
+            onChange={v => { DBG_ORBITAS.ORB_RADIO_MIN_M = v; setOrb(o => ({ ...o, ORB_RADIO_MIN_M: v })); }} />
+          <NumField label="ORB_RADIO_MAX_M" value={orb.ORB_RADIO_MAX_M} step={0.5} min={8} max={27} note="m"
+            onChange={v => { DBG_ORBITAS.ORB_RADIO_MAX_M = v; setOrb(o => ({ ...o, ORB_RADIO_MAX_M: v })); }} />
+          <NumField label="ORB_ALTURA_ALTERNA" value={orb.ORB_ALTURA_ALTERNA} step={0.05} min={0} max={1} note="abajo/arriba"
+            onChange={v => { DBG_ORBITAS.ORB_ALTURA_ALTERNA = v; setOrb(o => ({ ...o, ORB_ALTURA_ALTERNA: v })); }} />
+          <NumField label="ORB_VAR_M" value={orb.ORB_VAR_M} step={0.05} min={0} max={2} note="± m"
+            onChange={v => { DBG_ORBITAS.ORB_VAR_M = v; setOrb(o => ({ ...o, ORB_VAR_M: v })); }} />
+          <NumField label="ORB_VAR_FREQ" value={orb.ORB_VAR_FREQ} step={0.5} min={0} max={8} note="por vuelta"
+            onChange={v => { DBG_ORBITAS.ORB_VAR_FREQ = v; setOrb(o => ({ ...o, ORB_VAR_FREQ: v })); }} />
+          <NumField label="ORB_VEL_BASE" value={orb.ORB_VEL_BASE} step={1e-05} min={0} max={0.002} note="rad/frame"
+            onChange={v => { DBG_ORBITAS.ORB_VEL_BASE = v; setOrb(o => ({ ...o, ORB_VEL_BASE: v })); }} />
+          <NumField label="ORB_VEL_PASO" value={orb.ORB_VEL_PASO} step={0.05} min={0} max={3} note="× por anillo"
+            onChange={v => { DBG_ORBITAS.ORB_VEL_PASO = v; setOrb(o => ({ ...o, ORB_VEL_PASO: v })); }} />
+          <NumField label="ORB_SEP_MIN" value={orb.ORB_SEP_MIN} step={0.05} min={1} max={3} note="× ancho angular"
+            onChange={v => { DBG_ORBITAS.ORB_SEP_MIN = v; setOrb(o => ({ ...o, ORB_SEP_MIN: v })); }} />
+          <NumField label="ORB_LUZ_MIN" value={orb.ORB_LUZ_MIN} step={0.05} min={0} max={1} note="banda del haz"
+            onChange={v => { DBG_ORBITAS.ORB_LUZ_MIN = v; setOrb(o => ({ ...o, ORB_LUZ_MIN: v })); }} />
+          <NumField label="PANEL_ESCALA" value={orb.PANEL_ESCALA} step={0.05} min={0.5} max={3} note="× 3,6×2,4 m"
+            onChange={v => { DBG_ORBITAS.PANEL_ESCALA = v; setOrb(o => ({ ...o, PANEL_ESCALA: v })); }} />
+          <div style={ROW}>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
+              onClick={() => window.dispatchEvent(new CustomEvent("alight:debug-regenerar-orbitas"))}>
+              Regenerar órbitas
+            </button>
+          </div>
+          <pre style={{ ...NOTE, whiteSpace: "pre-wrap", margin: "4px 0" }}>{orbInfo}</pre>
 
           <div style={DIVIDER} />
           <span style={LABEL}>Linterna Z2 — paneles SILLAS <span style={NOTE}>(live)</span></span>

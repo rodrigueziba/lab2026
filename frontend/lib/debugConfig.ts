@@ -130,6 +130,23 @@ export const DBG_SUBPANELES = {
   GALERIA_CURVA:     0.08,   // curvatura (barrel) de la pantalla CRT
 };
 
+// ── Z7: órbitas ordenadas de los paneles SILLAS — se aplican con "Regenerar órbitas" ──
+export const DBG_ORBITAS = {
+  ORB_ORDENADAS:     true,   // false = 9 anillos inclinados al azar de antes (G5)
+  PANELES_MAX:       60,     // tope de paneles (los más recientes primero); se recorta a la capacidad
+  ORB_ANILLOS:       4,      // anillos horizontales concéntricos
+  ORB_RADIO_MIN_M:   15,     // radio del anillo interior (fuera del prisma/sillas, dentro del domo R=28)
+  ORB_RADIO_MAX_M:   24,     // radio del anillo exterior
+  ORB_ALTURA_ALTERNA: 0.9,   // 0 = todos al centro de la banda de luz; 1 = alternan abajo/arriba al máximo
+  ORB_VAR_M:         0.25,   // variación vertical suave de cada panel (± m, reservada dentro del rango)
+  ORB_VAR_FREQ:      2,      // ondulaciones por vuelta de la variación vertical
+  ORB_VEL_BASE:      0.00012, // rad/frame a 60 fps del anillo interior
+  ORB_VEL_PASO:      0.45,   // cada anillo hacia afuera: × (1 + paso × i); sentidos alternados
+  ORB_SEP_MIN:       1.3,    // separación angular mínima = ancho angular del panel × esto
+  ORB_LUZ_MIN:       0.5,    // la banda vertical usa el cono hasta donde el haz da ≥ este % de luz
+  PANEL_ESCALA:      1.5,    // tamaño del panel = 3,6 × 2,4 m × esto (era PANEL_SCALE fijo)
+};
+
 // ── P1: paneles orbitantes del camino SILLAS (ExperienceDome) — live ───────────
 export const DBG_PANELES = {
   PANELES_AUTO:        true,  // false = paneles siempre visibles (comportamiento anterior)
