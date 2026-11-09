@@ -291,6 +291,12 @@ export function dibujarFicha(ctx: CanvasRenderingContext2D, d: ProyectoDetalle) 
   espaciado(ctx, 0);
 }
 
+/** Z11: como dentro(), con el rectángulo agrandado `m` (fracción de su tamaño) por lado: histéresis de salida. */
+export function dentroAmpliado(r: Rect, x: number, y: number, m: number): boolean {
+  const ex = r.w * m, ey = r.h * m;
+  return x >= r.x - ex && x <= r.x + r.w + ex && y >= r.y - ey && y <= r.y + r.h + ey;
+}
+
 /** true si el punto (px de canvas) está dentro del rectángulo. */
 export function dentro(r: Rect, x: number, y: number): boolean {
   return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;

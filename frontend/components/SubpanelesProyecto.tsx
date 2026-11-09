@@ -24,7 +24,7 @@ import { playUIClick } from "@/lib/audioEngine";
 import { useProyectoDetalle, type ProyectoDetalle } from "@/lib/proyectoDetalle";
 import {
   HISTORIA_SIZE, GALERIA_SIZE, FICHA_SIZE, GALERIA_PANTALLA, HISTORIA_BOTONES, GALERIA_BOTONES,
-  paginarSinopsis, dibujarHistoria, dibujarGaleria, dibujarGaleriaPantalla, dibujarFicha, dentro,
+  paginarSinopsis, dibujarHistoria, dibujarGaleria, dibujarGaleriaPantalla, dibujarFicha, dentro, dentroAmpliado,
 } from "@/lib/retro/subpanelCanvas";
 
 // tamaño de cada subpanel en px del mockup (canvas = × 2)
@@ -147,10 +147,13 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
   const ui = useRef({
     pagina: 0, paginas: [[""]] as string[][], indice: 0,
     hover: null as string | null, sobre: null as "historia" | "galeria" | "ficha" | null,
+    // Z11: estado de la retícula (refs, nunca setState): escala actual + último clic aceptado
+    escalaPuntero: 1, tClic: -1e9,
   });
   const lienzos = useRef<{ historia: Lienzo | null; galeria: Lienzo | null; pantalla: Lienzo | null; ficha: Lienzo | null; datos: ProyectoDetalle | null }>(
     { historia: null, galeria: null, pantalla: null, ficha: null, datos: null });
   const imagenes = useRef(new Map<string, THREE.Texture>());
+  const cargando = useRef(new Set<string>()); // Z11: precargas en curso
   const loader = useMemo(() => new THREE.TextureLoader(), []);
 
   // texturas vacías para que los materiales compilen con USE_MAP desde el inicio (sin recompilar al abrir)
@@ -223,8 +226,8 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     const d = lienzos.current.datos, mat = pantMatRef.current;
     if (!d || !mat) return;
     const url = d.galeria[ui.current.indice] ?? d.foto;
-    mat.uniforms.uHas.value = 0;
-    if (!url) return;
+    // Z11: no se apaga la pantalla al cambiar: queda la imagen anterior hasta que llega la nueva
+    if (!url) { mat.uniforms.uHas.value = 0; return; }
     const hit = imagenes.current.get(url);
     const aplicar = (tex: THREE.Texture) => {
       const img = tex.image as { width?: number; height?: number } | undefined;
@@ -232,14 +235,32 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       mat.uniforms.uTexAspect.value = img?.width && img?.height ? img.width / img.height : 1.5;
       mat.uniforms.uHas.value = 1;
     };
-    if (hit) { aplicar(hit); return; }
+    if (hit) { aplicar(hit); precargarVecinas(); return; }
     loader.load(url, tex => {
       tex.colorSpace = THREE.SRGBColorSpace;
       if (lienzos.current.datos !== d) { tex.dispose(); return; }  // cambió el proyecto mientras cargaba
       imagenes.current.set(url, tex);
       gl.initTexture(tex);
-      if ((d.galeria[ui.current.indice] ?? d.foto) === url) aplicar(tex);
+      if ((d.galeria[ui.current.indice] ?? d.foto) === url) { aplicar(tex); precargarVecinas(); }
     }, undefined, () => console.warn(`[Subpaneles] Z4: no cargó la imagen de galería ${url}`));
+  };
+  // Z11: precarga la anterior y la siguiente para que ANT / SIG no esperen la red
+  const precargarVecinas = () => {
+    const d = lienzos.current.datos;
+    if (!d || d.galeria.length < 2) return;
+    const n = d.galeria.length;
+    for (const j of [(ui.current.indice + 1) % n, (ui.current.indice - 1 + n) % n]) {
+      const u = d.galeria[j];
+      if (!u || imagenes.current.has(u) || cargando.current.has(u)) continue;
+      cargando.current.add(u);
+      loader.load(u, tex => {
+        cargando.current.delete(u);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        if (lienzos.current.datos !== d) { tex.dispose(); return; }
+        imagenes.current.set(u, tex);
+        gl.initTexture(tex);
+      }, undefined, () => cargando.current.delete(u));
+    }
   };
 
   // ── lienzos por proyecto (se crean al llegar los datos, se liberan al cambiar/desmontar) ──
@@ -250,6 +271,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     const p = crearLienzo(GALERIA_PANTALLA.w, GALERIA_PANTALLA.h);
     const f = crearLienzo(FICHA_SIZE.w, FICHA_SIZE.h);
     const imgs = imagenes.current;
+    const carg = cargando.current; // Z11
     lienzos.current = { historia: h, galeria: g, pantalla: p, ficha: f, datos: data };
     ui.current.pagina = 0; ui.current.indice = 0; ui.current.hover = null; ui.current.sobre = null;
     if (h) ui.current.paginas = paginarSinopsis(h.ctx, data.sinopsis, DBG_SUBPANELES.HISTORIA_RENGLONES);
@@ -267,6 +289,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       for (const L of [h, g, p, f]) L?.tex.dispose();
       for (const t of imgs.values()) t.dispose();
       imgs.clear();
+      carg.clear(); // Z11: las precargas que lleguen tarde se descartan (datos distintos)
       if (hm) hm.map = vacia;
       if (gm) gm.map = vacia;
       if (fm) fm.map = vacia;
@@ -283,6 +306,10 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       if (e.button !== 0 || !document.pointerLockElement || !anim.current.abierto || anim.current.t < 0.95) return;
       const u = ui.current, d = lienzos.current.datos;
       if (!u.hover || !d) return;
+      // Z11: cooldown — no se reentra mientras dura el clic anterior
+      const ahora = performance.now();
+      if (ahora - u.tClic < DBG_SUBPANELES.PUNTERO_COOLDOWN_MS) return;
+      u.tClic = ahora;                // dispara el pulso de la retícula (duración fija)
       playUIClick(); // Z5
       if (u.sobre === "historia") {
         const n = u.paginas.length;
@@ -424,11 +451,18 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     }
     // el panel abierto también cuenta como "dentro" (su geometría mide panelAncho × panelAlto)
     if (!dentroAlgo && rayoUV(LINTERNA_STATE.sel?.mesh ?? null, panelAncho, panelAlto, _v.cam, _v.fwd, _hit, pad / panelAncho)) dentroAlgo = true;
+    // Z11: zonas de hit FIJAS en UV del canvas (no dependen del dibujo ni de la retícula), con
+    // histéresis: el botón ya señalado se suelta recién al salir de su rectángulo agrandado.
+    const hPrev = ui.current.hover, mH = Math.max(0, D.PUNTERO_HISTERESIS);
     if (sobre === "historia") {
-      if (dentro(HISTORIA_BOTONES.arriba, _hit.cx, _hit.cy)) hover = "arriba";
+      if (hPrev === "arriba" && ui.current.sobre === "historia" && dentroAmpliado(HISTORIA_BOTONES.arriba, _hit.cx, _hit.cy, mH)) hover = "arriba";
+      else if (hPrev === "abajo" && ui.current.sobre === "historia" && dentroAmpliado(HISTORIA_BOTONES.abajo, _hit.cx, _hit.cy, mH)) hover = "abajo";
+      else if (dentro(HISTORIA_BOTONES.arriba, _hit.cx, _hit.cy)) hover = "arriba";
       else if (dentro(HISTORIA_BOTONES.abajo, _hit.cx, _hit.cy)) hover = "abajo";
     } else if (sobre === "galeria") {
-      if (dentro(GALERIA_BOTONES.ant, _hit.cx, _hit.cy)) hover = "ant";
+      if (hPrev === "ant" && ui.current.sobre === "galeria" && dentroAmpliado(GALERIA_BOTONES.ant, _hit.cx, _hit.cy, mH)) hover = "ant";
+      else if (hPrev === "sig" && ui.current.sobre === "galeria" && dentroAmpliado(GALERIA_BOTONES.sig, _hit.cx, _hit.cy, mH)) hover = "sig";
+      else if (dentro(GALERIA_BOTONES.ant, _hit.cx, _hit.cy)) hover = "ant";
       else if (dentro(GALERIA_BOTONES.sig, _hit.cx, _hit.cy)) hover = "sig";
     }
 
@@ -441,10 +475,12 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
 
     const u = ui.current;
     if (hover !== u.hover || sobre !== u.sobre) {
-      const antes = u.sobre;
+      // Z11: se redibuja un canvas solo si cambió el botón señalado EN ese subpanel
+      const hHistAntes = u.sobre === "historia" ? u.hover : null, hHist = sobre === "historia" ? hover : null;
+      const hGalAntes  = u.sobre === "galeria"  ? u.hover : null, hGal  = sobre === "galeria"  ? hover : null;
       u.hover = hover; u.sobre = sobre;
-      if (antes === "historia" || sobre === "historia") redibujarHistoria();
-      if (antes === "galeria" || sobre === "galeria") redibujarGaleria();
+      if (hHistAntes !== hHist) redibujarHistoria();
+      if (hGalAntes !== hGal)   redibujarGaleria();
     }
 
     // Z5: retícula clara en el centro de pantalla, sobre el plano del conjunto
@@ -459,7 +495,11 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
         ver = t > 0;
         if (ver) {
           pt.position.set(_v.o.x + _v.d.x * t, _v.o.y + _v.d.y * t, 0.03);
-          const r = D.PUNTERO_RADIO_M / 0.21 * (hover ? 1.3 : 1);   // geometría base: radio medio 0.21 m
+          // Z11: un único objetivo (pulso de clic > hover > normal) e interpolación suave
+          const pulso = now - u.tClic < D.PUNTERO_PULSO_MS;
+          const objetivo = pulso ? D.PUNTERO_ESCALA_CLIC : hover ? D.PUNTERO_ESCALA_HOVER : 1;
+          u.escalaPuntero += (objetivo - u.escalaPuntero) * (1 - Math.exp(-Math.max(0.1, D.PUNTERO_SUAVIZADO_S) * dt));
+          const r = D.PUNTERO_RADIO_M / 0.21 * u.escalaPuntero;   // geometría base: radio medio 0.21 m
           pt.scale.set(r, r, 1);
         }
       }

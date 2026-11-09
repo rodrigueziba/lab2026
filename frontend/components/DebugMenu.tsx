@@ -1237,6 +1237,18 @@ export default function DebugMenu() {
             onChange={v => { DBG_SUBPANELES.PUNTERO_RADIO_M = v; setSubp(x => ({ ...x, PUNTERO_RADIO_M: v })); }} />
           <NumField label="PUNTERO_GRACIA_MS" value={subp.PUNTERO_GRACIA_MS} step={100} min={0} max={5000} note="Z5 antes de cerrar"
             onChange={v => { DBG_SUBPANELES.PUNTERO_GRACIA_MS = v; setSubp(x => ({ ...x, PUNTERO_GRACIA_MS: v })); }} />
+          <NumField label="PUNTERO_HISTERESIS" value={subp.PUNTERO_HISTERESIS} step={0.01} min={0} max={0.5} note="Z11 salida"
+            onChange={v => { DBG_SUBPANELES.PUNTERO_HISTERESIS = v; setSubp(x => ({ ...x, PUNTERO_HISTERESIS: v })); }} />
+          <NumField label="PUNTERO_PULSO_MS" value={subp.PUNTERO_PULSO_MS} step={10} min={0} max={1000} note="Z11 pulso clic"
+            onChange={v => { DBG_SUBPANELES.PUNTERO_PULSO_MS = v; setSubp(x => ({ ...x, PUNTERO_PULSO_MS: v })); }} />
+          <NumField label="PUNTERO_COOLDOWN_MS" value={subp.PUNTERO_COOLDOWN_MS} step={10} min={0} max={2000} note="Z11 entre clics"
+            onChange={v => { DBG_SUBPANELES.PUNTERO_COOLDOWN_MS = v; setSubp(x => ({ ...x, PUNTERO_COOLDOWN_MS: v })); }} />
+          <NumField label="PUNTERO_ESCALA_HOVER" value={subp.PUNTERO_ESCALA_HOVER} step={0.05} min={0.5} max={3} note="Z11 × radio"
+            onChange={v => { DBG_SUBPANELES.PUNTERO_ESCALA_HOVER = v; setSubp(x => ({ ...x, PUNTERO_ESCALA_HOVER: v })); }} />
+          <NumField label="PUNTERO_ESCALA_CLIC" value={subp.PUNTERO_ESCALA_CLIC} step={0.05} min={0.2} max={3} note="Z11 × radio"
+            onChange={v => { DBG_SUBPANELES.PUNTERO_ESCALA_CLIC = v; setSubp(x => ({ ...x, PUNTERO_ESCALA_CLIC: v })); }} />
+          <NumField label="PUNTERO_SUAVIZADO_S" value={subp.PUNTERO_SUAVIZADO_S} step={1} min={1} max={60} note="Z11 1/s"
+            onChange={v => { DBG_SUBPANELES.PUNTERO_SUAVIZADO_S = v; setSubp(x => ({ ...x, PUNTERO_SUAVIZADO_S: v })); }} />
           <div style={ROW}>
             <span>PANEL_BLOQUEA_MOVIMIENTO <span style={NOTE}>Z5 sin WASD</span></span>
             <button style={INPUT} onClick={() => {

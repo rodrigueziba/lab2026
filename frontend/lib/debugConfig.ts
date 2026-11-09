@@ -151,6 +151,13 @@ export const DBG_SUBPANELES = {
   PUNTERO_RADIO_M:   0.21,   // Z5: radio medio de la retícula (m)
   PUNTERO_GRACIA_MS: 1200,   // Z5: espera antes de cerrar si el puntero sale (evita cerrar por un roce)
   PANEL_BLOQUEA_MOVIMIENTO: false, // Z5: true = sin WASD mientras hay un panel abierto
+  // Z11: puntero estable sobre los botones
+  PUNTERO_HISTERESIS: 0.12,  // el hover entra con el botón y sale con el botón agrandado este % por lado
+  PUNTERO_PULSO_MS:   150,   // duración del pulso de la retícula al hacer clic
+  PUNTERO_COOLDOWN_MS: 250,  // clics ignorados después de uno aceptado
+  PUNTERO_ESCALA_HOVER: 1.3, // retícula sobre un botón (× radio)
+  PUNTERO_ESCALA_CLIC: 0.75, // retícula durante el pulso de clic (× radio)
+  PUNTERO_SUAVIZADO_S: 18,   // velocidad (1/s) con que la retícula va a su tamaño objetivo
   HISTORIA_RENGLONES: 10,    // renglones por página de la sinopsis
   GALERIA_AMBAR:     1.0,    // 1 = imagen monocroma ámbar, 0 = color original
   GALERIA_SCAN:      0.28,   // intensidad de scanlines de la pantalla CRT
