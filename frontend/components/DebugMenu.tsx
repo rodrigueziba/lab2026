@@ -356,7 +356,7 @@ export default function DebugMenu() {
       setPanelesFase(PANELES_SILLAS.fase); // P1
       { // Z2
         const L = LINTERNA_STATE;
-        const txt = `${L.fase}${L.sel ? ` · panel ${L.sel.indice} · ${L.sel.angulo.toFixed(1)}° · ${Math.round(L.progreso * 100)}%` : ""}${L.apagada ? " · apagada" : ""}`;
+        const txt = `${L.habilitada ? "habilitada" : "NO habilitada (movimiento bloqueado)"} · ${L.fase}${L.sel ? ` · panel ${L.sel.indice} · ${L.sel.angulo.toFixed(1)}° · ${Math.round(L.progreso * 100)}%` : ""}${L.apagada ? " · apagada" : ""}`;
         setLinternaLive(prev => (prev === txt ? prev : txt));
       }
       { // Z8
@@ -1081,6 +1081,14 @@ export default function DebugMenu() {
               DBG_LINTERNA.LINTERNA_ACTIVA = v;
               setLinterna(l => ({ ...l, LINTERNA_ACTIVA: v }));
             }}>{linterna.LINTERNA_ACTIVA ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>PANEL_SELECCION_REQUIERE_LIBERACION <span style={NOTE}>Z13 off = desde que se ven</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !linterna.PANEL_SELECCION_REQUIERE_LIBERACION;
+              DBG_LINTERNA.PANEL_SELECCION_REQUIERE_LIBERACION = v;
+              setLinterna(l => ({ ...l, PANEL_SELECCION_REQUIERE_LIBERACION: v }));
+            }}>{linterna.PANEL_SELECCION_REQUIERE_LIBERACION ? "ON" : "off"}</button>
           </div>
           <NumField label="CONO_DEG" value={linterna.CONO_DEG} step={0.5} min={1} max={45} note="° luz"
             onChange={v => { DBG_LINTERNA.CONO_DEG = v; setLinterna(l => ({ ...l, CONO_DEG: v })); }} />

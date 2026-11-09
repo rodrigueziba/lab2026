@@ -43,6 +43,7 @@ export const LINTERNA_STATE = {
   apagada:    false,  // true tras alight:visualizer-activate (hasta reset)
   abiertoIdx: -1,     // índice del panel abierto (−1 = ninguno)
   retener:    false,  // Z4: la mirada está sobre el conjunto abierto (panel + subpaneles) → no soltar
+  habilitada: false,  // Z13: selección habilitada (movimiento liberado) — debug
 };
 
 export const PANELES_LINTERNA: PanelLinterna[] = [];
@@ -309,10 +310,14 @@ const RAD = Math.PI / 180;
  * Avanza la fase de cada panel salvo la del seleccionado, calcula uLit por cono,
  * elige un único seleccionado con histéresis y corre el temporizador de apertura.
  */
-export function tickLinterna(camera: THREE.Camera, dt: number, now: number, activa: boolean, orbitan: boolean): void {
+export function tickLinterna(camera: THREE.Camera, dt: number, now: number, activa: boolean, orbitan: boolean, habilitada = true): void {
   const s = LINTERNA_STATE;
   const D = DBG_LINTERNA;
-  const on = activa && D.LINTERNA_ACTIVA && !s.apagada;
+  // Z13: antes de liberarse el movimiento no hay luz ni selección; si ya hay una en curso
+  // (selección, viaje o panel abierto) no se interrumpe.
+  const enCurso = s.sel !== null || ACERC.fase !== "orbita";
+  LINTERNA_STATE.habilitada = habilitada;
+  const on = activa && D.LINTERNA_ACTIVA && !s.apagada && (habilitada || enCurso);
   const kLit = 1 - Math.exp(-D.LUZ_FADE_S * dt);
   const kSel = 1 - Math.exp(-D.SEL_FADE_S * dt);
   const pasos = dt * 60; // la velocidad original era por frame a 60 fps

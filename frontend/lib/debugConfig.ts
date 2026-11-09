@@ -98,6 +98,7 @@ export const DBG_FLASH = {
 // ── Z2: linterna del usuario sobre los paneles SILLAS — live ───────────────────
 export const DBG_LINTERNA = {
   LINTERNA_ACTIVA:   true,  // false = sin linterna (órbitas y paneles como antes)
+  PANEL_SELECCION_REQUIERE_LIBERACION: true, // Z13: linterna/selección recién cuando se libera el movimiento (sala_activa)
   CONO_DEG:          12,    // semiángulo del cono de luz (ilumina con caída suave hasta acá)
   ENTRA_DEG:         5,     // histéresis: un panel queda seleccionado al entrar a este ángulo
   SALE_DEG:          8,     // histéresis: el seleccionado se suelta al pasar este ángulo

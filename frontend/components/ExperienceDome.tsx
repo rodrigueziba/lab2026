@@ -15,7 +15,7 @@ import Monoliths from "./Monoliths";
 import { DBG_SILLAS, DBG_PANELES, DBG_ORBITAS } from "@/lib/debugConfig";
 import { PRISM_CENTER_Y } from "./Prism"; // Z7: altura del origen de los haces
 import { resetEffects } from "@/lib/vizAudio";
-import { PANELES_SILLAS, tickPanelesSillas, installPanelesSillasListeners, panelesSillasVisibles } from "@/lib/alightStore";
+import { PANELES_SILLAS, tickPanelesSillas, installPanelesSillasListeners, panelesSillasVisibles, seleccionPanelesHabilitada } from "@/lib/alightStore";
 import { createPanelPlaceholder } from "@/lib/retro/panelPlaceholder";
 import { registrarPanelLinterna, tickLinterna, apagarLinterna, resetLinterna, type PanelLinterna, ORBITAS_INFO, type AnilloInfo } from "@/lib/linternaPaneles";
 import PanelSelMarco from "./PanelSelMarco";
@@ -850,7 +850,8 @@ export default function ExperienceDome() {
     actualizarHacesPanel(); // Z6
     if (panelsRef.current) panelsRef.current.visible = PANELES_SILLAS.fase !== "oculto";
     // Z2: linterna (test de cono) + fase de órbita propia de cada panel
-    if (Z2_FASE_POR_PANEL) tickLinterna(camera, dt, performance.now(), panelesSillasVisibles(), PANELES_SILLAS.fase !== "oculto");
+    // Z13: + selección habilitada recién con la liberación del movimiento
+    if (Z2_FASE_POR_PANEL) tickLinterna(camera, dt, performance.now(), panelesSillasVisibles(), PANELES_SILLAS.fase !== "oculto", seleccionPanelesHabilitada());
     if (shellRef.current) {
       shellRef.current.visible = !DBG_SILLAS.vizHideShell;
     }

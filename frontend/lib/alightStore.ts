@@ -2,7 +2,7 @@
 // No Zustand — plain objects mutated in place so useFrame can read without re-renders.
 // React components that need to re-render use storeSubscribe.
 
-import { DBG_PANELES } from "@/lib/debugConfig";
+import { DBG_LINTERNA, DBG_PANELES } from "@/lib/debugConfig";
 
 export type OscType   = "sine" | "square" | "sawtooth" | "triangle";
 export type LFOTarget = "volume" | "cutoff" | "pitch";
@@ -184,6 +184,14 @@ export function panelesSillasVisibles(): boolean {
   const st = INTERACT_STATE.experienceState;
   return p.camino === 'sillas' && p.prismaBajo && !p.interactuado
       && (st === 'sillas_secuencia' || st === 'sala_activa');
+}
+
+/** Z13: la linterna/selección de paneles se habilita con la MISMA liberación de movimiento
+ *  del camino SILLAS (ThreeScene: timer releaseDelayMs tras alight:dome-revealed →
+ *  experienceState 'sala_activa' + movementLocked false + alight:sala-activa). */
+export function seleccionPanelesHabilitada(): boolean {
+  if (!DBG_LINTERNA.PANEL_SELECCION_REQUIERE_LIBERACION) return true;
+  return INTERACT_STATE.experienceState === 'sala_activa' && !INTERACT_STATE.movementLocked;
 }
 
 /** P1: avanza el fade. Devuelve alpha actual (0–1). */

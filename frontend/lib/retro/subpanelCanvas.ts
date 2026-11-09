@@ -274,13 +274,14 @@ export function dibujarFicha(ctx: CanvasRenderingContext2D, d: ProyectoDetalle) 
   ctx.fillStyle = C.etiqueta;
   ctx.font = `22px ${MONO}`;
   ctx.fillText("ESTUDIANTE", 40, 484);
-  casilla(ctx, 236, 484, f.esEstudiante, "ON", f.esEstudiante);
-  casilla(ctx, 350, 484, !f.esEstudiante, "OFF", !f.esEstudiante);
+  // Z13: SÍ / NO (antes ON / OFF)
+  casilla(ctx, 236, 484, f.esEstudiante, "SÍ", f.esEstudiante);
+  casilla(ctx, 350, 484, !f.esEstudiante, "NO", !f.esEstudiante);
   ctx.fillStyle = C.etiqueta;
   ctx.font = `22px ${MONO}`;
   ctx.fillText("REMUNERADO", 580, 484);
-  casilla(ctx, 776, 484, f.esRemunerado, "ON", f.esRemunerado);
-  casilla(ctx, 890, 484, !f.esRemunerado, "OFF", !f.esRemunerado);
+  casilla(ctx, 776, 484, f.esRemunerado, "SÍ", f.esRemunerado);
+  casilla(ctx, 890, 484, !f.esRemunerado, "NO", !f.esRemunerado);
   // serigrafía de marca
   ctx.fillStyle = C.serigrafia;
   ctx.font = `14px ${MONO}`;
