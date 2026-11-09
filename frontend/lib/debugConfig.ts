@@ -117,6 +117,7 @@ export const DBG_ACERC = {
   ACERC_VUELTA_MS:  900,     // duración de la vuelta a la órbita
   ACERC_EASING:     "seno" as "seno" | "suave" | "cubica", // in-out sin rebote (seno / smootherstep / cúbica)
   ACERC_ESPERA_CIERRE: true, // la vuelta empieza cuando terminaron de cerrarse los subpaneles
+  ACERC_AJUSTE_S:   6,       // Z9: velocidad (1/s) con la que el panel acercado sigue un cambio de layout (resize)
 };
 
 // ── Z4: subpaneles del panel abierto (HISTORIA / GALERÍA / FICHA) — live ──────
@@ -130,6 +131,9 @@ export const DBG_SUBPANELES = {
   SUB_ADELANTE_M:    0.15,   // los subpaneles se adelantan hacia la cámara (evita cruzar el panel)
   SUB_AJUSTE_PANTALLA: true, // Z8: escala HISTORIA/GALERÍA/FICHA (y separaciones) para que entren en pantalla
   SUB_MARGEN_PANTALLA: 0.04, // Z8: margen a cada borde del viewport (fracción)
+  SUB_AJUSTE_BLOQUE: true,   // Z9: bloque panel+subpaneles centrado y ajustado (incl. curvatura CRT); off = ajuste Z8
+  SUB_MARGEN_SEGURIDAD: 0.06, // Z9: margen de seguridad por lado (fracción del viewport)
+  SUB_ESCALA_MIN:    0.55,   // Z9: escala mínima legible de los subpaneles; por debajo se aleja el bloque
   SUB_RETENER_PAD_M: 0.25,   // Z5 (era 1.0 sobre el conjunto): margen alrededor de cada subpanel y del panel
   SUB_LINEAS:        true,   // líneas guía punteadas ámbar hacia el panel
   SUB_PUNTERO:       true,   // Z5: retícula clara en el centro de pantalla con el panel abierto

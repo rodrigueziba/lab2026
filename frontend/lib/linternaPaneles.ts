@@ -7,6 +7,9 @@
 
 import * as THREE from "three";
 import { DBG_LINTERNA, DBG_ORBITAS, DBG_ACERC, DBG_SUBPANELES } from "@/lib/debugConfig";
+import { calcularLayoutBloque, type LayoutBloque } from "@/lib/subpanelLayout";
+import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
+import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 
 export interface PanelLinterna {
   pivot:    THREE.Object3D | null;   // grupo que gira con la fase propia del panel
@@ -74,7 +77,35 @@ export const ACERC = {
   toPos:    new THREE.Vector3(), toQuat:   new THREE.Quaternion(),   // frente a la cámara (local)
   distancia: 0,                                                      // m a la cámara (debug)
   escalaSub: 1,                                                      // escala de ajuste de Z4 (debug)
+  // Z9: marco de la cámara en el disparo + layout del bloque (panel + subpaneles)
+  camPos0:  new THREE.Vector3(), fwd0: new THREE.Vector3(), up0: new THREE.Vector3(),
+  ancho: 5.4, alto: 3.6,
+  layout:   { k: 1, d: 6, up: 0, alejado: false, entra: true } as LayoutBloque,
+  aspect:   0,                                                       // último aspecto usado (detecta resize)
 };
+
+/** Z9: recalcula el layout del bloque y el destino LOCAL del panel (sin allocations). */
+function calcularDestino(camera: THREE.Camera): void {
+  const p = ACERC.panel;
+  const parent = p?.mesh?.parent;
+  if (!p || !parent) return;
+  const pc = camera as THREE.PerspectiveCamera;
+  const fov = pc.isPerspectiveCamera ? pc.fov : 60;
+  const aspect = pc.isPerspectiveCamera ? pc.aspect : 16 / 9;
+  ACERC.aspect = aspect;
+  if (DBG_SUBPANELES.SUB_AJUSTE_BLOQUE) {
+    const curva = RETRO_FLAGS.enabled ? (CRT_UNIFORMS.uCurve.value as number) : 0;
+    calcularLayoutBloque(ACERC.ancho, ACERC.alto, fov, aspect, curva, ACERC.layout);
+  } else {
+    // Z8: panel centrado en la mira, sin desplazamiento (el ajuste lo hace Z4)
+    ACERC.layout.d = distanciaAcercamiento(camera, ACERC.ancho, ACERC.alto);
+    ACERC.layout.up = 0; ACERC.layout.k = 1; ACERC.layout.alejado = false; ACERC.layout.entra = true;
+  }
+  ACERC.distancia = ACERC.layout.d;
+  _aW.copy(ACERC.camPos0).addScaledVector(ACERC.fwd0, ACERC.layout.d).addScaledVector(ACERC.up0, ACERC.layout.up);
+  parent.updateWorldMatrix(true, false);
+  ACERC.toPos.copy(_aW); parent.worldToLocal(ACERC.toPos);
+}
 const _aW = new THREE.Vector3();
 const _aQ = new THREE.Quaternion();
 const _aPQ = new THREE.Quaternion();
@@ -102,22 +133,21 @@ function iniciarAcercamiento(p: PanelLinterna, camera: THREE.Camera, now: number
   const parent = mesh?.parent;
   if (!mesh || !parent) return false;
   const geo = mesh.geometry as THREE.PlaneGeometry;
-  const w = geo.parameters?.width ?? 5.4, h = geo.parameters?.height ?? 3.6;
+  ACERC.ancho = geo.parameters?.width ?? 5.4; ACERC.alto = geo.parameters?.height ?? 3.6;
   ACERC.restPos.copy(mesh.position); ACERC.restQuat.copy(mesh.quaternion);
   ACERC.fromPos.copy(mesh.position); ACERC.fromQuat.copy(mesh.quaternion);
-  // destino en mundo: sobre la dirección de la mirada, mirando a la cámara (misma orientación)
-  const d = distanciaAcercamiento(camera, w, h);
-  camera.getWorldPosition(_aW);
-  camera.getWorldDirection(_fwd);
-  _aW.addScaledVector(_fwd, d);
+  // Z9: marco de la cámara en el disparo (el bloque queda fijo en el mundo respecto de él)
+  camera.getWorldPosition(ACERC.camPos0);
+  camera.getWorldDirection(ACERC.fwd0);
   camera.getWorldQuaternion(_aQ);
-  // a local del padre (quieto mientras dura: la fase del panel está congelada)
+  ACERC.up0.set(0, 1, 0).applyQuaternion(_aQ);
+  // orientación: la de la cámara (el panel queda de frente); a local del padre, que está quieto
   parent.updateWorldMatrix(true, false);
-  ACERC.toPos.copy(_aW); parent.worldToLocal(ACERC.toPos);
   parent.getWorldQuaternion(_aPQ);
   ACERC.toQuat.copy(_aPQ).invert().multiply(_aQ);
-  ACERC.distancia = d;
   ACERC.panel = p; ACERC.fase = "acercando"; ACERC.t0 = now;
+  // Z9: destino = bloque centrado en pantalla (el panel viaja directo a su lugar final)
+  calcularDestino(camera);
   p.acercado = true;
   return true;
 }
@@ -139,10 +169,21 @@ function cancelarAcercamiento(): void {
   ACERC.panel = null; ACERC.fase = "orbita";
 }
 
-function tickAcercamiento(now: number): void {
+function tickAcercamiento(now: number, dt: number, camera: THREE.Camera): void {
   const p = ACERC.panel;
   if (!p || !p.mesh || ACERC.fase === "orbita") return;
   const m = p.mesh;
+  // Z9: si cambió el aspecto (resize) o el FOV, se recalcula el layout del bloque
+  if (ACERC.fase === "acercando" || ACERC.fase === "cerca") {
+    const pc = camera as THREE.PerspectiveCamera;
+    if (pc.isPerspectiveCamera && pc.aspect !== ACERC.aspect) calcularDestino(camera);
+  }
+  if (ACERC.fase === "cerca") {
+    // sigue el destino suavemente (solo se mueve si cambió por un resize)
+    const a = 1 - Math.exp(-Math.max(0.1, DBG_ACERC.ACERC_AJUSTE_S) * dt);
+    m.position.lerp(ACERC.toPos, a);
+    return;
+  }
   if (ACERC.fase === "acercando") {
     const k = Math.min(1, (now - ACERC.t0) / Math.max(1, DBG_ACERC.ACERC_MS));
     const e = easing(k);
@@ -238,7 +279,7 @@ export function tickLinterna(camera: THREE.Camera, dt: number, now: number, acti
       p.uLit.value += (0 - p.uLit.value) * kLit;
     }
     s.selAlpha += (0 - s.selAlpha) * kSel;
-    tickAcercamiento(now); // Z8: la vuelta sigue aunque la linterna esté inactiva
+    tickAcercamiento(now, dt, camera); // Z8: la vuelta sigue aunque la linterna esté inactiva
     return;
   }
 
@@ -298,5 +339,5 @@ export function tickLinterna(camera: THREE.Camera, dt: number, now: number, acti
     if (p.pivot) p.pivot.rotation.y = p.azimut + p.fase;
     moverVertical(p);
   }
-  tickAcercamiento(now); // Z8
+  tickAcercamiento(now, dt, camera); // Z8
 }

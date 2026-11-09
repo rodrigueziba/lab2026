@@ -98,6 +98,7 @@ const _rInv = new THREE.Matrix4();
 const _rO = new THREE.Vector3();
 const _rD = new THREE.Vector3();
 const _hit = { u: 0, v: 0, cx: 0, cy: 0, dentro: false };
+const _q = new THREE.Quaternion(); // Z9: pose del panel acercado (reutilizado)
 function rayoUV(
   mesh: THREE.Object3D | null, w: number, h: number,
   origen: THREE.Vector3, dir: THREE.Vector3, out: typeof _hit, margenU: number,
@@ -340,7 +341,20 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     // (subpaneles + separaciones) en la misma proporción; el panel no cambia.
     let k = 1;
     const pc = camera as THREE.PerspectiveCamera;
-    if (D.SUB_AJUSTE_PANTALLA && pc.isPerspectiveCamera) {
+    // Z9: con el panel acercado, el bloque lo resuelve calcularLayoutBloque (linterna): misma k,
+    // y el conjunto sigue la pose real del panel (que ya quedó desplazado para centrar el bloque)
+    const bloque = D.SUB_AJUSTE_BLOQUE && ACERC.panel !== null && ACERC.fase === "cerca"
+      && LINTERNA_STATE.sel === ACERC.panel && !!ACERC.panel.mesh;
+    if (bloque) {
+      const pm = ACERC.panel!.mesh!;
+      pm.getWorldPosition(_v.pos);
+      pm.getWorldQuaternion(_q);
+      _v.d.set(0, 0, 1).applyQuaternion(_q);                     // normal del panel → hacia la cámara
+      g.position.copy(_v.pos).addScaledVector(_v.d, D.SUB_ADELANTE_M);
+      g.quaternion.copy(_q);
+      k = ACERC.layout.k;
+      m *= k; gapL *= k; gapA *= k;
+    } else if (D.SUB_AJUSTE_PANTALLA && pc.isPerspectiveCamera) {
       camera.getWorldPosition(_v.cam);
       const dist = Math.max(0.1, _v.cam.distanceTo(g.position));
       const marg = 1 - 2 * THREE.MathUtils.clamp(D.SUB_MARGEN_PANTALLA, 0, 0.3);
@@ -354,7 +368,8 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     }
     if (k < 0.999 && !A.avisoEscala && A.t >= 1) {
       A.avisoEscala = true;
-      console.info(`[Subpaneles] Z8: HISTORIA/GALERÍA/FICHA reducidos a ${(k * 100).toFixed(0)} % para entrar en pantalla`);
+      console.info(`[Subpaneles] ${bloque ? "Z9" : "Z8"}: HISTORIA/GALERÍA/FICHA reducidos a ${(k * 100).toFixed(0)} % para entrar en pantalla`
+        + (bloque && ACERC.layout.alejado ? ` y bloque alejado a ${ACERC.layout.d.toFixed(2)} m (escala mínima alcanzada)` : ""));
     }
     A.escala = k;
     ACERC.escalaSub = k; // Z8: para el menú de debug

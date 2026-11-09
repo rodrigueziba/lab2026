@@ -356,7 +356,8 @@ export default function DebugMenu() {
         setLinternaLive(prev => (prev === txt ? prev : txt));
       }
       { // Z8
-        const txt = `${ACERC.fase}${ACERC.panel ? ` · panel ${ACERC.panel.indice} · d ${ACERC.distancia.toFixed(2)} m` : ""} · subpaneles ${(ACERC.escalaSub * 100).toFixed(0)} %`;
+        const L = ACERC.layout;
+        const txt = `${ACERC.fase}${ACERC.panel ? ` · panel ${ACERC.panel.indice} · d ${ACERC.distancia.toFixed(2)} m · sube ${L.up.toFixed(2)} m${L.alejado ? " · alejado" : ""}${L.entra ? "" : " · ✗ no entra"}` : ""} · subpaneles ${(ACERC.escalaSub * 100).toFixed(0)} %`;
         setAcercLive(prev => (prev === txt ? prev : txt));
       }
       { // Z7
@@ -1145,6 +1146,20 @@ export default function DebugMenu() {
           </div>
           <NumField label="SUB_MARGEN_PANTALLA" value={subp.SUB_MARGEN_PANTALLA} step={0.01} min={0} max={0.3} note="Z8 bordes"
             onChange={v => { DBG_SUBPANELES.SUB_MARGEN_PANTALLA = v; setSubp(x => ({ ...x, SUB_MARGEN_PANTALLA: v })); }} />
+          <div style={ROW}>
+            <span>SUB_AJUSTE_BLOQUE <span style={NOTE}>Z9 bloque centrado</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.SUB_AJUSTE_BLOQUE;
+              DBG_SUBPANELES.SUB_AJUSTE_BLOQUE = v;
+              setSubp(x => ({ ...x, SUB_AJUSTE_BLOQUE: v }));
+            }}>{subp.SUB_AJUSTE_BLOQUE ? "ON" : "off"}</button>
+          </div>
+          <NumField label="SUB_MARGEN_SEGURIDAD" value={subp.SUB_MARGEN_SEGURIDAD} step={0.01} min={0} max={0.3} note="Z9 por lado"
+            onChange={v => { DBG_SUBPANELES.SUB_MARGEN_SEGURIDAD = v; setSubp(x => ({ ...x, SUB_MARGEN_SEGURIDAD: v })); }} />
+          <NumField label="SUB_ESCALA_MIN" value={subp.SUB_ESCALA_MIN} step={0.05} min={0.1} max={1} note="Z9 legibilidad"
+            onChange={v => { DBG_SUBPANELES.SUB_ESCALA_MIN = v; setSubp(x => ({ ...x, SUB_ESCALA_MIN: v })); }} />
+          <NumField label="ACERC_AJUSTE_S" value={acerc.ACERC_AJUSTE_S} step={0.5} min={0.5} max={30} note="Z9 resize 1/s"
+            onChange={v => { DBG_ACERC.ACERC_AJUSTE_S = v; setAcerc(o => ({ ...o, ACERC_AJUSTE_S: v })); }} />
           <div style={ROW}>
             <span>estado <span style={NOTE}>{acercLive}</span></span>
           </div>
