@@ -33,6 +33,7 @@ export const RetroCRTShader = {
     uFlashHDR:     { value: 4.0 },   // energía del blanco antes del CRT (satura ACES+sRGB)
     uHdrClamp:     { value: 64.0 },  // tope lineal anti NaN/Inf (solo con destello o glare)
     uGlareColor:   { value: new THREE.Color("#FFF3DC") }, // crema en los bordes del velo
+    uFlashBorde:   { value: 0.3 },   // G3: encendido del borde fuera del barrel (fracción del de G2)
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -51,7 +52,7 @@ export const RetroCRTShader = {
     uniform float uFlashScanMax, uFlashVigAten, uFlashCapMax;
     uniform float uGlare, uGlareCA;
     uniform vec3  uFlashColor;
-    uniform float uFlashHDR, uHdrClamp;
+    uniform float uFlashHDR, uHdrClamp, uFlashBorde;
     uniform vec3  uGlareColor;
     varying vec2  vUv;
 
@@ -68,7 +69,8 @@ export const RetroCRTShader = {
       vec2 uv = barrel(vUv, uCurve);
       if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
         // G2: el borde fuera del barrel también se enciende con el destello (uFlash=0 → negro)
-        gl_FragColor = vec4(min(uFlashColor * (uFlashHDR * uFlash), vec3(uHdrClamp)), 1.0);
+        // G3: × uFlashBorde → la forma de la pantalla curva sigue leyéndose
+        gl_FragColor = vec4(min(uFlashColor * (uFlashHDR * uFlash * uFlashBorde), vec3(uHdrClamp)), 1.0);
         return;
       }
 

@@ -25,7 +25,7 @@ const CURVE_ANIM_MS = 400;
 // compartido (los del destello/glare siempre; el resto solo con DBG_RETRO_FX.crtUniformsVivos).
 const CRT_FLASH_KEYS = [
   "uFlash", "uFlashColor", "uFlashGlow", "uFlashScanMax", "uFlashVigAten", "uFlashCapMax",
-  "uGlare", "uGlareCA", "uFlashHDR", "uHdrClamp", "uGlareColor",
+  "uGlare", "uGlareCA", "uFlashHDR", "uHdrClamp", "uGlareColor", "uFlashBorde",
 ] as const;
 
 export default function RetroPostFX() {
@@ -84,6 +84,7 @@ export default function RetroPostFX() {
         uFlashHDR:     CRT_UNIFORMS.uFlashHDR,     // G2
         uHdrClamp:     CRT_UNIFORMS.uHdrClamp,     // G2
         uGlareColor:   CRT_UNIFORMS.uGlareColor,   // G2
+        uFlashBorde:   CRT_UNIFORMS.uFlashBorde,   // G3
       },
       vertexShader:   RetroCRTShader.vertexShader,
       fragmentShader: RetroCRTShader.fragmentShader,
@@ -168,14 +169,18 @@ export default function RetroPostFX() {
     // F2: destello diegético dentro del CRT (tope < 1 para que se vea grano/scanlines sobre el blanco)
     // G1: uFlash sale de la opacidad (el boost de bloom/exposición ya no es igual a ella)
     const op = FLASH_STATE.fase === "inactivo" ? 0 : FLASH_STATE.opacidad;
-    CRT_UNIFORMS.uFlash.value     = DBG_FLASH.FLASH_OVERLAY_DOM ? 0 : Math.min(op, DBG_FLASH.FLASH_CRT_MAX);
+    // G3: perilla maestra. uFlash × I escala en el shader la mezcla a blanco, scanlines
+    // (uScan → FLASH_SCAN_MAX), viñeta (VIG_ATEN × I), tinte, tope, borde y blow-out (BLOWOUT × I).
+    const I = Math.max(0, Math.min(1, DBG_FLASH.FLASH_INTENSIDAD));
+    CRT_UNIFORMS.uFlash.value     = DBG_FLASH.FLASH_OVERLAY_DOM ? 0 : Math.min(op, DBG_FLASH.FLASH_CRT_MAX) * I;
     CRT_UNIFORMS.uGlare.value     = DBG_FLASH.FLASH_OVERLAY_DOM ? 0 : FLASH_STATE.glare; // G1
     CRT_UNIFORMS.uGlareCA.value   = DBG_FLASH.FLASH_GLARE_ABERRACION;                   // G1
     CRT_UNIFORMS.uFlashGlow.value = DBG_FLASH.FLASH_GLOW;
     CRT_UNIFORMS.uFlashScanMax.value = DBG_FLASH.FLASH_SCAN_MAX;  // F3
     CRT_UNIFORMS.uFlashVigAten.value = DBG_FLASH.FLASH_VIG_ATEN;  // F3
     CRT_UNIFORMS.uFlashCapMax.value  = DBG_FLASH.FLASH_TOPE_LUM;  // F3
-    CRT_UNIFORMS.uFlashHDR.value     = Math.max(1, DBG_FLASH.FLASH_HDR);       // G2
+    CRT_UNIFORMS.uFlashHDR.value     = 1 + (Math.max(1, DBG_FLASH.FLASH_HDR) - 1) * I; // G2; G3: × intensidad
+    CRT_UNIFORMS.uFlashBorde.value   = Math.max(0, DBG_FLASH.FLASH_BORDE);             // G3
     CRT_UNIFORMS.uHdrClamp.value     = Math.max(1, DBG_FLASH.FLASH_HDR_CLAMP); // G2
     // G2: colores solo cuando cambia el string (Color.set parsea → no por frame)
     if (colorRef.current.flash !== DBG_FLASH.FLASH_COLOR) {
@@ -187,6 +192,7 @@ export default function RetroPostFX() {
       CRT_UNIFORMS.uGlareColor.value.set(DBG_FLASH.FLASH_GLARE_COLOR);
     }
     // G2: blow-out final = uFlash × FLASH_BLOWOUT; el pase solo corre mientras > 0
+    // G3: uFlash ya incluye I → uBlowout = uFlash × (FLASH_BLOWOUT × I), sin escalar dos veces
     const bo = Math.max(0, Math.min(1, CRT_UNIFORMS.uFlash.value * DBG_FLASH.FLASH_BLOWOUT));
     if (blowoutRef.current) {
       const u = blowoutRef.current.uniforms;
@@ -197,11 +203,12 @@ export default function RetroPostFX() {
       blowoutCompiled.current = true;
     }
     // G2: topes absolutos (finitos) para exposición y bloom
-    const expo = DBG_RETRO_FX.toneExposure * (1 + (DBG_FLASH.FLASH_EXPOSICION_MULT - 1) * b);
+    // G3: multiplicador de pico = 1 + (MULT − 1) × I
+    const expo = DBG_RETRO_FX.toneExposure * (1 + (DBG_FLASH.FLASH_EXPOSICION_MULT - 1) * I * b);
     renderer.toneMappingExposure = Number.isFinite(expo) ? Math.min(expo, DBG_FLASH.FLASH_EXPOSICION_TOPE) : DBG_RETRO_FX.toneExposure;
     if (bloomRef.current) {
       bloomRef.current.threshold = DBG_RETRO_FX.bloomThreshold;
-      const bs = DBG_RETRO_FX.bloomIntensity * (1 + (DBG_FLASH.FLASH_BLOOM_MULT - 1) * b);
+      const bs = DBG_RETRO_FX.bloomIntensity * (1 + (DBG_FLASH.FLASH_BLOOM_MULT - 1) * I * b);
       bloomRef.current.strength  = Number.isFinite(bs) ? Math.min(bs, DBG_FLASH.FLASH_BLOOM_TOPE) : DBG_RETRO_FX.bloomIntensity;
     }
 

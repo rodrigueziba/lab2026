@@ -1020,6 +1020,20 @@ export default function DebugMenu() {
             onChange={v => { DBG_FLASH.FLASH_VIG_ATEN = v; setFlash(f => ({ ...f, FLASH_VIG_ATEN: v })); }} />
           <NumField label="FLASH_TOPE_LUM" value={flash.FLASH_TOPE_LUM} step={0.01} min={0.92} max={1.5} note="F3 tope lum."
             onChange={v => { DBG_FLASH.FLASH_TOPE_LUM = v; setFlash(f => ({ ...f, FLASH_TOPE_LUM: v })); }} />
+          {/* G3: perilla maestra (0 = sin destello visible, 1 = pico completo de G2) */}
+          <div style={ROW}>
+            <span>FLASH_INTENSIDAD <span style={NOTE}>G3 maestra</span></span>
+            <input type="range" min={0} max={1} step={0.01} style={{ flex: 1 }}
+              value={flash.FLASH_INTENSIDAD}
+              onChange={e => {
+                const v = parseFloat(e.target.value);
+                DBG_FLASH.FLASH_INTENSIDAD = v;
+                setFlash(f => ({ ...f, FLASH_INTENSIDAD: v }));
+              }} />
+            <span style={{ width: 34, textAlign: "right" }}>{flash.FLASH_INTENSIDAD.toFixed(2)}</span>
+          </div>
+          <NumField label="FLASH_BORDE" value={flash.FLASH_BORDE} step={0.05} min={0} max={1} note="G3 borde curvo"
+            onChange={v => { DBG_FLASH.FLASH_BORDE = v; setFlash(f => ({ ...f, FLASH_BORDE: v })); }} />
           {/* G2: blanco enceguecedor */}
           <ColorField label="FLASH_COLOR" value={flash.FLASH_COLOR} note="G2 base"
             onChange={v => { DBG_FLASH.FLASH_COLOR = v; setFlash(f => ({ ...f, FLASH_COLOR: v })); }} />
@@ -1057,9 +1071,11 @@ export default function DebugMenu() {
           </div>
           {medicion.estado === "listo" && (
             <div style={{ ...ROW, flexDirection: "column", alignItems: "flex-start" }}>
-              <span>centro <span style={NOTE}>{medicion.centro.toFixed(4)} {medicion.centro > 0.98 ? "✓ > 0,98" : "✗ ≤ 0,98"}</span></span>
-              <span>esquina <span style={NOTE}>{medicion.esquina.toFixed(4)}</span></span>
-              <span>5 % más oscuro <span style={NOTE}>{medicion.oscuro5.toFixed(4)} {medicion.oscuro5 > 0.95 ? "✓ > 0,95" : "✗ ≤ 0,95"}</span></span>
+              <span>centro <span style={NOTE}>{medicion.centro.toFixed(4)} {medicion.centro >= 0.90 && medicion.centro <= 0.95 ? "✓ 0,90–0,95" : "fuera de 0,90–0,95"}</span></span>
+              <span>intensidad <span style={NOTE}>{medicion.intensidad.toFixed(2)}</span></span>
+              <span>esquina <span style={NOTE}>{medicion.esquina.toFixed(4)} {medicion.esquina >= 0.6 && medicion.esquina <= 0.75 ? "✓ 0,60–0,75" : "fuera de 0,60–0,75"}</span></span>
+              <span>contraste CRT (centro − esquina) <span style={NOTE}>{medicion.contraste.toFixed(4)}</span></span>
+              <span>5 % más oscuro <span style={NOTE}>{medicion.oscuro5.toFixed(4)}</span></span>
               <span>mín. RGB <span style={NOTE}>{medicion.minRGB.toFixed(4)}</span></span>
             </div>
           )}

@@ -168,14 +168,16 @@ export function estimarLuminanciaPico(
   let reduce = false;
   try { reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* ok */ }
   const pico = Math.max(0, Math.min(1, DBG_FLASH.FLASH_PICO)) * (reduce ? DBG_FLASH.FLASH_RM_PICO_MULT : 1);
-  const f    = Math.min(pico, DBG_FLASH.FLASH_CRT_MAX);              // uFlash en el pico
-  const glow = (1 + DBG_FLASH.FLASH_GLOW) * DBG_FLASH.FLASH_HDR;     // r = 0; G2: × FLASH_HDR
+  const I    = Math.max(0, Math.min(1, DBG_FLASH.FLASH_INTENSIDAD));  // G3: perilla maestra
+  const f    = Math.min(pico, DBG_FLASH.FLASH_CRT_MAX) * I;          // uFlash en el pico (G3: × I)
+  const hdr  = 1 + (Math.max(1, DBG_FLASH.FLASH_HDR) - 1) * I;       // G3
+  const glow = (1 + DBG_FLASH.FLASH_GLOW) * hdr;                     // r = 0; G2: × HDR
   const effScan = uScan + (Math.min(uScan, DBG_FLASH.FLASH_SCAN_MAX) - uScan) * f;
   const scanK   = 1 - effScan;                                       // G1: valle de la scanline (peor caso)
-  const cap     = 0.92 + (DBG_FLASH.FLASH_TOPE_LUM * DBG_FLASH.FLASH_HDR - 0.92) * f; // G2: tope × HDR
+  const cap     = 0.92 + (DBG_FLASH.FLASH_TOPE_LUM * hdr - 0.92) * f; // G2: tope × HDR
   // G1: peor caso también para el grano (−uGrain/2); G2: tinte neutralizado con uFlash
   const crt = (c: number, t: number) => Math.min((f * c * glow * scanK - uGrain * 0.5) * (t + (1 - t) * f) + uLift, cap);
-  const k = toneExposure * (1 + (DBG_FLASH.FLASH_EXPOSICION_MULT - 1) * pico) / 0.6;
+  const k = toneExposure * (1 + (DBG_FLASH.FLASH_EXPOSICION_MULT - 1) * I * pico) / 0.6; // G3: × I
   const r = crt(flashColor.r, tint.r) * k, g = crt(flashColor.g, tint.g) * k, b = crt(flashColor.b, tint.b) * k;
   // ACESInputMat (columnas) · v
   const ir = 0.59719 * r + 0.35458 * g + 0.04823 * b;
@@ -201,7 +203,9 @@ export const FLASH_MEDICION = {
   tPedido:  0,
   estado:   "—" as string,  // — | esperando | listo | error: …
   centro:   0,              // luminancia media del 10 % × 10 % central
-  esquina:  0,              // luminancia media del 5 % × 5 % superior izquierdo
+  esquina:  0,              // luminancia media del 5 % × 5 % superior izquierdo (incluye borde fuera del barrel)
+  contraste: 0,             // G3: centro − esquina (contraste del CRT)
+  intensidad: 0,            // G3: FLASH_INTENSIDAD con la que se midió
   oscuro5:  0,              // luminancia media del 5 % de píxeles más oscuros
   minRGB:   0,              // mínimo de todos los canales RGB de toda la pantalla
   ancho:    0,
@@ -277,9 +281,11 @@ export function medirPicoFlash(ctx: WebGLRenderingContext | WebGL2RenderingConte
   m.esquina = eN ? eS / eN : 0;
   m.oscuro5 = acc ? accS / acc : 0;
   m.minRGB  = minC / 255;
+  m.contraste  = m.centro - m.esquina;        // G3
+  m.intensidad = DBG_FLASH.FLASH_INTENSIDAD;  // G3
   m.ancho = w; m.alto = h;
   m.estado = "listo";
-  console.info(`[CurtainFlash] medición pico ${w}×${h}: centro ${m.centro.toFixed(4)} · esquina ${m.esquina.toFixed(4)} · 5% oscuro ${m.oscuro5.toFixed(4)} · minRGB ${m.minRGB.toFixed(4)}`);
+  console.info(`[CurtainFlash] medición pico ${w}×${h}: centro ${m.centro.toFixed(4)} · esquina ${m.esquina.toFixed(4)} · contraste ${m.contraste.toFixed(4)} · I ${m.intensidad.toFixed(2)} · 5% oscuro ${m.oscuro5.toFixed(4)} · minRGB ${m.minRGB.toFixed(4)}`);
 }
 
 /** F1/G1: factor 0–1 para el boost de postproceso (proporcional al pico efectivo). */

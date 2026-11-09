@@ -67,8 +67,8 @@ export const DBG_FLASH = {
   FLASH_CRT_MAX:         1.0,    // G2 (era 0.97) tope de uFlash; la textura diegética ahora la pone el blow-out
   FLASH_GLOW:            0.6,    // F3 (era 0.35) — resplandor central extra del blanco (uFlashGlow)
   // F3: límites del CRT escalados con uFlash
-  FLASH_SCAN_MAX:        0.0,    // G2 (era 0.06) scanlines restan como máximo esto en el pico (normal uScan 0.18)
-  FLASH_VIG_ATEN:        1.0,    // G2 (era 0.6) la viñeta se atenúa este porcentaje en el pico
+  FLASH_SCAN_MAX:        0.10,   // G3 (era 0; G2 era 0.06) scanlines restan como máximo esto en el pico (normal uScan 0.18)
+  FLASH_VIG_ATEN:        0.4,    // G3 (era 1.0; G2 era 0.6) la viñeta se atenúa este porcentaje en el pico
   FLASH_TOPE_LUM:        1.0,    // tope de luminancia del CRT en el pico (normal 0.92)
   // G1: caída exponencial + glare residual
   FLASH_BAJADA_EXP_K:    8.0,    // G2 (era 5) curvatura de la caída exponencial (0 = lineal)
@@ -82,14 +82,17 @@ export const DBG_FLASH = {
   // G2: blanco enceguecedor — color, margen HDR, blow-out final y seguridad
   FLASH_COLOR:           "#FFFFFF" as string, // G2 (era #FFF3DC fijo) color base del destello
   FLASH_GLARE_COLOR:     "#FFF3DC" as string, // G2 crema solo en los bordes del velo del glare
-  FLASH_HDR:             4.0,    // multiplicador de energía del blanco antes del CRT (satura el ACES)
+  FLASH_HDR:             2.5,    // G3 (era 4.0) multiplicador de energía del blanco antes del CRT (satura el ACES)
   FLASH_HDR_CLAMP:       64.0,   // tope lineal del CRT (anti NaN/Inf en half-float)
-  FLASH_BLOWOUT:         0.9,    // mezcla final hacia blanco puro tras ACES+sRGB (uBlowout = uFlash × esto)
-  FLASH_BLOWOUT_TEXTURA: 0.03,   // scanlines + grano que asoman sobre el blow-out (fracción)
+  FLASH_BLOWOUT:         0.6,    // G3 (era 0.9) mezcla final hacia blanco puro tras ACES+sRGB (uBlowout = uFlash × esto)
+  FLASH_BLOWOUT_TEXTURA: 0.10,   // G3 (era 0.03) scanlines + grano que asoman sobre el blow-out (fracción)
   FLASH_BLOOM_TOPE:      8.0,    // tope absoluto de bloom.strength
   FLASH_EXPOSICION_TOPE: 8.0,    // tope absoluto de toneMappingExposure
   FLASH_MEDIR_HOLD_MS:   500,    // la medición lee píxeles a estos ms de sostenido
   FLASH_AVISO_FOTOSENSIBILIDAD: false, // true = línea de aviso al inicio de la experiencia
+  // G3: perilla maestra — interpola todo lo del destello entre "sin destello" (0) y el pico configurado (1)
+  FLASH_INTENSIDAD:      0.65,   // escala uFlash (y con él scan, viñeta, tinte, tope, borde, blow-out), HDR, bloom y exposición
+  FLASH_BORDE:           0.3,    // encendido del borde fuera de la curvatura (fracción del de G2)
 };
 
 // ── P1: paneles orbitantes del camino SILLAS (ExperienceDome) — live ───────────
