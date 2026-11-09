@@ -1040,7 +1040,7 @@ export default function DebugMenu() {
             onChange={v => { DBG_SUBPANELES.SUB_ANIM_MS = v; setSubp(x => ({ ...x, SUB_ANIM_MS: v })); }} />
           <NumField label="SUB_ADELANTE_M" value={subp.SUB_ADELANTE_M} step={0.05} min={0} max={3} note="m hacia cámara"
             onChange={v => { DBG_SUBPANELES.SUB_ADELANTE_M = v; setSubp(x => ({ ...x, SUB_ADELANTE_M: v })); }} />
-          <NumField label="SUB_RETENER_PAD_M" value={subp.SUB_RETENER_PAD_M} step={0.1} min={0} max={6} note="m mirada"
+          <NumField label="SUB_RETENER_PAD_M" value={subp.SUB_RETENER_PAD_M} step={0.05} min={0} max={6} note="Z5 m margen"
             onChange={v => { DBG_SUBPANELES.SUB_RETENER_PAD_M = v; setSubp(x => ({ ...x, SUB_RETENER_PAD_M: v })); }} />
           <div style={ROW}>
             <span>SUB_LINEAS <span style={NOTE}>guías</span></span>
@@ -1057,6 +1057,18 @@ export default function DebugMenu() {
               DBG_SUBPANELES.SUB_PUNTERO = v;
               setSubp(x => ({ ...x, SUB_PUNTERO: v }));
             }}>{subp.SUB_PUNTERO ? "ON" : "off"}</button>
+          </div>
+          <NumField label="PUNTERO_RADIO_M" value={subp.PUNTERO_RADIO_M} step={0.01} min={0.05} max={1} note="Z5 retícula"
+            onChange={v => { DBG_SUBPANELES.PUNTERO_RADIO_M = v; setSubp(x => ({ ...x, PUNTERO_RADIO_M: v })); }} />
+          <NumField label="PUNTERO_GRACIA_MS" value={subp.PUNTERO_GRACIA_MS} step={100} min={0} max={5000} note="Z5 antes de cerrar"
+            onChange={v => { DBG_SUBPANELES.PUNTERO_GRACIA_MS = v; setSubp(x => ({ ...x, PUNTERO_GRACIA_MS: v })); }} />
+          <div style={ROW}>
+            <span>PANEL_BLOQUEA_MOVIMIENTO <span style={NOTE}>Z5 sin WASD</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.PANEL_BLOQUEA_MOVIMIENTO;
+              DBG_SUBPANELES.PANEL_BLOQUEA_MOVIMIENTO = v;
+              setSubp(x => ({ ...x, PANEL_BLOQUEA_MOVIMIENTO: v }));
+            }}>{subp.PANEL_BLOQUEA_MOVIMIENTO ? "ON" : "off"}</button>
           </div>
           <NumField label="HISTORIA_RENGLONES" value={subp.HISTORIA_RENGLONES} step={1} min={3} max={20} note="al abrir"
             onChange={v => { DBG_SUBPANELES.HISTORIA_RENGLONES = v; setSubp(x => ({ ...x, HISTORIA_RENGLONES: v })); }} />

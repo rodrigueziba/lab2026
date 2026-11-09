@@ -345,6 +345,8 @@ function Player() {
 
     // N1: block WASD + prism interaction during sillas_secuencia
     if (INTERACT_STATE.movementLocked) return;
+    // Z5: con PANEL_BLOQUEA_MOVIMIENTO, un panel SILLAS abierto también bloquea WASD
+    if (INTERACT_STATE.panelBloqueo) return;
 
     if (INTERACT_STATE.mode !== "none") return;
 

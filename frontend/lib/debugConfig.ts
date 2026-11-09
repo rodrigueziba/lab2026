@@ -118,9 +118,12 @@ export const DBG_SUBPANELES = {
   SUB_GAP_ABAJO_M:   0.95,   // separación panel ↔ FICHA (mockup 70 px)
   SUB_ANIM_MS:       400,    // salida desde el panel (escala + desplazamiento) y cierre inverso
   SUB_ADELANTE_M:    0.15,   // los subpaneles se adelantan hacia la cámara (evita cruzar el panel)
-  SUB_RETENER_PAD_M: 1.0,    // margen alrededor del conjunto en el que el panel sigue abierto
+  SUB_RETENER_PAD_M: 0.25,   // Z5 (era 1.0 sobre el conjunto): margen alrededor de cada subpanel y del panel
   SUB_LINEAS:        true,   // líneas guía punteadas ámbar hacia el panel
-  SUB_PUNTERO:       true,   // aro claro donde apunta la mirada sobre los subpaneles
+  SUB_PUNTERO:       true,   // Z5: retícula clara en el centro de pantalla con el panel abierto
+  PUNTERO_RADIO_M:   0.21,   // Z5: radio medio de la retícula (m)
+  PUNTERO_GRACIA_MS: 1200,   // Z5: espera antes de cerrar si el puntero sale (evita cerrar por un roce)
+  PANEL_BLOQUEA_MOVIMIENTO: false, // Z5: true = sin WASD mientras hay un panel abierto
   HISTORIA_RENGLONES: 10,    // renglones por página de la sinopsis
   GALERIA_AMBAR:     1.0,    // 1 = imagen monocroma ámbar, 0 = color original
   GALERIA_SCAN:      0.28,   // intensidad de scanlines de la pantalla CRT

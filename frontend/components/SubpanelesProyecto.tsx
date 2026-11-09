@@ -16,6 +16,8 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SUBPANELES } from "@/lib/debugConfig";
 import { LINTERNA_STATE } from "@/lib/linternaPaneles";
+import { INTERACT_STATE } from "@/lib/alightStore";
+import { playUIClick } from "@/lib/audioEngine";
 import { useProyectoDetalle, type ProyectoDetalle } from "@/lib/proyectoDetalle";
 import {
   HISTORIA_SIZE, GALERIA_SIZE, FICHA_SIZE, GALERIA_PANTALLA, HISTORIA_BOTONES, GALERIA_BOTONES,
@@ -88,6 +90,33 @@ const LINEA_FRAG = /* glsl */`
   }
 `;
 
+// Z5: raycast analítico rayo–plano contra un plano (PlaneGeometry w × h, normal +Z local).
+// Escribe u, v (0–1) en `out`; devuelve true si el impacto cae dentro del plano expandido
+// por `margenU` (fracción del ancho) y deja out.dentro = impacto estricto (sin margen).
+// Objetos de módulo reutilizados: sin allocations por frame.
+const _rInv = new THREE.Matrix4();
+const _rO = new THREE.Vector3();
+const _rD = new THREE.Vector3();
+const _hit = { u: 0, v: 0, cx: 0, cy: 0, dentro: false };
+function rayoUV(
+  mesh: THREE.Object3D | null, w: number, h: number,
+  origen: THREE.Vector3, dir: THREE.Vector3, out: typeof _hit, margenU: number,
+): boolean {
+  if (!mesh || !mesh.visible) return false;
+  _rInv.copy(mesh.matrixWorld).invert();
+  _rO.copy(origen).applyMatrix4(_rInv);
+  _rD.copy(origen).add(dir).applyMatrix4(_rInv).sub(_rO);
+  if (Math.abs(_rD.z) < 1e-6) return false;
+  const t = -_rO.z / _rD.z;
+  if (t <= 0) return false;
+  const u = (_rO.x + _rD.x * t) / w + 0.5;
+  const v = (_rO.y + _rD.y * t) / h + 0.5;
+  const mv = margenU * w / h;
+  out.u = u; out.v = v;
+  out.dentro = u >= 0 && u <= 1 && v >= 0 && v <= 1;
+  return u >= -margenU && u <= 1 + margenU && v >= -mv && v <= 1 + mv;
+}
+
 type Abierto = { proyectoId: number; abierto: boolean; n: number };
 
 export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAncho: number; panelAlto: number }) {
@@ -110,7 +139,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
   const lineaMatRef = useRef<THREE.ShaderMaterial>(null);
 
   // estado de animación / interacción (refs: sin re-render por frame)
-  const anim = useRef({ t: 0, abierto: false });
+  const anim = useRef({ t: 0, abierto: false, tDentro: 0 }); // Z5: tDentro = último instante con el puntero dentro
   const ui = useRef({
     pagina: 0, paginas: [[""]] as string[][], indice: 0,
     hover: null as string | null, sobre: null as "historia" | "galeria" | "ficha" | null,
@@ -151,11 +180,13 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
         g.updateMatrixWorld(true);
       }
       anim.current.abierto = true;
+      anim.current.tDentro = performance.now(); // Z5: la gracia arranca al abrir
       setEst(prev => ({ proyectoId: det.proyectoId as number, abierto: true, n: (prev?.n ?? 0) + 1 }));
     };
     const onCerrado = () => {
       anim.current.abierto = false;
       LINTERNA_STATE.retener = false;
+      INTERACT_STATE.panelBloqueo = false; // Z5
       setEst(prev => (prev ? { ...prev, abierto: false } : prev));
     };
     window.addEventListener("alight:panel-abierto", onAbierto);
@@ -164,6 +195,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       window.removeEventListener("alight:panel-abierto", onAbierto);
       window.removeEventListener("alight:panel-cerrado", onCerrado);
       LINTERNA_STATE.retener = false;
+      INTERACT_STATE.panelBloqueo = false; // Z5
     };
   }, [camera, _v]);
 
@@ -246,6 +278,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       if (e.button !== 0 || !document.pointerLockElement || !anim.current.abierto || anim.current.t < 0.95) return;
       const u = ui.current, d = lienzos.current.datos;
       if (!u.hover || !d) return;
+      playUIClick(); // Z5
       if (u.sobre === "historia") {
         const n = u.paginas.length;
         const prev = u.pagina;
@@ -289,6 +322,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     if (A.t <= 0) {
       if (g.visible) g.visible = false;
       LINTERNA_STATE.retener = false;
+      if (INTERACT_STATE.panelBloqueo) INTERACT_STATE.panelBloqueo = false; // Z5
       return;
     }
     g.visible = true;
@@ -322,46 +356,46 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     const pm = pantMatRef.current;
     if (pm) { pm.uniforms.uAmbar.value = D.GALERIA_AMBAR; pm.uniforms.uScan.value = D.GALERIA_SCAN; pm.uniforms.uCurva.value = D.GALERIA_CURVA; }
 
-    // ── mirada (centro de pantalla) sobre el plano del conjunto ──
-    g.updateMatrixWorld(true);
+    // ── Z5: modo puntero — raycast desde el centro de cámara contra los 3 subpaneles y el panel ──
     camera.getWorldPosition(_v.cam);
     camera.getWorldDirection(_v.fwd);
-    _v.inv.copy(g.matrixWorld).invert();
-    _v.o.copy(_v.cam).applyMatrix4(_v.inv);
-    _v.d.copy(_v.cam).add(_v.fwd).applyMatrix4(_v.inv).sub(_v.o);
-    let hx = 1e9, hy = 1e9;
-    if (Math.abs(_v.d.z) > 1e-6) {
-      const t = -_v.o.z / _v.d.z;
-      if (t > 0) { hx = _v.o.x + _v.d.x * t; hy = _v.o.y + _v.d.y * t; }
-    }
-    const pad = D.SUB_RETENER_PAD_M;
-    const xMax = px + gapL + Math.max(hw, gw) + pad;
-    const yMax = Math.max(py, hh / 2, gh / 2) + pad;
-    const yMin = -(py + gapA + fh) - pad;
-    LINTERNA_STATE.retener = A.abierto && A.t > 0.5 && Math.abs(hx) <= xMax && hy <= yMax && hy >= yMin;
-
-    // subpanel y botón bajo la mirada (solo con la animación completa)
+    g.updateMatrixWorld(true);
+    const now = performance.now();
+    const listo = A.t >= 1;
     let sobre: "historia" | "galeria" | "ficha" | null = null;
     let hover: string | null = null;
-    let cx = 0, cy = 0;
-    const probar = (mesh: THREE.Mesh | null, id: "historia" | "galeria" | "ficha", cw: number, ch: number) => {
-      if (!mesh || sobre) return;
-      const u = (hx - mesh.position.x) / mesh.scale.x + 0.5;
-      const v = (hy - mesh.position.y) / mesh.scale.y + 0.5;
-      if (u >= 0 && u <= 1 && v >= 0 && v <= 1) { sobre = id; cx = u * cw; cy = (1 - v) * ch; }
-    };
-    if (A.t >= 1) {
-      probar(hist, "historia", HISTORIA_SIZE.w, HISTORIA_SIZE.h);
-      probar(gal, "galeria", GALERIA_SIZE.w, GALERIA_SIZE.h);
-      probar(fic, "ficha", FICHA_SIZE.w, FICHA_SIZE.h);
-      if (sobre === "historia") {
-        if (dentro(HISTORIA_BOTONES.arriba, cx, cy)) hover = "arriba";
-        else if (dentro(HISTORIA_BOTONES.abajo, cx, cy)) hover = "abajo";
-      } else if (sobre === "galeria") {
-        if (dentro(GALERIA_BOTONES.ant, cx, cy)) hover = "ant";
-        else if (dentro(GALERIA_BOTONES.sig, cx, cy)) hover = "sig";
-      }
+    let dentroAlgo = false;
+    const pad = Math.max(0, D.SUB_RETENER_PAD_M);
+    // subpaneles: planos unitarios escalados → UV directo (con margen `pad` solo para retener)
+    if (rayoUV(hist, 1, 1, _v.cam, _v.fwd, _hit, pad / Math.max(0.001, hw))) {
+      dentroAlgo = true;
+      if (listo && _hit.dentro) { sobre = "historia"; _hit.cx = _hit.u * HISTORIA_SIZE.w; _hit.cy = (1 - _hit.v) * HISTORIA_SIZE.h; }
     }
+    if (!sobre && rayoUV(gal, 1, 1, _v.cam, _v.fwd, _hit, pad / Math.max(0.001, gw))) {
+      dentroAlgo = true;
+      if (listo && _hit.dentro) { sobre = "galeria"; _hit.cx = _hit.u * GALERIA_SIZE.w; _hit.cy = (1 - _hit.v) * GALERIA_SIZE.h; }
+    }
+    if (!sobre && rayoUV(fic, 1, 1, _v.cam, _v.fwd, _hit, pad / Math.max(0.001, fw))) {
+      dentroAlgo = true;
+      if (listo && _hit.dentro) sobre = "ficha";
+    }
+    // el panel abierto también cuenta como "dentro" (su geometría mide panelAncho × panelAlto)
+    if (!dentroAlgo && rayoUV(LINTERNA_STATE.sel?.mesh ?? null, panelAncho, panelAlto, _v.cam, _v.fwd, _hit, pad / panelAncho)) dentroAlgo = true;
+    if (sobre === "historia") {
+      if (dentro(HISTORIA_BOTONES.arriba, _hit.cx, _hit.cy)) hover = "arriba";
+      else if (dentro(HISTORIA_BOTONES.abajo, _hit.cx, _hit.cy)) hover = "abajo";
+    } else if (sobre === "galeria") {
+      if (dentro(GALERIA_BOTONES.ant, _hit.cx, _hit.cy)) hover = "ant";
+      else if (dentro(GALERIA_BOTONES.sig, _hit.cx, _hit.cy)) hover = "sig";
+    }
+
+    // Z5: gracia — si el puntero sale, espera PUNTERO_GRACIA_MS antes de soltar el panel
+    if (dentroAlgo || A.tDentro === 0) A.tDentro = now;
+    const enGracia = now - A.tDentro <= D.PUNTERO_GRACIA_MS;
+    LINTERNA_STATE.retener = A.abierto && A.t > 0.5 && (dentroAlgo || enGracia);
+    // Z5: bloqueo opcional del movimiento mientras hay un panel abierto
+    INTERACT_STATE.panelBloqueo = D.PANEL_BLOQUEA_MOVIMIENTO && A.abierto;
+
     const u = ui.current;
     if (hover !== u.hover || sobre !== u.sobre) {
       const antes = u.sobre;
@@ -369,10 +403,24 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       if (antes === "historia" || sobre === "historia") redibujarHistoria();
       if (antes === "galeria" || sobre === "galeria") redibujarGaleria();
     }
+
+    // Z5: retícula clara en el centro de pantalla, sobre el plano del conjunto
     const pt = punteroRef.current;
     if (pt) {
-      pt.visible = D.SUB_PUNTERO && sobre !== null;
-      if (pt.visible) pt.position.set(hx, hy, 0.03);
+      let ver = D.SUB_PUNTERO && A.abierto && A.t > 0.5;
+      if (ver) {
+        _v.inv.copy(g.matrixWorld).invert();
+        _v.o.copy(_v.cam).applyMatrix4(_v.inv);
+        _v.d.copy(_v.cam).add(_v.fwd).applyMatrix4(_v.inv).sub(_v.o);
+        const t = Math.abs(_v.d.z) > 1e-6 ? -_v.o.z / _v.d.z : -1;
+        ver = t > 0;
+        if (ver) {
+          pt.position.set(_v.o.x + _v.d.x * t, _v.o.y + _v.d.y * t, 0.03);
+          const r = D.PUNTERO_RADIO_M / 0.21 * (hover ? 1.3 : 1);   // geometría base: radio medio 0.21 m
+          pt.scale.set(r, r, 1);
+        }
+      }
+      pt.visible = ver;
     }
   });
 

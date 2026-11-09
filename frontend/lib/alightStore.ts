@@ -156,6 +156,7 @@ export const INTERACT_STATE = {
   // N6: initial state is 'cortina' (player behind the red curtain)
   experienceState: 'cortina' as 'cortina' | 'exploracion' | 'sillas_secuencia' | 'sala_activa',
   movementLocked: false,
+  panelBloqueo:   false, // Z5: panel SILLAS abierto con PANEL_BLOQUEA_MOVIMIENTO (lo escribe SubpanelesProyecto)
 };
 
 // ── P1: paneles orbitantes del camino SILLAS (ExperienceDome) ─────────────────
