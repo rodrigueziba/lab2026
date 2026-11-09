@@ -14,8 +14,14 @@ import SymbolSystem from "./SymbolSystem";
 import Monoliths from "./Monoliths";
 import { DBG_SILLAS, DBG_PANELES } from "@/lib/debugConfig";
 import { resetEffects } from "@/lib/vizAudio";
-import { PANELES_SILLAS, tickPanelesSillas, installPanelesSillasListeners } from "@/lib/alightStore";
+import { PANELES_SILLAS, tickPanelesSillas, installPanelesSillasListeners, panelesSillasVisibles } from "@/lib/alightStore";
 import { createPanelPlaceholder } from "@/lib/retro/panelPlaceholder";
+import { registrarPanelLinterna, tickLinterna, apagarLinterna, resetLinterna, type PanelLinterna } from "@/lib/linternaPaneles";
+import PanelSelMarco from "./PanelSelMarco";
+
+// Z2: cada panel orbita con su propia fase (pivot por panel) para poder frenarse bajo la
+// linterna y retomar sin saltos. false = órbita por anillo como antes (OrbitRing gira).
+const Z2_FASE_POR_PANEL = true;
 
 // N2: disable legacy floor textures and sector audio
 const LEGACY_FLOOR_TEXTURES_ENABLED = false;
@@ -257,6 +263,7 @@ const MARCO_GLSL = Z1_PANEL_MARCO ? /* glsl */`
 const FRAG = RAINBOW_GLSL + BEZEL_GLSL + MARCO_GLSL + /* glsl */`
   uniform sampler2D uMap;
   uniform float     uOscuro;
+  uniform float     uLit;     // Z2: luz de la linterna del usuario (0–1, test de cono en CPU)
   uniform float     uReveal;
   uniform vec3      uPrismPos;
   uniform float     uRainbow;
@@ -306,6 +313,9 @@ const FRAG = RAINBOW_GLSL + BEZEL_GLSL + MARCO_GLSL + /* glsl */`
         col = mix(dark, lit, totalStr) * gate;
       }
     }
+
+    // Z2: la linterna revela la imagen como un haz (nunca oscurece)
+    col = max(col, tex.rgb * uLit * gate);
 
     // R5: apply CRT bezel (cream frame + scanlines + header)
     ${Z1_PANEL_MARCO ? "col = applyMarco(vUv, col, gate);" : R5_PANEL_BEZEL ? "col = applyBezel(vUv, col, gate);" : ""}
@@ -373,16 +383,20 @@ interface PanelProps {
   position:    THREE.Vector3;
   item:        PanelItem;     // Z1: url (o null) + título para el placeholder
   indice:      number;        // Z1: varía el código de modelo del placeholder
+  azimuth:     number;        // Z2: ángulo base del anillo (va en el pivot del panel)
+  tiltZ:       number;        // Z2: inclinación Z del anillo (va en el pivot del panel)
+  speed:       number;        // Z2: velocidad de órbita (rad/frame a 60 fps)
   staggerSec:  number;
   activatedRef: { current: number | null };
 }
 
 const texLoader = new THREE.TextureLoader();
 
-function PanelMesh({ position, item, indice, staggerSec, activatedRef }: PanelProps) {
+function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, staggerSec, activatedRef }: PanelProps) {
   const url = item.url;
   const matRef  = useRef<THREE.ShaderMaterial>(null);
   const meshRef = useRef<THREE.Mesh>(null);   // P1: escala del fade
+  const pivotRef = useRef<THREE.Group>(null); // Z2: fase de órbita propia
   const gl      = useThree((s) => s.gl);
 
   // Rotate PlaneGeometry's +Z normal so the panel face points toward [0,0,0]
@@ -406,7 +420,19 @@ function PanelMesh({ position, item, indice, staggerSec, activatedRef }: PanelPr
     uAspect:    PANEL_LAYOUT_UNIFORMS.uAspect,
     uOscuro:    PANEL_LAYOUT_UNIFORMS.uOscuro,
     uTexAspect: { value: 1.5 },
+    uLit:       { value: 0 },   // Z2
   }), []);
+
+  // Z2: registro en la linterna (fase propia; el tick gira el pivot)
+  useEffect(() => {
+    if (!Z2_FASE_POR_PANEL) return;
+    const entry: PanelLinterna = {
+      pivot: pivotRef.current, mesh: meshRef.current, uLit: uniforms.uLit,
+      fase: 0, velocidad: speed, azimut: azimuth,
+      indice, titulo: item.titulo, url: item.url, angulo: 180,
+    };
+    return registrarPanelLinterna(entry);
+  }, [uniforms, speed, azimuth, indice, item]);
 
   // Z1: foto cargada (o null) + placeholder (creado solo si hace falta) + estado
   const fotoRef = useRef<{ tex: THREE.Texture | null; aspect: number; estado: "cargando" | "ok" | "sin-foto" | "error" }>(
@@ -488,15 +514,17 @@ function PanelMesh({ position, item, indice, staggerSec, activatedRef }: PanelPr
   });
 
   return (
-    <mesh ref={meshRef} position={position} quaternion={quaternion}>
-      <planeGeometry args={[3.6 * PANEL_SCALE, 2.4 * PANEL_SCALE]} />
-      <shaderMaterial
-        ref={matRef}
-        vertexShader={VERT}
-        fragmentShader={FRAG}
-        uniforms={uniforms}
-      />
-    </mesh>
+    <group ref={pivotRef} rotation={Z2_FASE_POR_PANEL ? [0, azimuth, tiltZ] : [0, 0, 0]}>
+      <mesh ref={meshRef} position={position} quaternion={quaternion}>
+        <planeGeometry args={[3.6 * PANEL_SCALE, 2.4 * PANEL_SCALE]} />
+        <shaderMaterial
+          ref={matRef}
+          vertexShader={VERT}
+          fragmentShader={FRAG}
+          uniforms={uniforms}
+        />
+      </mesh>
+    </group>
   );
 }
 
@@ -517,6 +545,7 @@ function OrbitRing({
 
   useFrame(() => {
     if (PANELES_SILLAS.fase === "oculto") return; // P1
+    if (Z2_FASE_POR_PANEL) return; // Z2: cada panel gira su propio pivot (tickLinterna)
     if (groupRef.current) groupRef.current.rotation.y += data.speed;
   });
 
@@ -524,7 +553,9 @@ function OrbitRing({
     <group
       ref={groupRef}
       position={[0, data.centerY, 0]}
-      rotation={[data.tiltX, data.azimuth, data.tiltZ]}
+      // Z2: con fase por panel, azimut y tiltZ van en el pivot de cada panel →
+      // Rx(tiltX)·Ry(azimut + fase)·Rz(tiltZ), la misma composición que antes
+      rotation={Z2_FASE_POR_PANEL ? [data.tiltX, 0, 0] : [data.tiltX, data.azimuth, data.tiltZ]}
     >
       {data.panels.map((p, i) => (
         <PanelMesh
@@ -532,6 +563,9 @@ function OrbitRing({
           position={p.pos}
           item={p.item}
           indice={Math.round(p.staggerSec / 0.12)}
+          azimuth={data.azimuth}
+          tiltZ={data.tiltZ}
+          speed={data.speed}
           staggerSec={p.staggerSec}
           activatedRef={activatedRef}
         />
@@ -582,7 +616,7 @@ export default function ExperienceDome() {
       setTimeout(() => window.dispatchEvent(new CustomEvent("alight:dome-revealed")), 9_800);
     };
     // visualizer-activate → begin shell fade + mount DomeVisualizer; reset legacy effects (N2)
-    const onVizOn  = () => { resetEffects(); vizActiveRef.current = true;  setVizActive(true); };
+    const onVizOn  = () => { resetEffects(); apagarLinterna(); vizActiveRef.current = true;  setVizActive(true); }; // Z2: apaga la linterna
     const onVizOff = () => {
       vizActiveRef.current = false;
       setVizActive(false);
@@ -606,6 +640,17 @@ export default function ExperienceDome() {
   // P1: eventos de la narrativa → PANELES_SILLAS (store)
   useEffect(() => installPanelesSillasListeners(), []);
 
+  // Z2: el reset de debug del camino SILLAS vuelve a habilitar la linterna; al desmontar se apaga
+  useEffect(() => {
+    const onReset = () => resetLinterna();
+    window.addEventListener("alight:debug-reset-sillas", onReset);
+    return () => {
+      window.removeEventListener("alight:debug-reset-sillas", onReset);
+      apagarLinterna();
+      resetLinterna();
+    };
+  }, []);
+
   // G1/AA2: animate shell opacity; sky shell uses DomeSky material when vizActive+domoShaderEnMalla
   useFrame((_, dt) => {
     // P1: fade y visibilidad de los paneles SILLAS, derivados del store
@@ -615,6 +660,8 @@ export default function ExperienceDome() {
     PANEL_LAYOUT_UNIFORMS.uRegla.value  = DBG_PANELES.PANEL_REGLA;
     PANEL_LAYOUT_UNIFORMS.uOscuro.value = DBG_PANELES.PANEL_OSCURO;
     if (panelsRef.current) panelsRef.current.visible = PANELES_SILLAS.fase !== "oculto";
+    // Z2: linterna (test de cono) + fase de órbita propia de cada panel
+    if (Z2_FASE_POR_PANEL) tickLinterna(camera, dt, performance.now(), panelesSillasVisibles(), PANELES_SILLAS.fase !== "oculto");
     if (shellRef.current) {
       shellRef.current.visible = !DBG_SILLAS.vizHideShell;
     }
@@ -683,6 +730,8 @@ export default function ExperienceDome() {
         <sphereGeometry args={[DOME_R + 2, 48, 32, 0, Math.PI * 2, 0, Math.PI * 0.52]} />
       </mesh>
 
+      {/* Z2: marco de selección de la linterna (un solo plano compartido) */}
+      {Z2_FASE_POR_PANEL && <PanelSelMarco ancho={3.6 * PANEL_SCALE} alto={2.4 * PANEL_SCALE} />}
       {/* P1: paneles del camino SILLAS — visibles solo entre prism-landed y la E sobre el prisma */}
       <group ref={panelsRef} visible={false}>
         {orbits.map((orb, i) => (

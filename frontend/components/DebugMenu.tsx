@@ -25,8 +25,10 @@ import {
   DBG_DOME_FORCE,
   DBG_FLASH,
   DBG_PANELES,
+  DBG_LINTERNA,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
+import { LINTERNA_STATE } from "@/lib/linternaPaneles";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { setVizVolume, restartVizAudio, BAND_STATE, BAND_U2_DEBUG, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
@@ -321,6 +323,9 @@ export default function DebugMenu() {
   const [flash, setFlash] = useState({ ...DBG_FLASH });
   const [flashLive, setFlashLive] = useState({ fase: FLASH_STATE.fase as string, luz: 0, visible: false, uFlash: 0, uGlare: 0, lum: 0 });
   const [medicion, setMedicion] = useState({ ...FLASH_MEDICION }); // G2: medición real del pico
+  // Z2: linterna — constantes + estado en vivo (mismo poll de 10 fps)
+  const [linterna, setLinterna] = useState({ ...DBG_LINTERNA });
+  const [linternaLive, setLinternaLive] = useState("inactiva");
   // P1: paneles SILLAS — constantes + estado en vivo (mismo poll)
   const [paneles, setPaneles] = useState({ ...DBG_PANELES, forzado: false });
   const [panelesFase, setPanelesFase] = useState(PANELES_SILLAS.fase as string);
@@ -337,6 +342,11 @@ export default function DebugMenu() {
     }), 100);
     const idP = setInterval(() => {
       setPanelesFase(PANELES_SILLAS.fase); // P1
+      { // Z2
+        const L = LINTERNA_STATE;
+        const txt = `${L.fase}${L.sel ? ` · panel ${L.sel.indice} · ${L.sel.angulo.toFixed(1)}° · ${Math.round(L.progreso * 100)}%` : ""}${L.apagada ? " · apagada" : ""}`;
+        setLinternaLive(prev => (prev === txt ? prev : txt));
+      }
       setMedicion(m => (m.estado === FLASH_MEDICION.estado && m.centro === FLASH_MEDICION.centro ? m : { ...FLASH_MEDICION })); // G2
     }, 100);
     return () => { clearInterval(id); clearInterval(idP); };
@@ -974,6 +984,38 @@ export default function DebugMenu() {
               }}>
               {paneles.forzado ? "Soltar paneles SILLAS" : "Forzar paneles SILLAS"}
             </button>
+          </div>
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Linterna Z2 — paneles SILLAS <span style={NOTE}>(live)</span></span>
+          <div style={ROW}>
+            <span>LINTERNA_ACTIVA</span>
+            <button style={INPUT} onClick={() => {
+              const v = !linterna.LINTERNA_ACTIVA;
+              DBG_LINTERNA.LINTERNA_ACTIVA = v;
+              setLinterna(l => ({ ...l, LINTERNA_ACTIVA: v }));
+            }}>{linterna.LINTERNA_ACTIVA ? "ON" : "off"}</button>
+          </div>
+          <NumField label="CONO_DEG" value={linterna.CONO_DEG} step={0.5} min={1} max={45} note="° luz"
+            onChange={v => { DBG_LINTERNA.CONO_DEG = v; setLinterna(l => ({ ...l, CONO_DEG: v })); }} />
+          <NumField label="ENTRA_DEG" value={linterna.ENTRA_DEG} step={0.5} min={0.5} max={30} note="° selección"
+            onChange={v => { DBG_LINTERNA.ENTRA_DEG = v; setLinterna(l => ({ ...l, ENTRA_DEG: v })); }} />
+          <NumField label="SALE_DEG" value={linterna.SALE_DEG} step={0.5} min={0.5} max={40} note="° suelta"
+            onChange={v => { DBG_LINTERNA.SALE_DEG = v; setLinterna(l => ({ ...l, SALE_DEG: v })); }} />
+          <NumField label="ABRIR_MS" value={linterna.ABRIR_MS} step={100} min={200} max={10000} note="→ abierto"
+            onChange={v => { DBG_LINTERNA.ABRIR_MS = v; setLinterna(l => ({ ...l, ABRIR_MS: v })); }} />
+          <NumField label="LUZ_INTENSIDAD" value={linterna.LUZ_INTENSIDAD} step={0.05} min={0} max={2} note="uLit"
+            onChange={v => { DBG_LINTERNA.LUZ_INTENSIDAD = v; setLinterna(l => ({ ...l, LUZ_INTENSIDAD: v })); }} />
+          <NumField label="LUZ_FADE_S" value={linterna.LUZ_FADE_S} step={0.5} min={0.5} max={40} note="1/s"
+            onChange={v => { DBG_LINTERNA.LUZ_FADE_S = v; setLinterna(l => ({ ...l, LUZ_FADE_S: v })); }} />
+          <NumField label="SEL_FADE_S" value={linterna.SEL_FADE_S} step={0.5} min={0.5} max={40} note="1/s marco"
+            onChange={v => { DBG_LINTERNA.SEL_FADE_S = v; setLinterna(l => ({ ...l, SEL_FADE_S: v })); }} />
+          <NumField label="ORBITA_VEL_MULT" value={linterna.ORBITA_VEL_MULT} step={0.1} min={0} max={5} note="× órbita"
+            onChange={v => { DBG_LINTERNA.ORBITA_VEL_MULT = v; setLinterna(l => ({ ...l, ORBITA_VEL_MULT: v })); }} />
+          <NumField label="MARCO_PAD_M" value={linterna.MARCO_PAD_M} step={0.05} min={0} max={1.5} note="m esquinas"
+            onChange={v => { DBG_LINTERNA.MARCO_PAD_M = v; setLinterna(l => ({ ...l, MARCO_PAD_M: v })); }} />
+          <div style={ROW}>
+            <span>estado <span style={NOTE}>{linternaLive}</span></span>
           </div>
 
           <div style={DIVIDER} />

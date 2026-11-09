@@ -95,6 +95,20 @@ export const DBG_FLASH = {
   FLASH_BORDE:           0.3,    // encendido del borde fuera de la curvatura (fracción del de G2)
 };
 
+// ── Z2: linterna del usuario sobre los paneles SILLAS — live ───────────────────
+export const DBG_LINTERNA = {
+  LINTERNA_ACTIVA:   true,  // false = sin linterna (órbitas y paneles como antes)
+  CONO_DEG:          12,    // semiángulo del cono de luz (ilumina con caída suave hasta acá)
+  ENTRA_DEG:         5,     // histéresis: un panel queda seleccionado al entrar a este ángulo
+  SALE_DEG:          8,     // histéresis: el seleccionado se suelta al pasar este ángulo
+  ABRIR_MS:          2000,  // luz sostenida en el mismo panel → estado 'abierto'
+  LUZ_INTENSIDAD:    1.0,   // brillo de la imagen bajo la linterna (1 = como bajo un haz)
+  LUZ_FADE_S:        8,     // velocidad de fundido de uLit (1/s)
+  SEL_FADE_S:        10,    // velocidad de fundido del marco SEL (1/s)
+  ORBITA_VEL_MULT:   1.0,   // multiplicador de la velocidad de órbita de cada panel
+  MARCO_PAD_M:       0.3,   // separación de las esquinas ámbar respecto del panel (m)
+};
+
 // ── P1: paneles orbitantes del camino SILLAS (ExperienceDome) — live ───────────
 export const DBG_PANELES = {
   PANELES_AUTO:        true,  // false = paneles siempre visibles (comportamiento anterior)
