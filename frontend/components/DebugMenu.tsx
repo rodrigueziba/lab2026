@@ -30,6 +30,7 @@ import {
   DBG_ORBITAS,
   DBG_ACERC,
   DBG_PRIORIDAD,
+  DBG_LOG_PANEL,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { LINTERNA_STATE, ORBITAS_INFO, ACERC } from "@/lib/linternaPaneles";
@@ -334,6 +335,7 @@ export default function DebugMenu() {
   const [orb, setOrb] = useState({ ...DBG_ORBITAS });       // Z7
   const [acerc, setAcerc] = useState({ ...DBG_ACERC });     // Z8
   const [prio, setPrio] = useState({ ...DBG_PRIORIDAD });   // Z10
+  const [logPanelOn, setLogPanelOn] = useState(DBG_LOG_PANEL.LOG_ACTIVO); // Z12
   const [acercLive, setAcercLive] = useState("orbita");     // Z8
   const [orbInfo, setOrbInfo] = useState("");               // Z7: tabla de anillos
   // P1: paneles SILLAS — constantes + estado en vivo (mismo poll)
@@ -359,7 +361,7 @@ export default function DebugMenu() {
       }
       { // Z8
         const L = ACERC.layout;
-        const txt = `${ACERC.fase}${ACERC.panel ? ` · panel ${ACERC.panel.indice} · d ${ACERC.distancia.toFixed(2)} m · sube ${L.up.toFixed(2)} m${L.alejado ? " · alejado" : ""}${L.entra ? "" : " · ✗ no entra"}` : ""} · subpaneles ${(ACERC.escalaSub * 100).toFixed(0)} %`;
+        const txt = `${ACERC.fase}${ACERC.fase === "abierto" ? (ACERC.miraDentro ? " · mira dentro" : ` · fuera ${ACERC.tFuera ? Math.round(performance.now() - ACERC.tFuera) : 0} ms`) : ""}${ACERC.panel ? ` · panel ${ACERC.panel.indice} · d ${ACERC.distancia.toFixed(2)} m · sube ${L.up.toFixed(2)} m${L.alejado ? " · alejado" : ""}${L.entra ? "" : " · ✗ no entra"}` : ""} · subpaneles ${(ACERC.escalaSub * 100).toFixed(0)} %`;
         setAcercLive(prev => (prev === txt ? prev : txt));
       }
       { // Z7
@@ -1162,6 +1164,20 @@ export default function DebugMenu() {
             onChange={v => { DBG_SUBPANELES.SUB_ESCALA_MIN = v; setSubp(x => ({ ...x, SUB_ESCALA_MIN: v })); }} />
           <NumField label="ACERC_AJUSTE_S" value={acerc.ACERC_AJUSTE_S} step={0.5} min={0.5} max={30} note="Z9 resize 1/s"
             onChange={v => { DBG_ACERC.ACERC_AJUSTE_S = v; setAcerc(o => ({ ...o, ACERC_AJUSTE_S: v })); }} />
+          <NumField label="CIERRE_MARGEN" value={acerc.CIERRE_MARGEN} step={0.01} min={0} max={0.5} note="Z12 caja de cierre"
+            onChange={v => { DBG_ACERC.CIERRE_MARGEN = v; setAcerc(o => ({ ...o, CIERRE_MARGEN: v })); }} />
+          <NumField label="CIERRE_GRACIA_MS" value={acerc.CIERRE_GRACIA_MS} step={100} min={0} max={10000} note="Z12 desde abierto"
+            onChange={v => { DBG_ACERC.CIERRE_GRACIA_MS = v; setAcerc(o => ({ ...o, CIERRE_GRACIA_MS: v })); }} />
+          <NumField label="ESPERA_DATOS_MS" value={acerc.ESPERA_DATOS_MS} step={500} min={500} max={30000} note="Z12 tope sin datos"
+            onChange={v => { DBG_ACERC.ESPERA_DATOS_MS = v; setAcerc(o => ({ ...o, ESPERA_DATOS_MS: v })); }} />
+          <div style={ROW}>
+            <span>DBG_LOG_PANEL <span style={NOTE}>Z12 log de transiciones en consola</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !logPanelOn;
+              DBG_LOG_PANEL.LOG_ACTIVO = v;
+              setLogPanelOn(v);
+            }}>{logPanelOn ? "ON" : "off"}</button>
+          </div>
           <div style={ROW}>
             <span>estado <span style={NOTE}>{acercLive}</span></span>
           </div>

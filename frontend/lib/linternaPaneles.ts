@@ -6,7 +6,7 @@
 // allocations por frame (vectores reutilizados).
 
 import * as THREE from "three";
-import { DBG_LINTERNA, DBG_ORBITAS, DBG_ACERC, DBG_SUBPANELES, DBG_PRIORIDAD } from "@/lib/debugConfig";
+import { DBG_LINTERNA, DBG_ORBITAS, DBG_ACERC, DBG_SUBPANELES, DBG_PRIORIDAD, DBG_LOG_PANEL } from "@/lib/debugConfig";
 import { calcularLayoutBloque, type LayoutBloque } from "@/lib/subpanelLayout";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
@@ -70,7 +70,8 @@ export function registrarPanelLinterna(p: PanelLinterna): () => void {
 // La animación se hace en el espacio LOCAL del padre del mesh (pivot de Z2): mientras el
 // panel está acercado su fase no avanza, así que el padre queda quieto y la pose orbital
 // de vuelta es exactamente la pose local de reposo guardada (fase congelada, sin saltos).
-export type AcercFase = "orbita" | "acercando" | "cerca" | "volviendo";
+// Z12: "cerca" = llegó y aparecen los subpaneles; "abierto" = bloque completo, recién ahí puede cerrarse
+export type AcercFase = "orbita" | "acercando" | "cerca" | "abierto" | "volviendo";
 export const ACERC = {
   fase:     "orbita" as AcercFase,
   panel:    null as PanelLinterna | null,
@@ -85,6 +86,13 @@ export const ACERC = {
   ancho: 5.4, alto: 3.6,
   layout:   { k: 1, d: 6, up: 0, alejado: false, entra: true, medioAncho: 2.7, medioAlto: 1.8 } as LayoutBloque,
   renderOrderPrevio: 0,                                              // Z10
+  // Z12: latch + cierre en pantalla
+  tLlegada: 0,                                                       // llegada al destino
+  tAbierto: 0,                                                       // bloque completo (subpaneles listos)
+  tFuera:   0,                                                       // desde cuándo la mira está fuera de la caja (0 = dentro)
+  bloqueListo: false,                                                // lo pone SubpanelesProyecto al terminar su salida
+  conSubpaneles: true,                                               // false = prestador (sin subpaneles)
+  miraDentro: true,                                                  // debug
   aspect:   0,                                                       // último aspecto usado (detecta resize)
 };
 
@@ -97,7 +105,7 @@ function calcularDestino(camera: THREE.Camera): void {
   const fov = pc.isPerspectiveCamera ? pc.fov : 60;
   const aspect = pc.isPerspectiveCamera ? pc.aspect : 16 / 9;
   ACERC.aspect = aspect;
-  if (DBG_SUBPANELES.SUB_AJUSTE_BLOQUE) {
+  if (DBG_SUBPANELES.SUB_AJUSTE_BLOQUE && ACERC.conSubpaneles) { // Z12: prestadores sin bloque
     const curva = RETRO_FLAGS.enabled ? (CRT_UNIFORMS.uCurve.value as number) : 0;
     calcularLayoutBloque(ACERC.ancho, ACERC.alto, fov, aspect, curva, ACERC.layout);
   } else {
@@ -116,6 +124,13 @@ function calcularDestino(camera: THREE.Camera): void {
 const _aW = new THREE.Vector3();
 const _aQ = new THREE.Quaternion();
 const _aPQ = new THREE.Quaternion();
+
+// ── Z12: log de diagnóstico (DBG_LOG_PANEL.LOG_ACTIVO) ──
+export function logPanel(transicion: string, motivo: string, p: PanelLinterna | null): void {
+  if (!DBG_LOG_PANEL.LOG_ACTIVO) return;
+  const ang = p ? p.angulo.toFixed(1) : "—";
+  console.info(`[panel] ${(performance.now() / 1000).toFixed(3)} s · ${transicion} · motivo: ${motivo} · panel ${p?.indice ?? "—"} · ángulo al centro ${ang}°`);
+}
 
 function easing(k: number): number {
   const e = DBG_ACERC.ACERC_EASING;
@@ -153,6 +168,10 @@ function iniciarAcercamiento(p: PanelLinterna, camera: THREE.Camera, now: number
   parent.getWorldQuaternion(_aPQ);
   ACERC.toQuat.copy(_aPQ).invert().multiply(_aQ);
   ACERC.panel = p; ACERC.fase = "acercando"; ACERC.t0 = now;
+  // Z12: estado del latch
+  ACERC.conSubpaneles = p.proyectoId !== null && DBG_SUBPANELES.SUB_ACTIVO;
+  ACERC.bloqueListo = false; ACERC.tLlegada = 0; ACERC.tAbierto = 0; ACERC.tFuera = 0; ACERC.miraDentro = true;
+  logPanel("apuntando → viajando", "luz sostenida ABRIR_MS", p);
   // Z10: el panel elegido se dibuja después de los que orbitan
   ACERC.renderOrderPrevio = mesh.renderOrder;
   mesh.renderOrder = DBG_PRIORIDAD.RENDER_ORDER_BLOQUE;
@@ -163,10 +182,12 @@ function iniciarAcercamiento(p: PanelLinterna, camera: THREE.Camera, now: number
 }
 
 /** Z8: empieza la vuelta a la órbita desde donde esté (también si se corta a mitad del acercamiento). */
+let motivoVuelta = "—"; // Z12: lo fija quien suelta (para el log)
 function iniciarVuelta(now: number): void {
   const p = ACERC.panel;
   if (!p?.mesh || ACERC.fase === "orbita" || ACERC.fase === "volviendo") return;
-  const espera = ACERC.fase === "cerca" && DBG_ACERC.ACERC_ESPERA_CIERRE ? DBG_SUBPANELES.SUB_ANIM_MS : 0;
+  const espera = (ACERC.fase === "cerca" || ACERC.fase === "abierto") && DBG_ACERC.ACERC_ESPERA_CIERRE ? DBG_SUBPANELES.SUB_ANIM_MS : 0;
+  logPanel(`${ACERC.fase} → retornando`, motivoVuelta, p);
   ACERC.fromPos.copy(p.mesh.position); ACERC.fromQuat.copy(p.mesh.quaternion);
   ACERC.fase = "volviendo"; ACERC.t0 = now + espera;
 }
@@ -174,6 +195,7 @@ function iniciarVuelta(now: number): void {
 /** Z8: cancela todo y deja el panel en su pose orbital al instante (visualizer-activate). */
 function cancelarAcercamiento(): void {
   const p = ACERC.panel;
+  if (p) logPanel(`${ACERC.fase} → orbita`, "cancelado (visualizer-activate)", p);
   if (p?.mesh) { p.mesh.position.copy(ACERC.restPos); p.mesh.quaternion.copy(ACERC.restQuat); p.mesh.renderOrder = ACERC.renderOrderPrevio; }
   // Z10: los demás vuelven al instante (los paneles se ocultan igual con el visualizador)
   for (const q of PANELES_LINTERNA) { q.oculta = 1; if (q.uAtenua) q.uAtenua.value = 1; }
@@ -186,14 +208,24 @@ function tickAcercamiento(now: number, dt: number, camera: THREE.Camera): void {
   if (!p || !p.mesh || ACERC.fase === "orbita") return;
   const m = p.mesh;
   // Z9: si cambió el aspecto (resize) o el FOV, se recalcula el layout del bloque
-  if (ACERC.fase === "acercando" || ACERC.fase === "cerca") {
+  if (ACERC.fase === "acercando" || ACERC.fase === "cerca" || ACERC.fase === "abierto") {
+    // Z9: resize → solo se recalcula el destino; Z12: nunca cambia la fase por esto
     const pc = camera as THREE.PerspectiveCamera;
     if (pc.isPerspectiveCamera && pc.aspect !== ACERC.aspect) calcularDestino(camera);
   }
-  if (ACERC.fase === "cerca") {
+  if (ACERC.fase === "cerca" || ACERC.fase === "abierto") {
     // sigue el destino suavemente (solo se mueve si cambió por un resize)
     const a = 1 - Math.exp(-Math.max(0.1, DBG_ACERC.ACERC_AJUSTE_S) * dt);
     m.position.lerp(ACERC.toPos, a);
+    // Z12: cerca → abierto cuando el bloque está completo (o sin subpaneles / datos que no llegan)
+    if (ACERC.fase === "cerca") {
+      const sinBloque = !ACERC.conSubpaneles;
+      const tarde = now - ACERC.tLlegada > DBG_ACERC.ESPERA_DATOS_MS;
+      if (ACERC.bloqueListo || sinBloque || tarde) {
+        ACERC.fase = "abierto"; ACERC.tAbierto = now; ACERC.tFuera = 0;
+        logPanel("cerca → abierto", ACERC.bloqueListo ? "subpaneles completos" : sinBloque ? "sin subpaneles (prestador)" : "datos no llegaron (ESPERA_DATOS_MS)", p);
+      }
+    }
     return;
   }
   if (ACERC.fase === "acercando") {
@@ -203,6 +235,8 @@ function tickAcercamiento(now: number, dt: number, camera: THREE.Camera): void {
     m.quaternion.slerpQuaternions(ACERC.fromQuat, ACERC.toQuat, e);
     if (k >= 1) {
       ACERC.fase = "cerca";
+      ACERC.tLlegada = now;
+      logPanel("viajando → cerca", "llegó al destino", p);
       // recién al llegar aparecen los subpaneles (Z4)
       if (LINTERNA_STATE.sel === p)
         emitir("alight:panel-abierto", { indice: p.indice, titulo: p.titulo, url: p.url, proyectoId: p.proyectoId });
@@ -217,6 +251,7 @@ function tickAcercamiento(now: number, dt: number, camera: THREE.Camera): void {
       m.position.copy(ACERC.restPos); m.quaternion.copy(ACERC.restQuat);
       m.renderOrder = ACERC.renderOrderPrevio;                     // Z10
       p.acercado = false;                                          // retoma la órbita desde su fase
+      logPanel("retornando → orbita", "llegó a su fase congelada", p);
       ACERC.panel = null; ACERC.fase = "orbita";
     }
   }
@@ -243,6 +278,7 @@ function soltar() {
 /** Z2: apaga y limpia todo (alight:visualizer-activate). */
 export function apagarLinterna(): void {
   LINTERNA_STATE.apagada = true;
+  motivoVuelta = "visualizer-activate";
   soltar();
   cancelarAcercamiento(); // Z8
   for (const p of PANELES_LINTERNA) p.uLit.value = 0;
@@ -282,7 +318,7 @@ export function tickLinterna(camera: THREE.Camera, dt: number, now: number, acti
   const pasos = dt * 60; // la velocidad original era por frame a 60 fps
 
   if (!on) {
-    if (s.sel) soltar();
+    if (s.sel) { motivoVuelta = "linterna inactiva"; soltar(); }
     if (!s.apagada) s.fase = "inactiva";
     for (const p of PANELES_LINTERNA) {
       // las órbitas siguen avanzando igual que antes (solo si los paneles se ven)
@@ -325,12 +361,25 @@ export function tickLinterna(camera: THREE.Camera, dt: number, now: number, acti
   const actual = s.sel;
   // Z4: con el panel abierto, la luz pasa a ser puntero: no se suelta mientras la mirada
   // siga sobre el conjunto (lo calcula SubpanelesProyecto en LINTERNA_STATE.retener)
-  // Z8: durante el acercamiento (≈0,9 s) no se suelta: el panel viaja hacia el centro de la mirada
-  const viajando = ACERC.fase === "acercando" && ACERC.panel === actual;
-  if (actual && actual.angulo > D.SALE_DEG && !(s.abiertoIdx >= 0 && s.retener) && !viajando) soltar();
+  // Z12: con el acercamiento disparado la selección queda LATCHEADA: el cono no cuenta.
+  // Durante el viaje y la aparición de los subpaneles no se suelta por nada (salvo
+  // visualizer-activate); en 'abierto' el cierre se decide en pantalla (caja del bloque).
+  const latcheado = ACERC.panel !== null && ACERC.panel === actual
+    && (ACERC.fase === "acercando" || ACERC.fase === "cerca" || ACERC.fase === "abierto");
+  if (latcheado) {
+    if (ACERC.fase === "abierto" && cierrePorPantalla(camera, now)) {
+      motivoVuelta = `mira fuera del bloque ${DBG_ACERC.CIERRE_GRACIA_MS} ms`;
+      soltar();
+    }
+  } else if (actual && actual.angulo > D.SALE_DEG && !(s.abiertoIdx >= 0 && s.retener)) {
+    motivoVuelta = "cono (luz retirada)";
+    logPanel(s.abiertoIdx >= 0 ? "abierto → orbita" : "apuntando → orbita", "cono (luz retirada)", actual);
+    soltar();
+  }
   // Z8: mientras un panel vuelve a su órbita no se puede seleccionar otro
   if (!s.sel && mejor && ACERC.fase === "orbita") {
     s.sel = mejor; s.marco = mejor; s.tSel = now; s.progreso = 0; s.fase = "seleccionado";
+    logPanel("orbita → apuntando", `entró al cono (< ${D.ENTRA_DEG}°)`, mejor);
   }
   if (!s.sel) s.fase = "buscando";
 
@@ -357,6 +406,43 @@ export function tickLinterna(camera: THREE.Camera, dt: number, now: number, acti
   tickPrioridad(dt, camera);         // Z10
 }
 
+// ── Z12: cierre decidido en pantalla ──────────────────────────────────────────
+// La mira (rayo central de la cámara) se intersecta con el plano del bloque (a ACERC.layout.d
+// sobre la dirección del disparo) y se compara con la caja envolvente del bloque completo
+// (panel + HISTORIA + GALERÍA + FICHA, centrada) más CIERRE_MARGEN. La gracia cuenta desde
+// 'abierto'. Mirar el panel (que quedó arriba del centro) nunca cierra.
+const _cc = new THREE.Vector3();
+const _cf = new THREE.Vector3();
+const _cr = new THREE.Vector3();
+function cierrePorPantalla(camera: THREE.Camera, now: number): boolean {
+  const L = ACERC.layout;
+  camera.getWorldPosition(_cam);
+  camera.getWorldDirection(_cf);
+  _cc.copy(ACERC.camPos0).addScaledVector(ACERC.fwd0, L.d);       // centro del bloque
+  const den = _cf.dot(ACERC.fwd0);
+  let dentro = false;
+  if (den > 1e-4) {
+    const t = _pos.copy(_cc).sub(_cam).dot(ACERC.fwd0) / den;
+    if (t > 0) {
+      _pos.copy(_cam).addScaledVector(_cf, t).sub(_cc);              // impacto relativo al centro
+      _cr.crossVectors(ACERC.fwd0, ACERC.up0).normalize();
+      const pc = camera as THREE.PerspectiveCamera;
+      const tanH = Math.tan(THREE.MathUtils.degToRad(pc.isPerspectiveCamera ? pc.fov : 60) / 2);
+      const aspect = pc.isPerspectiveCamera ? pc.aspect : 16 / 9;
+      const mY = DBG_ACERC.CIERRE_MARGEN * L.d * tanH, mX = mY * aspect;
+      // caja: el bloque centrado; sin subpaneles, solo el panel (que está en el centro)
+      const hx = (ACERC.conSubpaneles ? L.medioAncho : ACERC.ancho / 2) + mX;
+      const hy = (ACERC.conSubpaneles ? L.medioAlto : ACERC.alto / 2) + mY;
+      const yc = ACERC.conSubpaneles ? 0 : L.up;                      // sin bloque: el panel puede estar desplazado
+      dentro = Math.abs(_pos.dot(_cr)) <= hx && Math.abs(_pos.dot(ACERC.up0) - yc) <= hy;
+    }
+  }
+  ACERC.miraDentro = dentro;
+  if (dentro) { ACERC.tFuera = 0; return false; }
+  if (ACERC.tFuera === 0) ACERC.tFuera = now;
+  return now - ACERC.tFuera >= DBG_ACERC.CIERRE_GRACIA_MS;
+}
+
 // ── Z10: prioridad visual del conjunto abierto ────────────────────────────────
 // Causa: con el panel acercado (~6 m de la cámara) el conjunto mide ~19 × 11 m y sus
 // extremos llegan a 15–16 m del eje del domo, a la altura del anillo interior (r = 15 m):
@@ -369,7 +455,7 @@ const _right = new THREE.Vector3();
 
 function tickPrioridad(dt: number, camera: THREE.Camera): void {
   const P = DBG_PRIORIDAD;
-  const activo = P.PRIORIDAD_ACTIVA && ACERC.panel !== null && (ACERC.fase === "acercando" || ACERC.fase === "cerca");
+  const activo = P.PRIORIDAD_ACTIVA && ACERC.panel !== null && (ACERC.fase === "acercando" || ACERC.fase === "cerca" || ACERC.fase === "abierto"); // Z12: + abierto
   const k = 1 - Math.exp(-dt * 1000 / Math.max(1, P.ATENUAR_MS) * 3); // ~95 % en ATENUAR_MS
   const pc = camera as THREE.PerspectiveCamera;
   const t = Math.tan(THREE.MathUtils.degToRad(pc.isPerspectiveCamera ? pc.fov : 60) / 2);

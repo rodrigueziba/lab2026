@@ -358,6 +358,8 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       return;
     }
     g.visible = true;
+    // Z12: avisa a la linterna que el bloque terminó de aparecer (recién ahí 'abierto' y cuenta la gracia)
+    if (A.t >= 1 && A.abierto && ACERC.panel && !ACERC.bloqueListo) ACERC.bloqueListo = true;
     // salida: ease-out al abrir; el cierre recorre la misma curva al revés
     const e = 1 - Math.pow(1 - A.t, 3);
 
@@ -373,7 +375,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     const pc = camera as THREE.PerspectiveCamera;
     // Z9: con el panel acercado, el bloque lo resuelve calcularLayoutBloque (linterna): misma k,
     // y el conjunto sigue la pose real del panel (que ya quedó desplazado para centrar el bloque)
-    const bloque = D.SUB_AJUSTE_BLOQUE && ACERC.panel !== null && ACERC.fase === "cerca"
+    const bloque = D.SUB_AJUSTE_BLOQUE && ACERC.panel !== null && (ACERC.fase === "cerca" || ACERC.fase === "abierto") // Z12
       && LINTERNA_STATE.sel === ACERC.panel && !!ACERC.panel.mesh;
     if (bloque) {
       const pm = ACERC.panel!.mesh!;

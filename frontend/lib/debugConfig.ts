@@ -118,6 +118,10 @@ export const DBG_ACERC = {
   ACERC_EASING:     "seno" as "seno" | "suave" | "cubica", // in-out sin rebote (seno / smootherstep / cúbica)
   ACERC_ESPERA_CIERRE: true, // la vuelta empieza cuando terminaron de cerrarse los subpaneles
   ACERC_AJUSTE_S:   6,       // Z9: velocidad (1/s) con la que el panel acercado sigue un cambio de layout (resize)
+  // Z12: selección latcheada — durante el viaje no cuenta el cono; el cierre se decide en pantalla
+  CIERRE_MARGEN:    0.06,    // margen extra de la caja de cierre (fracción del semiviewport)
+  CIERRE_GRACIA_MS: 1200,    // fuera de la caja durante este tiempo (contado desde 'abierto') → cierra
+  ESPERA_DATOS_MS:  5000,    // si los subpaneles no aparecen (datos que no llegan), se da por abierto igual
 };
 
 // ── Z10: prioridad visual del proyecto abierto sobre los paneles en órbita — live ──
@@ -129,6 +133,11 @@ export const DBG_PRIORIDAD = {
   OCULTAR_MARGEN:     0.08,  // margen extra alrededor del conjunto (fracción del semiviewport)
   OCULTAR_PROF_M:     4.0,   // solo se esconden los que están a menos de esto DETRÁS del panel (los más lejanos los tapa la profundidad)
   RENDER_ORDER_BLOQUE: 20,   // renderOrder del conjunto abierto (los paneles en órbita usan 0)
+};
+
+// ── Z12: log de diagnóstico de la máquina de estados del panel (apagado por defecto) ──
+export const DBG_LOG_PANEL = {
+  LOG_ACTIVO: false, // true = console.info en cada transición (motivo, ángulo al centro, tiempo)
 };
 
 // ── Z4: subpaneles del panel abierto (HISTORIA / GALERÍA / FICHA) — live ──────
