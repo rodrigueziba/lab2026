@@ -18,6 +18,7 @@ import { PANELES_SILLAS, tickPanelesSillas, installPanelesSillasListeners, panel
 import { createPanelPlaceholder } from "@/lib/retro/panelPlaceholder";
 import { registrarPanelLinterna, tickLinterna, apagarLinterna, resetLinterna, type PanelLinterna } from "@/lib/linternaPaneles";
 import PanelSelMarco from "./PanelSelMarco";
+import SubpanelesProyecto from "./SubpanelesProyecto"; // Z4
 
 // Z2: cada panel orbita con su propia fase (pivot por panel) para poder frenarse bajo la
 // linterna y retomar sin saltos. false = órbita por anillo como antes (OrbitRing gira).
@@ -733,6 +734,8 @@ export default function ExperienceDome() {
 
       {/* Z2: marco de selección de la linterna (un solo plano compartido) */}
       {Z2_FASE_POR_PANEL && <PanelSelMarco ancho={3.6 * PANEL_SCALE} alto={2.4 * PANEL_SCALE} />}
+      {/* Z4: HISTORIA / GALERÍA / FICHA alrededor del panel abierto */}
+      {Z2_FASE_POR_PANEL && <SubpanelesProyecto panelAncho={3.6 * PANEL_SCALE} panelAlto={2.4 * PANEL_SCALE} />}
       {/* P1: paneles del camino SILLAS — visibles solo entre prism-landed y la E sobre el prisma */}
       <group ref={panelsRef} visible={false}>
         {orbits.map((orb, i) => (

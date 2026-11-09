@@ -109,6 +109,24 @@ export const DBG_LINTERNA = {
   MARCO_PAD_M:       0.3,   // separación de las esquinas ámbar respecto del panel (m)
 };
 
+// ── Z4: subpaneles del panel abierto (HISTORIA / GALERÍA / FICHA) — live ──────
+// Medidas tomadas del mockup en px y convertidas con SUB_M_POR_PX (400 px = ancho del panel 5,4 m).
+export const DBG_SUBPANELES = {
+  SUB_ACTIVO:        true,   // false = el panel se abre sin subpaneles
+  SUB_M_POR_PX:      0.0135, // escala mockup → metros (tamaño de los subpaneles)
+  SUB_GAP_LATERAL_M: 1.28,   // separación HISTORIA/GALERÍA ↔ panel (mockup 95 px)
+  SUB_GAP_ABAJO_M:   0.95,   // separación panel ↔ FICHA (mockup 70 px)
+  SUB_ANIM_MS:       400,    // salida desde el panel (escala + desplazamiento) y cierre inverso
+  SUB_ADELANTE_M:    0.15,   // los subpaneles se adelantan hacia la cámara (evita cruzar el panel)
+  SUB_RETENER_PAD_M: 1.0,    // margen alrededor del conjunto en el que el panel sigue abierto
+  SUB_LINEAS:        true,   // líneas guía punteadas ámbar hacia el panel
+  SUB_PUNTERO:       true,   // aro claro donde apunta la mirada sobre los subpaneles
+  HISTORIA_RENGLONES: 10,    // renglones por página de la sinopsis
+  GALERIA_AMBAR:     1.0,    // 1 = imagen monocroma ámbar, 0 = color original
+  GALERIA_SCAN:      0.28,   // intensidad de scanlines de la pantalla CRT
+  GALERIA_CURVA:     0.08,   // curvatura (barrel) de la pantalla CRT
+};
+
 // ── P1: paneles orbitantes del camino SILLAS (ExperienceDome) — live ───────────
 export const DBG_PANELES = {
   PANELES_AUTO:        true,  // false = paneles siempre visibles (comportamiento anterior)

@@ -26,6 +26,7 @@ import {
   DBG_FLASH,
   DBG_PANELES,
   DBG_LINTERNA,
+  DBG_SUBPANELES,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { LINTERNA_STATE } from "@/lib/linternaPaneles";
@@ -326,6 +327,7 @@ export default function DebugMenu() {
   // Z2: linterna — constantes + estado en vivo (mismo poll de 10 fps)
   const [linterna, setLinterna] = useState({ ...DBG_LINTERNA });
   const [linternaLive, setLinternaLive] = useState("inactiva");
+  const [subp, setSubp] = useState({ ...DBG_SUBPANELES }); // Z4
   // P1: paneles SILLAS — constantes + estado en vivo (mismo poll)
   const [paneles, setPaneles] = useState({ ...DBG_PANELES, forzado: false });
   const [panelesFase, setPanelesFase] = useState(PANELES_SILLAS.fase as string);
@@ -1017,6 +1019,53 @@ export default function DebugMenu() {
           <div style={ROW}>
             <span>estado <span style={NOTE}>{linternaLive}</span></span>
           </div>
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Subpaneles Z4 — HISTORIA / GALERÍA / FICHA <span style={NOTE}>(live)</span></span>
+          <div style={ROW}>
+            <span>SUB_ACTIVO <span style={NOTE}>al abrir</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.SUB_ACTIVO;
+              DBG_SUBPANELES.SUB_ACTIVO = v;
+              setSubp(x => ({ ...x, SUB_ACTIVO: v }));
+            }}>{subp.SUB_ACTIVO ? "ON" : "off"}</button>
+          </div>
+          <NumField label="SUB_M_POR_PX" value={subp.SUB_M_POR_PX} step={0.0005} min={0.004} max={0.04} note="tamaño"
+            onChange={v => { DBG_SUBPANELES.SUB_M_POR_PX = v; setSubp(x => ({ ...x, SUB_M_POR_PX: v })); }} />
+          <NumField label="SUB_GAP_LATERAL_M" value={subp.SUB_GAP_LATERAL_M} step={0.1} min={0} max={6} note="m lados"
+            onChange={v => { DBG_SUBPANELES.SUB_GAP_LATERAL_M = v; setSubp(x => ({ ...x, SUB_GAP_LATERAL_M: v })); }} />
+          <NumField label="SUB_GAP_ABAJO_M" value={subp.SUB_GAP_ABAJO_M} step={0.1} min={0} max={6} note="m abajo"
+            onChange={v => { DBG_SUBPANELES.SUB_GAP_ABAJO_M = v; setSubp(x => ({ ...x, SUB_GAP_ABAJO_M: v })); }} />
+          <NumField label="SUB_ANIM_MS" value={subp.SUB_ANIM_MS} step={50} min={50} max={3000} note="ms salida"
+            onChange={v => { DBG_SUBPANELES.SUB_ANIM_MS = v; setSubp(x => ({ ...x, SUB_ANIM_MS: v })); }} />
+          <NumField label="SUB_ADELANTE_M" value={subp.SUB_ADELANTE_M} step={0.05} min={0} max={3} note="m hacia cámara"
+            onChange={v => { DBG_SUBPANELES.SUB_ADELANTE_M = v; setSubp(x => ({ ...x, SUB_ADELANTE_M: v })); }} />
+          <NumField label="SUB_RETENER_PAD_M" value={subp.SUB_RETENER_PAD_M} step={0.1} min={0} max={6} note="m mirada"
+            onChange={v => { DBG_SUBPANELES.SUB_RETENER_PAD_M = v; setSubp(x => ({ ...x, SUB_RETENER_PAD_M: v })); }} />
+          <div style={ROW}>
+            <span>SUB_LINEAS <span style={NOTE}>guías</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.SUB_LINEAS;
+              DBG_SUBPANELES.SUB_LINEAS = v;
+              setSubp(x => ({ ...x, SUB_LINEAS: v }));
+            }}>{subp.SUB_LINEAS ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>SUB_PUNTERO <span style={NOTE}>aro</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.SUB_PUNTERO;
+              DBG_SUBPANELES.SUB_PUNTERO = v;
+              setSubp(x => ({ ...x, SUB_PUNTERO: v }));
+            }}>{subp.SUB_PUNTERO ? "ON" : "off"}</button>
+          </div>
+          <NumField label="HISTORIA_RENGLONES" value={subp.HISTORIA_RENGLONES} step={1} min={3} max={20} note="al abrir"
+            onChange={v => { DBG_SUBPANELES.HISTORIA_RENGLONES = v; setSubp(x => ({ ...x, HISTORIA_RENGLONES: v })); }} />
+          <NumField label="GALERIA_AMBAR" value={subp.GALERIA_AMBAR} step={0.05} min={0} max={1} note="monocromo"
+            onChange={v => { DBG_SUBPANELES.GALERIA_AMBAR = v; setSubp(x => ({ ...x, GALERIA_AMBAR: v })); }} />
+          <NumField label="GALERIA_SCAN" value={subp.GALERIA_SCAN} step={0.02} min={0} max={1} note="scanlines"
+            onChange={v => { DBG_SUBPANELES.GALERIA_SCAN = v; setSubp(x => ({ ...x, GALERIA_SCAN: v })); }} />
+          <NumField label="GALERIA_CURVA" value={subp.GALERIA_CURVA} step={0.01} min={0} max={0.4} note="curvatura"
+            onChange={v => { DBG_SUBPANELES.GALERIA_CURVA = v; setSubp(x => ({ ...x, GALERIA_CURVA: v })); }} />
 
           <div style={DIVIDER} />
           <span style={LABEL}>Destello de cortina F1 <span style={NOTE}>(live)</span></span>

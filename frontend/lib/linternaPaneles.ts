@@ -33,6 +33,7 @@ export const LINTERNA_STATE = {
   marco:      null as PanelLinterna | null,  // panel donde se dibuja el marco (sigue durante el fade-out)
   apagada:    false,  // true tras alight:visualizer-activate (hasta reset)
   abiertoIdx: -1,     // índice del panel abierto (−1 = ninguno)
+  retener:    false,  // Z4: la mirada está sobre el conjunto abierto (panel + subpaneles) → no soltar
 };
 
 export const PANELES_LINTERNA: PanelLinterna[] = [];
@@ -57,7 +58,7 @@ function emitir(nombre: string, detail: object) {
 function soltar() {
   const s = LINTERNA_STATE;
   if (s.abiertoIdx >= 0) emitir("alight:panel-cerrado", { indice: s.abiertoIdx });
-  s.sel = null; s.progreso = 0; s.abiertoIdx = -1;
+  s.sel = null; s.progreso = 0; s.abiertoIdx = -1; s.retener = false;
   s.fase = s.apagada ? "inactiva" : "buscando";
 }
 
@@ -135,7 +136,9 @@ export function tickLinterna(camera: THREE.Camera, dt: number, now: number, acti
 
   // histéresis: el seleccionado se mantiene hasta pasar SALE_DEG
   const actual = s.sel;
-  if (actual && actual.angulo > D.SALE_DEG) soltar();
+  // Z4: con el panel abierto, la luz pasa a ser puntero: no se suelta mientras la mirada
+  // siga sobre el conjunto (lo calcula SubpanelesProyecto en LINTERNA_STATE.retener)
+  if (actual && actual.angulo > D.SALE_DEG && !(s.abiertoIdx >= 0 && s.retener)) soltar();
   if (!s.sel && mejor) {
     s.sel = mejor; s.marco = mejor; s.tSel = now; s.progreso = 0; s.fase = "seleccionado";
   }
