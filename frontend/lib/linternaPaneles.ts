@@ -6,7 +6,7 @@
 // allocations por frame (vectores reutilizados).
 
 import * as THREE from "three";
-import { DBG_LINTERNA, DBG_ORBITAS, DBG_ACERC, DBG_SUBPANELES } from "@/lib/debugConfig";
+import { DBG_LINTERNA, DBG_ORBITAS, DBG_ACERC, DBG_SUBPANELES, DBG_PRIORIDAD } from "@/lib/debugConfig";
 import { calcularLayoutBloque, type LayoutBloque } from "@/lib/subpanelLayout";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
@@ -26,6 +26,9 @@ export interface PanelLinterna {
   proyectoId: number | null;         // Z3: para useProyectoDetalle (null = prestador)
   angulo:   number;                  // último ángulo al centro del cono (grados)
   acercado?: boolean;                // Z8: el mesh está fuera de su pose orbital (fase congelada)
+  // Z10: prioridad del proyecto abierto
+  uAtenua?: { value: number };       // multiplicador de brillo del shader del panel (1 = normal)
+  oculta?: number;                   // factor de escala 0–1 (lo aplica PanelMesh sobre el fade de P1)
 }
 
 export type LinternaFase = "inactiva" | "buscando" | "seleccionado" | "abierto";
@@ -80,7 +83,8 @@ export const ACERC = {
   // Z9: marco de la cámara en el disparo + layout del bloque (panel + subpaneles)
   camPos0:  new THREE.Vector3(), fwd0: new THREE.Vector3(), up0: new THREE.Vector3(),
   ancho: 5.4, alto: 3.6,
-  layout:   { k: 1, d: 6, up: 0, alejado: false, entra: true } as LayoutBloque,
+  layout:   { k: 1, d: 6, up: 0, alejado: false, entra: true, medioAncho: 2.7, medioAlto: 1.8 } as LayoutBloque,
+  renderOrderPrevio: 0,                                              // Z10
   aspect:   0,                                                       // último aspecto usado (detecta resize)
 };
 
@@ -100,6 +104,9 @@ function calcularDestino(camera: THREE.Camera): void {
     // Z8: panel centrado en la mira, sin desplazamiento (el ajuste lo hace Z4)
     ACERC.layout.d = distanciaAcercamiento(camera, ACERC.ancho, ACERC.alto);
     ACERC.layout.up = 0; ACERC.layout.k = 1; ACERC.layout.alejado = false; ACERC.layout.entra = true;
+    // Z10: sin el cálculo de bloque se toma todo el viewport como zona del conjunto
+    const t = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
+    ACERC.layout.medioAlto = ACERC.layout.d * t; ACERC.layout.medioAncho = ACERC.layout.medioAlto * aspect;
   }
   ACERC.distancia = ACERC.layout.d;
   _aW.copy(ACERC.camPos0).addScaledVector(ACERC.fwd0, ACERC.layout.d).addScaledVector(ACERC.up0, ACERC.layout.up);
@@ -146,6 +153,9 @@ function iniciarAcercamiento(p: PanelLinterna, camera: THREE.Camera, now: number
   parent.getWorldQuaternion(_aPQ);
   ACERC.toQuat.copy(_aPQ).invert().multiply(_aQ);
   ACERC.panel = p; ACERC.fase = "acercando"; ACERC.t0 = now;
+  // Z10: el panel elegido se dibuja después de los que orbitan
+  ACERC.renderOrderPrevio = mesh.renderOrder;
+  mesh.renderOrder = DBG_PRIORIDAD.RENDER_ORDER_BLOQUE;
   // Z9: destino = bloque centrado en pantalla (el panel viaja directo a su lugar final)
   calcularDestino(camera);
   p.acercado = true;
@@ -164,7 +174,9 @@ function iniciarVuelta(now: number): void {
 /** Z8: cancela todo y deja el panel en su pose orbital al instante (visualizer-activate). */
 function cancelarAcercamiento(): void {
   const p = ACERC.panel;
-  if (p?.mesh) { p.mesh.position.copy(ACERC.restPos); p.mesh.quaternion.copy(ACERC.restQuat); }
+  if (p?.mesh) { p.mesh.position.copy(ACERC.restPos); p.mesh.quaternion.copy(ACERC.restQuat); p.mesh.renderOrder = ACERC.renderOrderPrevio; }
+  // Z10: los demás vuelven al instante (los paneles se ocultan igual con el visualizador)
+  for (const q of PANELES_LINTERNA) { q.oculta = 1; if (q.uAtenua) q.uAtenua.value = 1; }
   if (p) p.acercado = false;
   ACERC.panel = null; ACERC.fase = "orbita";
 }
@@ -203,6 +215,7 @@ function tickAcercamiento(now: number, dt: number, camera: THREE.Camera): void {
     m.quaternion.slerpQuaternions(ACERC.fromQuat, ACERC.restQuat, e);
     if (k >= 1) {
       m.position.copy(ACERC.restPos); m.quaternion.copy(ACERC.restQuat);
+      m.renderOrder = ACERC.renderOrderPrevio;                     // Z10
       p.acercado = false;                                          // retoma la órbita desde su fase
       ACERC.panel = null; ACERC.fase = "orbita";
     }
@@ -280,6 +293,7 @@ export function tickLinterna(camera: THREE.Camera, dt: number, now: number, acti
     }
     s.selAlpha += (0 - s.selAlpha) * kSel;
     tickAcercamiento(now, dt, camera); // Z8: la vuelta sigue aunque la linterna esté inactiva
+    tickPrioridad(dt, camera);         // Z10
     return;
   }
 
@@ -340,4 +354,53 @@ export function tickLinterna(camera: THREE.Camera, dt: number, now: number, acti
     moverVertical(p);
   }
   tickAcercamiento(now, dt, camera); // Z8
+  tickPrioridad(dt, camera);         // Z10
+}
+
+// ── Z10: prioridad visual del conjunto abierto ────────────────────────────────
+// Causa: con el panel acercado (~6 m de la cámara) el conjunto mide ~19 × 11 m y sus
+// extremos llegan a 15–16 m del eje del domo, a la altura del anillo interior (r = 15 m):
+// los paneles de ese anillo atraviesan físicamente HISTORIA / GALERÍA (intersección de
+// geometría, no z-fight). Mientras haya un proyecto acercándose/abierto, los demás se
+// atenúan y los que se proyectan sobre el conjunto (en el encuadre del disparo) se
+// esconden por escala, con fundido; al volver, todo regresa con el mismo fundido.
+const _pv = new THREE.Vector3();
+const _right = new THREE.Vector3();
+
+function tickPrioridad(dt: number, camera: THREE.Camera): void {
+  const P = DBG_PRIORIDAD;
+  const activo = P.PRIORIDAD_ACTIVA && ACERC.panel !== null && (ACERC.fase === "acercando" || ACERC.fase === "cerca");
+  const k = 1 - Math.exp(-dt * 1000 / Math.max(1, P.ATENUAR_MS) * 3); // ~95 % en ATENUAR_MS
+  const pc = camera as THREE.PerspectiveCamera;
+  const t = Math.tan(THREE.MathUtils.degToRad(pc.isPerspectiveCamera ? pc.fov : 60) / 2);
+  const aspect = pc.isPerspectiveCamera ? pc.aspect : 16 / 9;
+  if (activo) _right.crossVectors(ACERC.fwd0, ACERC.up0).normalize();
+  const L = ACERC.layout;
+  // zona del conjunto en coordenadas normalizadas del encuadre del disparo (centrada)
+  const bx = L.medioAncho / (L.d * t * aspect), by = L.medioAlto / (L.d * t);
+  for (const p of PANELES_LINTERNA) {
+    if (p.oculta === undefined) p.oculta = 1;
+    let atenua = 1, oculta = 1;
+    if (activo && p !== ACERC.panel) {
+      atenua = THREE.MathUtils.clamp(P.ATENUAR_BRILLO, 0, 1);
+      if (P.OCULTAR_SOLAPADOS && p.mesh) {
+        p.mesh.getWorldPosition(_pv).sub(ACERC.camPos0);
+        const z = _pv.dot(ACERC.fwd0);
+        // solo los que están a la profundidad del conjunto o delante (los de atrás quedan tapados y dan espacio)
+        if (z > 0.1 && z < L.d + P.OCULTAR_PROF_M) {
+          const xn = _pv.dot(_right) / (z * t * aspect);
+          const yn = _pv.dot(ACERC.up0) / (z * t);
+          // semitamaño del otro panel en pantalla (aprox. con su ancho/alto a esa distancia)
+          const pw = (ACERC.ancho / 2) / (z * t * aspect), ph = (ACERC.alto / 2) / (z * t);
+          if (Math.abs(xn) < bx + pw + P.OCULTAR_MARGEN && Math.abs(yn) < by + ph + P.OCULTAR_MARGEN) oculta = 0;
+        }
+      }
+    }
+    p.oculta += (oculta - p.oculta) * k;
+    if (Math.abs(p.oculta - oculta) < 0.002) p.oculta = oculta;
+    if (p.uAtenua) {
+      p.uAtenua.value += (atenua - p.uAtenua.value) * k;
+      if (Math.abs(p.uAtenua.value - atenua) < 0.002) p.uAtenua.value = atenua;
+    }
+  }
 }

@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { LINTERNA_STATE } from "@/lib/linternaPaneles";
-import { DBG_LINTERNA } from "@/lib/debugConfig";
+import { DBG_LINTERNA, DBG_PRIORIDAD } from "@/lib/debugConfig";
 
 const LABEL_W_M = 2.2;   // ancho del rótulo en metros (canvas 512×64 → 8:1)
 const LABEL_H_M = LABEL_W_M / 8;
@@ -97,7 +97,7 @@ export default function PanelSelMarco({ ancho, alto }: { ancho: number; alto: nu
   });
 
   return (
-    <mesh ref={meshRef} visible={false} renderOrder={10} frustumCulled={false}>
+    <mesh ref={meshRef} visible={false} renderOrder={DBG_PRIORIDAD.RENDER_ORDER_BLOQUE + 4} frustumCulled={false}> {/* Z10 (era 10) */}
       <planeGeometry args={[1, 1]} />
       <shaderMaterial
         ref={matRef}

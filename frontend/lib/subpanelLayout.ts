@@ -15,6 +15,8 @@ export interface LayoutBloque {
   up: number;       // desplazamiento del panel sobre el "arriba" de la cámara (m), centra el bloque
   alejado: boolean; // true si con la escala mínima no entraba y se alejó el bloque
   entra: boolean;   // true si el resultado entra completo
+  medioAncho: number; // Z10: semiancho del bloque en el plano del panel (m)
+  medioAlto: number;  // Z10: semialto del bloque (centrado en pantalla) (m)
 }
 
 // tamaño de cada subpanel en px del mockup (canvas = × 2)
@@ -55,7 +57,7 @@ export function calcularLayoutBloque(
   const kMin = Math.min(1, Math.max(0.1, S.SUB_ESCALA_MIN));
   const px = w / 2, py = h / 2;
 
-  let k = 1, up = 0, entra = false, alejado = false;
+  let k = 1, up = 0, entra = false, alejado = false, medioAncho = px, medioAlto = py;
   for (let iter = 0; iter < 80; iter++) {
     const hw = HW * m0 * k, hh = HH * m0 * k, gw = GW * m0 * k, gh = GH * m0 * k;
     const fw = FW * m0 * k, fh = FH * m0 * k, gL = gL0 * k, gA = gA0 * k;
@@ -67,6 +69,7 @@ export function calcularLayoutBloque(
     const dS = Math.max(0.1, d - adel);
     const yS = dS * t, xS = yS * aspect;
     const xL = px + gL + Math.max(hw, gw);              // borde exterior de HISTORIA / GALERÍA
+    medioAncho = Math.max(xL, fw / 2); medioAlto = (top + bottom) / 2;
     entra =
       visible(px / xP, (up + py) / yP, curva, lim) &&
       visible(px / xP, (up - py) / yP, curva, lim) &&
@@ -78,5 +81,6 @@ export function calcularLayoutBloque(
     else { d *= 1.04; alejado = true; }                 // con la escala mínima: se aleja el bloque
   }
   out.k = k; out.d = d; out.up = up; out.alejado = alejado; out.entra = entra;
+  out.medioAncho = medioAncho; out.medioAlto = medioAlto;
   return out;
 }

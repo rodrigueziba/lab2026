@@ -14,7 +14,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SUBPANELES } from "@/lib/debugConfig";
+import { DBG_SUBPANELES, DBG_PRIORIDAD } from "@/lib/debugConfig";
+
+// Z10: el conjunto se dibuja después de los paneles en órbita (renderOrder 0)
+const RO = DBG_PRIORIDAD.RENDER_ORDER_BLOQUE;
 import { LINTERNA_STATE, ACERC } from "@/lib/linternaPaneles";
 import { INTERACT_STATE } from "@/lib/alightStore";
 import { playUIClick } from "@/lib/audioEngine";
@@ -466,16 +469,16 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
 
   return (
     <group ref={groupRef} visible={false}>
-      <mesh ref={historiaRef} renderOrder={5}>
+      <mesh ref={historiaRef} renderOrder={RO + 1}>
         <planeGeometry args={[1, 1]} />
         <meshBasicMaterial ref={histMatRef} map={vacia} toneMapped={false} fog={false} />
       </mesh>
-      <mesh ref={galeriaRef} renderOrder={5}>
+      <mesh ref={galeriaRef} renderOrder={RO + 1}>
         <planeGeometry args={[1, 1]} />
         <meshBasicMaterial ref={galMatRef} map={vacia} toneMapped={false} fog={false} />
         {/* pantalla CRT: hija del marco, en coordenadas normalizadas del canvas */}
         <mesh
-          renderOrder={6}
+          renderOrder={RO + 2}
           position={[
             (GALERIA_PANTALLA.x + GALERIA_PANTALLA.w / 2) / GALERIA_SIZE.w - 0.5,
             0.5 - (GALERIA_PANTALLA.y + GALERIA_PANTALLA.h / 2) / GALERIA_SIZE.h,
@@ -487,25 +490,25 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
           <shaderMaterial ref={pantMatRef} uniforms={uniformsPantalla} vertexShader={PANTALLA_VERT} fragmentShader={PANTALLA_FRAG} />
         </mesh>
       </mesh>
-      <mesh ref={fichaRef} renderOrder={5}>
+      <mesh ref={fichaRef} renderOrder={RO + 1}>
         <planeGeometry args={[1, 1]} />
         <meshBasicMaterial ref={fichaMatRef} map={vacia} toneMapped={false} fog={false} />
       </mesh>
       {/* líneas guía: un material compartido */}
-      <mesh ref={lineaIzq} renderOrder={4}>
+      <mesh ref={lineaIzq} renderOrder={RO + 3}>
         <planeGeometry args={[1, 1]} />
         <shaderMaterial ref={lineaMatRef} uniforms={uniformsLinea} vertexShader={PANTALLA_VERT} fragmentShader={LINEA_FRAG} transparent depthWrite={false} />
       </mesh>
-      <mesh ref={lineaDer} renderOrder={4}>
+      <mesh ref={lineaDer} renderOrder={RO + 3}>
         <planeGeometry args={[1, 1]} />
         <shaderMaterial uniforms={uniformsLinea} vertexShader={PANTALLA_VERT} fragmentShader={LINEA_FRAG} transparent depthWrite={false} />
       </mesh>
-      <mesh ref={lineaAbajo} renderOrder={4} rotation={[0, 0, Math.PI / 2]}>
+      <mesh ref={lineaAbajo} renderOrder={RO + 3} rotation={[0, 0, Math.PI / 2]}>
         <planeGeometry args={[1, 1]} />
         <shaderMaterial uniforms={uniformsLinea} vertexShader={PANTALLA_VERT} fragmentShader={LINEA_FRAG} transparent depthWrite={false} />
       </mesh>
       {/* puntero: aro claro donde apunta la mirada (mockup: círculo sobre SIG ▶) */}
-      <mesh ref={punteroRef} renderOrder={7} visible={false}>
+      <mesh ref={punteroRef} renderOrder={RO + 5} visible={false}>
         <ringGeometry args={[0.18, 0.24, 32]} />
         <meshBasicMaterial color="#FFF3DC" transparent opacity={0.85} depthWrite={false} toneMapped={false} fog={false} />
       </mesh>

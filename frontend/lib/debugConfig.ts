@@ -120,6 +120,17 @@ export const DBG_ACERC = {
   ACERC_AJUSTE_S:   6,       // Z9: velocidad (1/s) con la que el panel acercado sigue un cambio de layout (resize)
 };
 
+// ── Z10: prioridad visual del proyecto abierto sobre los paneles en órbita — live ──
+export const DBG_PRIORIDAD = {
+  PRIORIDAD_ACTIVA:   true,  // false = los demás paneles no cambian (comportamiento Z9)
+  ATENUAR_BRILLO:     0.25,  // brillo de los demás paneles mientras hay un proyecto abierto/acercándose
+  ATENUAR_MS:         600,   // fundido de atenuación / ocultamiento (ida y vuelta)
+  OCULTAR_SOLAPADOS:  true,  // esconde (escala → 0) los paneles cuya proyección se solapa con el conjunto
+  OCULTAR_MARGEN:     0.08,  // margen extra alrededor del conjunto (fracción del semiviewport)
+  OCULTAR_PROF_M:     4.0,   // solo se esconden los que están a menos de esto DETRÁS del panel (los más lejanos los tapa la profundidad)
+  RENDER_ORDER_BLOQUE: 20,   // renderOrder del conjunto abierto (los paneles en órbita usan 0)
+};
+
 // ── Z4: subpaneles del panel abierto (HISTORIA / GALERÍA / FICHA) — live ──────
 // Medidas tomadas del mockup en px y convertidas con SUB_M_POR_PX (400 px = ancho del panel 5,4 m).
 export const DBG_SUBPANELES = {

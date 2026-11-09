@@ -29,6 +29,7 @@ import {
   DBG_SUBPANELES,
   DBG_ORBITAS,
   DBG_ACERC,
+  DBG_PRIORIDAD,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { LINTERNA_STATE, ORBITAS_INFO, ACERC } from "@/lib/linternaPaneles";
@@ -332,6 +333,7 @@ export default function DebugMenu() {
   const [subp, setSubp] = useState({ ...DBG_SUBPANELES }); // Z4
   const [orb, setOrb] = useState({ ...DBG_ORBITAS });       // Z7
   const [acerc, setAcerc] = useState({ ...DBG_ACERC });     // Z8
+  const [prio, setPrio] = useState({ ...DBG_PRIORIDAD });   // Z10
   const [acercLive, setAcercLive] = useState("orbita");     // Z8
   const [orbInfo, setOrbInfo] = useState("");               // Z7: tabla de anillos
   // P1: paneles SILLAS — constantes + estado en vivo (mismo poll)
@@ -1163,6 +1165,35 @@ export default function DebugMenu() {
           <div style={ROW}>
             <span>estado <span style={NOTE}>{acercLive}</span></span>
           </div>
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Prioridad Z10 — proyecto abierto sobre las órbitas <span style={NOTE}>(live)</span></span>
+          <div style={ROW}>
+            <span>PRIORIDAD_ACTIVA <span style={NOTE}>off = como Z9</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !prio.PRIORIDAD_ACTIVA;
+              DBG_PRIORIDAD.PRIORIDAD_ACTIVA = v;
+              setPrio(o => ({ ...o, PRIORIDAD_ACTIVA: v }));
+            }}>{prio.PRIORIDAD_ACTIVA ? "ON" : "off"}</button>
+          </div>
+          <NumField label="ATENUAR_BRILLO" value={prio.ATENUAR_BRILLO} step={0.05} min={0} max={1} note="brillo de los demás"
+            onChange={v => { DBG_PRIORIDAD.ATENUAR_BRILLO = v; setPrio(o => ({ ...o, ATENUAR_BRILLO: v })); }} />
+          <NumField label="ATENUAR_MS" value={prio.ATENUAR_MS} step={50} min={0} max={5000} note="ms fundido"
+            onChange={v => { DBG_PRIORIDAD.ATENUAR_MS = v; setPrio(o => ({ ...o, ATENUAR_MS: v })); }} />
+          <div style={ROW}>
+            <span>OCULTAR_SOLAPADOS <span style={NOTE}>esconde los que se cruzan</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !prio.OCULTAR_SOLAPADOS;
+              DBG_PRIORIDAD.OCULTAR_SOLAPADOS = v;
+              setPrio(o => ({ ...o, OCULTAR_SOLAPADOS: v }));
+            }}>{prio.OCULTAR_SOLAPADOS ? "ON" : "off"}</button>
+          </div>
+          <NumField label="OCULTAR_MARGEN" value={prio.OCULTAR_MARGEN} step={0.01} min={0} max={0.5} note="zona extra"
+            onChange={v => { DBG_PRIORIDAD.OCULTAR_MARGEN = v; setPrio(o => ({ ...o, OCULTAR_MARGEN: v })); }} />
+          <NumField label="OCULTAR_PROF_M" value={prio.OCULTAR_PROF_M} step={0.5} min={0} max={30} note="m detrás del panel"
+            onChange={v => { DBG_PRIORIDAD.OCULTAR_PROF_M = v; setPrio(o => ({ ...o, OCULTAR_PROF_M: v })); }} />
+          <NumField label="RENDER_ORDER_BLOQUE" value={prio.RENDER_ORDER_BLOQUE} step={1} min={1} max={100} note="al montar"
+            onChange={v => { DBG_PRIORIDAD.RENDER_ORDER_BLOQUE = v; setPrio(o => ({ ...o, RENDER_ORDER_BLOQUE: v })); }} />
 
           <div style={DIVIDER} />
           <span style={LABEL}>Subpaneles Z4 — HISTORIA / GALERÍA / FICHA <span style={NOTE}>(live)</span></span>

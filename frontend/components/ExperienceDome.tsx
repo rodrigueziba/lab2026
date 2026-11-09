@@ -418,6 +418,7 @@ const FRAG = RAINBOW_GLSL + BEZEL_GLSL + MARCO_GLSL + /* glsl */`
   uniform int       uHazN;
   uniform float     uHazSuave, uHazGain, uBrilloBase, uBorde, uBordeInt, uViejo;
   uniform vec3      uLitColor;
+  uniform float     uAtenua;  // Z10: brillo relativo mientras otro proyecto está abierto (1 = normal)
   varying vec2 vUv;
   varying vec3 vWorldPos;
 
@@ -471,7 +472,7 @@ const FRAG = RAINBOW_GLSL + BEZEL_GLSL + MARCO_GLSL + /* glsl */`
 
       // R5: apply CRT bezel (cream frame + scanlines + header)
       ${Z1_PANEL_MARCO ? "col = applyMarco(vUv, col, gate);" : R5_PANEL_BEZEL ? "col = applyBezel(vUv, col, gate);" : ""}
-      gl_FragColor = vec4(col, 1.0);
+      gl_FragColor = vec4(col * uAtenua, 1.0);
       return;
     }
 
@@ -494,7 +495,7 @@ const FRAG = RAINBOW_GLSL + BEZEL_GLSL + MARCO_GLSL + /* glsl */`
     ${Z1_PANEL_MARCO ? `vec2 pb = vec2(vUv.x, vUv.y / uAspect);
     float db = min(min(pb.x, 1.0 - pb.x), min(pb.y, 1.0 / uAspect - pb.y));
     if (db < uBorde) col = vec3(0.227, 0.231, 0.235) * luz * uBordeInt;` : ""}
-    gl_FragColor = vec4(col * gate, 1.0);
+    gl_FragColor = vec4(col * gate * uAtenua, 1.0);
   }
 `;
 
@@ -574,6 +575,7 @@ function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, bobAmp = 0, 
   const matRef  = useRef<THREE.ShaderMaterial>(null);
   const meshRef = useRef<THREE.Mesh>(null);   // P1: escala del fade
   const pivotRef = useRef<THREE.Group>(null); // Z2: fase de órbita propia
+  const entryRef = useRef<PanelLinterna | null>(null); // Z10
   const gl      = useThree((s) => s.gl);
 
   // Rotate PlaneGeometry's +Z normal so the panel face points toward [0,0,0]
@@ -598,6 +600,7 @@ function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, bobAmp = 0, 
     uOscuro:    PANEL_LAYOUT_UNIFORMS.uOscuro,
     uTexAspect: { value: 1.5 },
     uLit:       { value: 0 },   // Z2
+    uAtenua:    { value: 1 },   // Z10
     ...PANEL_HAZ_UNIFORMS,      // Z6: haces + brillo base + flag del diseño viejo (objetos compartidos)
   }), []);
 
@@ -605,11 +608,14 @@ function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, bobAmp = 0, 
   useEffect(() => {
     if (!Z2_FASE_POR_PANEL) return;
     const entry: PanelLinterna = {
+      uAtenua: uniforms.uAtenua, oculta: 1, // Z10
       pivot: pivotRef.current, mesh: meshRef.current, uLit: uniforms.uLit,
       fase: 0, velocidad: speed, azimut: azimuth, bobAmp, bobSemilla, // Z7
       indice, titulo: item.titulo, url: item.url, proyectoId: item.proyectoId, angulo: 180,
     };
-    return registrarPanelLinterna(entry);
+    entryRef.current = entry; // Z10: PanelMesh lee entry.oculta en useFrame
+    const quitar = registrarPanelLinterna(entry);
+    return () => { quitar(); entryRef.current = null; };
   }, [uniforms, speed, azimuth, indice, item, bobAmp, bobSemilla]);
 
   // Z1: foto cargada (o null) + placeholder (creado solo si hace falta) + estado
@@ -666,7 +672,9 @@ function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, bobAmp = 0, 
     if (PANELES_SILLAS.fase === "oculto") return;
     // P1: fade por escala (smoothstep) — sin transparencia ni cambio de materiales
     const a = PANELES_SILLAS.alpha;
-    if (meshRef.current) meshRef.current.scale.setScalar(Math.max(0.0001, a * a * (3 - 2 * a)));
+    // Z10: × entry.oculta (los que se solapan con el proyecto abierto se esconden con fundido)
+    const oc = entryRef.current?.oculta ?? 1;
+    if (meshRef.current) meshRef.current.scale.setScalar(Math.max(0.0001, a * a * (3 - 2 * a) * oc));
     const mat = matRef.current;
     // Z1: foto o placeholder (el canvas se crea una sola vez, la primera vez que hace falta)
     if (mat) {
