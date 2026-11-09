@@ -146,6 +146,7 @@ function expDecay(t: number, k: number): number {
 }
 
 // ── F3: luminancia final estimada en el centro de la pantalla en el pico ──────
+// G2: queda como dato SECUNDARIO (teórico); el panel muestra primero la medición real.
 // Replica la fórmula del CRT (lib/retro/retroCRT.ts) en el centro (r=0: glow completo,
 // viñeta 0, scanline media, grano medio 0) + OutputPass: ACESFilmic de three
 // (exposure/0.6, RRT/ODT fit) → sRGB → luminancia Rec.709. Supone escena ≈ 0 detrás.
@@ -168,12 +169,12 @@ export function estimarLuminanciaPico(
   try { reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* ok */ }
   const pico = Math.max(0, Math.min(1, DBG_FLASH.FLASH_PICO)) * (reduce ? DBG_FLASH.FLASH_RM_PICO_MULT : 1);
   const f    = Math.min(pico, DBG_FLASH.FLASH_CRT_MAX);              // uFlash en el pico
-  const glow = 1 + DBG_FLASH.FLASH_GLOW;                             // r = 0
+  const glow = (1 + DBG_FLASH.FLASH_GLOW) * DBG_FLASH.FLASH_HDR;     // r = 0; G2: × FLASH_HDR
   const effScan = uScan + (Math.min(uScan, DBG_FLASH.FLASH_SCAN_MAX) - uScan) * f;
   const scanK   = 1 - effScan;                                       // G1: valle de la scanline (peor caso)
-  const cap     = 0.92 + (DBG_FLASH.FLASH_TOPE_LUM - 0.92) * f;
-  // G1: peor caso también para el grano (−uGrain/2)
-  const crt = (c: number, t: number) => Math.min((f * c * glow * scanK - uGrain * 0.5) * t + uLift, cap);
+  const cap     = 0.92 + (DBG_FLASH.FLASH_TOPE_LUM * DBG_FLASH.FLASH_HDR - 0.92) * f; // G2: tope × HDR
+  // G1: peor caso también para el grano (−uGrain/2); G2: tinte neutralizado con uFlash
+  const crt = (c: number, t: number) => Math.min((f * c * glow * scanK - uGrain * 0.5) * (t + (1 - t) * f) + uLift, cap);
   const k = toneExposure * (1 + (DBG_FLASH.FLASH_EXPOSICION_MULT - 1) * pico) / 0.6;
   const r = crt(flashColor.r, tint.r) * k, g = crt(flashColor.g, tint.g) * k, b = crt(flashColor.b, tint.b) * k;
   // ACESInputMat (columnas) · v
@@ -185,7 +186,100 @@ export function estimarLuminanciaPico(
   const or = 1.60475 * fr - 0.53108 * fg - 0.07367 * fb;
   const og = -0.10208 * fr + 1.10813 * fg - 0.00605 * fb;
   const ob = -0.00327 * fr - 0.07276 * fg + 1.07602 * fb;
-  return 0.2126 * lin2srgb(or) + 0.7152 * lin2srgb(og) + 0.0722 * lin2srgb(ob);
+  const L = 0.2126 * lin2srgb(or) + 0.7152 * lin2srgb(og) + 0.0722 * lin2srgb(ob);
+  // G2: blow-out final (peor caso de su textura: valle de scanline + grano 1)
+  const bo = f * DBG_FLASH.FLASH_BLOWOUT;
+  return (L + (1 - L) * bo) * (1 - DBG_FLASH.FLASH_BLOWOUT_TEXTURA * bo);
+}
+
+// ── G2: medición REAL del pico — lee píxeles del canvas en el frame de render ──
+// La pide el DebugMenu ("Medir pico del destello"); la ejecuta RetroPostFX justo
+// después de composer.render() (mismo frame → no hace falta preserveDrawingBuffer).
+// El buffer se reserva solo al medir (una vez), nunca por frame.
+export const FLASH_MEDICION = {
+  pedido:   false,
+  tPedido:  0,
+  estado:   "—" as string,  // — | esperando | listo | error: …
+  centro:   0,              // luminancia media del 10 % × 10 % central
+  esquina:  0,              // luminancia media del 5 % × 5 % superior izquierdo
+  oscuro5:  0,              // luminancia media del 5 % de píxeles más oscuros
+  minRGB:   0,              // mínimo de todos los canales RGB de toda la pantalla
+  ancho:    0,
+  alto:     0,
+};
+
+/** G2: pide la medición y dispara el destello (origen debug, no espera al telón). */
+export function pedirMedicionFlash(): void {
+  FLASH_MEDICION.pedido  = true;
+  FLASH_MEDICION.tPedido = performance.now();
+  FLASH_MEDICION.estado  = "esperando";
+  window.dispatchEvent(new CustomEvent("alight:debug-curtain-flash"));
+}
+
+/** G2: true cuando toca leer (sostenido, ya pasado FLASH_MEDIR_HOLD_MS). Marca error si no arrancó. */
+export function medicionFlashLista(now: number): boolean {
+  const m = FLASH_MEDICION;
+  if (!m.pedido) return false;
+  const s = FLASH_STATE;
+  if (s.fase === "inactivo" && now - m.tPedido > 1000) {
+    m.pedido = false;
+    m.estado = DBG_FLASH.FLASH_ACTIVO ? "error: el destello no arrancó" : "error: FLASH_ACTIVO off";
+    return false;
+  }
+  return s.fase === "sostenido" && now - s.t0 - s.subidaMs >= DBG_FLASH.FLASH_MEDIR_HOLD_MS;
+}
+
+/** G2: lee el framebuffer por defecto (lo que se ve) y calcula las métricas. */
+export function medirPicoFlash(ctx: WebGLRenderingContext | WebGL2RenderingContext): void {
+  const m = FLASH_MEDICION;
+  m.pedido = false;
+  const w = ctx.drawingBufferWidth, h = ctx.drawingBufferHeight;
+  if (w <= 0 || h <= 0) { m.estado = "error: canvas vacío"; return; }
+  const px = new Uint8Array(w * h * 4);
+  try {
+    ctx.bindFramebuffer(ctx.FRAMEBUFFER, null);
+    ctx.readPixels(0, 0, w, h, ctx.RGBA, ctx.UNSIGNED_BYTE, px);
+  } catch (e) {
+    m.estado = `error: readPixels (${String(e)})`;
+    return;
+  }
+  const BINS = 1024;
+  const hist = new Float64Array(BINS), histN = new Uint32Array(BINS);
+  const cx0 = Math.floor(w * 0.45), cx1 = Math.ceil(w * 0.55);
+  const cy0 = Math.floor(h * 0.45), cy1 = Math.ceil(h * 0.55);
+  const ex1 = Math.ceil(w * 0.05),  ey0 = Math.floor(h * 0.95); // readPixels: y=0 abajo → arriba = y alto
+  let cS = 0, cN = 0, eS = 0, eN = 0, minC = 255;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      const L = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      if (r < minC) minC = r;
+      if (g < minC) minC = g;
+      if (b < minC) minC = b;
+      const k = Math.min(BINS - 1, Math.floor(L * BINS));
+      hist[k] += L; histN[k]++;
+      if (x >= cx0 && x < cx1 && y >= cy0 && y < cy1) { cS += L; cN++; }
+      if (x < ex1 && y >= ey0) { eS += L; eN++; }
+    }
+  }
+  // 5 % más oscuro: se acumula desde el bin más bajo
+  const objetivo = Math.max(1, Math.floor(w * h * 0.05));
+  let acc = 0, accS = 0;
+  for (let k = 0; k < BINS && acc < objetivo; k++) {
+    const n = histN[k];
+    if (!n) continue;
+    const toma = Math.min(n, objetivo - acc);
+    accS += (hist[k] / n) * toma;
+    acc  += toma;
+  }
+  m.centro  = cN ? cS / cN : 0;
+  m.esquina = eN ? eS / eN : 0;
+  m.oscuro5 = acc ? accS / acc : 0;
+  m.minRGB  = minC / 255;
+  m.ancho = w; m.alto = h;
+  m.estado = "listo";
+  console.info(`[CurtainFlash] medición pico ${w}×${h}: centro ${m.centro.toFixed(4)} · esquina ${m.esquina.toFixed(4)} · 5% oscuro ${m.oscuro5.toFixed(4)} · minRGB ${m.minRGB.toFixed(4)}`);
 }
 
 /** F1/G1: factor 0–1 para el boost de postproceso (proporcional al pico efectivo). */

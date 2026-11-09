@@ -26,7 +26,7 @@ import {
   DBG_FLASH,
   DBG_PANELES,
 } from "@/lib/debugConfig";
-import { FLASH_STATE, estimarLuminanciaPico } from "@/lib/curtainFlash";
+import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { setVizVolume, restartVizAudio, BAND_STATE, BAND_U2_DEBUG, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
@@ -320,6 +320,7 @@ export default function DebugMenu() {
   // F1: destello del telón — constantes + estado en vivo (poll 10fps solo con el menú abierto)
   const [flash, setFlash] = useState({ ...DBG_FLASH });
   const [flashLive, setFlashLive] = useState({ fase: FLASH_STATE.fase as string, luz: 0, visible: false, uFlash: 0, uGlare: 0, lum: 0 });
+  const [medicion, setMedicion] = useState({ ...FLASH_MEDICION }); // G2: medición real del pico
   // P1: paneles SILLAS — constantes + estado en vivo (mismo poll)
   const [paneles, setPaneles] = useState({ ...DBG_PANELES, forzado: false });
   const [panelesFase, setPanelesFase] = useState(PANELES_SILLAS.fase as string);
@@ -334,7 +335,10 @@ export default function DebugMenu() {
       lum: estimarLuminanciaPico(CRT_UNIFORMS.uFlashColor.value, CRT_UNIFORMS.uTint.value,
         CRT_UNIFORMS.uScan.value, CRT_UNIFORMS.uLift.value, DBG_RETRO_FX.toneExposure, CRT_UNIFORMS.uGrain.value),
     }), 100);
-    const idP = setInterval(() => setPanelesFase(PANELES_SILLAS.fase), 100); // P1
+    const idP = setInterval(() => {
+      setPanelesFase(PANELES_SILLAS.fase); // P1
+      setMedicion(m => (m.estado === FLASH_MEDICION.estado && m.centro === FLASH_MEDICION.centro ? m : { ...FLASH_MEDICION })); // G2
+    }, 100);
     return () => { clearInterval(id); clearInterval(idP); };
   }, [visible]);
 
@@ -963,13 +967,13 @@ export default function DebugMenu() {
             onChange={v => { DBG_FLASH.FLASH_SUBIDA_MS = v; setFlash(f => ({ ...f, FLASH_SUBIDA_MS: v })); }} />
           <NumField label="FLASH_SOSTENIDO_MS" value={flash.FLASH_SOSTENIDO_MS} step={50} min={0} max={4000} note="mín."
             onChange={v => { DBG_FLASH.FLASH_SOSTENIDO_MS = v; setFlash(f => ({ ...f, FLASH_SOSTENIDO_MS: v })); }} />
-          <NumField label="FLASH_BAJADA_MS" value={flash.FLASH_BAJADA_MS} step={50} min={0} max={5000} note="ease-out"
+          <NumField label="FLASH_BAJADA_MS" value={flash.FLASH_BAJADA_MS} step={10} min={0} max={5000} note="exponencial"
             onChange={v => { DBG_FLASH.FLASH_BAJADA_MS = v; setFlash(f => ({ ...f, FLASH_BAJADA_MS: v })); }} />
           <NumField label="FLASH_PICO" value={flash.FLASH_PICO} step={0.05} min={0} max={1} note="opacidad"
             onChange={v => { DBG_FLASH.FLASH_PICO = v; setFlash(f => ({ ...f, FLASH_PICO: v })); }} />
-          <NumField label="FLASH_BLOOM_MULT" value={flash.FLASH_BLOOM_MULT} step={0.1} min={1} max={6} note="× bloom"
+          <NumField label="FLASH_BLOOM_MULT" value={flash.FLASH_BLOOM_MULT} step={0.1} min={1} max={12} note="× bloom"
             onChange={v => { DBG_FLASH.FLASH_BLOOM_MULT = v; setFlash(f => ({ ...f, FLASH_BLOOM_MULT: v })); }} />
-          <NumField label="FLASH_EXPOSICION_MULT" value={flash.FLASH_EXPOSICION_MULT} step={0.1} min={1} max={6} note="× exposición"
+          <NumField label="FLASH_EXPOSICION_MULT" value={flash.FLASH_EXPOSICION_MULT} step={0.1} min={1} max={12} note="× exposición"
             onChange={v => { DBG_FLASH.FLASH_EXPOSICION_MULT = v; setFlash(f => ({ ...f, FLASH_EXPOSICION_MULT: v })); }} />
           <NumField label="FLASH_LUZ_FADE_MS" value={flash.FLASH_LUZ_FADE_MS} step={50} min={0} max={4000} note="luz telón → 0"
             onChange={v => { DBG_FLASH.FLASH_LUZ_FADE_MS = v; setFlash(f => ({ ...f, FLASH_LUZ_FADE_MS: v })); }} />
@@ -1016,8 +1020,51 @@ export default function DebugMenu() {
             onChange={v => { DBG_FLASH.FLASH_VIG_ATEN = v; setFlash(f => ({ ...f, FLASH_VIG_ATEN: v })); }} />
           <NumField label="FLASH_TOPE_LUM" value={flash.FLASH_TOPE_LUM} step={0.01} min={0.92} max={1.5} note="F3 tope lum."
             onChange={v => { DBG_FLASH.FLASH_TOPE_LUM = v; setFlash(f => ({ ...f, FLASH_TOPE_LUM: v })); }} />
+          {/* G2: blanco enceguecedor */}
+          <ColorField label="FLASH_COLOR" value={flash.FLASH_COLOR} note="G2 base"
+            onChange={v => { DBG_FLASH.FLASH_COLOR = v; setFlash(f => ({ ...f, FLASH_COLOR: v })); }} />
+          <ColorField label="FLASH_GLARE_COLOR" value={flash.FLASH_GLARE_COLOR} note="G2 borde glare"
+            onChange={v => { DBG_FLASH.FLASH_GLARE_COLOR = v; setFlash(f => ({ ...f, FLASH_GLARE_COLOR: v })); }} />
+          <NumField label="FLASH_HDR" value={flash.FLASH_HDR} step={0.5} min={1} max={16} note="G2 energía pre-CRT"
+            onChange={v => { DBG_FLASH.FLASH_HDR = v; setFlash(f => ({ ...f, FLASH_HDR: v })); }} />
+          <NumField label="FLASH_HDR_CLAMP" value={flash.FLASH_HDR_CLAMP} step={1} min={1} max={1000} note="G2 anti NaN"
+            onChange={v => { DBG_FLASH.FLASH_HDR_CLAMP = v; setFlash(f => ({ ...f, FLASH_HDR_CLAMP: v })); }} />
+          <NumField label="FLASH_BLOWOUT" value={flash.FLASH_BLOWOUT} step={0.01} min={0} max={1} note="G2 post-sRGB"
+            onChange={v => { DBG_FLASH.FLASH_BLOWOUT = v; setFlash(f => ({ ...f, FLASH_BLOWOUT: v })); }} />
+          <NumField label="FLASH_BLOWOUT_TEXTURA" value={flash.FLASH_BLOWOUT_TEXTURA} step={0.005} min={0} max={0.2} note="G2 scan+grano"
+            onChange={v => { DBG_FLASH.FLASH_BLOWOUT_TEXTURA = v; setFlash(f => ({ ...f, FLASH_BLOWOUT_TEXTURA: v })); }} />
+          <NumField label="FLASH_BLOOM_TOPE" value={flash.FLASH_BLOOM_TOPE} step={0.5} min={0} max={30} note="G2 clamp"
+            onChange={v => { DBG_FLASH.FLASH_BLOOM_TOPE = v; setFlash(f => ({ ...f, FLASH_BLOOM_TOPE: v })); }} />
+          <NumField label="FLASH_EXPOSICION_TOPE" value={flash.FLASH_EXPOSICION_TOPE} step={0.5} min={0.5} max={30} note="G2 clamp"
+            onChange={v => { DBG_FLASH.FLASH_EXPOSICION_TOPE = v; setFlash(f => ({ ...f, FLASH_EXPOSICION_TOPE: v })); }} />
+          <NumField label="FLASH_MEDIR_HOLD_MS" value={flash.FLASH_MEDIR_HOLD_MS} step={50} min={0} max={3000} note="G2 lectura"
+            onChange={v => { DBG_FLASH.FLASH_MEDIR_HOLD_MS = v; setFlash(f => ({ ...f, FLASH_MEDIR_HOLD_MS: v })); }} />
           <div style={ROW}>
-            <span>luminancia pico estimada <span style={NOTE}>(valle scanline + grano) {flashLive.lum.toFixed(3)} {flashLive.lum > 0.95 ? "✓ > 0,95" : "✗ ≤ 0,95"}</span></span>
+            <span>FLASH_AVISO_FOTOSENSIBILIDAD <span style={NOTE}>G2 aviso al inicio</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !flash.FLASH_AVISO_FOTOSENSIBILIDAD;
+              DBG_FLASH.FLASH_AVISO_FOTOSENSIBILIDAD = v;
+              setFlash(f => ({ ...f, FLASH_AVISO_FOTOSENSIBILIDAD: v }));
+            }}>{flash.FLASH_AVISO_FOTOSENSIBILIDAD ? "ON" : "off"}</button>
+          </div>
+          {/* G2: medición REAL (píxeles leídos del canvas en el sostenido) */}
+          <div style={ROW}>
+            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
+              onClick={() => pedirMedicionFlash()}>
+              Medir pico del destello
+            </button>
+            <span style={NOTE}>{medicion.estado}{medicion.estado === "listo" ? ` · ${medicion.ancho}×${medicion.alto}` : ""}</span>
+          </div>
+          {medicion.estado === "listo" && (
+            <div style={{ ...ROW, flexDirection: "column", alignItems: "flex-start" }}>
+              <span>centro <span style={NOTE}>{medicion.centro.toFixed(4)} {medicion.centro > 0.98 ? "✓ > 0,98" : "✗ ≤ 0,98"}</span></span>
+              <span>esquina <span style={NOTE}>{medicion.esquina.toFixed(4)}</span></span>
+              <span>5 % más oscuro <span style={NOTE}>{medicion.oscuro5.toFixed(4)} {medicion.oscuro5 > 0.95 ? "✓ > 0,95" : "✗ ≤ 0,95"}</span></span>
+              <span>mín. RGB <span style={NOTE}>{medicion.minRGB.toFixed(4)}</span></span>
+            </div>
+          )}
+          <div style={ROW}>
+            <span>teórico (secundario) <span style={NOTE}>(valle scanline + grano) {flashLive.lum.toFixed(3)}</span></span>
           </div>
           <div style={ROW}>
             <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
@@ -1639,6 +1686,14 @@ export default function DebugMenu() {
               RETRO_FLAGS.comfortMode   = v;
               setRetroFx(r => ({ ...r, comfortMode: v }));
             }}>{retroFx.comfortMode ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>crtUniformsVivos <span style={NOTE}>G2 todos los uniforms del CRT · recargar</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !retroFx.crtUniformsVivos;
+              DBG_RETRO_FX.crtUniformsVivos = v;
+              setRetroFx(r => ({ ...r, crtUniformsVivos: v }));
+            }}>{retroFx.crtUniformsVivos ? "ON" : "off"}</button>
           </div>
           <div style={ROW}>
             <span>quality</span>

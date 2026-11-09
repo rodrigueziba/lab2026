@@ -20,6 +20,9 @@ export const DBG_RETRO_FX = {
   enabled:          true,            // RETRO_POSTFX_ENABLED
   quality:          "medium" as "low" | "medium" | "high",
   comfortMode:      false,           // disables wobble + CA
+  // G2: true = TODOS los uniforms del CRT conectados (uTime, uCurve, uComfort, uRes, sliders del CRT).
+  // false = solo los del destello/glare (imagen en reposo idéntica a la actual). Requiere recargar.
+  crtUniformsVivos: false,
   // CRT pass tunable values (live)
   crtCurveFX:       0.06,
   crtScanFX:        0.18,
@@ -49,33 +52,44 @@ export const DBG_RETRO_FX = {
 // ── F1: destello enceguecedor al atravesar el telón (CurtainFlash) — todo live ─
 export const DBG_FLASH = {
   FLASH_ACTIVO:          true,   // false = sin destello; el telón vuelve al fade original de 1,2 s
-  FLASH_SUBIDA_MS:       150,    // subida a blanco total
+  FLASH_SUBIDA_MS:       100,    // G2 (era 150) subida a blanco total
   FLASH_SOSTENIDO_MS:    2000,   // G1 (era 1800) sostenido mínimo en blanco total (se extiende si el telón no está apagado)
-  FLASH_BAJADA_MS:       450,    // G1 (era 2000) bajada exponencial hasta ver la escena
+  FLASH_BAJADA_MS:       120,    // G2 (era 450; G1 era 2000) caída exponencial casi inmediata
   FLASH_PICO:            1.0,    // opacidad máxima del overlay (0–1)
-  FLASH_BLOOM_MULT:      5.0,    // F3 (era 3) — bloom en el pico = bloomIntensity × este valor
-  FLASH_EXPOSICION_MULT: 3.0,    // F3 (era 2) — exposición en el pico = toneExposure × este valor
+  FLASH_BLOOM_MULT:      8.0,    // G2 (era 5; F3 era 3) — bloom en el pico = bloomIntensity × este valor
+  FLASH_EXPOSICION_MULT: 5.0,    // G2 (era 3; F3 era 2) — exposición en el pico = toneExposure × este valor
   FLASH_LUZ_FADE_MS:     600,    // la luz del telón baja a 0 en este tiempo desde el disparo
   FLASH_TOPE_MS:         4000,   // tope del sostenido extendido (aviso en consola si se alcanza)
   FLASH_RM_PICO_MULT:    0.6,    // prefers-reduced-motion: pico × este valor
   FLASH_RM_SUBIDA_MS:    400,    // prefers-reduced-motion: subida mínima
   // F2: destello diegético dentro del CRT
   FLASH_OVERLAY_DOM:     false,  // true = overlay HTML anterior (F1) encima del canvas, sin CRT
-  FLASH_CRT_MAX:         0.97,   // tope de uFlash (deja ver 3 % de escena + todo el CRT encima)
+  FLASH_CRT_MAX:         1.0,    // G2 (era 0.97) tope de uFlash; la textura diegética ahora la pone el blow-out
   FLASH_GLOW:            0.6,    // F3 (era 0.35) — resplandor central extra del blanco (uFlashGlow)
   // F3: límites del CRT escalados con uFlash
-  FLASH_SCAN_MAX:        0.06,   // scanlines restan como máximo esto en el pico (normal uScan 0.18)
-  FLASH_VIG_ATEN:        0.6,    // la viñeta se atenúa este porcentaje en el pico
+  FLASH_SCAN_MAX:        0.0,    // G2 (era 0.06) scanlines restan como máximo esto en el pico (normal uScan 0.18)
+  FLASH_VIG_ATEN:        1.0,    // G2 (era 0.6) la viñeta se atenúa este porcentaje en el pico
   FLASH_TOPE_LUM:        1.0,    // tope de luminancia del CRT en el pico (normal 0.92)
   // G1: caída exponencial + glare residual
-  FLASH_BAJADA_EXP_K:    5.0,    // curvatura de la caída exponencial (0 = lineal)
-  FLASH_GLARE_INICIO:    0.35,   // uGlare al terminar la caída
+  FLASH_BAJADA_EXP_K:    8.0,    // G2 (era 5) curvatura de la caída exponencial (0 = lineal)
+  FLASH_GLARE_INICIO:    0.35,   // uGlare al terminar la caída (0 = sin glare)
   FLASH_GLARE_MS:        2500,   // duración del glare hasta 0
   FLASH_GLARE_EXP_K:     4.0,    // curvatura del decaimiento del glare
   FLASH_GLARE_BLOOM:     0.6,    // bloom/exposición al empezar el glare = este % del boost de pico
   FLASH_GLARE_ABERRACION: 0.003, // aberración cromática extra con uGlare=1 (base uCA 0.0012)
   FLASH_RM_BAJADA_MS:    900,    // prefers-reduced-motion: caída mínima
   FLASH_RM_GLARE_MULT:   0.5,    // prefers-reduced-motion: glare inicio × este valor
+  // G2: blanco enceguecedor — color, margen HDR, blow-out final y seguridad
+  FLASH_COLOR:           "#FFFFFF" as string, // G2 (era #FFF3DC fijo) color base del destello
+  FLASH_GLARE_COLOR:     "#FFF3DC" as string, // G2 crema solo en los bordes del velo del glare
+  FLASH_HDR:             4.0,    // multiplicador de energía del blanco antes del CRT (satura el ACES)
+  FLASH_HDR_CLAMP:       64.0,   // tope lineal del CRT (anti NaN/Inf en half-float)
+  FLASH_BLOWOUT:         0.9,    // mezcla final hacia blanco puro tras ACES+sRGB (uBlowout = uFlash × esto)
+  FLASH_BLOWOUT_TEXTURA: 0.03,   // scanlines + grano que asoman sobre el blow-out (fracción)
+  FLASH_BLOOM_TOPE:      8.0,    // tope absoluto de bloom.strength
+  FLASH_EXPOSICION_TOPE: 8.0,    // tope absoluto de toneMappingExposure
+  FLASH_MEDIR_HOLD_MS:   500,    // la medición lee píxeles a estos ms de sostenido
+  FLASH_AVISO_FOTOSENSIBILIDAD: false, // true = línea de aviso al inicio de la experiencia
 };
 
 // ── P1: paneles orbitantes del camino SILLAS (ExperienceDome) — live ───────────

@@ -29,6 +29,10 @@ export const RetroCRTShader = {
     // G1: glare residual tras el destello (uGlare=0 → imagen idéntica)
     uGlare:        { value: 0 },     // 0–1, velo aditivo de blanco cálido con núcleo central
     uGlareCA:      { value: 0.003 }, // aberración cromática extra con uGlare=1
+    // G2: blanco enceguecedor (uFlash=0 y uGlare=0 → ramas no tomadas, imagen idéntica)
+    uFlashHDR:     { value: 4.0 },   // energía del blanco antes del CRT (satura ACES+sRGB)
+    uHdrClamp:     { value: 64.0 },  // tope lineal anti NaN/Inf (solo con destello o glare)
+    uGlareColor:   { value: new THREE.Color("#FFF3DC") }, // crema en los bordes del velo
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -47,6 +51,8 @@ export const RetroCRTShader = {
     uniform float uFlashScanMax, uFlashVigAten, uFlashCapMax;
     uniform float uGlare, uGlareCA;
     uniform vec3  uFlashColor;
+    uniform float uFlashHDR, uHdrClamp;
+    uniform vec3  uGlareColor;
     varying vec2  vUv;
 
     float hash(vec2 p) {
@@ -61,7 +67,8 @@ export const RetroCRTShader = {
     void main() {
       vec2 uv = barrel(vUv, uCurve);
       if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        // G2: el borde fuera del barrel también se enciende con el destello (uFlash=0 → negro)
+        gl_FragColor = vec4(min(uFlashColor * (uFlashHDR * uFlash), vec3(uHdrClamp)), 1.0);
         return;
       }
 
@@ -84,14 +91,17 @@ export const RetroCRTShader = {
       // uFlash = 0 → rama no tomada, imagen idéntica a la anterior.
       if (uFlash > 0.0) {
         float r = length(d);
-        vec3 flashCol = uFlashColor * (1.0 + uFlashGlow * (1.0 - smoothstep(0.0, 0.7, r)));
+        // G2: × uFlashHDR → margen para que ACES + sRGB saturen a blanco
+        vec3 flashCol = uFlashColor * uFlashHDR * (1.0 + uFlashGlow * (1.0 - smoothstep(0.0, 0.7, r)));
         col = mix(col, flashCol, uFlash);
       }
       // G1: glare residual — velo ADITIVO (nunca oscurece), más fuerte en el centro
       if (uGlare > 0.0) {
         float rg = length(d);
         float w  = mix(0.30, 1.0, 1.0 - smoothstep(0.0, 0.75, rg));
-        col += uFlashColor * (uGlare * w);
+        // G2: blanco en el núcleo, crema solo hacia los bordes
+        vec3 gc  = mix(uFlashColor, uGlareColor, smoothstep(0.0, 0.75, rg));
+        col += gc * (uGlare * w);
       }
 
       // Scanlines
@@ -110,9 +120,19 @@ export const RetroCRTShader = {
       col *= 1.0 - effVig * smoothstep(0.4, 1.4, dot(vc, vc));
 
       // Creamy whites + raised blacks — cap luminance at 0.92
-      col = col * uTint + uLift;
+      // G2: el tinte crema no actúa durante el destello (uFlash=0 → uTint exacto)
+      col = col * mix(uTint, vec3(1.0), uFlash) + uLift;
       // F3: el tope sube hacia uFlashCapMax con el destello
-      col = min(col, mix(0.92, uFlashCapMax, uFlash));
+      // G2: tope relativo al blanco HDR (uFlashCapMax × uFlashHDR); si fuera 1.0 lineal, el HDR se anularía
+      col = min(col, mix(0.92, uFlashCapMax * uFlashHDR, uFlash));
+      // G2: anti NaN/Inf antes del tone mapping (solo con destello o glare: sin efecto en reposo)
+      if (uFlash > 0.0 || uGlare > 0.0) {
+        col = vec3(
+          (isnan(col.r) || isinf(col.r)) ? 0.0 : col.r,
+          (isnan(col.g) || isinf(col.g)) ? 0.0 : col.g,
+          (isnan(col.b) || isinf(col.b)) ? 0.0 : col.b);
+        col = clamp(col, 0.0, uHdrClamp);
+      }
 
       gl_FragColor = vec4(col, 1.0);
     }

@@ -17,6 +17,7 @@ import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from ".
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import CurtainFlash from "./CurtainFlash"; // F1: destello al atravesar el telón
+import FlashAviso from "./FlashAviso"; // G2: aviso de fotosensibilidad (flag, off por defecto)
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
 import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
@@ -780,6 +781,7 @@ export default function ThreeScene() {
       </Canvas>
       <DebugMenu />
       <CurtainFlash />
+      <FlashAviso />
       <NearLecternHUD />
       <AudioGestureHUD />
       {DEBUG_ENABLED && DBG_SILLAS.debugOverlays && <PrismDebugOverlay />}
