@@ -141,6 +141,14 @@ export const DBG_PANELES = {
   PANEL_PLACEHOLDER:   true,  // tarjeta retro para paneles sin foto o con carga fallida
   PANEL_PLACEHOLDER_FORZAR: false, // debug: mostrar el placeholder en todos los paneles
   PANEL_OSCURO:        0.018, // brillo de la imagen fuera de los haces del prisma (R5: 0.018 fijo)
+  // Z6: reposo a oscuras — el panel no emite; solo se ve con los haces o la linterna
+  PANEL_DISENO_VIEJO:  false, // true = vuelve al marco beige + regla de Z1/R5 (emisivo)
+  PANEL_BRILLO_BASE:   0.004, // luz ambiente mínima sobre la foto (casi cero)
+  PANEL_HAZ_INTENSIDAD: 1.4,  // ganancia de los haces del prisma sobre los paneles
+  PANEL_HAZ_COS:       0.984, // coseno del semiángulo del cono (≈10°, igual que el domo)
+  PANEL_HAZ_SUAVE:     0.014, // suavidad del borde del cono (en coseno; 0.014 → lleno a ≈3,6°)
+  PANEL_BORDE:         0.006, // borde carbón mínimo (fracción del ancho; 0 = sin borde)
+  PANEL_BORDE_INT:     0.35,  // intensidad del borde carbón (también depende de la luz)
 };
 
 export const DBG_PRISM = {

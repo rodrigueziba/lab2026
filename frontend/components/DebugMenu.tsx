@@ -960,6 +960,27 @@ export default function DebugMenu() {
             onChange={v => { DBG_PANELES.PANEL_REGLA = v; setPaneles(p => ({ ...p, PANEL_REGLA: v })); }} />
           <NumField label="PANEL_OSCURO" value={paneles.PANEL_OSCURO} step={0.005} min={0} max={1} note="Z1 fuera de haz"
             onChange={v => { DBG_PANELES.PANEL_OSCURO = v; setPaneles(p => ({ ...p, PANEL_OSCURO: v })); }} />
+          {/* Z6: reposo a oscuras, iluminado por haces y linterna */}
+          <div style={ROW}>
+            <span>PANEL_DISENO_VIEJO <span style={NOTE}>Z6 marco beige + regla</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !paneles.PANEL_DISENO_VIEJO;
+              DBG_PANELES.PANEL_DISENO_VIEJO = v;
+              setPaneles(p => ({ ...p, PANEL_DISENO_VIEJO: v }));
+            }}>{paneles.PANEL_DISENO_VIEJO ? "ON" : "off"}</button>
+          </div>
+          <NumField label="PANEL_BRILLO_BASE" value={paneles.PANEL_BRILLO_BASE} step={0.001} min={0} max={0.2} note="Z6 ambiente"
+            onChange={v => { DBG_PANELES.PANEL_BRILLO_BASE = v; setPaneles(p => ({ ...p, PANEL_BRILLO_BASE: v })); }} />
+          <NumField label="PANEL_HAZ_INTENSIDAD" value={paneles.PANEL_HAZ_INTENSIDAD} step={0.1} min={0} max={6} note="Z6 haces"
+            onChange={v => { DBG_PANELES.PANEL_HAZ_INTENSIDAD = v; setPaneles(p => ({ ...p, PANEL_HAZ_INTENSIDAD: v })); }} />
+          <NumField label="PANEL_HAZ_COS" value={paneles.PANEL_HAZ_COS} step={0.001} min={0.9} max={0.9999} note="Z6 cono"
+            onChange={v => { DBG_PANELES.PANEL_HAZ_COS = v; setPaneles(p => ({ ...p, PANEL_HAZ_COS: v })); }} />
+          <NumField label="PANEL_HAZ_SUAVE" value={paneles.PANEL_HAZ_SUAVE} step={0.001} min={0.0005} max={0.05} note="Z6 borde cono"
+            onChange={v => { DBG_PANELES.PANEL_HAZ_SUAVE = v; setPaneles(p => ({ ...p, PANEL_HAZ_SUAVE: v })); }} />
+          <NumField label="PANEL_BORDE" value={paneles.PANEL_BORDE} step={0.001} min={0} max={0.05} note="Z6 borde carbón"
+            onChange={v => { DBG_PANELES.PANEL_BORDE = v; setPaneles(p => ({ ...p, PANEL_BORDE: v })); }} />
+          <NumField label="PANEL_BORDE_INT" value={paneles.PANEL_BORDE_INT} step={0.05} min={0} max={2} note="Z6"
+            onChange={v => { DBG_PANELES.PANEL_BORDE_INT = v; setPaneles(p => ({ ...p, PANEL_BORDE_INT: v })); }} />
           <div style={ROW}>
             <span>PANEL_PLACEHOLDER <span style={NOTE}>Z1 sin foto / error</span></span>
             <button style={INPUT} onClick={() => {

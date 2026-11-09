@@ -232,6 +232,14 @@ const MARCO_GLSL = Z1_PANEL_MARCO ? /* glsl */`
     else         s.y = 0.5 + (s.y - 0.5) * ta / ra;
     return s;
   }
+  // Z6: foto a ras de la geometría (sin margen ni regla), cover-fit sobre todo el plano
+  vec2 z6ImageUv(vec2 uv) {
+    float ta = max(0.01, uTexAspect);
+    vec2 s = uv;
+    if (ta > uAspect) s.x = 0.5 + (s.x - 0.5) * uAspect / ta;
+    else              s.y = 0.5 + (s.y - 0.5) * ta / uAspect;
+    return s;
+  }
   vec3 applyMarco(vec2 uv, vec3 content, float gate) {
     vec3 cream = vec3(0.910, 0.863, 0.769); // #E8DCC4
     vec3 ocre  = vec3(0.788, 0.588, 0.227); // regla ocre (mockup)
@@ -262,6 +270,60 @@ const MARCO_GLSL = Z1_PANEL_MARCO ? /* glsl */`
   }
 ` : "";
 
+// Z6: haces que iluminan los paneles. Hoy la fuente es el abanico del prisma (7 haces
+// que giran con uPrismRot, los mismos que dibuja el domo); los 4 haces de HazSystem son
+// spots verticales al piso que existen recién con el visualizador (paneles ya ocultos).
+// Arrays de uniforms compartidos por los 60 paneles; se escriben en useFrame sin allocations.
+const HAZ_MAX = 7;
+function hslRaw(h: number, s: number, l: number): THREE.Vector3 {
+  // misma fórmula que hsl2rgb del shader (valores crudos, sin conversión de color space)
+  const f = (o: number) => {
+    const p = Math.abs(((h + o) % 1) * 6 - 3);
+    return l + s * (Math.min(1, Math.max(0, p - 1)) - 0.5) * (1 - Math.abs(2 * l - 1));
+  };
+  return new THREE.Vector3(f(1), f(2 / 3), f(1 / 3));
+}
+const PANEL_HAZ_UNIFORMS = {
+  uHazO:       { value: Array.from({ length: HAZ_MAX }, () => new THREE.Vector3()) },
+  uHazD:       { value: Array.from({ length: HAZ_MAX }, () => new THREE.Vector3(1, 0, 0)) },
+  uHazColor:   { value: Array.from({ length: HAZ_MAX }, (_, i) => hslRaw(i / (HAZ_MAX - 1), 0.65, 0.65)) },
+  uHazCos:     { value: new Array<number>(HAZ_MAX).fill(0.984) },
+  uHazInt:     { value: new Array<number>(HAZ_MAX).fill(0) },
+  uHazN:       { value: HAZ_MAX },
+  uHazSuave:   { value: 0.014 },
+  uHazGain:    { value: 1.4 },
+  uBrilloBase: { value: 0.004 },
+  uBorde:      { value: 0.006 },
+  uBordeInt:   { value: 0.35 },
+  uViejo:      { value: 0 },
+  uLitColor:   { value: new THREE.Vector3(1.0, 0.890, 0.659) }, // #FFE3A8 (crudo)
+};
+
+/** Z6: actualiza los haces desde el prisma (posición, giro, intensidad del arcoíris). */
+function actualizarHacesPanel(): void {
+  const U = PANEL_HAZ_UNIFORMS;
+  const D = DBG_PANELES;
+  const az = PRISM_ROT_UNIFORM.value as number;
+  const el = 0.32;                                   // ~18°, igual que el shader del domo
+  const ce = Math.cos(el), se = Math.sin(el);
+  const intens = PRISM_RAINBOW_UNIFORM.value as number;
+  const pos = PRISM_POS_UNIFORM.value as THREE.Vector3;
+  for (let i = 0; i < HAZ_MAX; i++) {
+    const sweep = -0.38 + 0.76 * (i / (HAZ_MAX - 1)); // ±22°, mismo abanico que el domo
+    const a = az - sweep;                             // rotAround(Y, sweep) = azimut − sweep
+    U.uHazO.value[i].copy(pos);
+    U.uHazD.value[i].set(ce * Math.cos(a), se, ce * Math.sin(a));
+    U.uHazCos.value[i] = D.PANEL_HAZ_COS;
+    U.uHazInt.value[i] = intens;
+  }
+  U.uHazSuave.value   = D.PANEL_HAZ_SUAVE;
+  U.uHazGain.value    = D.PANEL_HAZ_INTENSIDAD;
+  U.uBrilloBase.value = D.PANEL_BRILLO_BASE;
+  U.uBorde.value      = D.PANEL_BORDE;
+  U.uBordeInt.value   = D.PANEL_BORDE_INT;
+  U.uViejo.value      = D.PANEL_DISENO_VIEJO ? 1 : 0;
+}
+
 const FRAG = RAINBOW_GLSL + BEZEL_GLSL + MARCO_GLSL + /* glsl */`
   uniform sampler2D uMap;
   uniform float     uOscuro;
@@ -270,58 +332,92 @@ const FRAG = RAINBOW_GLSL + BEZEL_GLSL + MARCO_GLSL + /* glsl */`
   uniform vec3      uPrismPos;
   uniform float     uRainbow;
   uniform float     uPrismRot;
+  // Z6: haces que iluminan el panel (calculados en CPU cada frame; sin luces de escena)
+  uniform vec3      uHazO[${HAZ_MAX}];
+  uniform vec3      uHazD[${HAZ_MAX}];
+  uniform vec3      uHazColor[${HAZ_MAX}];
+  uniform float     uHazCos[${HAZ_MAX}];
+  uniform float     uHazInt[${HAZ_MAX}];
+  uniform int       uHazN;
+  uniform float     uHazSuave, uHazGain, uBrilloBase, uBorde, uBordeInt, uViejo;
+  uniform vec3      uLitColor;
   varying vec2 vUv;
   varying vec3 vWorldPos;
 
   void main() {
-    float gate = smoothstep(0.0, 0.05, uReveal);
-    vec4  tex  = texture2D(uMap, ${Z1_PANEL_MARCO ? "z1ImageUv(vUv)" : "vUv"});
-    vec3  col  = vec3(0.002, 0.001, 0.004);
+    // Z6: false/0 = diseño en reposo a oscuras; 1 = diseño viejo (R5/Z1: marco beige + regla)
+    if (uViejo > 0.5) {
+      float gate = smoothstep(0.0, 0.05, uReveal);
+      vec4  tex  = texture2D(uMap, ${Z1_PANEL_MARCO ? "z1ImageUv(vUv)" : "vUv"});
+      vec3  col  = vec3(0.002, 0.001, 0.004);
 
-    if (gate >= 0.01) {
-      if (uRainbow < 0.005) {
-        col = tex.rgb * uOscuro * gate;
-      } else {
-        // ── Outward radial beams ──────────────────────────────────────────────
-        // 7 beams fan outward from the prism horizontally.
-        // uPrismRot rotates the fan's central azimuth → beams sweep around dome.
-        // el = 18° elevation so beams point toward panels at heights 6-14m, r≈25m.
-        float az = uPrismRot;
-        float el = 0.32;  // ~18° elevation
-        vec3  centBeam = vec3(cos(el) * cos(az), sin(el), cos(el) * sin(az));
+      if (gate >= 0.01) {
+        if (uRainbow < 0.005) {
+          col = tex.rgb * uOscuro * gate;
+        } else {
+          // ── Outward radial beams ──────────────────────────────────────────────
+          // 7 beams fan outward from the prism horizontally.
+          // uPrismRot rotates the fan's central azimuth → beams sweep around dome.
+          // el = 18° elevation so beams point toward panels at heights 6-14m, r≈25m.
+          float az = uPrismRot;
+          float el = 0.32;  // ~18° elevation
+          vec3  centBeam = vec3(cos(el) * cos(az), sin(el), cos(el) * sin(az));
 
-        vec3  toFrag = normalize(vWorldPos - uPrismPos);
-        float dist   = length(vWorldPos - uPrismPos);
-        float dFade  = exp(-dist * 0.010);
+          vec3  toFrag = normalize(vWorldPos - uPrismPos);
+          float dist   = length(vWorldPos - uPrismPos);
+          float dFade  = exp(-dist * 0.010);
 
-        float totalStr = 0.0;
-        vec3  beamTint = vec3(0.0);
-        for (int i = 0; i < 7; i++) {
-          float t      = float(i) / 6.0;           // 0=red … 1=violet
-          float sweep  = mix(-0.38, 0.38, t);       // ±22° horizontal dispersion
-          vec3  beam   = rotAround(centBeam, vec3(0.0, 1.0, 0.0), sweep);
-          float align  = dot(toFrag, beam);
-          float bOuter = smoothstep(0.984, 0.998, align);
-          float bInner = smoothstep(0.998, 1.000, align);
-          float b      = (bOuter * 0.6 + bInner * 1.4) * dFade;
-          totalStr    += b;
-          beamTint    += hsl2rgb(t, 0.65, 0.65) * b;
+          float totalStr = 0.0;
+          vec3  beamTint = vec3(0.0);
+          for (int i = 0; i < 7; i++) {
+            float t      = float(i) / 6.0;           // 0=red … 1=violet
+            float sweep  = mix(-0.38, 0.38, t);       // ±22° horizontal dispersion
+            vec3  beam   = rotAround(centBeam, vec3(0.0, 1.0, 0.0), sweep);
+            float align  = dot(toFrag, beam);
+            float bOuter = smoothstep(0.984, 0.998, align);
+            float bInner = smoothstep(0.998, 1.000, align);
+            float b      = (bOuter * 0.6 + bInner * 1.4) * dFade;
+            totalStr    += b;
+            beamTint    += hsl2rgb(t, 0.65, 0.65) * b;
+          }
+          totalStr = clamp(totalStr * uRainbow, 0.0, 1.0);
+          beamTint = clamp(beamTint * uRainbow, 0.0, 1.0);
+
+          vec3 lit  = tex.rgb + beamTint * 0.22;
+          vec3 dark = tex.rgb * uOscuro;
+          col = mix(dark, lit, totalStr) * gate;
         }
-        totalStr = clamp(totalStr * uRainbow, 0.0, 1.0);
-        beamTint = clamp(beamTint * uRainbow, 0.0, 1.0);
-
-        vec3 lit  = tex.rgb + beamTint * 0.22;
-        vec3 dark = tex.rgb * uOscuro;
-        col = mix(dark, lit, totalStr) * gate;
       }
+
+      // Z2: la linterna revela la imagen como un haz (nunca oscurece)
+      col = max(col, tex.rgb * uLit * gate);
+
+      // R5: apply CRT bezel (cream frame + scanlines + header)
+      ${Z1_PANEL_MARCO ? "col = applyMarco(vUv, col, gate);" : R5_PANEL_BEZEL ? "col = applyBezel(vUv, col, gate);" : ""}
+      gl_FragColor = vec4(col, 1.0);
+      return;
     }
 
-    // Z2: la linterna revela la imagen como un haz (nunca oscurece)
-    col = max(col, tex.rgb * uLit * gate);
-
-    // R5: apply CRT bezel (cream frame + scanlines + header)
-    ${Z1_PANEL_MARCO ? "col = applyMarco(vUv, col, gate);" : R5_PANEL_BEZEL ? "col = applyBezel(vUv, col, gate);" : ""}
-    gl_FragColor = vec4(col, 1.0);
+    // ── Z6: el panel no emite: color = albedo (foto o placeholder) × luz recibida ──
+    float gate = smoothstep(0.0, 0.05, uReveal);
+    vec4  tex  = texture2D(uMap, ${Z1_PANEL_MARCO ? "z6ImageUv(vUv)" : "vUv"});
+    vec3  luz  = vec3(uBrilloBase);
+    for (int i = 0; i < ${HAZ_MAX}; i++) {
+      if (i >= uHazN) break;
+      vec3  toFrag = vWorldPos - uHazO[i];
+      float dist   = length(toFrag);
+      float align  = dot(toFrag / max(dist, 1e-4), uHazD[i]);
+      // cono con borde suave: 0 en el borde (uHazCos), 1 hacia el eje
+      float m      = smoothstep(uHazCos[i], min(1.0, uHazCos[i] + uHazSuave), align);
+      luz += uHazColor[i] * (m * uHazInt[i] * uHazGain * exp(-dist * 0.010));
+    }
+    luz += uLitColor * uLit;                         // linterna del usuario (Z2), luz cálida
+    vec3 col = tex.rgb * luz;
+    // borde mínimo carbón, también iluminado (solo se ve con luz: ayuda a leer la forma)
+    ${Z1_PANEL_MARCO ? `vec2 pb = vec2(vUv.x, vUv.y / uAspect);
+    float db = min(min(pb.x, 1.0 - pb.x), min(pb.y, 1.0 / uAspect - pb.y));
+    if (db < uBorde) col = vec3(0.227, 0.231, 0.235) * luz * uBordeInt;` : ""}
+    gl_FragColor = vec4(col * gate, 1.0);
   }
 `;
 
@@ -423,6 +519,7 @@ function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, staggerSec, 
     uOscuro:    PANEL_LAYOUT_UNIFORMS.uOscuro,
     uTexAspect: { value: 1.5 },
     uLit:       { value: 0 },   // Z2
+    ...PANEL_HAZ_UNIFORMS,      // Z6: haces + brillo base + flag del diseño viejo (objetos compartidos)
   }), []);
 
   // Z2: registro en la linterna (fase propia; el tick gira el pivot)
@@ -661,6 +758,7 @@ export default function ExperienceDome() {
     PANEL_LAYOUT_UNIFORMS.uMargen.value = DBG_PANELES.PANEL_MARGEN;
     PANEL_LAYOUT_UNIFORMS.uRegla.value  = DBG_PANELES.PANEL_REGLA;
     PANEL_LAYOUT_UNIFORMS.uOscuro.value = DBG_PANELES.PANEL_OSCURO;
+    actualizarHacesPanel(); // Z6
     if (panelsRef.current) panelsRef.current.visible = PANELES_SILLAS.fase !== "oculto";
     // Z2: linterna (test de cono) + fase de órbita propia de cada panel
     if (Z2_FASE_POR_PANEL) tickLinterna(camera, dt, performance.now(), panelesSillasVisibles(), PANELES_SILLAS.fase !== "oculto");
