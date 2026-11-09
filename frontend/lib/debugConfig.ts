@@ -100,6 +100,12 @@ export const DBG_PANELES = {
   PANELES_AUTO:        true,  // false = paneles siempre visibles (comportamiento anterior)
   PANELES_FADE_IN_MS:  600,   // fade de aparición (alpha)
   PANELES_FADE_OUT_MS: 600,   // fade de desaparición (alpha)
+  // Z1: marco del panel de proyecto (unidades = fracción del ANCHO del panel → margen parejo)
+  PANEL_MARGEN:        0.03,  // margen beige en los 4 lados (mockup: 12 px / 400 px)
+  PANEL_REGLA:         0.05,  // alto de la tira de regla ocre, dentro del margen (mockup: 20 px / 400 px)
+  PANEL_PLACEHOLDER:   true,  // tarjeta retro para paneles sin foto o con carga fallida
+  PANEL_PLACEHOLDER_FORZAR: false, // debug: mostrar el placeholder en todos los paneles
+  PANEL_OSCURO:        0.018, // brillo de la imagen fuera de los haces del prisma (R5: 0.018 fijo)
 };
 
 export const DBG_PRISM = {

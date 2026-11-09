@@ -941,6 +941,29 @@ export default function DebugMenu() {
             onChange={v => { DBG_PANELES.PANELES_FADE_IN_MS = v; setPaneles(p => ({ ...p, PANELES_FADE_IN_MS: v })); }} />
           <NumField label="PANELES_FADE_OUT_MS" value={paneles.PANELES_FADE_OUT_MS} step={50} min={0} max={5000} note="live"
             onChange={v => { DBG_PANELES.PANELES_FADE_OUT_MS = v; setPaneles(p => ({ ...p, PANELES_FADE_OUT_MS: v })); }} />
+          {/* Z1: marco y placeholder de los paneles de proyecto */}
+          <NumField label="PANEL_MARGEN" value={paneles.PANEL_MARGEN} step={0.005} min={0} max={0.15} note="Z1 × ancho"
+            onChange={v => { DBG_PANELES.PANEL_MARGEN = v; setPaneles(p => ({ ...p, PANEL_MARGEN: v })); }} />
+          <NumField label="PANEL_REGLA" value={paneles.PANEL_REGLA} step={0.005} min={0} max={0.2} note="Z1 × ancho"
+            onChange={v => { DBG_PANELES.PANEL_REGLA = v; setPaneles(p => ({ ...p, PANEL_REGLA: v })); }} />
+          <NumField label="PANEL_OSCURO" value={paneles.PANEL_OSCURO} step={0.005} min={0} max={1} note="Z1 fuera de haz"
+            onChange={v => { DBG_PANELES.PANEL_OSCURO = v; setPaneles(p => ({ ...p, PANEL_OSCURO: v })); }} />
+          <div style={ROW}>
+            <span>PANEL_PLACEHOLDER <span style={NOTE}>Z1 sin foto / error</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !paneles.PANEL_PLACEHOLDER;
+              DBG_PANELES.PANEL_PLACEHOLDER = v;
+              setPaneles(p => ({ ...p, PANEL_PLACEHOLDER: v }));
+            }}>{paneles.PANEL_PLACEHOLDER ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>PANEL_PLACEHOLDER_FORZAR <span style={NOTE}>Z1 todos</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !paneles.PANEL_PLACEHOLDER_FORZAR;
+              DBG_PANELES.PANEL_PLACEHOLDER_FORZAR = v;
+              setPaneles(p => ({ ...p, PANEL_PLACEHOLDER_FORZAR: v }));
+            }}>{paneles.PANEL_PLACEHOLDER_FORZAR ? "ON" : "off"}</button>
+          </div>
           <div style={ROW}>
             <span>estado <span style={NOTE}>{panelesFase}</span></span>
             <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}

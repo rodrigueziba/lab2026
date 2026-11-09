@@ -12,9 +12,10 @@ import HazSystem from "./HazSystem";
 import HazRings from "./HazRings";
 import SymbolSystem from "./SymbolSystem";
 import Monoliths from "./Monoliths";
-import { DBG_SILLAS } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_PANELES } from "@/lib/debugConfig";
 import { resetEffects } from "@/lib/vizAudio";
 import { PANELES_SILLAS, tickPanelesSillas, installPanelesSillasListeners } from "@/lib/alightStore";
+import { createPanelPlaceholder } from "@/lib/retro/panelPlaceholder";
 
 // N2: disable legacy floor textures and sector audio
 const LEGACY_FLOOR_TEXTURES_ENABLED = false;
@@ -24,11 +25,14 @@ const API_URL    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 const DOME_R     = 28;
 const MAX_PANELS = 60;
 const PANEL_SCALE = 1.5; // G4: multiply panel dimensions by this factor
-const CACHE_KEY  = "alight:media-urls";
+const CACHE_KEY  = "alight:media-items-v2"; // Z1: era "alight:media-urls" (solo URLs, sin título)
 
 // ── Minimal shapes from the project's data layer ──────────────────────────────
-interface Proyecto  { foto?: string; galeria?: string[]; referencias?: string[] }
-interface Prestador { foto?: string | null }
+interface Proyecto  { titulo?: string; foto?: string | null; galeria?: string[]; referencias?: string[] }
+interface Prestador { nombre?: string; foto?: string | null }
+
+// Z1: cada panel lleva la URL (o null si no hay foto) y el título para el placeholder
+interface PanelItem { url: string | null; titulo: string }
 
 // ── Data helpers ──────────────────────────────────────────────────────────────
 function getYoutubeId(url: string): string | null {
@@ -36,19 +40,30 @@ function getYoutubeId(url: string): string | null {
   return m ? m[1] : null;
 }
 
-function extractUrls(ps: Proyecto[], pr: Prestador[]): string[] {
-  const seen = new Set<string>();
-  const add  = (u?: string | null) => { if (u) seen.add(u); };
+// Z1: mismo orden y deduplicación que antes, pero con título. Un proyecto sin ninguna
+// imagen aporta un item { url: null } → panel placeholder con su título.
+function extractItems(ps: Proyecto[], pr: Prestador[]): PanelItem[] {
+  const seen  = new Set<string>();
+  const items: PanelItem[] = [];
+  const add = (u: string | null | undefined, titulo: string) => {
+    const url = u?.trim();
+    if (!url || seen.has(url)) return false;
+    seen.add(url);
+    items.push({ url, titulo });
+    return true;
+  };
   ps.forEach(p => {
-    add(p.foto);
-    p.galeria?.forEach(add);
+    const titulo = p.titulo ?? "SIN TÍTULO";
+    let alguna = add(p.foto, titulo);
+    p.galeria?.forEach(g => { alguna = add(g, titulo) || alguna; });
     p.referencias?.forEach(r => {
       const id = getYoutubeId(r);
-      if (id) add(`https://img.youtube.com/vi/${id}/hqdefault.jpg`);
+      if (id) alguna = add(`https://img.youtube.com/vi/${id}/hqdefault.jpg`, titulo) || alguna;
     });
+    if (!alguna && !p.foto && !(p.galeria?.length)) items.push({ url: null, titulo });
   });
-  pr.forEach(p => add(p.foto));
-  return [...seen];
+  pr.forEach(p => { add(p.foto, p.nombre ?? "PRESTADOR"); });
+  return items;
 }
 
 // ── Orbital ring layout ────────────────────────────────────────────────────────
@@ -62,7 +77,7 @@ interface OrbitData {
   tiltZ:   number;
   azimuth: number;
   speed:   number;
-  panels:  { pos: THREE.Vector3; url: string; staggerSec: number }[];
+  panels:  { pos: THREE.Vector3; item: PanelItem; staggerSec: number }[];
 }
 
 interface OrbitBand { count: number; centerY: number; rFactor: number; }
@@ -81,7 +96,7 @@ const ORBIT_BANDS: OrbitBand[] = [
   { count: 6, centerY: 13, rFactor: 0.96 },
 ];
 
-function buildOrbits(urls: string[]): OrbitData[] {
+function buildOrbits(urls: PanelItem[]): OrbitData[] {
   let urlIdx     = 0;
   let staggerIdx = 0;
 
@@ -105,7 +120,7 @@ function buildOrbits(urls: string[]): OrbitData[] {
           0,
           radius * Math.sin(angle),
         ),
-        url:        urls[urlIdx++] ?? "",
+        item:       urls[urlIdx++] ?? { url: null, titulo: "" },
         staggerSec: staggerIdx++ * 0.12,
       };
     });
@@ -175,8 +190,73 @@ const BEZEL_GLSL = R5_PANEL_BEZEL ? /* glsl */`
   }
 ` : "";
 
-const FRAG = RAINBOW_GLSL + BEZEL_GLSL + /* glsl */`
+// Z1: marco con margen UNIFORME + regla ocre dentro del margen + foto con ajuste "cover".
+// Causa del margen desparejo de R5: bz = 0.04 en UV para ambos ejes, pero el plano es
+// 3:2 → arriba/abajo medía 0.04 × alto (2/3 del lateral) y el encabezado quedaba pegado
+// al borde; además la foto se estiraba a 3:2 y el marco la tapaba (sin cálculo de aspecto).
+// Ahora todo se mide en fracciones del ANCHO. false = vuelve al bezel R5.
+const Z1_PANEL_MARCO = true;
+
+// Z1: uniforms compartidos por los 60 paneles (los escribe ExperienceDome desde DBG_PANELES)
+const PANEL_LAYOUT_UNIFORMS = {
+  uMargen: { value: 0.03 },
+  uRegla:  { value: 0.05 },
+  uAspect: { value: 1.5 },     // ancho / alto del plano (3.6 × 2.4)
+  uOscuro: { value: 0.018 },   // brillo del contenido fuera de los haces (R5: 0.018 fijo)
+};
+
+const MARCO_GLSL = Z1_PANEL_MARCO ? /* glsl */`
+  uniform float uMargen, uRegla, uAspect, uTexAspect;
+  // coordenadas en unidades de ancho: x ∈ [0,1], y ∈ [0, 1/uAspect]
+  vec4 z1Rect() {
+    float H = 1.0 / uAspect;
+    // (x0, y0, ancho, alto) de la zona de imagen
+    return vec4(uMargen, uMargen, 1.0 - 2.0 * uMargen, max(0.001, H - 2.0 * uMargen - uRegla));
+  }
+  // UV de la textura con ajuste "cover" (recorta, no estira)
+  vec2 z1ImageUv(vec2 uv) {
+    vec2 p = vec2(uv.x, uv.y / uAspect);
+    vec4 r = z1Rect();
+    vec2 s = (p - r.xy) / r.zw;
+    float ra = r.z / r.w;
+    float ta = max(0.01, uTexAspect);
+    if (ta > ra) s.x = 0.5 + (s.x - 0.5) * ra / ta;
+    else         s.y = 0.5 + (s.y - 0.5) * ta / ra;
+    return s;
+  }
+  vec3 applyMarco(vec2 uv, vec3 content, float gate) {
+    vec3 cream = vec3(0.910, 0.863, 0.769); // #E8DCC4
+    vec3 ocre  = vec3(0.788, 0.588, 0.227); // regla ocre (mockup)
+    vec3 tinta = vec3(0.227, 0.231, 0.235); // #3A3B3C
+    float H = 1.0 / uAspect;
+    vec2 p = vec2(uv.x, uv.y / uAspect);
+    float m = uMargen;
+    // margen beige parejo en los 4 lados
+    if (p.x < m || p.x > 1.0 - m || p.y < m || p.y > H - m) return cream * gate;
+    // regla: franja superior dentro del margen, con marcas que cuelgan desde arriba
+    float yTop = H - m;
+    if (p.y > yTop - uRegla) {
+      float x   = (p.x - m) / (1.0 - 2.0 * m);       // 0–1 a lo ancho de la regla
+      float d   = (yTop - p.y) / max(uRegla, 0.0001); // 0 arriba → 1 abajo
+      float n   = x * 50.0;                           // 50 divisiones
+      float fx  = fract(n);
+      bool mayor = mod(floor(n + 0.5), 5.0) < 0.5;
+      float largo = mayor ? 0.62 : 0.32;
+      float tick = step(fx, 0.09) + step(0.91, fx);    // trazo centrado en cada división
+      float onTick = min(1.0, tick) * step(d, largo);
+      return mix(ocre, tinta, onTick) * gate;
+    }
+    // scanlines sobre la imagen (igual que R5)
+    vec4 r = z1Rect();
+    float sy = (p.y - r.y) / r.w;
+    float sl = 0.88 + 0.12 * sin(sy * 420.0 * 6.2831);
+    return content * sl;
+  }
+` : "";
+
+const FRAG = RAINBOW_GLSL + BEZEL_GLSL + MARCO_GLSL + /* glsl */`
   uniform sampler2D uMap;
+  uniform float     uOscuro;
   uniform float     uReveal;
   uniform vec3      uPrismPos;
   uniform float     uRainbow;
@@ -186,12 +266,12 @@ const FRAG = RAINBOW_GLSL + BEZEL_GLSL + /* glsl */`
 
   void main() {
     float gate = smoothstep(0.0, 0.05, uReveal);
-    vec4  tex  = texture2D(uMap, vUv);
+    vec4  tex  = texture2D(uMap, ${Z1_PANEL_MARCO ? "z1ImageUv(vUv)" : "vUv"});
     vec3  col  = vec3(0.002, 0.001, 0.004);
 
     if (gate >= 0.01) {
       if (uRainbow < 0.005) {
-        col = tex.rgb * 0.018 * gate;
+        col = tex.rgb * uOscuro * gate;
       } else {
         // ── Outward radial beams ──────────────────────────────────────────────
         // 7 beams fan outward from the prism horizontally.
@@ -222,13 +302,13 @@ const FRAG = RAINBOW_GLSL + BEZEL_GLSL + /* glsl */`
         beamTint = clamp(beamTint * uRainbow, 0.0, 1.0);
 
         vec3 lit  = tex.rgb + beamTint * 0.22;
-        vec3 dark = tex.rgb * 0.018;
+        vec3 dark = tex.rgb * uOscuro;
         col = mix(dark, lit, totalStr) * gate;
       }
     }
 
     // R5: apply CRT bezel (cream frame + scanlines + header)
-    ${R5_PANEL_BEZEL ? "col = applyBezel(vUv, col, gate);" : ""}
+    ${Z1_PANEL_MARCO ? "col = applyMarco(vUv, col, gate);" : R5_PANEL_BEZEL ? "col = applyBezel(vUv, col, gate);" : ""}
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -291,14 +371,16 @@ const DOME_SHELL_UNIFORMS = {
 // ── PanelMesh ─────────────────────────────────────────────────────────────────
 interface PanelProps {
   position:    THREE.Vector3;
-  url:         string;
+  item:        PanelItem;     // Z1: url (o null) + título para el placeholder
+  indice:      number;        // Z1: varía el código de modelo del placeholder
   staggerSec:  number;
   activatedRef: { current: number | null };
 }
 
 const texLoader = new THREE.TextureLoader();
 
-function PanelMesh({ position, url, staggerSec, activatedRef }: PanelProps) {
+function PanelMesh({ position, item, indice, staggerSec, activatedRef }: PanelProps) {
+  const url = item.url;
   const matRef  = useRef<THREE.ShaderMaterial>(null);
   const meshRef = useRef<THREE.Mesh>(null);   // P1: escala del fade
   const gl      = useThree((s) => s.gl);
@@ -318,26 +400,61 @@ function PanelMesh({ position, url, staggerSec, activatedRef }: PanelProps) {
     uPrismPos: PRISM_POS_UNIFORM,
     uRainbow:  PRISM_RAINBOW_UNIFORM,
     uPrismRot: PRISM_ROT_UNIFORM,
+    // Z1: layout compartido + aspecto propio de la textura (cover-fit)
+    uMargen:    PANEL_LAYOUT_UNIFORMS.uMargen,
+    uRegla:     PANEL_LAYOUT_UNIFORMS.uRegla,
+    uAspect:    PANEL_LAYOUT_UNIFORMS.uAspect,
+    uOscuro:    PANEL_LAYOUT_UNIFORMS.uOscuro,
+    uTexAspect: { value: 1.5 },
   }), []);
+
+  // Z1: foto cargada (o null) + placeholder (creado solo si hace falta) + estado
+  const fotoRef = useRef<{ tex: THREE.Texture | null; aspect: number; estado: "cargando" | "ok" | "sin-foto" | "error" }>(
+    { tex: null, aspect: 1.5, estado: "cargando" });
+  const phRef   = useRef<THREE.CanvasTexture | null>(null);
 
   // Async texture load — only touches the uniform, never touches React state
   useEffect(() => {
     let live = true;
     let loaded: THREE.Texture | null = null; // P1: para liberar en el cleanup
-    texLoader.load(url, (tex) => {
-      if (!live || !matRef.current) { tex.dispose(); return; }
-      loaded = tex;
-      tex.colorSpace = THREE.SRGBColorSpace;
-      // P1: subir la textura a la GPU al cargar (cortina/exploración), no al aparecer
-      gl.initTexture(tex);
-      matRef.current.uniforms.uMap.value = tex;
-    });
+    const f = fotoRef.current;
+    f.tex = null; f.estado = url ? "cargando" : "sin-foto";
+    // Z1: el placeholder se dibuja y sube a la GPU acá (al cargar), no al aparecer el panel
+    const prepararPh = () => {
+      if (!DBG_PANELES.PANEL_PLACEHOLDER || phRef.current) return;
+      phRef.current = createPanelPlaceholder(item.titulo, indice);
+      if (phRef.current) gl.initTexture(phRef.current);
+    };
+    if (!url) prepararPh();
+    if (url) {
+      texLoader.load(url, (tex) => {
+        if (!live || !matRef.current) { tex.dispose(); return; }
+        loaded = tex;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        // P1: subir la textura a la GPU al cargar (cortina/exploración), no al aparecer
+        gl.initTexture(tex);
+        // Z1: aspecto real de la imagen para el cover-fit
+        const img = tex.image as { width?: number; height?: number } | undefined;
+        f.aspect = img?.width && img?.height ? img.width / img.height : 1.5;
+        f.tex = tex; f.estado = "ok";
+      }, undefined, () => {
+        // Z1: antes no había onError → el panel quedaba con una textura vacía (negro)
+        if (!live) return;
+        f.estado = "error";
+        prepararPh();
+        console.warn(`[ExperienceDome] Z1: no cargó la foto del panel "${item.titulo}": ${url}`);
+      });
+    }
     return () => {
       live = false;
       // P1: liberar la textura al desmontar
       loaded?.dispose();
+      f.tex = null;
     };
-  }, [url, gl]);
+  }, [url, gl, item.titulo, indice]);
+
+  // Z1: liberar el placeholder al desmontar
+  useEffect(() => () => { phRef.current?.dispose(); phRef.current = null; }, []);
 
   // Reveal is driven purely in useFrame — no state, no re-renders
   useFrame(() => {
@@ -347,6 +464,22 @@ function PanelMesh({ position, url, staggerSec, activatedRef }: PanelProps) {
     const a = PANELES_SILLAS.alpha;
     if (meshRef.current) meshRef.current.scale.setScalar(Math.max(0.0001, a * a * (3 - 2 * a)));
     const mat = matRef.current;
+    // Z1: foto o placeholder (el canvas se crea una sola vez, la primera vez que hace falta)
+    if (mat) {
+      const f = fotoRef.current;
+      const falta = f.estado === "sin-foto" || f.estado === "error";
+      const usarPh = DBG_PANELES.PANEL_PLACEHOLDER && (DBG_PANELES.PANEL_PLACEHOLDER_FORZAR || falta);
+      if (usarPh && !phRef.current) {
+        phRef.current = createPanelPlaceholder(item.titulo, indice);
+        if (phRef.current) gl.initTexture(phRef.current);
+      }
+      const ph = usarPh ? phRef.current : null;
+      const tex = ph ?? f.tex;
+      if (tex && mat.uniforms.uMap.value !== tex) {
+        mat.uniforms.uMap.value = tex;
+        mat.uniforms.uTexAspect.value = ph ? (ph.userData.aspect as number) : f.aspect;
+      }
+    }
     if (!mat || activatedRef.current === null) return;
     const elapsed = (Date.now() - activatedRef.current) / 1000 - staggerSec;
     if (elapsed > 0 && mat.uniforms.uReveal.value < 1) {
@@ -397,7 +530,8 @@ function OrbitRing({
         <PanelMesh
           key={i}
           position={p.pos}
-          url={p.url}
+          item={p.item}
+          indice={Math.round(p.staggerSec / 0.12)}
           staggerSec={p.staggerSec}
           activatedRef={activatedRef}
         />
@@ -408,7 +542,7 @@ function OrbitRing({
 
 // ── ExperienceDome ────────────────────────────────────────────────────────────
 export default function ExperienceDome() {
-  const [urls, setUrls]       = useState<string[]>([]);
+  const [urls, setUrls]       = useState<PanelItem[]>([]); // Z1: items con título
   const [vizActive, setVizActive] = useState(false); // mounts DomeVisualizer only when true
   const activatedRef          = useRef<number | null>(null);
   const vizActiveRef          = useRef(false); // for useFrame (avoids state read per frame)
@@ -426,7 +560,7 @@ export default function ExperienceDome() {
       fetch(`${API_URL}/prestador`).then(r => r.json()),
     ])
       .then(([proyectos, prestadores]: [Proyecto[], Prestador[]]) => {
-        const extracted = extractUrls(proyectos, prestadores);
+        const extracted = extractItems(proyectos, prestadores);
         try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(extracted)); } catch { /* ok */ }
         setUrls(extracted);
       })
@@ -476,6 +610,10 @@ export default function ExperienceDome() {
   useFrame((_, dt) => {
     // P1: fade y visibilidad de los paneles SILLAS, derivados del store
     tickPanelesSillas(performance.now());
+    // Z1: layout del marco desde el menú de debug (uniforms compartidos, sin allocations)
+    PANEL_LAYOUT_UNIFORMS.uMargen.value = DBG_PANELES.PANEL_MARGEN;
+    PANEL_LAYOUT_UNIFORMS.uRegla.value  = DBG_PANELES.PANEL_REGLA;
+    PANEL_LAYOUT_UNIFORMS.uOscuro.value = DBG_PANELES.PANEL_OSCURO;
     if (panelsRef.current) panelsRef.current.visible = PANELES_SILLAS.fase !== "oculto";
     if (shellRef.current) {
       shellRef.current.visible = !DBG_SILLAS.vizHideShell;
