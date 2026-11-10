@@ -709,6 +709,7 @@ function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, bobAmp = 0, 
           vertexShader={VERT}
           fragmentShader={FRAG}
           uniforms={uniforms}
+          side={THREE.DoubleSide} /* Z18: su parche esférico se ve desde adentro */
         />
       </mesh>
     </group>

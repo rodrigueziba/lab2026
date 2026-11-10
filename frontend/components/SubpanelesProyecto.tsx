@@ -16,6 +16,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SUBPANELES, DBG_PRIORIDAD, DBG_AISLAR_UI } from "@/lib/debugConfig";
 import { ponerEnCapaUI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
+import { crearParche, actualizarParche, uvDeParche, UV_PARCHE, type ParamsParche } from "@/lib/retro/parcheEsferico";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 
 // Z10: el conjunto se dibuja después de los paneles en órbita (renderOrder 0)
@@ -117,6 +118,16 @@ const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _ojoL = new THREE.Ve
 const _mb = new THREE.Matrix4();
 const _PI2 = Math.PI / 2;
 const _gq2 = new THREE.Quaternion();  // Z16
+// Z18: parámetros reutilizados de los parches y raycast contra la esfera
+const _pp: ParamsParche = { yaw: 0, pitch: 0, ancho: 0.1, alto: 0.1, R: 3, curva: 1, vertical: false };
+const _qfi = new THREE.Quaternion();
+const _eo = new THREE.Vector3(), _ed = new THREE.Vector3();
+const _box = { yaw: 0, pitch: 0, ancho: 0, alto: 0 };
+function ponerParche(geo: THREE.BufferGeometry, yaw: number, pitch: number, ancho: number, alto: number, R: number, curva: number, vertical: boolean): void {
+  _pp.yaw = yaw; _pp.pitch = pitch; _pp.ancho = Math.max(1e-4, ancho); _pp.alto = Math.max(1e-4, alto);
+  _pp.R = R; _pp.curva = curva; _pp.vertical = vertical;
+  actualizarParche(geo, _pp);
+}
 // Z16: fija depthTest en los materiales del grupo (callback fijo → traverse sin allocations)
 let _depthTestDe = true;
 function fijarDepthTest(o: THREE.Object3D): void {
@@ -193,9 +204,38 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
   const fichaMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const pantMatRef  = useRef<THREE.ShaderMaterial>(null);
   const lineaMatRef = useRef<THREE.ShaderMaterial>(null);
+  // Z18: domo esférico — grupo en el ojo (marco capturado) y parches
+  const domoRef  = useRef<THREE.Group>(null);
+  const pPanel = useRef<THREE.Mesh>(null), pHist = useRef<THREE.Mesh>(null), pGal = useRef<THREE.Mesh>(null);
+  const pFic = useRef<THREE.Mesh>(null), pPant = useRef<THREE.Mesh>(null);
+  const pLinL = useRef<THREE.Mesh>(null), pLinR = useRef<THREE.Mesh>(null), pLinB = useRef<THREE.Mesh>(null);
+  const geos = useMemo(() => {
+    const su = DBG_SUBPANELES.ESF_SEG_U, sv = DBG_SUBPANELES.ESF_SEG_V;
+    return {
+      panel: crearParche(su, sv), hist: crearParche(su, sv), gal: crearParche(su, sv), fic: crearParche(su, sv),
+      pant: crearParche(su, sv), linL: crearParche(su, 1), linR: crearParche(su, 1), linB: crearParche(su, 1),
+    };
+  }, []);
+  useEffect(() => () => { for (const g of Object.values(geos)) g.dispose(); }, [geos]); // Z18: liberar geometrías
+  // Z18: los parches comparten los materiales de los planos (texturas de canvas, pantalla CRT, líneas).
+  // Se libera el material por defecto que three crea para cada Mesh sin material.
+  useEffect(() => {
+    const pares: [THREE.Mesh | null, THREE.Material | null][] = [
+      [pHist.current, histMatRef.current], [pGal.current, galMatRef.current], [pFic.current, fichaMatRef.current],
+      [pPant.current, pantMatRef.current], [pLinL.current, lineaMatRef.current],
+      [pLinR.current, lineaMatRef.current], [pLinB.current, lineaMatRef.current],
+    ];
+    for (const [mesh, mat] of pares) {
+      if (!mesh || !mat || mesh.material === mat) continue;
+      (mesh.material as THREE.Material).dispose();
+      mesh.material = mat;
+    }
+    const pp = pPanel.current;                    // el del panel se reemplaza al abrir (material del panel real)
+    return () => { if (pp && !(pp.material as THREE.ShaderMaterial).isShaderMaterial) (pp.material as THREE.Material).dispose(); };
+  }, []);
 
   // estado de animación / interacción (refs: sin re-render por frame)
-  const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false, capaUI: false, dtViejo: false }); // Z5: tDentro; Z8: escala; Z16/Z17: capa UI
+  const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false, capaUI: false, dtViejo: false, esfVersion: -1, esfT: -1, panelOculto: false }); // Z5…Z18
   const ui = useRef({
     pagina: 0, paginas: [[""]] as string[][], indice: 0,
     hover: null as string | null, sobre: null as "historia" | "galeria" | "ficha" | null,
@@ -405,7 +445,11 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     A.t = objetivo > A.t ? Math.min(1, A.t + paso) : Math.max(0, A.t - paso);
     if (A.t <= 0) {
       if (g.visible) g.visible = false;
-      if (A.capaUI) { A.capaUI = false; ponerEnCapaUI(g, false); } // Z17
+      if (A.capaUI) { A.capaUI = false; ponerEnCapaUI(g, false); if (domoRef.current) ponerEnCapaUI(domoRef.current, false); } // Z17
+      // Z18: domo esférico oculto y panel real visible otra vez (vuelve a su órbita)
+      if (domoRef.current && domoRef.current.visible) domoRef.current.visible = false;
+      if (A.panelOculto) { A.panelOculto = false; if (ACERC.panel?.mesh) ACERC.panel.mesh.visible = true; }
+      A.esfT = -1;
       LINTERNA_STATE.retener = false;
       if (INTERACT_STATE.panelBloqueo) INTERACT_STATE.panelBloqueo = false; // Z5
       return;
@@ -471,7 +515,11 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     // Z17: capa de interfaz = pase propio (capa CAPA_UI) con depth limpio; depthTest normal.
     // El modo de Z16 (depthTest off en la escena) queda solo detrás de DOMO_CAPA_DEPTHTEST_VIEJO.
     const capaUI = domo && D.DOMO_CAPA_UI && RETRO_FLAGS.enabled;
-    if (capaUI !== A.capaUI) { A.capaUI = capaUI; ponerEnCapaUI(g, capaUI); if (capaUI) CAPA_UI_ESTADO.activa = true; }
+    if (capaUI !== A.capaUI) {
+      A.capaUI = capaUI; ponerEnCapaUI(g, capaUI);
+      if (domoRef.current) ponerEnCapaUI(domoRef.current, capaUI);  // Z18
+      if (capaUI) CAPA_UI_ESTADO.activa = true;
+    }
     const dtViejo = domo && D.DOMO_CAPA_DEPTHTEST_VIEJO;
     if (dtViejo !== A.dtViejo) { A.dtViejo = dtViejo; _depthTestDe = !dtViejo; g.traverse(fijarDepthTest); }
     const s = Math.max(0.001, e);
@@ -583,6 +631,71 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       if (M !== "todo" && M !== "sin_orbita") { if (li) li.visible = false; if (ld) ld.visible = false; if (lb) lb.visible = false; }
     }
 
+    // ── Z18: domo ESFÉRICO — parches de esfera de radio R alrededor del ojo, en el marco capturado ──
+    const esferico = concavo && domo && D.SUB_DOMO_ESFERICO && !!ACERC.layout.esferico;
+    const dg = domoRef.current;
+    if (dg) dg.visible = esferico;
+    if (esferico && dg) {
+      const L = ACERC.layout, R = L.d;
+      dg.position.copy(ACERC.camPos0); dg.quaternion.copy(ACERC.qF);
+      // los planos de Z4/Z16 no se dibujan; el panel real se oculta mientras está su parche
+      if (hist) hist.visible = false;
+      if (gal) gal.visible = false;
+      if (fic) fic.visible = false;
+      if (li) li.visible = false;
+      if (ld) ld.visible = false;
+      if (lb) lb.visible = false;
+      const pmReal = ACERC.panel?.mesh as THREE.Mesh | undefined;
+      if (pmReal) { pmReal.visible = false; A.panelOculto = true; }
+      // material del panel: el mismo ShaderMaterial del panel real (uLit, uReveal, haces…)
+      const pPm = pPanel.current;
+      if (pPm && pmReal && pPm.material !== pmReal.material) pPm.material = pmReal.material;
+      // aislar (debug)
+      const M = DBG_AISLAR_UI.MODO;
+      const todos = M === "todo" || M === "sin_marco" || M === "sin_orbita";
+      if (pPm) pPm.visible = todos || M === "panel";
+      if (pHist.current) pHist.current.visible = todos || M === "historia";
+      if (pGal.current)  pGal.current.visible  = todos || M === "galeria";
+      if (pPant.current) pPant.current.visible = todos || M === "galeria";
+      if (pFic.current)  pFic.current.visible  = todos || M === "ficha";
+      const verLineas = (M === "todo" || M === "sin_orbita") && la > 0.01;
+      if (pLinL.current) pLinL.current.visible = verLineas;
+      if (pLinR.current) pLinR.current.visible = verLineas;
+      if (pLinB.current) pLinB.current.visible = verLineas;
+      // geometría: solo mientras anima o si cambió el layout (resize)
+      if (A.esfT !== e || A.esfVersion !== ACERC.layoutVersion) {
+        A.esfT = e; A.esfVersion = ACERC.layoutVersion;
+        const pY = L.pYaw ?? 0, pP = L.pPitch ?? 0, pA = L.pAncho ?? 0.8, pH = L.pAlto ?? 0.5;
+        // panel: del plano tangente (igual al panel real que llegó) a la esfera
+        ponerParche(geos.panel, pY, pP, pA, pH, R, e, false);
+        // laterales y FICHA: salen del panel (yaw/pitch/ancho/alto animados desde su centro)
+        const k0 = 0.12;                                           // tamaño inicial relativo
+        const lY = L.lYaw ?? 0, lP = L.lPitch ?? 0, lA = L.lAncho ?? 0.5, lH = L.lAlto ?? 0.6;
+        const ka = k0 + (1 - k0) * e;
+        ponerParche(geos.hist, pY + (-lY - pY) * e, pP + (lP - pP) * e, lA * ka, lH * ka, R, 1, false);
+        ponerParche(geos.gal,  pY + ( lY - pY) * e, pP + (lP - pP) * e, lA * ka, lH * ka, R, 1, false);
+        // pantalla CRT de GALERÍA: sub-parche (rect. GALERIA_PANTALLA) apenas delante
+        {
+          const gy = pY + (lY - pY) * e, gp = pP + (lP - pP) * e, ga = lA * ka, gh2 = lH * ka;
+          const ux = (GALERIA_PANTALLA.x + GALERIA_PANTALLA.w / 2) / GALERIA_SIZE.w - 0.5;
+          const vy = 0.5 - (GALERIA_PANTALLA.y + GALERIA_PANTALLA.h / 2) / GALERIA_SIZE.h;
+          ponerParche(geos.pant, gy + ux * ga, gp + vy * gh2, ga * GALERIA_PANTALLA.w / GALERIA_SIZE.w, gh2 * GALERIA_PANTALLA.h / GALERIA_SIZE.h, R - 0.006, 1, false);
+        }
+        const fY = L.fYaw ?? 0, fP = L.fPitch ?? 0, fA = L.fAncho ?? 0.7, fH = L.fAlto ?? 0.35;
+        ponerParche(geos.fic, pY + (fY - pY) * e, pP + (fP - pP) * e, fA * ka, fH * ka, R, 1, false);
+        // líneas guía: arcos sobre la esfera entre bordes (un poco delante)
+        const gr = Math.max(0.05, D.ESF_LINEA_GROSOR_DEG) * Math.PI / 180, sep = L.sep ?? 0.05;
+        ponerParche(geos.linL, pY - pA / 2 - sep / 2, pP, sep, gr, R - 0.01, 1, false);
+        ponerParche(geos.linR, pY + pA / 2 + sep / 2, pP, sep, gr, R - 0.01, 1, false);
+        ponerParche(geos.linB, pY, pP - pH / 2 - sep / 2, gr, sep, R - 0.01, 1, true);
+        if (lm) lm.uniforms.uLen.value = Math.max(0.05, R * sep);
+      }
+      if (lm) lm.uniforms.uAlpha.value = la;
+    } else if (A.panelOculto && ACERC.panel?.mesh) {
+      // se apagó el modo esférico con el panel abierto: el panel real vuelve a verse
+      A.panelOculto = false; ACERC.panel.mesh.visible = true;
+    }
+
     // pantalla CRT
     const pm = pantMatRef.current;
     if (pm) { pm.uniforms.uAmbar.value = D.GALERIA_AMBAR; pm.uniforms.uScan.value = D.GALERIA_SCAN; pm.uniforms.uCurva.value = D.GALERIA_CURVA; }
@@ -598,6 +711,45 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     let dentroAlgo = false;
     let tMin = 1e9;                                   // Z14: distancia al primer impacto (retícula)
     const pad = Math.max(0, D.SUB_RETENER_PAD_M);
+    // Z18: con el domo esférico, una sola intersección rayo–esfera y la inversa del mapeo de cada parche
+    if (esferico) {
+      const L = ACERC.layout, R = L.d;
+      _qfi.copy(ACERC.qF).invert();
+      _eo.copy(_v.cam).sub(ACERC.camPos0).applyQuaternion(_qfi);   // ojo actual en el marco
+      _ed.copy(_v.fwd).applyQuaternion(_qfi);
+      const b = _eo.dot(_ed), c = _eo.lengthSq() - R * R, disc = b * b - c;
+      if (disc >= 0) {
+        const tS = -b + Math.sqrt(disc);
+        if (tS > 0) {
+          const hx = _eo.x + _ed.x * tS, hy = _eo.y + _ed.y * tS, hz = _eo.z + _ed.z * tS;
+          const yawH = Math.atan2(hx, -hz), pitchH = Math.asin(THREE.MathUtils.clamp(hy / R, -1, 1));
+          const mAng = pad / R;
+          // HISTORIA (−lYaw), GALERÍA (+lYaw), FICHA y panel
+          _box.pitch = L.lPitch ?? 0; _box.ancho = L.lAncho ?? 0; _box.alto = L.lAlto ?? 0;
+          _box.yaw = -(L.lYaw ?? 0);
+          if (uvDeParche(yawH, pitchH, _box, mAng / Math.max(1e-3, _box.ancho))) {
+            dentroAlgo = true; tMin = tS;
+            if (listo && UV_PARCHE.u >= 0 && UV_PARCHE.u <= 1 && UV_PARCHE.v >= 0 && UV_PARCHE.v <= 1) {
+              sobre = "historia"; _hit.cx = UV_PARCHE.u * HISTORIA_SIZE.w; _hit.cy = UV_PARCHE.v * HISTORIA_SIZE.h;
+            }
+          }
+          _box.yaw = L.lYaw ?? 0;
+          if (!sobre && uvDeParche(yawH, pitchH, _box, mAng / Math.max(1e-3, _box.ancho))) {
+            dentroAlgo = true; tMin = tS;
+            if (listo && UV_PARCHE.u >= 0 && UV_PARCHE.u <= 1 && UV_PARCHE.v >= 0 && UV_PARCHE.v <= 1) {
+              sobre = "galeria"; _hit.cx = UV_PARCHE.u * GALERIA_SIZE.w; _hit.cy = UV_PARCHE.v * GALERIA_SIZE.h;
+            }
+          }
+          _box.yaw = L.fYaw ?? 0; _box.pitch = L.fPitch ?? 0; _box.ancho = L.fAncho ?? 0; _box.alto = L.fAlto ?? 0;
+          if (!sobre && uvDeParche(yawH, pitchH, _box, mAng / Math.max(1e-3, _box.ancho))) {
+            dentroAlgo = true; tMin = tS;
+            if (listo && UV_PARCHE.u >= 0 && UV_PARCHE.u <= 1 && UV_PARCHE.v >= 0 && UV_PARCHE.v <= 1) sobre = "ficha";
+          }
+          _box.yaw = L.pYaw ?? 0; _box.pitch = L.pPitch ?? 0; _box.ancho = L.pAncho ?? 0; _box.alto = L.pAlto ?? 0;
+          if (uvDeParche(yawH, pitchH, _box, mAng / Math.max(1e-3, _box.ancho))) { dentroAlgo = true; tMin = Math.min(tMin, tS); }
+        }
+      }
+    } else
     // subpaneles: planos unitarios escalados → UV directo (con margen `pad` solo para retener)
     if (rayoUV(hist, 1, 1, _v.cam, _v.fwd, _hit, pad / Math.max(0.001, hw))) {
       dentroAlgo = true; if (_hit.dentro) tMin = Math.min(tMin, _hit.t);
@@ -683,14 +835,15 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
   });
 
   return (
+    <>
     <group ref={groupRef} visible={false}>
       <mesh ref={historiaRef} renderOrder={RO + 1}>
         <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial ref={histMatRef} map={vacia} toneMapped={false} fog={false} />
+        <meshBasicMaterial ref={histMatRef} map={vacia} toneMapped={false} fog={false} side={THREE.DoubleSide} />
       </mesh>
       <mesh ref={galeriaRef} renderOrder={RO + 1}>
         <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial ref={galMatRef} map={vacia} toneMapped={false} fog={false} />
+        <meshBasicMaterial ref={galMatRef} map={vacia} toneMapped={false} fog={false} side={THREE.DoubleSide} />
         {/* pantalla CRT: hija del marco, en coordenadas normalizadas del canvas */}
         <mesh
           renderOrder={RO + 2}
@@ -702,17 +855,17 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
           scale={[GALERIA_PANTALLA.w / GALERIA_SIZE.w, GALERIA_PANTALLA.h / GALERIA_SIZE.h, 1]}
         >
           <planeGeometry args={[1, 1]} />
-          <shaderMaterial ref={pantMatRef} uniforms={uniformsPantalla} vertexShader={PANTALLA_VERT} fragmentShader={PANTALLA_FRAG} />
+          <shaderMaterial ref={pantMatRef} uniforms={uniformsPantalla} vertexShader={PANTALLA_VERT} fragmentShader={PANTALLA_FRAG} side={THREE.DoubleSide} />
         </mesh>
       </mesh>
       <mesh ref={fichaRef} renderOrder={RO + 1}>
         <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial ref={fichaMatRef} map={vacia} toneMapped={false} fog={false} />
+        <meshBasicMaterial ref={fichaMatRef} map={vacia} toneMapped={false} fog={false} side={THREE.DoubleSide} />
       </mesh>
       {/* líneas guía: un material compartido */}
       <mesh ref={lineaIzq} renderOrder={RO + 3}>
         <planeGeometry args={[1, 1]} />
-        <shaderMaterial ref={lineaMatRef} uniforms={uniformsLinea} vertexShader={PANTALLA_VERT} fragmentShader={LINEA_FRAG} transparent depthWrite={false} />
+        <shaderMaterial ref={lineaMatRef} uniforms={uniformsLinea} vertexShader={PANTALLA_VERT} fragmentShader={LINEA_FRAG} transparent depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
       <mesh ref={lineaDer} renderOrder={RO + 3}>
         <planeGeometry args={[1, 1]} />
@@ -723,10 +876,24 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
         <shaderMaterial uniforms={uniformsLinea} vertexShader={PANTALLA_VERT} fragmentShader={LINEA_FRAG} transparent depthWrite={false} />
       </mesh>
       {/* puntero: aro claro donde apunta la mirada (mockup: círculo sobre SIG ▶) */}
-      <mesh ref={punteroRef} renderOrder={RO + 5} visible={false}>
+      <mesh ref={punteroRef} renderOrder={RO + 9} visible={false}> {/* Z18: único (era RO + 5) */}
         <ringGeometry args={[0.18, 0.24, 32]} />
         <meshBasicMaterial color="#FFF3DC" transparent opacity={0.85} depthWrite={false} toneMapped={false} fog={false} />
       </mesh>
     </group>
+    {/* Z18: domo esférico — parches de esfera en el marco capturado (grupo en el ojo, renderOrder 0).
+        Comparten materiales con los planos (dispose={null}: los libera su dueño). renderOrder únicos y
+        crecientes: panel < HISTORIA < GALERÍA < pantalla < FICHA < líneas (< marco SEL < retícula). */}
+    <group ref={domoRef} visible={false}>
+      <mesh ref={pPanel} geometry={geos.panel} renderOrder={RO + 0} frustumCulled={false} dispose={null} />
+      <mesh ref={pHist}  geometry={geos.hist}  renderOrder={RO + 1} frustumCulled={false} dispose={null} />
+      <mesh ref={pGal}   geometry={geos.gal}   renderOrder={RO + 2} frustumCulled={false} dispose={null} />
+      <mesh ref={pPant}  geometry={geos.pant}  renderOrder={RO + 3} frustumCulled={false} dispose={null} />
+      <mesh ref={pFic}   geometry={geos.fic}   renderOrder={RO + 4} frustumCulled={false} dispose={null} />
+      <mesh ref={pLinL}  geometry={geos.linL}  renderOrder={RO + 5} frustumCulled={false} dispose={null} />
+      <mesh ref={pLinR}  geometry={geos.linR}  renderOrder={RO + 5} frustumCulled={false} dispose={null} />
+      <mesh ref={pLinB}  geometry={geos.linB}  renderOrder={RO + 5} frustumCulled={false} dispose={null} />
+    </group>
+    </>
   );
 }

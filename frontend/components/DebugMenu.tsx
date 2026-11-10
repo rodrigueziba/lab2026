@@ -363,7 +363,9 @@ export default function DebugMenu() {
       }
       { // Z8
         const L = ACERC.layout;
-        const conc = L.domo ? ` · domo R ${L.d.toFixed(1)} m · laterales ${(L.latDeg ?? 0).toFixed(1)}° a ±${((L.yaw ?? 0) * 180 / Math.PI).toFixed(1)}° (borde ${((L.yawExt ?? 0) * 180 / Math.PI).toFixed(1)}°)${L.lateralesEntran === false ? " ✗ laterales no entran" : ""}`
+        const D2 = 180 / Math.PI;
+        const esf = L.esferico ? ` · esférico: panel ${((L.pAncho ?? 0) * D2).toFixed(1)}×${((L.pAlto ?? 0) * D2).toFixed(1)}° a ${((L.pPitch ?? 0) * D2).toFixed(1)}° · laterales ${((L.lAncho ?? 0) * D2).toFixed(1)}° a ±${((L.lYaw ?? 0) * D2).toFixed(1)}° (borde ${((L.yawExt ?? 0) * D2).toFixed(1)}°) · FICHA a ${((L.fPitch ?? 0) * D2).toFixed(1)}°${L.entra ? "" : " ✗ no entra"}` : "";
+        const conc = L.esferico ? esf : L.domo ? ` · domo R ${L.d.toFixed(1)} m · laterales ${(L.latDeg ?? 0).toFixed(1)}° a ±${((L.yaw ?? 0) * 180 / Math.PI).toFixed(1)}° (borde ${((L.yawExt ?? 0) * 180 / Math.PI).toFixed(1)}°)${L.lateralesEntran === false ? " ✗ laterales no entran" : ""}`
           : L.concavo ? ` · cóncavo yaw ${((L.yaw ?? 0) * 180 / Math.PI).toFixed(0)}° (borde ${((L.yawExt ?? 0) * 180 / Math.PI).toFixed(0)}°) · FICHA ${((L.pitch ?? 0) * 180 / Math.PI).toFixed(0)}°` : "";
         const txt = `${ACERC.fase}${conc}${ACERC.fase === "abierto" ? (ACERC.miraDentro ? " · mira dentro" : ` · fuera ${ACERC.tFuera ? Math.round(performance.now() - ACERC.tFuera) : 0} ms`) : ""}${ACERC.panel ? ` · panel ${ACERC.panel.indice} · d ${ACERC.distancia.toFixed(2)} m · sube ${L.up.toFixed(2)} m${L.alejado ? " · alejado" : ""}${L.entra ? "" : " · ✗ no entra"}` : ""} · subpaneles ${(ACERC.escalaSub * 100).toFixed(0)} %`;
         setAcercLive(prev => (prev === txt ? prev : txt));
@@ -1208,6 +1210,48 @@ export default function DebugMenu() {
               setSubp(x => ({ ...x, DOMO_CAPA_UI: v }));
             }}>{subp.DOMO_CAPA_UI ? "ON" : "off"}</button>
           </div>
+          <div style={ROW}>
+            <span>SUB_DOMO_ESFERICO <span style={NOTE}>Z18 off = planos Z16</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.SUB_DOMO_ESFERICO;
+              DBG_SUBPANELES.SUB_DOMO_ESFERICO = v;
+              setSubp(x => ({ ...x, SUB_DOMO_ESFERICO: v }));
+            }}>{subp.SUB_DOMO_ESFERICO ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>ESF_PANEL_CONSERVAR_Z8 <span style={NOTE}>Z18 tamaño en pantalla de Z8</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.ESF_PANEL_CONSERVAR_Z8;
+              DBG_SUBPANELES.ESF_PANEL_CONSERVAR_Z8 = v;
+              setSubp(x => ({ ...x, ESF_PANEL_CONSERVAR_Z8: v }));
+            }}>{subp.ESF_PANEL_CONSERVAR_Z8 ? "ON" : "off"}</button>
+          </div>
+          <NumField label="ESF_PANEL_ANCHO_DEG" value={subp.ESF_PANEL_ANCHO_DEG} step={1} min={10} max={90} note="Z18 si no conserva"
+            onChange={v => { DBG_SUBPANELES.ESF_PANEL_ANCHO_DEG = v; setSubp(x => ({ ...x, ESF_PANEL_ANCHO_DEG: v })); }} />
+          <NumField label="ESF_PANEL_ALTO_DEG" value={subp.ESF_PANEL_ALTO_DEG} step={1} min={10} max={70} note="Z18 si no conserva"
+            onChange={v => { DBG_SUBPANELES.ESF_PANEL_ALTO_DEG = v; setSubp(x => ({ ...x, ESF_PANEL_ALTO_DEG: v })); }} />
+          <NumField label="ESF_PANEL_PITCH_DEG" value={subp.ESF_PANEL_PITCH_DEG} step={0.5} min={-30} max={30} note="Z18 panel y laterales"
+            onChange={v => { DBG_SUBPANELES.ESF_PANEL_PITCH_DEG = v; setSubp(x => ({ ...x, ESF_PANEL_PITCH_DEG: v })); }} />
+          <NumField label="ESF_LAT_ANCHO_DEG" value={subp.ESF_LAT_ANCHO_DEG} step={1} min={10} max={60} note="Z18 HISTORIA/GALERÍA"
+            onChange={v => { DBG_SUBPANELES.ESF_LAT_ANCHO_DEG = v; setSubp(x => ({ ...x, ESF_LAT_ANCHO_DEG: v })); }} />
+          <NumField label="ESF_LAT_ALTO_DEG" value={subp.ESF_LAT_ALTO_DEG} step={1} min={10} max={70} note="Z18"
+            onChange={v => { DBG_SUBPANELES.ESF_LAT_ALTO_DEG = v; setSubp(x => ({ ...x, ESF_LAT_ALTO_DEG: v })); }} />
+          <NumField label="ESF_LAT_YAW_DEG" value={subp.ESF_LAT_YAW_DEG} step={1} min={10} max={80} note="Z18 mínimo"
+            onChange={v => { DBG_SUBPANELES.ESF_LAT_YAW_DEG = v; setSubp(x => ({ ...x, ESF_LAT_YAW_DEG: v })); }} />
+          <NumField label="ESF_FICHA_ANCHO_DEG" value={subp.ESF_FICHA_ANCHO_DEG} step={1} min={10} max={90} note="Z18"
+            onChange={v => { DBG_SUBPANELES.ESF_FICHA_ANCHO_DEG = v; setSubp(x => ({ ...x, ESF_FICHA_ANCHO_DEG: v })); }} />
+          <NumField label="ESF_FICHA_ALTO_DEG" value={subp.ESF_FICHA_ALTO_DEG} step={1} min={5} max={60} note="Z18"
+            onChange={v => { DBG_SUBPANELES.ESF_FICHA_ALTO_DEG = v; setSubp(x => ({ ...x, ESF_FICHA_ALTO_DEG: v })); }} />
+          <NumField label="ESF_SEP_DEG" value={subp.ESF_SEP_DEG} step={0.5} min={0} max={15} note="Z18 entre bordes"
+            onChange={v => { DBG_SUBPANELES.ESF_SEP_DEG = v; setSubp(x => ({ ...x, ESF_SEP_DEG: v })); }} />
+          <NumField label="ESF_YAW_MAX_DEG" value={subp.ESF_YAW_MAX_DEG} step={1} min={20} max={90} note="Z18 borde exterior"
+            onChange={v => { DBG_SUBPANELES.ESF_YAW_MAX_DEG = v; setSubp(x => ({ ...x, ESF_YAW_MAX_DEG: v })); }} />
+          <NumField label="ESF_SEG_U" value={subp.ESF_SEG_U} step={1} min={2} max={96} note="Z18 recargar"
+            onChange={v => { DBG_SUBPANELES.ESF_SEG_U = v; setSubp(x => ({ ...x, ESF_SEG_U: v })); }} />
+          <NumField label="ESF_SEG_V" value={subp.ESF_SEG_V} step={1} min={2} max={96} note="Z18 recargar"
+            onChange={v => { DBG_SUBPANELES.ESF_SEG_V = v; setSubp(x => ({ ...x, ESF_SEG_V: v })); }} />
+          <NumField label="ESF_LINEA_GROSOR_DEG" value={subp.ESF_LINEA_GROSOR_DEG} step={0.1} min={0.1} max={5} note="Z18 líneas"
+            onChange={v => { DBG_SUBPANELES.ESF_LINEA_GROSOR_DEG = v; setSubp(x => ({ ...x, ESF_LINEA_GROSOR_DEG: v })); }} />
           <div style={ROW}>
             <span>DOMO_CAPA_DEPTHTEST_VIEJO <span style={NOTE}>Z17 modo Z16 (con cortes), comparar</span></span>
             <button style={INPUT} onClick={() => {

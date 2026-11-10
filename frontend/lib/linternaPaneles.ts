@@ -7,7 +7,7 @@
 
 import * as THREE from "three";
 import { DBG_LINTERNA, DBG_ORBITAS, DBG_ACERC, DBG_SUBPANELES, DBG_PRIORIDAD, DBG_LOG_PANEL, DBG_AISLAR_UI } from "@/lib/debugConfig";
-import { calcularLayoutBloque, calcularLayoutConcavo, calcularLayoutDomo, type LayoutBloque } from "@/lib/subpanelLayout";
+import { calcularLayoutBloque, calcularLayoutConcavo, calcularLayoutDomo, calcularLayoutEsferico, type LayoutBloque } from "@/lib/subpanelLayout";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CAPA_UI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
@@ -101,6 +101,7 @@ export const ACERC = {
   fF: new THREE.Vector3(0, 0, -1), uF: new THREE.Vector3(0, 1, 0), rF: new THREE.Vector3(1, 0, 0),
   qF: new THREE.Quaternion(), qPanelW: new THREE.Quaternion(),
   escalaDesde: 1, escalaHasta: 1,
+  layoutVersion: 0,                                                  // Z18
   depthTestPrevio: true,
 };
 
@@ -115,8 +116,12 @@ function calcularDestino(camera: THREE.Camera): void {
   ACERC.aspect = aspect;
   if (DBG_SUBPANELES.SUB_AJUSTE_BLOQUE && ACERC.conSubpaneles) { // Z12: prestadores sin bloque
     const curva = RETRO_FLAGS.enabled ? (CRT_UNIFORMS.uCurve.value as number) : 0;
-    if (DBG_SUBPANELES.SUB_CONCAVO && DBG_SUBPANELES.SUB_DOMO_CERCANO)  // Z16: domo cercano
+    if (DBG_SUBPANELES.SUB_CONCAVO && DBG_SUBPANELES.SUB_DOMO_CERCANO && DBG_SUBPANELES.SUB_DOMO_ESFERICO) { // Z18
+      calcularLayoutEsferico(ACERC.ancho, ACERC.alto, fov, aspect, curva, ACERC.layout);
+    } else if (DBG_SUBPANELES.SUB_CONCAVO && DBG_SUBPANELES.SUB_DOMO_CERCANO) { // Z16: domo cercano
+      ACERC.layout.esferico = false;
       calcularLayoutDomo(ACERC.ancho, ACERC.alto, fov, aspect, curva, ACERC.layout);
+    }
     else if (DBG_SUBPANELES.SUB_CONCAVO)  // Z14: conjunto cóncavo alrededor del ojo
       calcularLayoutConcavo(ACERC.ancho, ACERC.alto, fov, aspect, curva, Math.asin(THREE.MathUtils.clamp(ACERC.fwd0.y, -1, 1)), ACERC.layout);
     else
@@ -125,12 +130,13 @@ function calcularDestino(camera: THREE.Camera): void {
     // Z8: panel centrado en la mira, sin desplazamiento (el ajuste lo hace Z4)
     ACERC.layout.d = distanciaAcercamiento(camera, ACERC.ancho, ACERC.alto);
     ACERC.layout.up = 0; ACERC.layout.k = 1; ACERC.layout.alejado = false; ACERC.layout.entra = true;
-    ACERC.layout.concavo = false; ACERC.layout.domo = false; // Z14 / Z16
+    ACERC.layout.concavo = false; ACERC.layout.domo = false; ACERC.layout.esferico = false; // Z14 / Z16 / Z18
     // Z10: sin el cálculo de bloque se toma todo el viewport como zona del conjunto
     const t = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
     ACERC.layout.medioAlto = ACERC.layout.d * t; ACERC.layout.medioAncho = ACERC.layout.medioAlto * aspect;
   }
   ACERC.distancia = ACERC.layout.d;
+  ACERC.layoutVersion++; // Z18: los parches se reconstruyen si cambia (resize)
   parent.updateWorldMatrix(true, false);
   if (ACERC.layout.domo) {
     // Z16: panel a DOMO_RADIO_M sobre el marco rígido, subido `elevPanel` (giro sobre RIGHT del marco),
@@ -138,7 +144,9 @@ function calcularDestino(camera: THREE.Camera): void {
     const ep = ACERC.layout.elevPanel ?? 0;
     _aQ.setFromAxisAngle(ACERC.rF, ep);
     _aW.copy(ACERC.fF).applyQuaternion(_aQ).multiplyScalar(ACERC.layout.d).add(ACERC.camPos0);
-    ACERC.qPanelW.copy(ACERC.qF);                       // vertical en el marco (arriba = UP): sin keystone
+    // vertical en el marco (Z16); Z18: perpendicular a su dirección (tangente a la esfera en el centro)
+    if (ACERC.layout.esferico) ACERC.qPanelW.copy(_aQ).multiply(ACERC.qF);
+    else ACERC.qPanelW.copy(ACERC.qF);
     parent.getWorldQuaternion(_aPQ);
     ACERC.toQuat.copy(_aPQ).invert().multiply(ACERC.qPanelW);
     ACERC.escalaHasta = ACERC.layout.panelEscala ?? 1;

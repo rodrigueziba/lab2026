@@ -105,7 +105,7 @@ export default function PanelSelMarco({ ancho, alto }: { ancho: number; alto: nu
   });
 
   return (
-    <mesh ref={meshRef} visible={false} renderOrder={DBG_PRIORIDAD.RENDER_ORDER_BLOQUE + 4} frustumCulled={false}> {/* Z10 (era 10) */}
+    <mesh ref={meshRef} visible={false} renderOrder={DBG_PRIORIDAD.RENDER_ORDER_BLOQUE + 8} frustumCulled={false}> {/* Z10 (era 10) */}
       <planeGeometry args={[1, 1]} />
       <shaderMaterial
         ref={matRef}

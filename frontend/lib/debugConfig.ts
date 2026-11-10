@@ -178,6 +178,22 @@ export const DBG_SUBPANELES = {
   DOMO_PITCH_MAX_DEG: 25,    // límite del pitch del marco capturado (evita piso/techo)
   DOMO_CAPA_UI:      true,   // Z17: el conjunto se dibuja en un pase propio (capa UI) antes del bloom/CRT, depth limpio
   DOMO_CAPA_DEPTHTEST_VIEJO: false, // Z16 (con bug): depthTest off en la escena; solo para comparar
+  // Z18: domo ESFÉRICO — cada elemento es un parche de esfera de radio DOMO_RADIO_M
+  SUB_DOMO_ESFERICO: true,   // false = planos del domo cercano de Z16
+  ESF_PANEL_CONSERVAR_Z8: true, // true = el panel conserva su tamaño en pantalla de Z8 (ACERC_PANTALLA)
+  ESF_PANEL_ANCHO_DEG: 40,   // tamaño del panel si no se conserva el de Z8
+  ESF_PANEL_ALTO_DEG:  28,
+  ESF_PANEL_PITCH_DEG: 2,    // pitch del panel (y de los laterales) en el marco
+  ESF_LAT_ANCHO_DEG:   30,   // HISTORIA / GALERÍA
+  ESF_LAT_ALTO_DEG:    36,
+  ESF_LAT_YAW_DEG:     38,   // yaw mínimo de los laterales (se agranda si se superponen)
+  ESF_FICHA_ANCHO_DEG: 44,
+  ESF_FICHA_ALTO_DEG:  20,
+  ESF_SEP_DEG:         3,    // separación entre bordes
+  ESF_YAW_MAX_DEG:     53,   // borde exterior de los laterales
+  ESF_SEG_U:           24,   // subdivisiones horizontales del parche
+  ESF_SEG_V:           16,   // subdivisiones verticales
+  ESF_LINEA_GROSOR_DEG: 0.6, // grosor angular de las líneas guía
   SUB_RETENER_PAD_M: 0.25,   // Z5 (era 1.0 sobre el conjunto): margen alrededor de cada subpanel y del panel
   SUB_LINEAS:        true,   // líneas guía punteadas ámbar hacia el panel
   SUB_PUNTERO:       true,   // Z5: retícula clara en el centro de pantalla con el panel abierto

@@ -33,6 +33,12 @@ export interface LayoutBloque {
   fichaW?: number; fichaH?: number; // tamaño de FICHA (m)
   latDeg?: number;      // ancho angular efectivo de los laterales (°)
   lateralesEntran?: boolean;        // false = ni con DOMO_LAT_MIN_DEG entran (no se achica el panel)
+  // Z18: domo esférico (todo en rad, en el marco capturado)
+  esferico?: boolean;
+  pYaw?: number; pPitch?: number; pAncho?: number; pAlto?: number;      // panel
+  lYaw?: number; lPitch?: number; lAncho?: number; lAlto?: number;      // HISTORIA (−lYaw) / GALERÍA (+lYaw)
+  fYaw?: number; fPitch?: number; fAncho?: number; fAlto?: number;      // FICHA
+  sep?: number;
 }
 
 // tamaño de cada subpanel en px del mockup (canvas = × 2)
@@ -98,7 +104,7 @@ export function calcularLayoutBloque(
   }
   out.k = k; out.d = d; out.up = up; out.alejado = alejado; out.entra = entra;
   out.medioAncho = medioAncho; out.medioAlto = medioAlto;
-  out.concavo = false; // Z14
+  out.concavo = false; out.esferico = false; // Z14 / Z18
   return out;
 }
 
@@ -163,7 +169,7 @@ export function calcularLayoutConcavo(
   }
   out.k = k; out.d = d; out.up = d * Math.tan(ep); out.alejado = alejado; out.entra = entra;
   out.medioAncho = px; out.medioAlto = py;
-  out.concavo = true; out.dLat = R; out.yaw = yaw; out.pitch = pitch;
+  out.concavo = true; out.esferico = false; out.dLat = R; out.yaw = yaw; out.pitch = pitch;
   out.yawExt = yaw + aLH; out.angTop = topAll; out.angBot = bot;
   return out;
 }
@@ -255,7 +261,7 @@ export function calcularLayoutDomo(
     latDeg = Math.max(latMin, latDeg - 0.5);
   }
   const aLV = Math.atan(lh / 2 / R);
-  out.domo = true; out.concavo = true;
+  out.domo = true; out.concavo = true; out.esferico = false;
   out.k = latDeg / Math.max(1e-3, S.DOMO_LAT_DEG);   // escala relativa (solo debug)
   out.d = R; out.dLat = R; out.up = 0; out.alejado = false;
   out.entra = vertOk && ok; out.lateralesEntran = ok;
@@ -265,5 +271,87 @@ export function calcularLayoutDomo(
   out.yaw = yaw; out.pitch = pitchF;
   out.yawExt = yaw + latDeg * D2R / 2;
   out.angTop = Math.max(top, ep + aLV); out.angBot = Math.min(bot, ep - aLV);
+  return out;
+}
+
+// ── Z18: domo ESFÉRICO ────────────────────────────────────────────────────────
+/** ¿Se ve (con margen y curvatura CRT) la dirección (yaw, pitch) del marco con la cámara alineada? */
+function dirVisible(yaw: number, pitch: number, t: number, aspect: number, curva: number, lim: number): boolean {
+  const cp = Math.cos(pitch);
+  const x = cp * Math.sin(yaw), y = Math.sin(pitch), z = -cp * Math.cos(yaw);
+  if (z > -1e-3) return false;
+  return visible((x / -z) / (t * aspect), (y / -z) / t, curva, lim);
+}
+/** Borde de un parche (esquinas + puntos medios de cada lado) visible. Sin allocations. */
+function parcheVisible(yc: number, pc: number, w: number, h: number, t: number, aspect: number, curva: number, lim: number): boolean {
+  for (let i = 0; i <= 4; i++) {
+    const fu = i / 4 - 0.5;
+    if (!dirVisible(yc + fu * w, pc + h / 2, t, aspect, curva, lim)) return false;
+    if (!dirVisible(yc + fu * w, pc - h / 2, t, aspect, curva, lim)) return false;
+    if (!dirVisible(yc - w / 2, pc + fu * h, t, aspect, curva, lim)) return false;
+    if (!dirVisible(yc + w / 2, pc + fu * h, t, aspect, curva, lim)) return false;
+  }
+  return true;
+}
+
+/**
+ * Z18: layout del domo esférico (parches de esfera de radio DOMO_RADIO_M alrededor del ojo).
+ * Panel: por defecto conserva el tamaño angular de Z8 (ACERC_PANTALLA). Laterales a yaw
+ * ±max(ESF_LAT_YAW, panel/2 + sep + lateral/2); si el borde exterior pasa de ESF_YAW_MAX o no
+ * se ve, se angostan hasta DOMO_LAT_MIN_DEG. FICHA debajo del panel a sep; si no entra en el
+ * encuadre (margen + curvatura CRT), se sube el conjunto (pitch del panel) de a 0,5°.
+ */
+export function calcularLayoutEsferico(
+  w: number, h: number, fovDeg: number, aspect: number, curva: number, out: LayoutBloque,
+): LayoutBloque {
+  const S = DBG_SUBPANELES;
+  const D2R = Math.PI / 180;
+  const t = Math.tan((fovDeg * D2R) / 2);
+  const f = Math.min(1, Math.max(0.05, DBG_ACERC.ACERC_PANTALLA));
+  const dZ8 = Math.max(h / (2 * f * t), w / (2 * f * t * aspect));
+  const R = Math.max(0.5, S.DOMO_RADIO_M);
+  const lim = 1 - 2 * Math.min(0.3, Math.max(0, S.SUB_MARGEN_SEGURIDAD));
+  const pA = S.ESF_PANEL_CONSERVAR_Z8 ? 2 * Math.atan(w / 2 / dZ8) : S.ESF_PANEL_ANCHO_DEG * D2R;
+  const pH = S.ESF_PANEL_CONSERVAR_Z8 ? 2 * Math.atan(h / 2 / dZ8) : S.ESF_PANEL_ALTO_DEG * D2R;
+  const sep = Math.max(0, S.ESF_SEP_DEG) * D2R;
+  const fA = S.ESF_FICHA_ANCHO_DEG * D2R, fH = S.ESF_FICHA_ALTO_DEG * D2R;
+  const lH = S.ESF_LAT_ALTO_DEG * D2R;
+  const yawMax = Math.abs(S.ESF_YAW_MAX_DEG) * D2R;
+  const lMin = Math.max(5, S.DOMO_LAT_MIN_DEG) * D2R;
+
+  // vertical: panel a ESF_PANEL_PITCH; FICHA debajo; si no entra, se sube (luego se baja si sobra arriba)
+  let pP = S.ESF_PANEL_PITCH_DEG * D2R, pF = 0, vertOk = false;
+  for (let i = 0; i < 120; i++) {
+    pF = pP - (pH / 2 + sep + fH / 2);
+    const okP = parcheVisible(0, pP, pA, pH, t, aspect, curva, lim);
+    const okF = parcheVisible(0, pF, fA, fH, t, aspect, curva, lim);
+    vertOk = okP && okF;
+    if (vertOk) break;
+    pP += okF ? -0.5 * D2R : 0.5 * D2R;            // FICHA cortada → subir; panel cortado → bajar
+  }
+  // laterales
+  let lA = Math.max(lMin, S.ESF_LAT_ANCHO_DEG * D2R), lY = 0, latOk = false;
+  for (let i = 0; i < 200; i++) {
+    lY = Math.max(S.ESF_LAT_YAW_DEG * D2R, pA / 2 + sep + lA / 2);
+    latOk = lY + lA / 2 <= yawMax
+      && parcheVisible(lY, pP, lA, lH, t, aspect, curva, lim)
+      && parcheVisible(-lY, pP, lA, lH, t, aspect, curva, lim);
+    if (latOk || lA <= lMin) break;
+    lA = Math.max(lMin, lA - 0.25 * D2R);
+  }
+  out.esferico = true; out.domo = true; out.concavo = true;
+  out.pYaw = 0; out.pPitch = pP; out.pAncho = pA; out.pAlto = pH;
+  out.lYaw = lY; out.lPitch = pP; out.lAncho = lA; out.lAlto = lH;
+  out.fYaw = 0; out.fPitch = pF; out.fAncho = fA; out.fAlto = fH;
+  out.sep = sep;
+  // campos que usan linterna / cierre / Z10 / debug
+  out.d = R; out.dLat = R; out.up = 0; out.alejado = false; out.k = lA / (S.ESF_LAT_ANCHO_DEG * D2R);
+  out.entra = vertOk && latOk; out.lateralesEntran = latOk;
+  out.elevPanel = pP; out.panelEscala = S.ESF_PANEL_CONSERVAR_Z8 ? R / dZ8 : (R * Math.tan(pA / 2)) / (w / 2);
+  out.medioAncho = R * Math.tan(pA / 2); out.medioAlto = R * Math.tan(pH / 2);
+  out.yaw = lY; out.pitch = pF; out.latDeg = lA / D2R;
+  out.yawExt = lY + lA / 2;
+  out.angTop = Math.max(pP + pH / 2, pP + lH / 2);
+  out.angBot = Math.min(pF - fH / 2, pP - lH / 2);
   return out;
 }
