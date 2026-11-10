@@ -36,7 +36,7 @@ import {
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { LINTERNA_STATE, ORBITAS_INFO, ACERC } from "@/lib/linternaPaneles";
-import { FOCO, FOCO_PASO } from "@/lib/focoSubpanel";
+import { FOCO, FOCO_PASO, FOCO_COBERTURA } from "@/lib/focoSubpanel";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { setVizVolume, restartVizAudio, BAND_STATE, BAND_U2_DEBUG, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
@@ -366,7 +366,7 @@ export default function DebugMenu() {
         setLinternaLive(prev => (prev === txt ? prev : txt));
       }
       { // Z19
-        const txt = `${FOCO.fase}${FOCO.candidato && FOCO.fase === "nada" ? ` · dwell ${Math.round(FOCO_PASO.progreso * 100)}%` : ""}${FOCO.id ? ` · ${FOCO.id} · ${Math.round(FOCO.f * 100)}% · pantalla ${(FOCO.pct * 100).toFixed(0)}% · ${(FOCO.ancho * 180 / Math.PI).toFixed(0)}×${(FOCO.alto * 180 / Math.PI).toFixed(0)}°` : FOCO.candidato ? ` · dwell ${FOCO.candidato}` : ""} · resto ${(FOCO.atenua * 100).toFixed(0)}%`;
+        const txt = `${FOCO.fase}${FOCO.candidato && FOCO.fase === "nada" ? ` · dwell ${Math.round(FOCO_PASO.progreso * 100)}%` : ""}${FOCO.id ? ` · ${FOCO.id} · ${Math.round(FOCO.f * 100)}% · pantalla ${(FOCO_COBERTURA.ancho * 100).toFixed(0)}×${(FOCO_COBERTURA.alto * 100).toFixed(0)}% · ${(FOCO.ancho * 180 / Math.PI).toFixed(0)}×${(FOCO.alto * 180 / Math.PI).toFixed(0)}°` : FOCO.candidato ? ` · dwell ${FOCO.candidato}` : ""} · resto ${(FOCO.atenua * 100).toFixed(0)}%`;
         setFocoLive(prev => (prev === txt ? prev : txt));
       }
       { // Z8
@@ -1379,6 +1379,24 @@ export default function DebugMenu() {
             onChange={v => { DBG_FOCO.FOCO_GRACIA_S = v; setFoco(o => ({ ...o, FOCO_GRACIA_S: v })); }} />
           <NumField label="FOCO_COOLDOWN_S" value={foco.FOCO_COOLDOWN_S} step={0.05} min={0} max={5} note="s entre transiciones"
             onChange={v => { DBG_FOCO.FOCO_COOLDOWN_S = v; setFoco(o => ({ ...o, FOCO_COOLDOWN_S: v })); }} />
+          <NumField label="FOCO_PLANO" value={foco.FOCO_PLANO} step={0.05} min={0} max={1} note="Z21 1 = plano, 0 = esfera"
+            onChange={v => { DBG_FOCO.FOCO_PLANO = v; setFoco(o => ({ ...o, FOCO_PLANO: v })); }} />
+          <div style={ROW}>
+            <span>FOCO_SIN_ROLL <span style={NOTE}>Z21 arriba = cámara</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !foco.FOCO_SIN_ROLL;
+              DBG_FOCO.FOCO_SIN_ROLL = v;
+              setFoco(o => ({ ...o, FOCO_SIN_ROLL: v }));
+            }}>{foco.FOCO_SIN_ROLL ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>FOCO_MODO_Z19 <span style={NOTE}>Z21 foco viejo (abanico)</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !foco.FOCO_MODO_Z19;
+              DBG_FOCO.FOCO_MODO_Z19 = v;
+              setFoco(o => ({ ...o, FOCO_MODO_Z19: v }));
+            }}>{foco.FOCO_MODO_Z19 ? "ON" : "off"}</button>
+          </div>
           <NumField label="FOCO_ENTRADA_MARGEN_DEG" value={foco.FOCO_ENTRADA_MARGEN_DEG} step={0.5} min={0} max={15} note="Z20 ° región de entrada"
             onChange={v => { DBG_FOCO.FOCO_ENTRADA_MARGEN_DEG = v; setFoco(o => ({ ...o, FOCO_ENTRADA_MARGEN_DEG: v })); }} />
           <NumField label="FOCO_PARPADEO_S" value={foco.FOCO_PARPADEO_S} step={0.01} min={0} max={1} note="Z20 s tolerados sin hit"

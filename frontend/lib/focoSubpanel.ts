@@ -9,6 +9,7 @@
 import * as THREE from "three";
 import { DBG_FOCO, DBG_SUBPANELES } from "@/lib/debugConfig";
 import { visible } from "@/lib/subpanelLayout";
+import type { PlanoFoco } from "@/lib/retro/parcheEsferico";
 
 export type FocoId = "historia" | "galeria" | "ficha";
 export type FocoFase = "nada" | "entrando" | "foco" | "saliendo";
@@ -189,4 +190,92 @@ export function pasoFoco(e: EntradaFoco, dt: number): "entrar" | "salir" | "" {
   P.progreso = FOCO.fase === "nada" && FOCO.candidato
     ? (F.FOCO_DWELL_S > 0 ? Math.min(1, P.dwell / F.FOCO_DWELL_S) : 1) : 0;
   return res;
+}
+
+// ── Z21: objetivo del foco como PLANO casi frontal (sin abanico, sin roll) ────
+export const FOCO_PLANO_OBJ: PlanoFoco = { cx: 0, cy: 0, cz: -1, rx: 1, ry: 0, rz: 0, ux: 0, uy: 1, uz: 0, D: 1.6, W: 1, H: 1, plano: 0.85 };
+export const FOCO_COBERTURA = { ancho: 0, alto: 0 };   // fracción real del viewport (debug / reporte)
+const _pc = new THREE.Vector3(), _pu = new THREE.Vector3(), _pr2 = new THREE.Vector3(), _pq = new THREE.Vector3();
+const _cob = { x0: 0, x1: 0, y0: 0, y1: 0 };
+/** Proyecta un punto del plano objetivo (coords del plano x, y) con la cámara (base _cR/_cU/_cF). */
+function proyPlano(x: number, y: number, D: number, t: number, aspect: number): boolean {
+  _pq.copy(_pc).multiplyScalar(D).addScaledVector(_pr2, x).addScaledVector(_pu, y);
+  const z = _pq.dot(_cF);
+  if (z <= 1e-3) return false;
+  _pr.x = (_pq.dot(_cR) / z) / (t * aspect); _pr.y = (_pq.dot(_cU) / z) / t; _pr.ok = true;
+  return true;
+}
+function planoEntra(W: number, H: number, D: number, t: number, aspect: number, curva: number, lim: number, frac: number, medir: boolean): boolean {
+  if (medir) { _cob.x0 = 9; _cob.x1 = -9; _cob.y0 = 9; _cob.y1 = -9; }
+  for (let i = 0; i <= 8; i++) {
+    const f = i / 8 - 0.5;
+    for (let s = 0; s < 4; s++) {
+      const x = s < 2 ? f * W : (s === 2 ? -0.5 : 0.5) * W;
+      const y = s < 2 ? (s === 0 ? 0.5 : -0.5) * H : f * H;
+      if (!proyPlano(x, y, D, t, aspect)) return false;
+      if (medir) { _cob.x0 = Math.min(_cob.x0, _pr.x); _cob.x1 = Math.max(_cob.x1, _pr.x); _cob.y0 = Math.min(_cob.y0, _pr.y); _cob.y1 = Math.max(_cob.y1, _pr.y); }
+      else if (Math.abs(_pr.x) > frac || Math.abs(_pr.y) > frac || !visible(_pr.x, _pr.y, curva, lim)) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Z21: plano en foco. Centro = centro del parche corrido hacia la mirada (FOCO_SEGUIR_MIRADA, con
+ * tope); "arriba" = arriba de la cámara (FOCO_SIN_ROLL) ortogonalizado; tamaño con la proporción del
+ * canvas (`aspTex` = ancho/alto) y la mayor escala que entra en FOCO_PANTALLA (tope de pantalla) y
+ * en el encuadre con margen + curvatura CRT, mirando con la cámara actual. Sin tope angular.
+ */
+export function calcularFocoPlano(
+  yc: number, pc: number, aspTex: number,
+  qCamEnMarco: THREE.Quaternion, fovDeg: number, aspect: number, curva: number,
+): void {
+  const F = DBG_FOCO;
+  const D2R = Math.PI / 180;
+  const t = Math.tan(fovDeg * D2R / 2);
+  _qc.copy(qCamEnMarco);
+  _cR.set(1, 0, 0).applyQuaternion(_qc); _cU.set(0, 1, 0).applyQuaternion(_qc); _cF.set(0, 0, -1).applyQuaternion(_qc);
+  const gy = Math.atan2(_cF.x, -_cF.z), gp = Math.asin(THREE.MathUtils.clamp(_cF.y, -1, 1));
+  const lim = 1 - 2 * Math.min(0.3, Math.max(0, DBG_SUBPANELES.SUB_MARGEN_SEGURIDAD));
+  const frac = THREE.MathUtils.clamp(F.FOCO_PANTALLA, 0.1, 1);
+  const maxD = Math.max(0, F.FOCO_DESPL_MAX_DEG) * D2R;
+  const D = Math.max(0.3, F.FOCO_RADIO_M);
+  const asp = Math.max(0.1, aspTex);
+  let seguir = THREE.MathUtils.clamp(F.FOCO_SEGUIR_MIRADA, 0, 1);
+  let W = 0.1;
+  for (let intento = 0; intento < 6; intento++) {
+    // corrimiento hacia la mirada (con tope; si no entra, desde el 4.º intento sin tope y siguiendo más)
+    const sinTope = intento >= 3;
+    const y = yc + (sinTope ? (gy - yc) * seguir : THREE.MathUtils.clamp((gy - yc) * seguir, -maxD, maxD));
+    const p = pc + (sinTope ? (gp - pc) * seguir : THREE.MathUtils.clamp((gp - pc) * seguir, -maxD, maxD));
+    const cp = Math.cos(p);
+    _pc.set(cp * Math.sin(y), Math.sin(p), -cp * Math.cos(y));
+    // FOCO_SIN_ROLL: el plano es PARALELO al plano de imagen de la cámara al entrar (base derecha /
+    // arriba de la cámara) → proyección lineal: renglones horizontales y sin keystone aunque el centro
+    // no esté en el eje de la mirada. Si no: mira al ojo con el arriba del marco (comportamiento con roll).
+    if (F.FOCO_SIN_ROLL) { _pu.copy(_cU); _pr2.copy(_cR); }
+    else {
+      _pu.set(0, 1, 0).addScaledVector(_pc, -_pc.y).normalize();
+      _pr2.crossVectors(_pc, _pu).normalize();                       // derecha = c × arriba
+    }
+    const Wmin = 0.02 * D;
+    if (!planoEntra(Wmin, Wmin / asp, D, t, aspect, curva, lim, frac, false)) { seguir = Math.min(1, seguir + 0.25); continue; }
+    let lo = Wmin, hi = 2 * D * Math.tan(85 * D2R);
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2;
+      if (planoEntra(mid, mid / asp, D, t, aspect, curva, lim, frac, false)) lo = mid; else hi = mid;
+    }
+    W = lo;
+    break;
+  }
+  const O = FOCO_PLANO_OBJ;
+  O.cx = _pc.x; O.cy = _pc.y; O.cz = _pc.z; O.rx = _pr2.x; O.ry = _pr2.y; O.rz = _pr2.z;
+  O.ux = _pu.x; O.uy = _pu.y; O.uz = _pu.z; O.D = D; O.W = W; O.H = W / asp;
+  O.plano = THREE.MathUtils.clamp(F.FOCO_PLANO, 0, 1);
+  // compatibilidad con el resto (centro y tamaño angular aproximado)
+  FOCO.yaw = Math.atan2(_pc.x, -_pc.z); FOCO.pitch = Math.asin(THREE.MathUtils.clamp(_pc.y, -1, 1));
+  FOCO.ancho = 2 * Math.atan(W / 2 / D); FOCO.alto = 2 * Math.atan(O.H / 2 / D); FOCO.R = D;
+  planoEntra(W, O.H, D, t, aspect, curva, lim, frac, true);
+  FOCO_COBERTURA.ancho = (_cob.x1 - _cob.x0) / 2; FOCO_COBERTURA.alto = (_cob.y1 - _cob.y0) / 2;
+  FOCO.pct = Math.max(FOCO_COBERTURA.ancho, FOCO_COBERTURA.alto);
 }

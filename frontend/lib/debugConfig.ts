@@ -147,8 +147,8 @@ export const DBG_FOCO = {
   SUB_FOCO:            true,  // false = sin foco (comportamiento Z18)
   FOCO_DWELL_S:        1.0,   // segundos con la retícula sobre el subpanel para entrar en foco (0 = inmediato)
   FOCO_RADIO_M:        1.6,   // radio del parche en foco (más cerca → tapa al resto por profundidad)
-  FOCO_PANTALLA:       0.80,  // fracción del viewport (ancho y alto) que ocupa, mirado de frente
-  FOCO_ANG_MAX_DEG:    90,    // tope del ancho / alto angular en foco
+  FOCO_PANTALLA:       0.80,  // tope de pantalla: fracción máxima del viewport (ancho y alto) mirado de frente
+  FOCO_ANG_MAX_DEG:    90,    // tope angular SOLO del modo Z19 (el plano de Z21 lo limita FOCO_PANTALLA)
   FOCO_SEGUIR_MIRADA:  0.35,  // el centro se corre hacia la mirada esta fracción
   FOCO_DESPL_MAX_DEG:  15,    // máximo corrimiento del centro hacia la mirada
   FOCO_OTROS_OPACIDAD: 0.35,  // brillo del resto del conjunto mientras hay foco
@@ -156,6 +156,10 @@ export const DBG_FOCO = {
   FOCO_GRACIA_S:       0.4,   // fuera del margen este tiempo → sale del foco
   FOCO_COOLDOWN_S:     0.25,  // mínimo entre transiciones (evita oscilar)
   FOCO_MS:             450,   // duración de entrada y salida
+  // Z21: foco como plano casi frontal (sin abanico) y sin roll
+  FOCO_PLANO:          0.85,  // 1 = plano total, 0 = esfera (curvatura residual = 1 − esto)
+  FOCO_SIN_ROLL:       true,  // el "arriba" del plano en foco es el de la cámara al entrar en foco
+  FOCO_MODO_Z19:       false, // true = foco viejo (parche esférico estirado, con abanico/roll)
   // Z20: robustez + feedback del dwell
   FOCO_ENTRADA_MARGEN_DEG: 2, // la región de cada subpanel se agranda esto para elegir el sujeto
   FOCO_PARPADEO_S:     0.15,  // pérdidas de hit más cortas no reinician el dwell

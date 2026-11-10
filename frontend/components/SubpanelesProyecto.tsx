@@ -16,8 +16,8 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_SUBPANELES, DBG_PRIORIDAD, DBG_AISLAR_UI } from "@/lib/debugConfig";
 import { ponerEnCapaUI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
-import { crearParche, actualizarParche, uvDeParche, UV_PARCHE, type ParamsParche } from "@/lib/retro/parcheEsferico";
-import { FOCO, resetFoco, calcularFocoObjetivo, pasoFoco, ENTRADA_FOCO, FOCO_PASO, resetPasoFoco, type FocoId } from "@/lib/focoSubpanel";
+import { crearParche, actualizarParche, uvDeParche, UV_PARCHE, morphAPlano, raycastMalla, RAY_MALLA, type ParamsParche } from "@/lib/retro/parcheEsferico";
+import { FOCO, resetFoco, calcularFocoObjetivo, calcularFocoPlano, FOCO_PLANO_OBJ, pasoFoco, ENTRADA_FOCO, FOCO_PASO, resetPasoFoco, type FocoId } from "@/lib/focoSubpanel";
 import { DBG_FOCO, DBG_LOG_PANEL } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
@@ -139,7 +139,8 @@ const ORDEN_F: FocoId[] = ["ficha", "historia", "galeria"];
 function efDe(id: FocoId): EF { return id === "historia" ? _efH : id === "galeria" ? _efG : _efF; }
 /** base → (si está en foco) mezcla hacia el objetivo del foco. */
 function ponerEF(ef: EF, id: FocoId, yaw: number, pitch: number, ancho: number, alto: number, R: number): void {
-  const k = FOCO.id === id ? FOCO.fEase : 0;
+  // Z21: en modo plano el parche base queda en la esfera (el morph a plano va aparte, en la geometría)
+  const k = FOCO.id === id && DBG_FOCO.FOCO_MODO_Z19 ? FOCO.fEase : 0;
   ef.yaw = yaw + (FOCO.yaw - yaw) * k; ef.pitch = pitch + (FOCO.pitch - pitch) * k;
   ef.ancho = ancho + (FOCO.ancho - ancho) * k; ef.alto = alto + (FOCO.alto - alto) * k;
   ef.R = R + (FOCO.R - R) * k;
@@ -305,7 +306,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
 
   // estado de animación / interacción (refs: sin re-render por frame)
   const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false, capaUI: false, dtViejo: false, esfVersion: -1, esfT: -1, panelOculto: false, focoK: -1, focoId: "" as string,
-    anilloA: 0, anilloP: 0, bordeA: 0, bordeId: "" as string, colAnillo: "", colBorde: "" }); // Z5…Z20
+    anilloA: 0, anilloP: 0, bordeA: 0, bordeId: "" as string, colAnillo: "", colBorde: "", focoFaseAnt: "nada" as string }); // Z5…Z21
   const ui = useRef({
     pagina: 0, paginas: [[""]] as string[][], indice: 0,
     hover: null as string | null, sobre: null as "historia" | "galeria" | "ficha" | null,
@@ -775,6 +776,18 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
             _efG.ancho * GALERIA_PANTALLA.w / GALERIA_SIZE.w, _efG.alto * GALERIA_PANTALLA.h / GALERIA_SIZE.h, _efG.R * 0.998, 1, false);
         }
         ponerParche(geos.fic, _efF.yaw, _efF.pitch, _efF.ancho, _efF.alto, _efF.R, 1, false);
+        // Z21: el subpanel en foco pasa de su pose esférica a un plano casi frontal (sin roll)
+        if (!DBG_FOCO.FOCO_MODO_Z19 && FOCO.id && FOCO.fEase > 0) {
+          const k = FOCO.fEase;
+          if (FOCO.id === "historia") morphAPlano(geos.hist, FOCO_PLANO_OBJ, k);
+          else if (FOCO.id === "ficha") morphAPlano(geos.fic, FOCO_PLANO_OBJ, k);
+          else {
+            morphAPlano(geos.gal, FOCO_PLANO_OBJ, k);
+            morphAPlano(geos.pant, FOCO_PLANO_OBJ, k,
+              GALERIA_PANTALLA.x / GALERIA_SIZE.w, (GALERIA_PANTALLA.x + GALERIA_PANTALLA.w) / GALERIA_SIZE.w,
+              GALERIA_PANTALLA.y / GALERIA_SIZE.h, (GALERIA_PANTALLA.y + GALERIA_PANTALLA.h) / GALERIA_SIZE.h, 0.997);
+          }
+        }
         // líneas guía: arcos sobre la esfera entre bordes (un poco delante)
         const gr = Math.max(0.05, D.ESF_LINEA_GROSOR_DEG) * Math.PI / 180, sep = L.sep ?? 0.05;
         ponerParche(geos.linL, pY - pA / 2 - sep / 2, pP, sep, gr, R - 0.01, 1, false);
@@ -825,6 +838,20 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       const mAng = pad / Math.max(0.5, L.d);
       const orden: FocoId[] = FOCO.id === "galeria" ? ORDEN_G : FOCO.id === "ficha" ? ORDEN_F : ORDEN_H;
       for (const id of orden) {
+        // Z21: el subpanel en foco (plano casi frontal / en transición): raycast contra su malla real
+        if (!DBG_FOCO.FOCO_MODO_Z19 && FOCO.id === id && FOCO.fase !== "nada") {
+          const geo = id === "historia" ? geos.hist : id === "galeria" ? geos.gal : geos.fic;
+          if (raycastMalla(geo, _eo.x, _eo.y, _eo.z, _ed.x, _ed.y, _ed.z)) {
+            dentroAlgo = true; tMin = Math.min(tMin, RAY_MALLA.t);
+            if (listo) {
+              sobre = id;
+              if (id === "historia") { _hit.cx = RAY_MALLA.u * HISTORIA_SIZE.w; _hit.cy = (1 - RAY_MALLA.v) * HISTORIA_SIZE.h; }
+              if (id === "galeria")  { _hit.cx = RAY_MALLA.u * GALERIA_SIZE.w;  _hit.cy = (1 - RAY_MALLA.v) * GALERIA_SIZE.h; }
+              break;
+            }
+          }
+          continue;
+        }
         const ef = efDe(id);
         rayoEsfera(_eo, _ed, ef.R);
         if (!_hitEsf.ok) continue;
@@ -896,7 +923,18 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
           const dAng = Math.hypot(dy * Math.cos(_hitEsf.pitch), dp);
           if (dAng < mejor) { mejor = dAng; ENTRADA_FOCO.sujeto = id; angSujeto = dAng; }
         }
-        if (FOCO.id && (FOCO.fase === "entrando" || FOCO.fase === "foco")) {
+        if (FOCO.id && (FOCO.fase === "entrando" || FOCO.fase === "foco") && !F.FOCO_MODO_Z19) {
+          // Z21: plano analítico del objetivo + margen de salida
+          const O = FOCO_PLANO_OBJ, m = Math.max(0, F.FOCO_SALIDA_MARGEN_DEG) * Math.PI / 180;
+          const dn = _ed.x * O.cx + _ed.y * O.cy + _ed.z * O.cz;
+          if (dn > 1e-4) {
+            const tP = (O.D - (_eo.x * O.cx + _eo.y * O.cy + _eo.z * O.cz)) / dn;
+            const px = _eo.x + _ed.x * tP - O.D * O.cx, py = _eo.y + _ed.y * tP - O.D * O.cy, pz = _eo.z + _ed.z * tP - O.D * O.cz;
+            const lx = px * O.rx + py * O.ry + pz * O.rz, ly = px * O.ux + py * O.uy + pz * O.uz;
+            const mm = O.D * Math.tan(m);
+            ENTRADA_FOCO.dentroFoco = tP > 0 && Math.abs(lx) <= O.W / 2 + mm && Math.abs(ly) <= O.H / 2 + mm;
+          }
+        } else if (FOCO.id && (FOCO.fase === "entrando" || FOCO.fase === "foco")) {
           const ef = efDe(FOCO.id);
           rayoEsfera(_eo, _ed, ef.R);
           const m = Math.max(0, F.FOCO_SALIDA_MARGEN_DEG) * Math.PI / 180;
@@ -914,8 +952,19 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
         camera.getWorldQuaternion(_tq);
         _qCamM.copy(_qfi).multiply(_tq);                             // cámara actual en el marco
         const pcam = camera as THREE.PerspectiveCamera;
-        calcularFocoObjetivo(yc, pc, w, h, _qCamM, pcam.isPerspectiveCamera ? pcam.fov : 60,
-          pcam.isPerspectiveCamera ? pcam.aspect : 16 / 9, RETRO_FLAGS.enabled ? (CRT_UNIFORMS.uCurve.value as number) : 0);
+        const fovC = pcam.isPerspectiveCamera ? pcam.fov : 60, aspC = pcam.isPerspectiveCamera ? pcam.aspect : 16 / 9;
+        const curC = RETRO_FLAGS.enabled ? (CRT_UNIFORMS.uCurve.value as number) : 0;
+        if (F.FOCO_MODO_Z19) calcularFocoObjetivo(yc, pc, w, h, _qCamM, fovC, aspC, curC);
+        else {
+          // Z21: plano con la proporción real del canvas del subpanel
+          const aspTex = id === "ficha" ? FICHA_SIZE.w / FICHA_SIZE.h : id === "galeria" ? GALERIA_SIZE.w / GALERIA_SIZE.h : HISTORIA_SIZE.w / HISTORIA_SIZE.h;
+          calcularFocoPlano(yc, pc, aspTex, _qCamM, fovC, aspC, curC);
+        }
+      }
+      // Z21: boundingSphere del parche al terminar cada animación de foco
+      if (FOCO.fase !== A.focoFaseAnt) {
+        if (FOCO.fase === "foco" || FOCO.fase === "nada") for (const gg of [geos.hist, geos.gal, geos.fic, geos.pant]) gg.computeBoundingSphere();
+        A.focoFaseAnt = FOCO.fase;
       }
       // Z20: log de transiciones del foco (DBG_LOG_PANEL)
       if (DBG_LOG_PANEL.LOG_ACTIVO && (FOCO.fase !== faseAntes || FOCO_PASO.motivo !== motivoAntes))
