@@ -7,7 +7,7 @@
 
 import * as THREE from "three";
 import { DBG_LINTERNA, DBG_ORBITAS, DBG_ACERC, DBG_SUBPANELES, DBG_PRIORIDAD, DBG_LOG_PANEL } from "@/lib/debugConfig";
-import { calcularLayoutBloque, calcularLayoutConcavo, type LayoutBloque } from "@/lib/subpanelLayout";
+import { calcularLayoutBloque, calcularLayoutConcavo, calcularLayoutDomo, type LayoutBloque } from "@/lib/subpanelLayout";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 
@@ -29,6 +29,7 @@ export interface PanelLinterna {
   // Z10: prioridad del proyecto abierto
   uAtenua?: { value: number };       // multiplicador de brillo del shader del panel (1 = normal)
   oculta?: number;                   // factor de escala 0–1 (lo aplica PanelMesh sobre el fade de P1)
+  escalaAcerc?: number;              // Z16: escala extra del panel acercado al domo cercano (1 = normal)
 }
 
 export type LinternaFase = "inactiva" | "buscando" | "seleccionado" | "abierto";
@@ -95,6 +96,11 @@ export const ACERC = {
   conSubpaneles: true,                                               // false = prestador (sin subpaneles)
   miraDentro: true,                                                  // debug
   aspect:   0,                                                       // último aspecto usado (detecta resize)
+  // Z16: marco RÍGIDO capturado (pitch limitado): forward, up, right y su orientación
+  fF: new THREE.Vector3(0, 0, -1), uF: new THREE.Vector3(0, 1, 0), rF: new THREE.Vector3(1, 0, 0),
+  qF: new THREE.Quaternion(), qPanelW: new THREE.Quaternion(),
+  escalaDesde: 1, escalaHasta: 1,
+  depthTestPrevio: true,
 };
 
 /** Z9: recalcula el layout del bloque y el destino LOCAL del panel (sin allocations). */
@@ -108,7 +114,9 @@ function calcularDestino(camera: THREE.Camera): void {
   ACERC.aspect = aspect;
   if (DBG_SUBPANELES.SUB_AJUSTE_BLOQUE && ACERC.conSubpaneles) { // Z12: prestadores sin bloque
     const curva = RETRO_FLAGS.enabled ? (CRT_UNIFORMS.uCurve.value as number) : 0;
-    if (DBG_SUBPANELES.SUB_CONCAVO)  // Z14: conjunto cóncavo alrededor del ojo
+    if (DBG_SUBPANELES.SUB_CONCAVO && DBG_SUBPANELES.SUB_DOMO_CERCANO)  // Z16: domo cercano
+      calcularLayoutDomo(ACERC.ancho, ACERC.alto, fov, aspect, curva, ACERC.layout);
+    else if (DBG_SUBPANELES.SUB_CONCAVO)  // Z14: conjunto cóncavo alrededor del ojo
       calcularLayoutConcavo(ACERC.ancho, ACERC.alto, fov, aspect, curva, Math.asin(THREE.MathUtils.clamp(ACERC.fwd0.y, -1, 1)), ACERC.layout);
     else
       calcularLayoutBloque(ACERC.ancho, ACERC.alto, fov, aspect, curva, ACERC.layout);
@@ -116,19 +124,47 @@ function calcularDestino(camera: THREE.Camera): void {
     // Z8: panel centrado en la mira, sin desplazamiento (el ajuste lo hace Z4)
     ACERC.layout.d = distanciaAcercamiento(camera, ACERC.ancho, ACERC.alto);
     ACERC.layout.up = 0; ACERC.layout.k = 1; ACERC.layout.alejado = false; ACERC.layout.entra = true;
-    ACERC.layout.concavo = false; // Z14
+    ACERC.layout.concavo = false; ACERC.layout.domo = false; // Z14 / Z16
     // Z10: sin el cálculo de bloque se toma todo el viewport como zona del conjunto
     const t = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
     ACERC.layout.medioAlto = ACERC.layout.d * t; ACERC.layout.medioAncho = ACERC.layout.medioAlto * aspect;
   }
   ACERC.distancia = ACERC.layout.d;
-  _aW.copy(ACERC.camPos0).addScaledVector(ACERC.fwd0, ACERC.layout.d).addScaledVector(ACERC.up0, ACERC.layout.up);
   parent.updateWorldMatrix(true, false);
+  if (ACERC.layout.domo) {
+    // Z16: panel a DOMO_RADIO_M sobre el marco rígido, subido `elevPanel` (giro sobre RIGHT del marco),
+    // mirando al ojo; escala para conservar su tamaño angular de Z8
+    const ep = ACERC.layout.elevPanel ?? 0;
+    _aQ.setFromAxisAngle(ACERC.rF, ep);
+    _aW.copy(ACERC.fF).applyQuaternion(_aQ).multiplyScalar(ACERC.layout.d).add(ACERC.camPos0);
+    ACERC.qPanelW.copy(ACERC.qF);                       // vertical en el marco (arriba = UP): sin keystone
+    parent.getWorldQuaternion(_aPQ);
+    ACERC.toQuat.copy(_aPQ).invert().multiply(ACERC.qPanelW);
+    ACERC.escalaHasta = ACERC.layout.panelEscala ?? 1;
+  } else {
+    _aW.copy(ACERC.camPos0).addScaledVector(ACERC.fwd0, ACERC.layout.d).addScaledVector(ACERC.up0, ACERC.layout.up);
+    ACERC.escalaHasta = 1;
+  }
   ACERC.toPos.copy(_aW); parent.worldToLocal(ACERC.toPos);
+}
+
+/** Z16: captura el marco rígido de la cámara (sin roll) con el pitch limitado a ±DOMO_PITCH_MAX_DEG. */
+function capturarMarco(): void {
+  const f = ACERC.fwd0;
+  const lim = Math.abs(DBG_SUBPANELES.DOMO_PITCH_MAX_DEG) * Math.PI / 180;
+  const el = THREE.MathUtils.clamp(Math.asin(THREE.MathUtils.clamp(f.y, -1, 1)), -lim, lim);
+  const hx = f.x, hz = f.z, hl = Math.hypot(hx, hz) || 1;
+  ACERC.fF.set((hx / hl) * Math.cos(el), Math.sin(el), (hz / hl) * Math.cos(el));
+  ACERC.rF.crossVectors(ACERC.fF, _Yw).normalize();     // derecha horizontal (la cámara no tiene roll)
+  ACERC.uF.crossVectors(ACERC.rF, ACERC.fF).normalize();
+  _aM.makeBasis(ACERC.rF, ACERC.uF, _aW.copy(ACERC.fF).negate());
+  ACERC.qF.setFromRotationMatrix(_aM);                   // orientación "de cámara" del marco
 }
 const _aW = new THREE.Vector3();
 const _aQ = new THREE.Quaternion();
 const _aPQ = new THREE.Quaternion();
+const _aM = new THREE.Matrix4();          // Z16
+const _Yw = new THREE.Vector3(0, 1, 0);   // Z16
 
 // ── Z12: log de diagnóstico (DBG_LOG_PANEL.LOG_ACTIVO) ──
 export function logPanel(transicion: string, motivo: string, p: PanelLinterna | null): void {
@@ -168,6 +204,7 @@ function iniciarAcercamiento(p: PanelLinterna, camera: THREE.Camera, now: number
   camera.getWorldDirection(ACERC.fwd0);
   camera.getWorldQuaternion(_aQ);
   ACERC.up0.set(0, 1, 0).applyQuaternion(_aQ);
+  capturarMarco(); // Z16
   // orientación: la de la cámara (el panel queda de frente); a local del padre, que está quieto
   parent.updateWorldMatrix(true, false);
   parent.getWorldQuaternion(_aPQ);
@@ -182,6 +219,11 @@ function iniciarAcercamiento(p: PanelLinterna, camera: THREE.Camera, now: number
   mesh.renderOrder = DBG_PRIORIDAD.RENDER_ORDER_BLOQUE;
   // Z9: destino = bloque centrado en pantalla (el panel viaja directo a su lugar final)
   calcularDestino(camera);
+  // Z16: escala animada y capa de interfaz (depthTest off) solo para el conjunto del domo cercano
+  ACERC.escalaDesde = p.escalaAcerc ?? 1;
+  const mat = mesh.material as THREE.Material;
+  ACERC.depthTestPrevio = mat.depthTest;
+  if (ACERC.layout.domo && DBG_SUBPANELES.DOMO_CAPA_UI) mat.depthTest = false;
   p.acercado = true;
   return true;
 }
@@ -194,6 +236,7 @@ function iniciarVuelta(now: number): void {
   const espera = (ACERC.fase === "cerca" || ACERC.fase === "abierto") && DBG_ACERC.ACERC_ESPERA_CIERRE ? DBG_SUBPANELES.SUB_ANIM_MS : 0;
   logPanel(`${ACERC.fase} → retornando`, motivoVuelta, p);
   ACERC.fromPos.copy(p.mesh.position); ACERC.fromQuat.copy(p.mesh.quaternion);
+  ACERC.escalaDesde = p.escalaAcerc ?? 1; ACERC.escalaHasta = 1; // Z16
   ACERC.fase = "volviendo"; ACERC.t0 = now + espera;
 }
 
@@ -201,7 +244,11 @@ function iniciarVuelta(now: number): void {
 function cancelarAcercamiento(): void {
   const p = ACERC.panel;
   if (p) logPanel(`${ACERC.fase} → orbita`, "cancelado (visualizer-activate)", p);
-  if (p?.mesh) { p.mesh.position.copy(ACERC.restPos); p.mesh.quaternion.copy(ACERC.restQuat); p.mesh.renderOrder = ACERC.renderOrderPrevio; }
+  if (p?.mesh) {
+    p.mesh.position.copy(ACERC.restPos); p.mesh.quaternion.copy(ACERC.restQuat); p.mesh.renderOrder = ACERC.renderOrderPrevio;
+    ((p.mesh as THREE.Mesh).material as THREE.Material).depthTest = ACERC.depthTestPrevio; // Z16
+  }
+  if (p) p.escalaAcerc = 1; // Z16
   // Z10: los demás vuelven al instante (los paneles se ocultan igual con el visualizador)
   for (const q of PANELES_LINTERNA) { q.oculta = 1; if (q.uAtenua) q.uAtenua.value = 1; }
   if (p) p.acercado = false;
@@ -222,6 +269,8 @@ function tickAcercamiento(now: number, dt: number, camera: THREE.Camera): void {
     // sigue el destino suavemente (solo se mueve si cambió por un resize)
     const a = 1 - Math.exp(-Math.max(0.1, DBG_ACERC.ACERC_AJUSTE_S) * dt);
     m.position.lerp(ACERC.toPos, a);
+    m.quaternion.slerp(ACERC.toQuat, a);                                   // Z16: el destino puede rotar (resize)
+    p.escalaAcerc = (p.escalaAcerc ?? 1) + (ACERC.escalaHasta - (p.escalaAcerc ?? 1)) * a;
     // Z12: cerca → abierto cuando el bloque está completo (o sin subpaneles / datos que no llegan)
     if (ACERC.fase === "cerca") {
       const sinBloque = !ACERC.conSubpaneles;
@@ -238,6 +287,7 @@ function tickAcercamiento(now: number, dt: number, camera: THREE.Camera): void {
     const e = easing(k);
     m.position.lerpVectors(ACERC.fromPos, ACERC.toPos, e);
     m.quaternion.slerpQuaternions(ACERC.fromQuat, ACERC.toQuat, e);
+    p.escalaAcerc = ACERC.escalaDesde + (ACERC.escalaHasta - ACERC.escalaDesde) * e; // Z16
     if (k >= 1) {
       ACERC.fase = "cerca";
       ACERC.tLlegada = now;
@@ -252,9 +302,12 @@ function tickAcercamiento(now: number, dt: number, camera: THREE.Camera): void {
     const e = easing(k);
     m.position.lerpVectors(ACERC.fromPos, ACERC.restPos, e);
     m.quaternion.slerpQuaternions(ACERC.fromQuat, ACERC.restQuat, e);
+    p.escalaAcerc = ACERC.escalaDesde + (1 - ACERC.escalaDesde) * e;   // Z16
     if (k >= 1) {
       m.position.copy(ACERC.restPos); m.quaternion.copy(ACERC.restQuat);
       m.renderOrder = ACERC.renderOrderPrevio;                     // Z10
+      ((m as THREE.Mesh).material as THREE.Material).depthTest = ACERC.depthTestPrevio; // Z16
+      p.escalaAcerc = 1;
       p.acercado = false;                                          // retoma la órbita desde su fase
       logPanel("retornando → orbita", "llegó a su fase congelada", p);
       ACERC.panel = null; ACERC.fase = "orbita";
@@ -466,6 +519,15 @@ function cierrePorPantalla(camera: THREE.Camera, now: number): boolean {
  *  `extra` agranda la región (p. ej. el semiángulo de otro panel). */
 function enRegionConcava(dir: THREE.Vector3, extra: number, margen: number): boolean {
   const L = ACERC.layout, f = ACERC.fwd0;
+  if (L.domo) {
+    // Z16: en el marco rígido capturado: yaw sobre su UP, elevación sobre su RIGHT
+    const x = dir.dot(ACERC.rF), y = dir.dot(ACERC.uF), z = dir.dot(ACERC.fF);
+    const yawF = Math.atan2(x, z), elevF = Math.atan2(y, Math.hypot(x, z));
+    const extD = (L.yawExt ?? 0) + margen + extra;
+    return z > 0 && Math.abs(yawF) <= extD
+      && elevF <= (L.angTop ?? 0) + margen + extra
+      && elevF >= (L.angBot ?? 0) - margen - extra;
+  }
   const yawRel = Math.atan2(f.x * dir.z - f.z * dir.x, f.x * dir.x + f.z * dir.z);
   const elevRel = Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1)) - Math.asin(THREE.MathUtils.clamp(f.y, -1, 1));
   const ext = (L.yawExt ?? 0) + margen + extra;

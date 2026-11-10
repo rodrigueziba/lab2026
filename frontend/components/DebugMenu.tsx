@@ -361,7 +361,8 @@ export default function DebugMenu() {
       }
       { // Z8
         const L = ACERC.layout;
-        const conc = L.concavo ? ` · cóncavo yaw ${((L.yaw ?? 0) * 180 / Math.PI).toFixed(0)}° (borde ${((L.yawExt ?? 0) * 180 / Math.PI).toFixed(0)}°) · FICHA ${((L.pitch ?? 0) * 180 / Math.PI).toFixed(0)}°` : "";
+        const conc = L.domo ? ` · domo R ${L.d.toFixed(1)} m · laterales ${(L.latDeg ?? 0).toFixed(1)}° a ±${((L.yaw ?? 0) * 180 / Math.PI).toFixed(1)}° (borde ${((L.yawExt ?? 0) * 180 / Math.PI).toFixed(1)}°)${L.lateralesEntran === false ? " ✗ laterales no entran" : ""}`
+          : L.concavo ? ` · cóncavo yaw ${((L.yaw ?? 0) * 180 / Math.PI).toFixed(0)}° (borde ${((L.yawExt ?? 0) * 180 / Math.PI).toFixed(0)}°) · FICHA ${((L.pitch ?? 0) * 180 / Math.PI).toFixed(0)}°` : "";
         const txt = `${ACERC.fase}${conc}${ACERC.fase === "abierto" ? (ACERC.miraDentro ? " · mira dentro" : ` · fuera ${ACERC.tFuera ? Math.round(performance.now() - ACERC.tFuera) : 0} ms`) : ""}${ACERC.panel ? ` · panel ${ACERC.panel.indice} · d ${ACERC.distancia.toFixed(2)} m · sube ${L.up.toFixed(2)} m${L.alejado ? " · alejado" : ""}${L.entra ? "" : " · ✗ no entra"}` : ""} · subpaneles ${(ACERC.escalaSub * 100).toFixed(0)} %`;
         setAcercLive(prev => (prev === txt ? prev : txt));
       }
@@ -1174,6 +1175,36 @@ export default function DebugMenu() {
               DBG_SUBPANELES.SUB_CONCAVO = v;
               setSubp(x => ({ ...x, SUB_CONCAVO: v }));
             }}>{subp.SUB_CONCAVO ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>SUB_DOMO_CERCANO <span style={NOTE}>Z16 off = cóncavo Z14</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.SUB_DOMO_CERCANO;
+              DBG_SUBPANELES.SUB_DOMO_CERCANO = v;
+              setSubp(x => ({ ...x, SUB_DOMO_CERCANO: v }));
+            }}>{subp.SUB_DOMO_CERCANO ? "ON" : "off"}</button>
+          </div>
+          <NumField label="DOMO_RADIO_M" value={subp.DOMO_RADIO_M} step={0.1} min={1} max={10} note="Z16 m"
+            onChange={v => { DBG_SUBPANELES.DOMO_RADIO_M = v; setSubp(x => ({ ...x, DOMO_RADIO_M: v })); }} />
+          <NumField label="DOMO_LAT_DEG" value={subp.DOMO_LAT_DEG} step={1} min={10} max={60} note="Z16 ancho lateral"
+            onChange={v => { DBG_SUBPANELES.DOMO_LAT_DEG = v; setSubp(x => ({ ...x, DOMO_LAT_DEG: v })); }} />
+          <NumField label="DOMO_LAT_MIN_DEG" value={subp.DOMO_LAT_MIN_DEG} step={1} min={5} max={40} note="Z16 mínimo"
+            onChange={v => { DBG_SUBPANELES.DOMO_LAT_MIN_DEG = v; setSubp(x => ({ ...x, DOMO_LAT_MIN_DEG: v })); }} />
+          <NumField label="DOMO_FICHA_DEG" value={subp.DOMO_FICHA_DEG} step={1} min={10} max={70} note="Z16 ancho FICHA"
+            onChange={v => { DBG_SUBPANELES.DOMO_FICHA_DEG = v; setSubp(x => ({ ...x, DOMO_FICHA_DEG: v })); }} />
+          <NumField label="DOMO_SEP_DEG" value={subp.DOMO_SEP_DEG} step={0.5} min={0} max={15} note="Z16 separación"
+            onChange={v => { DBG_SUBPANELES.DOMO_SEP_DEG = v; setSubp(x => ({ ...x, DOMO_SEP_DEG: v })); }} />
+          <NumField label="DOMO_YAW_MAX_DEG" value={subp.DOMO_YAW_MAX_DEG} step={1} min={20} max={80} note="Z16 borde exterior"
+            onChange={v => { DBG_SUBPANELES.DOMO_YAW_MAX_DEG = v; setSubp(x => ({ ...x, DOMO_YAW_MAX_DEG: v })); }} />
+          <NumField label="DOMO_PITCH_MAX_DEG" value={subp.DOMO_PITCH_MAX_DEG} step={1} min={0} max={60} note="Z16 pitch del marco"
+            onChange={v => { DBG_SUBPANELES.DOMO_PITCH_MAX_DEG = v; setSubp(x => ({ ...x, DOMO_PITCH_MAX_DEG: v })); }} />
+          <div style={ROW}>
+            <span>DOMO_CAPA_UI <span style={NOTE}>Z16 depthTest off</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.DOMO_CAPA_UI;
+              DBG_SUBPANELES.DOMO_CAPA_UI = v;
+              setSubp(x => ({ ...x, DOMO_CAPA_UI: v }));
+            }}>{subp.DOMO_CAPA_UI ? "ON" : "off"}</button>
           </div>
           <NumField label="SUB_YAW_DEG" value={subp.SUB_YAW_DEG} step={1} min={10} max={80} note="Z14 laterales (mín.)"
             onChange={v => { DBG_SUBPANELES.SUB_YAW_DEG = v; setSubp(x => ({ ...x, SUB_YAW_DEG: v })); }} />

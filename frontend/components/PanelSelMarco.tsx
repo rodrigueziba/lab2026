@@ -9,8 +9,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { LINTERNA_STATE } from "@/lib/linternaPaneles";
-import { DBG_LINTERNA, DBG_PRIORIDAD } from "@/lib/debugConfig";
+import { LINTERNA_STATE, ACERC } from "@/lib/linternaPaneles";
+import { DBG_LINTERNA, DBG_PRIORIDAD, DBG_SUBPANELES } from "@/lib/debugConfig";
 
 const LABEL_W_M = 2.2;   // ancho del rótulo en metros (canvas 512×64 → 8:1)
 const LABEL_H_M = LABEL_W_M / 8;
@@ -74,6 +74,8 @@ export default function PanelSelMarco({ ancho, alto }: { ancho: number; alto: nu
     const target = s.marco?.mesh;
     if (!target || s.selAlpha < 0.01) { mesh.visible = false; return; }
     mesh.visible = true;
+    // Z16: con el domo cercano el marco es parte de la capa de interfaz (sin depthTest)
+    mat.depthTest = !(ACERC.layout.domo && ACERC.fase !== "orbita" && DBG_SUBPANELES.DOMO_CAPA_UI);
 
     // tamaño en metros (MARCO_PAD_M en vivo)
     const pad = Math.max(0, DBG_LINTERNA.MARCO_PAD_M);

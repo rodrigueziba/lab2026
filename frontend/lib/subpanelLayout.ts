@@ -25,6 +25,14 @@ export interface LayoutBloque {
   yawExt?: number;    // yaw del borde exterior de los laterales (rad)
   angTop?: number;    // elevación del borde superior del conjunto respecto de la mira del disparo (rad)
   angBot?: number;    // ídem borde inferior (rad, negativo)
+  // Z16: domo cercano (marco rígido de la cámara capturada; ángulos en ese marco)
+  domo?: boolean;
+  elevPanel?: number;   // elevación del panel en el marco (rad); los laterales van a la misma
+  panelEscala?: number; // escala del panel para conservar su tamaño angular a DOMO_RADIO_M
+  latW?: number; latH?: number;     // tamaño de HISTORIA / GALERÍA (m)
+  fichaW?: number; fichaH?: number; // tamaño de FICHA (m)
+  latDeg?: number;      // ancho angular efectivo de los laterales (°)
+  lateralesEntran?: boolean;        // false = ni con DOMO_LAT_MIN_DEG entran (no se achica el panel)
 }
 
 // tamaño de cada subpanel en px del mockup (canvas = × 2)
@@ -157,5 +165,105 @@ export function calcularLayoutConcavo(
   out.medioAncho = px; out.medioAlto = py;
   out.concavo = true; out.dLat = R; out.yaw = yaw; out.pitch = pitch;
   out.yawExt = yaw + aLH; out.angTop = topAll; out.angBot = bot;
+  return out;
+}
+
+// ── Z16: domo cercano ─────────────────────────────────────────────────────────
+/** Proyección de un punto (a, b) del plano de un elemento ubicado a yaw ψ (sobre el UP del
+ *  marco) y pitch θ (sobre el RIGHT del marco) a radio R, mirando al ojo. Devuelve coords
+ *  normalizadas de pantalla (−1..1) con la cámara alineada al marco. Sin allocations. */
+const _pj = { x: 0, y: 0, ok: false };
+function proyectar(psi: number, theta: number, a: number, b: number, R: number, t: number, aspect: number, panelYawOnly: boolean) {
+  // punto en el marco del elemento: (a, b, −R); rotación: pitch θ (eje x) y luego yaw ψ (eje y)
+  const x = a;
+  let y = b, z = -R;
+  if (!panelYawOnly) {                           // pitch sobre x: y' = y cosθ − z sinθ ; z' = y sinθ + z cosθ
+    const c = Math.cos(theta), s = Math.sin(theta);
+    const y2 = y * c - z * s, z2 = y * s + z * c; y = y2; z = z2;
+  } else {                                       // laterales: solo se traslada en elevación (arriba = UP del marco)
+    y += R * Math.tan(theta);                    // centro a la elevación θ, plano vertical en el marco
+  }
+  const c2 = Math.cos(psi), s2 = Math.sin(psi);  // yaw sobre y: x' = x cosψ + z sinψ ; z' = −x sinψ + z cosψ
+  const x2 = x * c2 + z * s2, z3 = -x * s2 + z * c2;
+  _pj.ok = z3 < -1e-3;
+  _pj.x = _pj.ok ? (x2 / -z3) / (t * aspect) : 9;
+  _pj.y = _pj.ok ? (y / -z3) / t : 9;
+  return _pj;
+}
+
+/**
+ * Z16: domo CERCANO a DOMO_RADIO_M del ojo, todo dimensionado por tamaño angular.
+ * Panel: conserva el tamaño en pantalla de Z8 (ACERC_PANTALLA) → escala R/d. FICHA debajo,
+ * laterales a ±yaw = media del panel + separación + media del lateral; si el borde exterior
+ * pasa de DOMO_YAW_MAX_DEG o no se ve (margen + curvatura CRT), se achican los laterales hasta
+ * DOMO_LAT_MIN_DEG; el panel NO se achica (lateralesEntran = false avisa).
+ */
+export function calcularLayoutDomo(
+  w: number, h: number, fovDeg: number, aspect: number, curva: number, out: LayoutBloque,
+): LayoutBloque {
+  const S = DBG_SUBPANELES;
+  const D2R = Math.PI / 180;
+  const t = Math.tan((fovDeg * D2R) / 2);
+  const f = Math.min(1, Math.max(0.05, DBG_ACERC.ACERC_PANTALLA));
+  const dZ8 = Math.max(h / (2 * f * t), w / (2 * f * t * aspect));   // distancia de Z8
+  const R = Math.max(0.5, S.DOMO_RADIO_M);
+  const esc = R / dZ8;                                                // conserva el tamaño angular
+  const pw = w * esc, ph = h * esc;
+  const aPH = Math.atan(pw / 2 / R), aPV = Math.atan(ph / 2 / R);
+  const sep = Math.max(0, S.DOMO_SEP_DEG) * D2R;
+  const lim = 1 - 2 * Math.min(0.3, Math.max(0, S.SUB_MARGEN_SEGURIDAD));
+  const yawMax = Math.abs(S.DOMO_YAW_MAX_DEG) * D2R;
+
+  // FICHA (ancho angular → metros) y encuadre vertical panel + FICHA centrado
+  let fichaDeg = Math.max(5, S.DOMO_FICHA_DEG);
+  let fw = 0, fh = 0, aFV = 0, ep = 0, pitchF = 0, top = 0, bot = 0, vertOk = false;
+  for (let i = 0; i < 40; i++) {
+    fw = 2 * R * Math.tan(fichaDeg * D2R / 2);
+    fh = fw * (FH / FW);
+    aFV = Math.atan(fh / 2 / R);
+    ep = aFV + sep / 2;                              // centra el bloque vertical (panel arriba, FICHA abajo)
+    pitchF = ep - aPV - sep - aFV;
+    top = ep + aPV; bot = pitchF - aFV;
+    vertOk = true;
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+      // vertical en el marco (arriba = UP): sin keystone; centro a la elevación ep / pitchF a radio R
+      const p = proyectar(0, ep, sx * pw / 2, sy * ph / 2, R * Math.cos(ep), t, aspect, true);
+      if (!p.ok || !visible(p.x, p.y, curva, lim)) vertOk = false;
+      const q = proyectar(0, pitchF, sx * fw / 2, sy * fh / 2, R * Math.cos(pitchF), t, aspect, true);
+      if (!q.ok || !visible(q.x, q.y, curva, lim)) vertOk = false;
+    }
+    if (vertOk || fichaDeg <= 20) break;
+    fichaDeg -= 1;                                   // primero se achica FICHA (el panel no)
+  }
+
+  // laterales: a la elevación del panel, verticales en el marco (arriba = UP), mirando al ojo en yaw
+  const latMin = Math.max(5, S.DOMO_LAT_MIN_DEG);
+  let latDeg = Math.max(latMin, S.DOMO_LAT_DEG);
+  let lw = 0, lh = 0, yaw = 0, ok = false;
+  for (let i = 0; i < 80; i++) {
+    lw = 2 * R * Math.tan(latDeg * D2R / 2);
+    lh = lw * (HH / HW);
+    const aL = latDeg * D2R / 2;
+    yaw = aPH + sep + aL;
+    ok = yaw + aL <= yawMax;
+    if (ok) for (const sg of [-1, 1]) for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+      // plano rotado solo en yaw: su punto (a, b) en el marco; elevación del centro = ep
+      const p = proyectar(sg * yaw, ep, sx * lw / 2, sy * lh / 2, R * Math.cos(ep), t, aspect, true);
+      if (!p.ok || !visible(p.x, p.y, curva, lim)) ok = false;
+    }
+    if (ok || latDeg <= latMin) break;
+    latDeg = Math.max(latMin, latDeg - 0.5);
+  }
+  const aLV = Math.atan(lh / 2 / R);
+  out.domo = true; out.concavo = true;
+  out.k = latDeg / Math.max(1e-3, S.DOMO_LAT_DEG);   // escala relativa (solo debug)
+  out.d = R; out.dLat = R; out.up = 0; out.alejado = false;
+  out.entra = vertOk && ok; out.lateralesEntran = ok;
+  out.medioAncho = pw / 2; out.medioAlto = ph / 2;
+  out.elevPanel = ep; out.panelEscala = esc;
+  out.latW = lw; out.latH = lh; out.fichaW = fw; out.fichaH = fh; out.latDeg = latDeg;
+  out.yaw = yaw; out.pitch = pitchF;
+  out.yawExt = yaw + latDeg * D2R / 2;
+  out.angTop = Math.max(top, ep + aLV); out.angBot = Math.min(bot, ep - aLV);
   return out;
 }

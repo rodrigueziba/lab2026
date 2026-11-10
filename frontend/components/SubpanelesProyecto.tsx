@@ -114,6 +114,15 @@ const _ax = new THREE.Vector3(), _ay = new THREE.Vector3(), _az = new THREE.Vect
 const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _ojoL = new THREE.Vector3();
 const _mb = new THREE.Matrix4();
 const _PI2 = Math.PI / 2;
+const _gq2 = new THREE.Quaternion();  // Z16
+// Z16: fija depthTest en los materiales del grupo (callback fijo → traverse sin allocations)
+let _depthTestDe = true;
+function fijarDepthTest(o: THREE.Object3D): void {
+  const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+  if (!m) return;
+  if (Array.isArray(m)) { for (const x of m) x.depthTest = _depthTestDe; }
+  else m.depthTest = _depthTestDe;
+}
 
 /** Z14: lleva `mesh` (hijo del grupo `g`, sin padre transformado) a una pose de mundo
  *  interpolada entre la del panel (inicio) y la objetivo, con escala w×h·s. */
@@ -184,7 +193,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
   const lineaMatRef = useRef<THREE.ShaderMaterial>(null);
 
   // estado de animación / interacción (refs: sin re-render por frame)
-  const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false }); // Z5: tDentro; Z8: escala de ajuste
+  const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false, capaUI: false }); // Z5: tDentro; Z8: escala; Z16: capa UI
   const ui = useRef({
     pagina: 0, paginas: [[""]] as string[][], indice: 0,
     hover: null as string | null, sobre: null as "historia" | "galeria" | "ficha" | null,
@@ -446,9 +455,19 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     }
     A.escala = k;
     ACERC.escalaSub = k; // Z8: para el menú de debug
-    const hw = MOCK.historia.w * m, hh = MOCK.historia.h * m;
-    const gw = MOCK.galeria.w * m,  gh = MOCK.galeria.h * m;
-    const fw = MOCK.ficha.w * m,    fh = MOCK.ficha.h * m;
+    let hw = MOCK.historia.w * m, hh = MOCK.historia.h * m;
+    let gw = MOCK.galeria.w * m,  gh = MOCK.galeria.h * m;
+    let fw = MOCK.ficha.w * m,    fh = MOCK.ficha.h * m;
+    // Z16: domo cercano → tamaños angulares del layout (metros a DOMO_RADIO_M)
+    const domo = bloque && D.SUB_CONCAVO && D.SUB_DOMO_CERCANO && !!ACERC.layout.domo;
+    if (domo) {
+      const Ld = ACERC.layout;
+      hw = gw = Ld.latW ?? hw; hh = gh = Ld.latH ?? hh;
+      fw = Ld.fichaW ?? fw;    fh = Ld.fichaH ?? fh;
+    }
+    // Z16: capa de interfaz (depthTest off) solo para este grupo, solo en el domo cercano
+    const capaUI = domo && D.DOMO_CAPA_UI;
+    if (capaUI !== A.capaUI) { A.capaUI = capaUI; _depthTestDe = !capaUI; g.traverse(fijarDepthTest); }
     const s = Math.max(0.001, e);
 
     const hist = historiaRef.current, gal = galeriaRef.current, fic = fichaRef.current;
@@ -464,19 +483,41 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       g.updateMatrixWorld(true);
       _gqi.copy(g.quaternion).invert();
       _cV.subVectors(_v.pos, ojo);                                   // panel − ojo
+      if (domo) {
+        // Z16: marco RÍGIDO capturado — laterales giran sobre su UP (verticales en el marco,
+        // arriba = UP del marco → sin roll aparente), FICHA gira sobre su RIGHT; todo a radio R.
+        const R = Lc.d, ep = Lc.elevPanel ?? 0;
+        _tq.setFromAxisAngle(ACERC.rF, ep);
+        _ojoL.copy(ACERC.fF).applyQuaternion(_tq);                  // dirección del panel (elevación ep)
+        for (let i = 0; i < 2; i++) {
+          const mesh = i === 0 ? hist : gal;
+          if (!mesh) continue;
+          const sg = i === 0 ? 1 : -1;                               // HISTORIA +yaw (izq.), GALERÍA −yaw
+          _gq2.setFromAxisAngle(ACERC.uF, sg * yaw);
+          _tp.copy(_ojoL).applyQuaternion(_gq2).multiplyScalar(R).add(ojo);
+          _tq.copy(_gq2).multiply(ACERC.qF);                         // vertical en el marco, de frente en yaw
+          posarDesdePanel(mesh, g, _v.pos, _q, _tp, _tq, e, i === 0 ? hw : gw, i === 0 ? hh : gh, s);
+        }
+        if (fic) {
+          _gq2.setFromAxisAngle(ACERC.rF, pitch);
+          _tp.copy(ACERC.fF).applyQuaternion(_gq2).multiplyScalar(R).add(ojo);
+          _tq.copy(ACERC.qF);                                        // vertical en el marco (arriba = UP): sin keystone
+          posarDesdePanel(fic, g, _v.pos, _q, _tp, _tq, e, fw, fh, s);
+        }
+      }
       // HISTORIA: +yaw (izquierda) sobre la vertical del mundo, mirando al ojo
-      if (hist) {
+      if (hist && !domo) {
         _tp.copy(_cV).applyAxisAngle(_Y, yaw).multiplyScalar(fac).add(ojo);
         _tq.setFromRotationMatrix(_mb.lookAt(ojo, _tp, _Y));          // normal (+Z) exacta hacia el ojo, sin rolido
         posarDesdePanel(hist, g, _v.pos, _q, _tp, _tq, e, hw, hh, s);
       }
-      if (gal) {
+      if (gal && !domo) {
         _tp.copy(_cV).applyAxisAngle(_Y, -yaw).multiplyScalar(fac).add(ojo);
         _tq.setFromRotationMatrix(_mb.lookAt(ojo, _tp, _Y));
         posarDesdePanel(gal, g, _v.pos, _q, _tp, _tq, e, gw, gh, s);
       }
       // FICHA: pitch alrededor del eje horizontal derecho del panel
-      if (fic) {
+      if (fic && !domo) {
         _rH.crossVectors(_cV, _Y).normalize();
         _tp.copy(_cV).applyAxisAngle(_rH, pitch).multiplyScalar(fac).add(ojo);
         _tq.setFromRotationMatrix(_mb.lookAt(ojo, _tp, _Y));
@@ -488,24 +529,26 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       if (li) li.visible = vis;
       if (ld) ld.visible = vis;
       if (lb) lb.visible = vis;
+      // Z16: semiancho / semialto REALES del panel (en el domo cercano está escalado)
+      const pxW = px * (domo ? (ACERC.panel?.escalaAcerc ?? 1) : 1), pyW = py * (domo ? (ACERC.panel?.escalaAcerc ?? 1) : 1);
       if (vis) {
         _ax.set(1, 0, 0).applyQuaternion(_q);                        // derecha del panel (mundo)
         if (li && hist) {
-          _tp.copy(_v.pos).addScaledVector(_ax, -px);
+          _tp.copy(_v.pos).addScaledVector(_ax, -pxW);
           hist.getWorldPosition(_cV); _ay.set(1, 0, 0).applyQuaternion(hist.getWorldQuaternion(_tq));
           _cV.addScaledVector(_ay, hw * s / 2);
           ponerLinea(li, g, _tp, _cV, ojo, LINEA_GROSOR_M);
         }
         if (ld && gal) {
           _ax.set(1, 0, 0).applyQuaternion(_q);
-          _tp.copy(_v.pos).addScaledVector(_ax, px);
+          _tp.copy(_v.pos).addScaledVector(_ax, pxW);
           gal.getWorldPosition(_cV); _ay.set(1, 0, 0).applyQuaternion(gal.getWorldQuaternion(_tq));
           _cV.addScaledVector(_ay, -gw * s / 2);
           ponerLinea(ld, g, _tp, _cV, ojo, LINEA_GROSOR_M);
         }
         if (lb && fic) {
           _ay.set(0, 1, 0).applyQuaternion(_q);                      // arriba del panel
-          _tp.copy(_v.pos).addScaledVector(_ay, -py);
+          _tp.copy(_v.pos).addScaledVector(_ay, -pyW);
           fic.getWorldPosition(_cV); _az.set(0, 1, 0).applyQuaternion(fic.getWorldQuaternion(_tq));
           _cV.addScaledVector(_az, fh * s / 2);
           ponerLinea(lb, g, _tp, _cV, ojo, LINEA_GROSOR_M);

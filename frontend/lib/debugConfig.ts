@@ -162,6 +162,16 @@ export const DBG_SUBPANELES = {
   SUB_YAW_MAX_DEG:   60,     // el borde exterior de los laterales no pasa de este yaw (si no, se reduce la escala)
   SUB_PITCH_FICHA_DEG: -24,  // pitch de FICHA respecto del panel; se agranda si se superpone
   SUB_DIST_FACTOR:   1.0,    // distancia al ojo de los subpaneles = distancia del panel × esto
+  // Z16: domo CERCANO en el marco rígido de la cámara del disparo (dimensionado angular)
+  SUB_DOMO_CERCANO:  true,   // false = layout cóncavo de Z14
+  DOMO_RADIO_M:      3.0,    // radio del domo cercano (ojo → panel y subpaneles)
+  DOMO_LAT_DEG:      26,     // ancho angular de HISTORIA y GALERÍA
+  DOMO_LAT_MIN_DEG:  20,     // ancho angular mínimo de los laterales (si no entran)
+  DOMO_FICHA_DEG:    34,     // ancho angular de FICHA
+  DOMO_SEP_DEG:      3,      // separación angular entre bordes
+  DOMO_YAW_MAX_DEG:  50,     // borde exterior de los laterales (para verse sin girar en 16:9)
+  DOMO_PITCH_MAX_DEG: 25,    // límite del pitch del marco capturado (evita piso/techo)
+  DOMO_CAPA_UI:      true,   // el conjunto se dibuja como capa de interfaz (depthTest off, renderOrder alto)
   SUB_RETENER_PAD_M: 0.25,   // Z5 (era 1.0 sobre el conjunto): margen alrededor de cada subpanel y del panel
   SUB_LINEAS:        true,   // líneas guía punteadas ámbar hacia el panel
   SUB_PUNTERO:       true,   // Z5: retícula clara en el centro de pantalla con el panel abierto

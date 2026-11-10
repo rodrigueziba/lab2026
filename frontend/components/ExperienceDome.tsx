@@ -674,7 +674,8 @@ function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, bobAmp = 0, 
     const a = PANELES_SILLAS.alpha;
     // Z10: × entry.oculta (los que se solapan con el proyecto abierto se esconden con fundido)
     const oc = entryRef.current?.oculta ?? 1;
-    if (meshRef.current) meshRef.current.scale.setScalar(Math.max(0.0001, a * a * (3 - 2 * a) * oc));
+    const ea = entryRef.current?.escalaAcerc ?? 1; // Z16: tamaño angular del panel en el domo cercano
+    if (meshRef.current) meshRef.current.scale.setScalar(Math.max(0.0001, a * a * (3 - 2 * a) * oc * ea));
     const mat = matRef.current;
     // Z1: foto o placeholder (el canvas se crea una sola vez, la primera vez que hace falta)
     if (mat) {
