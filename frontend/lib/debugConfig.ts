@@ -173,6 +173,14 @@ export const DBG_FOCO = {
   FOCO_BORDE_ANCHO:    0.025, // ancho del borde (fracción del lado menor)
 };
 
+// ── Video (etapa 1): botón "▶ VER" en FICHA / clic en el panel → reproductor aparte (modal) ──
+export const DBG_VIDEO = {
+  YT_MODAL:        true,  // false = sin botón ni clic de video (como antes)
+  YT_CLIC_PANEL:   true,  // clic con la retícula sobre el panel abierto también abre el video
+  YT_NOCOOKIE:     true,  // reproductor desde youtube-nocookie.com
+  YT_RELOCK:       true,  // al cerrar el modal se vuelve a capturar el mouse
+};
+
 // ── Z12: log de diagnóstico de la máquina de estados del panel (apagado por defecto) ──
 export const DBG_LOG_PANEL = {
   LOG_ACTIVO: false, // true = console.info en cada transición (motivo, ángulo al centro, tiempo)

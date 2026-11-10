@@ -18,7 +18,7 @@ import { DBG_SUBPANELES, DBG_PRIORIDAD, DBG_AISLAR_UI } from "@/lib/debugConfig"
 import { ponerEnCapaUI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
 import { crearParche, actualizarParche, uvDeParche, UV_PARCHE, morphAPlano, raycastMalla, RAY_MALLA, type ParamsParche } from "@/lib/retro/parcheEsferico";
 import { FOCO, resetFoco, calcularFocoObjetivo, calcularFocoPlano, FOCO_PLANO_OBJ, pasoFoco, ENTRADA_FOCO, FOCO_PASO, resetPasoFoco, type FocoId } from "@/lib/focoSubpanel";
-import { DBG_FOCO, DBG_LOG_PANEL } from "@/lib/debugConfig";
+import { DBG_FOCO, DBG_LOG_PANEL, DBG_VIDEO } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 
@@ -29,7 +29,7 @@ import { INTERACT_STATE } from "@/lib/alightStore";
 import { playUIClick } from "@/lib/audioEngine";
 import { useProyectoDetalle, type ProyectoDetalle } from "@/lib/proyectoDetalle";
 import {
-  HISTORIA_SIZE, GALERIA_SIZE, FICHA_SIZE, GALERIA_PANTALLA, HISTORIA_BOTONES, GALERIA_BOTONES,
+  HISTORIA_SIZE, GALERIA_SIZE, FICHA_SIZE, GALERIA_PANTALLA, HISTORIA_BOTONES, GALERIA_BOTONES, FICHA_BOTONES,
   paginarSinopsis, dibujarHistoria, dibujarGaleria, dibujarGaleriaPantalla, dibujarFicha, dentro, dentroAmpliado,
 } from "@/lib/retro/subpanelCanvas";
 
@@ -312,6 +312,8 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     hover: null as string | null, sobre: null as "historia" | "galeria" | "ficha" | null,
     // Z11: estado de la retícula (refs, nunca setState): escala actual + último clic aceptado
     escalaPuntero: 1, tClic: -1e9,
+    sobrePanel: false, // video etapa 1: la retícula está sobre el panel abierto
+    videoId: null as string | null, vSel: null as unknown, vDatos: null as unknown, // video etapa 1: id cacheado
   });
   const lienzos = useRef<{ historia: Lienzo | null; galeria: Lienzo | null; pantalla: Lienzo | null; ficha: Lienzo | null; datos: ProyectoDetalle | null }>(
     { historia: null, galeria: null, pantalla: null, ficha: null, datos: null });
@@ -389,6 +391,24 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     L.tex.needsUpdate = true;
     if (P) { dibujarGaleriaPantalla(P.ctx, ui.current.indice, d.ficha.ciudad); P.tex.needsUpdate = true; }
   };
+  // video etapa 1: id de YouTube del panel abierto (su miniatura) o, si no, el del proyecto (Z3)
+  const videoDelPanel = (): string | null => {
+    if (!DBG_VIDEO.YT_MODAL) return null;
+    const m = LINTERNA_STATE.sel?.url?.match(/img\.youtube\.com\/vi\/([^/]{11})\//);
+    return m ? m[1] : (lienzos.current.datos?.youtubeId ?? null);
+  };
+  const redibujarFicha = () => {
+    const L = lienzos.current.ficha, d = lienzos.current.datos;
+    if (!L || !d) return;
+    dibujarFicha(L.ctx, d, !!ui.current.videoId, ui.current.sobre === "ficha" ? ui.current.hover : null);
+    L.tex.needsUpdate = true;
+  };
+  const verVideo = () => {
+    const id = ui.current.videoId;
+    if (!id) return false;
+    window.dispatchEvent(new CustomEvent("alight:ver-video", { detail: { videoId: id, titulo: lienzos.current.datos?.titulo ?? "" } }));
+    return true;
+  };
   const mostrarImagen = () => {
     const d = lienzos.current.datos, mat = pantMatRef.current;
     if (!d || !mat) return;
@@ -444,7 +464,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     if (h) ui.current.paginas = paginarSinopsis(h.ctx, data.sinopsis, DBG_SUBPANELES.HISTORIA_RENGLONES);
     redibujarHistoria();
     redibujarGaleria();
-    if (f) { dibujarFicha(f.ctx, data); f.tex.needsUpdate = true; }
+    redibujarFicha();
     const hm = histMatRef.current, gm = galMatRef.current, fm = fichaMatRef.current, pm = pantMatRef.current;
     if (hm && h) hm.map = h.tex;
     if (gm && g) gm.map = g.tex;
@@ -472,7 +492,15 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     const onDown = (e: MouseEvent) => {
       if (e.button !== 0 || !document.pointerLockElement || !anim.current.abierto || anim.current.t < 0.95) return;
       const u = ui.current, d = lienzos.current.datos;
-      if (!u.hover || !d) return;
+      if (!d) return;
+      // video etapa 1: clic sobre el panel abierto (sin botón debajo) abre el video del proyecto
+      if (!u.hover) {
+        if (u.sobrePanel && DBG_VIDEO.YT_CLIC_PANEL && FOCO.fase === "nada" && performance.now() - u.tClic >= DBG_SUBPANELES.PUNTERO_COOLDOWN_MS) {
+          u.tClic = performance.now();
+          if (verVideo()) playUIClick();
+        }
+        return;
+      }
       // Z19: durante la entrada/salida del foco el botón se mueve bajo la retícula → se ignora
       if (FOCO.fase === "entrando" || FOCO.fase === "saliendo") return;
       // Z11: cooldown — no se reentra mientras dura el clic anterior
@@ -492,6 +520,8 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
         if (u.hover === "sig") u.indice = (u.indice + 1) % n;
         redibujarGaleria();
         mostrarImagen();
+      } else if (u.sobre === "ficha" && u.hover === "ver") {
+        verVideo(); // video etapa 1
       }
     };
     window.addEventListener("mousedown", onDown);
@@ -817,6 +847,13 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     const pm = pantMatRef.current;
     if (pm) { pm.uniforms.uAmbar.value = D.GALERIA_AMBAR; pm.uniforms.uScan.value = D.GALERIA_SCAN; pm.uniforms.uCurva.value = D.GALERIA_CURVA; }
 
+    // video etapa 1: id del video cacheado; se recalcula solo si cambian el panel o los datos
+    if (ui.current.vSel !== LINTERNA_STATE.sel || ui.current.vDatos !== lienzos.current.datos) {
+      ui.current.vSel = LINTERNA_STATE.sel; ui.current.vDatos = lienzos.current.datos;
+      ui.current.videoId = videoDelPanel();
+      redibujarFicha();
+    }
+
     // ── Z5: modo puntero — raycast desde el centro de cámara contra los 3 subpaneles y el panel ──
     camera.getWorldPosition(_v.cam);
     camera.getWorldDirection(_v.fwd);
@@ -827,6 +864,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     let hover: string | null = null;
     let dentroAlgo = false;
     let tMin = 1e9;                                   // Z14: distancia al primer impacto (retícula)
+    let panelEstricto = false;                        // video etapa 1: retícula sobre el panel (sin margen)
     const pad = Math.max(0, D.SUB_RETENER_PAD_M);
     // Z18/Z19: rayo–esfera (centrada en el ojo) por radio y la inversa del mapeo de cada parche,
     // con los parámetros EFECTIVOS (pose animada real, incluido el foco). El de foco va primero.
@@ -847,6 +885,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
               sobre = id;
               if (id === "historia") { _hit.cx = RAY_MALLA.u * HISTORIA_SIZE.w; _hit.cy = (1 - RAY_MALLA.v) * HISTORIA_SIZE.h; }
               if (id === "galeria")  { _hit.cx = RAY_MALLA.u * GALERIA_SIZE.w;  _hit.cy = (1 - RAY_MALLA.v) * GALERIA_SIZE.h; }
+              if (id === "ficha")    { _hit.cx = RAY_MALLA.u * FICHA_SIZE.w;    _hit.cy = (1 - RAY_MALLA.v) * FICHA_SIZE.h; }
               break;
             }
           }
@@ -862,6 +901,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
           sobre = id;
           if (id === "historia") { _hit.cx = UV_PARCHE.u * HISTORIA_SIZE.w; _hit.cy = UV_PARCHE.v * HISTORIA_SIZE.h; }
           if (id === "galeria")  { _hit.cx = UV_PARCHE.u * GALERIA_SIZE.w;  _hit.cy = UV_PARCHE.v * GALERIA_SIZE.h; }
+          if (id === "ficha")    { _hit.cx = UV_PARCHE.u * FICHA_SIZE.w;    _hit.cy = UV_PARCHE.v * FICHA_SIZE.h; }
           break;
         }
       }
@@ -869,7 +909,10 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       rayoEsfera(_eo, _ed, L.d);
       if (_hitEsf.ok) {
         _box.yaw = L.pYaw ?? 0; _box.pitch = L.pPitch ?? 0; _box.ancho = L.pAncho ?? 0; _box.alto = L.pAlto ?? 0;
-        if (uvDeParche(_hitEsf.yaw, _hitEsf.pitch, _box, mAng / Math.max(1e-3, _box.ancho))) { dentroAlgo = true; tMin = Math.min(tMin, _hitEsf.t); }
+        if (uvDeParche(_hitEsf.yaw, _hitEsf.pitch, _box, mAng / Math.max(1e-3, _box.ancho))) {
+          dentroAlgo = true; tMin = Math.min(tMin, _hitEsf.t);
+          panelEstricto = UV_PARCHE.u >= 0 && UV_PARCHE.u <= 1 && UV_PARCHE.v >= 0 && UV_PARCHE.v <= 1;
+        }
       }
     } else
     // subpaneles: planos unitarios escalados → UV directo (con margen `pad` solo para retener)
@@ -883,10 +926,13 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     }
     if (!sobre && rayoUV(fic, 1, 1, _v.cam, _v.fwd, _hit, pad / Math.max(0.001, fw))) {
       dentroAlgo = true; if (_hit.dentro) tMin = Math.min(tMin, _hit.t);
-      if (listo && _hit.dentro) sobre = "ficha";
+      if (listo && _hit.dentro) { sobre = "ficha"; _hit.cx = _hit.u * FICHA_SIZE.w; _hit.cy = (1 - _hit.v) * FICHA_SIZE.h; }
     }
     // el panel abierto también cuenta como "dentro" (su geometría mide panelAncho × panelAlto)
-    if (!dentroAlgo && rayoUV(LINTERNA_STATE.sel?.mesh ?? null, panelAncho, panelAlto, _v.cam, _v.fwd, _hit, pad / panelAncho)) dentroAlgo = true;
+    if (!esferico && rayoUV(LINTERNA_STATE.sel?.mesh ?? null, panelAncho, panelAlto, _v.cam, _v.fwd, _hit, pad / panelAncho)) {
+      dentroAlgo = true;
+      if (_hit.dentro && !sobre) panelEstricto = true;                 // video etapa 1
+    }
     // Z11: zonas de hit FIJAS en UV del canvas (no dependen del dibujo ni de la retícula), con
     // histéresis: el botón ya señalado se suelta recién al salir de su rectángulo agrandado.
     const hPrev = ui.current.hover, mH = Math.max(0, D.PUNTERO_HISTERESIS);
@@ -900,7 +946,12 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       else if (hPrev === "sig" && ui.current.sobre === "galeria" && dentroAmpliado(GALERIA_BOTONES.sig, _hit.cx, _hit.cy, mH)) hover = "sig";
       else if (dentro(GALERIA_BOTONES.ant, _hit.cx, _hit.cy)) hover = "ant";
       else if (dentro(GALERIA_BOTONES.sig, _hit.cx, _hit.cy)) hover = "sig";
+    } else if (sobre === "ficha" && ui.current.videoId) {
+      // video etapa 1: botón "▶ VER VIDEO" (zona fija + histéresis de Z11)
+      if (hPrev === "ver" && ui.current.sobre === "ficha" && dentroAmpliado(FICHA_BOTONES.ver, _hit.cx, _hit.cy, mH)) hover = "ver";
+      else if (dentro(FICHA_BOTONES.ver, _hit.cx, _hit.cy)) hover = "ver";
     }
+    ui.current.sobrePanel = panelEstricto && listo && !sobre;
 
     // ── Z19/Z20: FOCO — la máquina de estados es pura (pasoFoco en focoSubpanel.ts); acá solo se
     // arma la entrada: sujeto (región + margen de entrada, el más cercano al centro), habilitación
@@ -983,9 +1034,11 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       // Z11: se redibuja un canvas solo si cambió el botón señalado EN ese subpanel
       const hHistAntes = u.sobre === "historia" ? u.hover : null, hHist = sobre === "historia" ? hover : null;
       const hGalAntes  = u.sobre === "galeria"  ? u.hover : null, hGal  = sobre === "galeria"  ? hover : null;
+      const hFicAntes  = u.sobre === "ficha"    ? u.hover : null, hFic  = sobre === "ficha"    ? hover : null;
       u.hover = hover; u.sobre = sobre;
       if (hHistAntes !== hHist) redibujarHistoria();
       if (hGalAntes !== hGal)   redibujarGaleria();
+      if (hFicAntes !== hFic)   redibujarFicha();      // video etapa 1
     }
 
     // Z5: retícula clara en el centro de pantalla, sobre el plano del conjunto
@@ -1000,7 +1053,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
         camera.getWorldQuaternion(_tq);
         pt.quaternion.copy(_tq).premultiply(_gqi);
         const pulso = now - u.tClic < D.PUNTERO_PULSO_MS;
-        const objetivo = pulso ? D.PUNTERO_ESCALA_CLIC : hover ? D.PUNTERO_ESCALA_HOVER : 1;
+        const objetivo = pulso ? D.PUNTERO_ESCALA_CLIC : (hover || (u.sobrePanel && u.videoId && DBG_VIDEO.YT_CLIC_PANEL)) ? D.PUNTERO_ESCALA_HOVER : 1; // video etapa 1: también sobre el panel
         u.escalaPuntero += (objetivo - u.escalaPuntero) * (1 - Math.exp(-Math.max(0.1, D.PUNTERO_SUAVIZADO_S) * dt));
         const r = D.PUNTERO_RADIO_M / 0.21 * u.escalaPuntero * (dist / Math.max(0.1, ACERC.layout.d)); // tamaño en pantalla constante
         pt.scale.set(r, r, 1);
@@ -1015,7 +1068,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
           pt.position.set(_v.o.x + _v.d.x * t, _v.o.y + _v.d.y * t, 0.03);
           // Z11: un único objetivo (pulso de clic > hover > normal) e interpolación suave
           const pulso = now - u.tClic < D.PUNTERO_PULSO_MS;
-          const objetivo = pulso ? D.PUNTERO_ESCALA_CLIC : hover ? D.PUNTERO_ESCALA_HOVER : 1;
+          const objetivo = pulso ? D.PUNTERO_ESCALA_CLIC : (hover || (u.sobrePanel && u.videoId && DBG_VIDEO.YT_CLIC_PANEL)) ? D.PUNTERO_ESCALA_HOVER : 1; // video etapa 1: también sobre el panel
           u.escalaPuntero += (objetivo - u.escalaPuntero) * (1 - Math.exp(-Math.max(0.1, D.PUNTERO_SUAVIZADO_S) * dt));
           const r = D.PUNTERO_RADIO_M / 0.21 * u.escalaPuntero;   // geometría base: radio medio 0.21 m
           pt.scale.set(r, r, 1);

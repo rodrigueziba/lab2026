@@ -221,7 +221,12 @@ function casilla(ctx: CanvasRenderingContext2D, x: number, y: number, marcada: b
   ctx.fillText(txt, x + 40, y);
 }
 
-export function dibujarFicha(ctx: CanvasRenderingContext2D, d: ProyectoDetalle) {
+// Etapa 1 video: botón "▶ VER" a la derecha de REFERENCIAS (debajo del numeral, sin pisar filas)
+export const FICHA_BOTONES = {
+  ver: { x: 856, y: 282, w: 224, h: 40 } as Rect,
+};
+
+export function dibujarFicha(ctx: CanvasRenderingContext2D, d: ProyectoDetalle, verVideo = false, hover: string | null = null) {
   const { w, h } = FICHA_SIZE;
   const f = d.ficha;
   ctx.clearRect(0, 0, w, h);
@@ -288,6 +293,24 @@ export function dibujarFicha(ctx: CanvasRenderingContext2D, d: ProyectoDetalle) 
   espaciado(ctx, 3);
   ctx.textAlign = "right";
   ctx.fillText("UNIT-07 · PROPERTY OF AUSTRAL ELECTRIC", w - 30, h - 10);
+  ctx.textAlign = "left";
+  // Etapa 1 video: botón para abrir el video del proyecto en el reproductor aparte
+  if (verVideo) {
+    const r = FICHA_BOTONES.ver;
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect(r.x + 4, r.y + 5, r.w, r.h);
+    ctx.fillStyle = C.ambarFondo;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.lineWidth = hover === "ver" ? 6 : 3;
+    ctx.strokeStyle = hover === "ver" ? C.ambar : C.oxido;
+    ctx.strokeRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = C.ambar;
+    ctx.font = `bold 26px ${MONO}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("▶ VER VIDEO", r.x + r.w / 2, r.y + r.h / 2 + 2);
+    ctx.textBaseline = "alphabetic";
+  }
   ctx.textAlign = "left";
   espaciado(ctx, 0);
 }

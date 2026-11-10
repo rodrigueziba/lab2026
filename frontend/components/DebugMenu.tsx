@@ -33,6 +33,7 @@ import {
   DBG_LOG_PANEL,
   DBG_AISLAR_UI,
   DBG_FOCO,
+  DBG_VIDEO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { LINTERNA_STATE, ORBITAS_INFO, ACERC } from "@/lib/linternaPaneles";
@@ -341,6 +342,7 @@ export default function DebugMenu() {
   const [logPanelOn, setLogPanelOn] = useState(DBG_LOG_PANEL.LOG_ACTIVO); // Z12
   const [aislar, setAislar] = useState(DBG_AISLAR_UI.MODO);                // Z17
   const [foco, setFoco] = useState({ ...DBG_FOCO });                        // Z19
+  const [video, setVideo] = useState({ ...DBG_VIDEO });                     // video etapa 1
   const [focoLive, setFocoLive] = useState("nada");                          // Z19
   const [acercLive, setAcercLive] = useState("orbita");     // Z8
   const [orbInfo, setOrbInfo] = useState("");               // Z7: tabla de anillos
@@ -1346,6 +1348,41 @@ export default function DebugMenu() {
             onChange={v => { DBG_PRIORIDAD.OCULTAR_PROF_M = v; setPrio(o => ({ ...o, OCULTAR_PROF_M: v })); }} />
           <NumField label="RENDER_ORDER_BLOQUE" value={prio.RENDER_ORDER_BLOQUE} step={1} min={1} max={100} note="al montar"
             onChange={v => { DBG_PRIORIDAD.RENDER_ORDER_BLOQUE = v; setPrio(o => ({ ...o, RENDER_ORDER_BLOQUE: v })); }} />
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Video — etapa 1 (reproductor aparte) <span style={NOTE}>(live)</span></span>
+          <div style={ROW}>
+            <span>YT_MODAL <span style={NOTE}>botón ▶ VER en FICHA</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !video.YT_MODAL;
+              DBG_VIDEO.YT_MODAL = v;
+              setVideo(o => ({ ...o, YT_MODAL: v }));
+            }}>{video.YT_MODAL ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>YT_CLIC_PANEL <span style={NOTE}>clic en el panel abre el video</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !video.YT_CLIC_PANEL;
+              DBG_VIDEO.YT_CLIC_PANEL = v;
+              setVideo(o => ({ ...o, YT_CLIC_PANEL: v }));
+            }}>{video.YT_CLIC_PANEL ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>YT_NOCOOKIE <span style={NOTE}>youtube-nocookie.com</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !video.YT_NOCOOKIE;
+              DBG_VIDEO.YT_NOCOOKIE = v;
+              setVideo(o => ({ ...o, YT_NOCOOKIE: v }));
+            }}>{video.YT_NOCOOKIE ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>YT_RELOCK <span style={NOTE}>recapturar mouse al cerrar</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !video.YT_RELOCK;
+              DBG_VIDEO.YT_RELOCK = v;
+              setVideo(o => ({ ...o, YT_RELOCK: v }));
+            }}>{video.YT_RELOCK ? "ON" : "off"}</button>
+          </div>
 
           <div style={DIVIDER} />
           <span style={LABEL}>Foco Z19 — subpanel agrandado <span style={NOTE}>(live)</span></span>
