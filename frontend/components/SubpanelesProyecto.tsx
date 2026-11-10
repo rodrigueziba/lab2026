@@ -17,8 +17,8 @@ import * as THREE from "three";
 import { DBG_SUBPANELES, DBG_PRIORIDAD, DBG_AISLAR_UI } from "@/lib/debugConfig";
 import { ponerEnCapaUI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
 import { crearParche, actualizarParche, uvDeParche, UV_PARCHE, type ParamsParche } from "@/lib/retro/parcheEsferico";
-import { FOCO, resetFoco, easingFoco, calcularFocoObjetivo, type FocoId } from "@/lib/focoSubpanel";
-import { DBG_FOCO } from "@/lib/debugConfig";
+import { FOCO, resetFoco, calcularFocoObjetivo, pasoFoco, ENTRADA_FOCO, FOCO_PASO, resetPasoFoco, type FocoId } from "@/lib/focoSubpanel";
+import { DBG_FOCO, DBG_LOG_PANEL } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 
@@ -217,6 +217,36 @@ function rayoUV(
   return u >= -margenU && u <= 1 + margenU && v >= -mv && v <= 1 + mv;
 }
 
+// Z20: anillo de progreso del dwell (arco que se llena desde arriba, sentido horario)
+const ANILLO_FRAG = /* glsl */`
+  uniform float uProg, uAlpha;
+  uniform vec3  uColor;
+  varying vec2  vUv;
+  void main() {
+    vec2 p = vUv - 0.5;
+    float r = length(p) * 2.0;
+    if (r < 0.80 || r > 1.0) discard;
+    float a = atan(p.x, p.y) / 6.28318;
+    a = a < 0.0 ? a + 1.0 : a;
+    float alpha = mix(0.18, 1.0, step(a, uProg)) * uAlpha;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(uColor, alpha);
+  }
+`;
+// Z20: brillo ámbar en el borde del subpanel apuntado (parche esférico superpuesto)
+const BORDE_FRAG = /* glsl */`
+  uniform vec3  uColor;
+  uniform float uAlfa, uAncho, uAspect;
+  varying vec2  vUv;
+  void main() {
+    float dx = min(vUv.x, 1.0 - vUv.x) * uAspect;   // ancho del borde parejo (en unidades del alto)
+    float dy = min(vUv.y, 1.0 - vUv.y);
+    float a = (1.0 - smoothstep(0.0, uAncho, min(dx, dy))) * uAlfa;
+    if (a < 0.01) discard;
+    gl_FragColor = vec4(uColor, a);
+  }
+`;
+
 type Abierto = { proyectoId: number; abierto: boolean; n: number };
 
 export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAncho: number; panelAlto: number }) {
@@ -242,11 +272,17 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
   const pPanel = useRef<THREE.Mesh>(null), pHist = useRef<THREE.Mesh>(null), pGal = useRef<THREE.Mesh>(null);
   const pFic = useRef<THREE.Mesh>(null), pPant = useRef<THREE.Mesh>(null);
   const pLinL = useRef<THREE.Mesh>(null), pLinR = useRef<THREE.Mesh>(null), pLinB = useRef<THREE.Mesh>(null);
+  // Z20: feedback del dwell
+  const anilloRef = useRef<THREE.Mesh>(null), anilloMat = useRef<THREE.ShaderMaterial>(null);
+  const pBorde = useRef<THREE.Mesh>(null), bordeMat = useRef<THREE.ShaderMaterial>(null);
+  const uniformsAnillo = useMemo(() => ({ uProg: { value: 0 }, uAlpha: { value: 0 }, uColor: { value: new THREE.Color("#FF9A1F") } }), []);
+  const uniformsBorde = useMemo(() => ({ uColor: { value: new THREE.Color("#FF9A1F") }, uAlfa: { value: 0 }, uAncho: { value: 0.025 }, uAspect: { value: 1 } }), []);
   const geos = useMemo(() => {
     const su = DBG_SUBPANELES.ESF_SEG_U, sv = DBG_SUBPANELES.ESF_SEG_V;
     return {
       panel: crearParche(su, sv), hist: crearParche(su, sv), gal: crearParche(su, sv), fic: crearParche(su, sv),
       pant: crearParche(su, sv), linL: crearParche(su, 1), linR: crearParche(su, 1), linB: crearParche(su, 1),
+      borde: crearParche(su, sv), // Z20
     };
   }, []);
   useEffect(() => () => { for (const g of Object.values(geos)) g.dispose(); }, [geos]); // Z18: liberar geometrías
@@ -268,7 +304,8 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
   }, []);
 
   // estado de animación / interacción (refs: sin re-render por frame)
-  const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false, capaUI: false, dtViejo: false, esfVersion: -1, esfT: -1, panelOculto: false, focoK: -1, focoId: "" as string }); // Z5…Z19
+  const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false, capaUI: false, dtViejo: false, esfVersion: -1, esfT: -1, panelOculto: false, focoK: -1, focoId: "" as string,
+    anilloA: 0, anilloP: 0, bordeA: 0, bordeId: "" as string, colAnillo: "", colBorde: "" }); // Z5…Z20
   const ui = useRef({
     pagina: 0, paginas: [[""]] as string[][], indice: 0,
     hover: null as string | null, sobre: null as "historia" | "galeria" | "ficha" | null,
@@ -323,7 +360,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       INTERACT_STATE.panelBloqueo = false; // Z5
       setEst(prev => (prev ? { ...prev, abierto: false } : prev));
     };
-    const onViz = () => { resetFoco(); }; // Z19: visualizer-activate cancela el foco
+    const onViz = () => { resetFoco(); resetPasoFoco(); }; // Z19/Z20: visualizer-activate cancela el foco
     window.addEventListener("alight:visualizer-activate", onViz);
     window.addEventListener("alight:panel-abierto", onAbierto);
     window.addEventListener("alight:panel-cerrado", onCerrado);
@@ -481,7 +518,10 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     const hayDatos = !!lienzos.current.datos;
     const objetivo = A.abierto && hayDatos && D.SUB_ACTIVO ? 1 : 0;
     const paso = dt * 1000 / Math.max(1, D.SUB_ANIM_MS);
-    A.t = objetivo > A.t ? Math.min(1, A.t + paso) : Math.max(0, A.t - paso);
+    // Z20: antes "objetivo > t ? sube : baja" → con t = objetivo = 1 bajaba un paso y volvía al
+    // siguiente frame: t oscilaba 1 ↔ 0,97 y `listo` (t ≥ 1) era verdadero solo en frames alternos.
+    if (objetivo > A.t) A.t = Math.min(1, A.t + paso);
+    else if (objetivo < A.t) A.t = Math.max(0, A.t - paso);
     if (A.t <= 0) {
       if (g.visible) g.visible = false;
       if (A.capaUI) { A.capaUI = false; ponerEnCapaUI(g, false); if (domoRef.current) ponerEnCapaUI(domoRef.current, false); } // Z17
@@ -491,7 +531,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       A.esfT = -1;
       // Z19: sin conjunto no hay foco; brillos de vuelta a 1
       if (FOCO.fase !== "nada" || FOCO.atenua !== 1) {
-        resetFoco(); FOCO.atenua = 1;
+        resetFoco(); resetPasoFoco(); FOCO.atenua = 1;
         histMatRef.current?.color.setScalar(1); galMatRef.current?.color.setScalar(1); fichaMatRef.current?.color.setScalar(1);
         if (pantMatRef.current) pantMatRef.current.uniforms.uAtenua.value = 1;
         if (ACERC.panel?.uAtenua) ACERC.panel.uAtenua.value = 1;
@@ -835,50 +875,51 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       else if (dentro(GALERIA_BOTONES.sig, _hit.cx, _hit.cy)) hover = "sig";
     }
 
-    // ── Z19: FOCO de un subpanel (dwell → entrando → foco → saliendo), con histéresis y cooldown ──
+    // ── Z19/Z20: FOCO — la máquina de estados es pura (pasoFoco en focoSubpanel.ts); acá solo se
+    // arma la entrada: sujeto (región + margen de entrada, el más cercano al centro), habilitación
+    // (proyecto abierto y subpaneles aparecidos ≥ FOCO_ESCALA_MIN) y si la retícula sigue en el foco.
     {
       const F = DBG_FOCO;
-      const dur = Math.max(1, F.FOCO_MS);
-      const activo = F.SUB_FOCO && esferico && A.abierto && listo;
-      if (FOCO.fase === "entrando") { FOCO.f = Math.min(1, FOCO.f + dt * 1000 / dur); if (FOCO.f >= 1) FOCO.fase = "foco"; }
-      else if (FOCO.fase === "saliendo") { FOCO.f = Math.max(0, FOCO.f - dt * 1000 / dur); if (FOCO.f <= 0) { FOCO.fase = "nada"; FOCO.id = null; } }
-      FOCO.fEase = easingFoco(FOCO.f);
-      const objAt = FOCO.fase === "entrando" || FOCO.fase === "foco" ? THREE.MathUtils.clamp(F.FOCO_OTROS_OPACIDAD, 0, 1) : 1;
-      FOCO.atenua += (objAt - FOCO.atenua) * (1 - Math.exp(-dt * 3000 / dur));
-      const cooldownOk = now - FOCO.tUltima >= F.FOCO_COOLDOWN_S * 1000;
-      if (!activo) {
-        if (FOCO.fase === "entrando" || FOCO.fase === "foco") { FOCO.fase = "saliendo"; FOCO.tUltima = now; }
-        FOCO.candidato = null;
-      } else if (FOCO.fase === "nada") {
-        // dwell sobre un subpanel (estricto, sin margen)
-        if (sobre) {
-          if (FOCO.candidato !== sobre) { FOCO.candidato = sobre; FOCO.tCand = now; }
-          if (now - FOCO.tCand >= F.FOCO_DWELL_S * 1000 && cooldownOk) {
-            const L = ACERC.layout, id = sobre as FocoId;
-            const yc = id === "historia" ? -(L.lYaw ?? 0) : id === "galeria" ? (L.lYaw ?? 0) : (L.fYaw ?? 0);
-            const pc = id === "ficha" ? (L.fPitch ?? 0) : (L.lPitch ?? 0);
-            const w = id === "ficha" ? (L.fAncho ?? 0.7) : (L.lAncho ?? 0.5), h = id === "ficha" ? (L.fAlto ?? 0.35) : (L.lAlto ?? 0.6);
-            camera.getWorldQuaternion(_tq);
-            _qCamM.copy(_qfi).multiply(_tq);                         // cámara actual en el marco
-            const pcam = camera as THREE.PerspectiveCamera;
-            calcularFocoObjetivo(yc, pc, w, h, _qCamM, pcam.isPerspectiveCamera ? pcam.fov : 60,
-              pcam.isPerspectiveCamera ? pcam.aspect : 16 / 9, RETRO_FLAGS.enabled ? (CRT_UNIFORMS.uCurve.value as number) : 0);
-            FOCO.id = id; FOCO.fase = "entrando"; FOCO.f = 0; FOCO.tUltima = now; FOCO.tFuera = 0; FOCO.candidato = null;
-          }
-        } else FOCO.candidato = null;
-      } else if ((FOCO.fase === "entrando" || FOCO.fase === "foco") && FOCO.id) {
-        // salida con histéresis: margen alrededor del subpanel agrandado + gracia + cooldown
-        const ef = efDe(FOCO.id);
-        rayoEsfera(_eo, _ed, ef.R);
-        _box.yaw = ef.yaw; _box.pitch = ef.pitch; _box.ancho = ef.ancho; _box.alto = ef.alto;
-        const m = Math.max(0, F.FOCO_SALIDA_MARGEN_DEG) * Math.PI / 180;
-        const dentroFoco = _hitEsf.ok && uvDeParche(_hitEsf.yaw, _hitEsf.pitch, _box, m / Math.max(1e-3, Math.min(ef.ancho, ef.alto)));
-        if (dentroFoco) FOCO.tFuera = 0;
-        else {
-          if (FOCO.tFuera === 0) FOCO.tFuera = now;
-          if (now - FOCO.tFuera >= F.FOCO_GRACIA_S * 1000 && cooldownOk) { FOCO.fase = "saliendo"; FOCO.tUltima = now; FOCO.tFuera = 0; }
+      const escalaAp = 0.12 + 0.88 * e;                                // misma escala de aparición que los parches
+      ENTRADA_FOCO.habilitado = F.SUB_FOCO && esferico && A.abierto && escalaAp >= F.FOCO_ESCALA_MIN;
+      ENTRADA_FOCO.sujeto = null; ENTRADA_FOCO.dentroFoco = false;
+      let angSujeto = 0;
+      if (esferico) {
+        const mE = Math.max(0, F.FOCO_ENTRADA_MARGEN_DEG) * Math.PI / 180;
+        let mejor = 1e9;
+        for (const id of ORDEN_H) {
+          const ef = efDe(id);
+          rayoEsfera(_eo, _ed, ef.R);
+          if (!_hitEsf.ok) continue;
+          const dy = _hitEsf.yaw - ef.yaw, dp = _hitEsf.pitch - ef.pitch;
+          if (Math.abs(dy) > ef.ancho / 2 + mE || Math.abs(dp) > ef.alto / 2 + mE) continue;
+          const dAng = Math.hypot(dy * Math.cos(_hitEsf.pitch), dp);
+          if (dAng < mejor) { mejor = dAng; ENTRADA_FOCO.sujeto = id; angSujeto = dAng; }
+        }
+        if (FOCO.id && (FOCO.fase === "entrando" || FOCO.fase === "foco")) {
+          const ef = efDe(FOCO.id);
+          rayoEsfera(_eo, _ed, ef.R);
+          const m = Math.max(0, F.FOCO_SALIDA_MARGEN_DEG) * Math.PI / 180;
+          ENTRADA_FOCO.dentroFoco = _hitEsf.ok
+            && Math.abs(_hitEsf.yaw - ef.yaw) <= ef.ancho / 2 + m && Math.abs(_hitEsf.pitch - ef.pitch) <= ef.alto / 2 + m;
         }
       }
+      const faseAntes = FOCO.fase, motivoAntes = FOCO_PASO.motivo;
+      const r = pasoFoco(ENTRADA_FOCO, dt);
+      if (r === "entrar" && FOCO.id) {
+        const L = ACERC.layout, id = FOCO.id;
+        const yc = id === "historia" ? -(L.lYaw ?? 0) : id === "galeria" ? (L.lYaw ?? 0) : (L.fYaw ?? 0);
+        const pc = id === "ficha" ? (L.fPitch ?? 0) : (L.lPitch ?? 0);
+        const w = id === "ficha" ? (L.fAncho ?? 0.7) : (L.lAncho ?? 0.5), h = id === "ficha" ? (L.fAlto ?? 0.35) : (L.lAlto ?? 0.6);
+        camera.getWorldQuaternion(_tq);
+        _qCamM.copy(_qfi).multiply(_tq);                             // cámara actual en el marco
+        const pcam = camera as THREE.PerspectiveCamera;
+        calcularFocoObjetivo(yc, pc, w, h, _qCamM, pcam.isPerspectiveCamera ? pcam.fov : 60,
+          pcam.isPerspectiveCamera ? pcam.aspect : 16 / 9, RETRO_FLAGS.enabled ? (CRT_UNIFORMS.uCurve.value as number) : 0);
+      }
+      // Z20: log de transiciones del foco (DBG_LOG_PANEL)
+      if (DBG_LOG_PANEL.LOG_ACTIVO && (FOCO.fase !== faseAntes || FOCO_PASO.motivo !== motivoAntes))
+        console.info(`[foco] ${(now / 1000).toFixed(3)} s · ${faseAntes} → ${FOCO.fase} · ${FOCO_PASO.motivo} · sujeto ${ENTRADA_FOCO.sujeto ?? "—"} · ángulo al centro ${(angSujeto * 180 / Math.PI).toFixed(1)}°`);
     }
 
     // Z5: gracia — si el puntero sale, espera PUNTERO_GRACIA_MS antes de soltar el panel
@@ -933,6 +974,44 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       }
       pt.visible = ver;
     }
+
+    // ── Z20: feedback del dwell — anillo alrededor de la retícula + borde ámbar del sujeto ──
+    {
+      const F = DBG_FOCO;
+      const k = 1 - Math.exp(-dt * 12);
+      const prog = FOCO_PASO.progreso;
+      const objA = F.FOCO_ANILLO && prog > 0 ? 1 : 0;
+      A.anilloA += (objA - A.anilloA) * k;
+      if (prog > 0) A.anilloP = prog;                          // al perder el hit se desvanece (no salta a 0)
+      const an = anilloRef.current, am = anilloMat.current;
+      if (an && am && pt) {
+        if (A.colAnillo !== F.FOCO_ANILLO_COLOR) { A.colAnillo = F.FOCO_ANILLO_COLOR; (am.uniforms.uColor.value as THREE.Color).set(F.FOCO_ANILLO_COLOR); }
+        an.visible = pt.visible && A.anilloA > 0.01;
+        if (an.visible) {
+          an.position.copy(pt.position); an.quaternion.copy(pt.quaternion);
+          const sc = 0.48 * Math.max(0.5, F.FOCO_ANILLO_RADIO) * pt.scale.x;   // la retícula mide 0.24 de radio exterior
+          an.scale.set(sc, sc, 1);
+          am.uniforms.uProg.value = A.anilloP; am.uniforms.uAlpha.value = A.anilloA;
+        }
+      }
+      // borde ámbar sobre el parche del candidato (solo domo esférico)
+      const cand = FOCO.fase === "nada" ? FOCO.candidato : null;
+      const objB = F.FOCO_BORDE && cand ? Math.max(0, F.FOCO_BORDE_ALFA) * (0.35 + 0.65 * prog) : 0;
+      A.bordeA += (objB - A.bordeA) * k;
+      if (cand) A.bordeId = cand;
+      const pb = pBorde.current, bm = bordeMat.current;
+      if (pb && bm) {
+        if (A.colBorde !== F.FOCO_BORDE_COLOR) { A.colBorde = F.FOCO_BORDE_COLOR; (bm.uniforms.uColor.value as THREE.Color).set(F.FOCO_BORDE_COLOR); }
+        pb.visible = !!domoRef.current?.visible && A.bordeA > 0.01 && A.bordeId !== "";
+        if (pb.visible) {
+          const ef = efDe(A.bordeId as FocoId);
+          ponerParche(geos.borde, ef.yaw, ef.pitch, ef.ancho, ef.alto, ef.R * 0.997, 1, false);
+          bm.uniforms.uAlfa.value = A.bordeA;
+          bm.uniforms.uAncho.value = Math.max(0.002, F.FOCO_BORDE_ANCHO);
+          bm.uniforms.uAspect.value = ef.ancho / Math.max(1e-3, ef.alto);
+        }
+      }
+    }
   });
 
   return (
@@ -981,6 +1060,12 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
         <ringGeometry args={[0.18, 0.24, 32]} />
         <meshBasicMaterial color="#FFF3DC" transparent opacity={0.85} depthWrite={false} toneMapped={false} fog={false} />
       </mesh>
+      {/* Z20: anillo de progreso del dwell (encima de la retícula) */}
+      <mesh ref={anilloRef} renderOrder={RO + 13} visible={false}>
+        <planeGeometry args={[1, 1]} />
+        <shaderMaterial ref={anilloMat} uniforms={uniformsAnillo} vertexShader={PANTALLA_VERT} fragmentShader={ANILLO_FRAG}
+          transparent depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
     </group>
     {/* Z18: domo esférico — parches de esfera en el marco capturado (grupo en el ojo, renderOrder 0).
         Comparten materiales con los planos (dispose={null}: los libera su dueño). renderOrder únicos y
@@ -994,6 +1079,11 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       <mesh ref={pLinL}  geometry={geos.linL}  renderOrder={RO + 5} frustumCulled={false} dispose={null} />
       <mesh ref={pLinR}  geometry={geos.linR}  renderOrder={RO + 5} frustumCulled={false} dispose={null} />
       <mesh ref={pLinB}  geometry={geos.linB}  renderOrder={RO + 5} frustumCulled={false} dispose={null} />
+      {/* Z20: brillo ámbar de borde del subpanel apuntado durante el dwell */}
+      <mesh ref={pBorde} geometry={geos.borde} renderOrder={RO + 6} frustumCulled={false} visible={false}>
+        <shaderMaterial ref={bordeMat} uniforms={uniformsBorde} vertexShader={PANTALLA_VERT} fragmentShader={BORDE_FRAG}
+          transparent depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
     </group>
     </>
   );

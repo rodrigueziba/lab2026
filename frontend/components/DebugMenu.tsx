@@ -36,7 +36,7 @@ import {
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { LINTERNA_STATE, ORBITAS_INFO, ACERC } from "@/lib/linternaPaneles";
-import { FOCO } from "@/lib/focoSubpanel";
+import { FOCO, FOCO_PASO } from "@/lib/focoSubpanel";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { setVizVolume, restartVizAudio, BAND_STATE, BAND_U2_DEBUG, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
@@ -366,7 +366,7 @@ export default function DebugMenu() {
         setLinternaLive(prev => (prev === txt ? prev : txt));
       }
       { // Z19
-        const txt = `${FOCO.fase}${FOCO.id ? ` · ${FOCO.id} · ${Math.round(FOCO.f * 100)}% · pantalla ${(FOCO.pct * 100).toFixed(0)}% · ${(FOCO.ancho * 180 / Math.PI).toFixed(0)}×${(FOCO.alto * 180 / Math.PI).toFixed(0)}°` : FOCO.candidato ? ` · dwell ${FOCO.candidato}` : ""} · resto ${(FOCO.atenua * 100).toFixed(0)}%`;
+        const txt = `${FOCO.fase}${FOCO.candidato && FOCO.fase === "nada" ? ` · dwell ${Math.round(FOCO_PASO.progreso * 100)}%` : ""}${FOCO.id ? ` · ${FOCO.id} · ${Math.round(FOCO.f * 100)}% · pantalla ${(FOCO.pct * 100).toFixed(0)}% · ${(FOCO.ancho * 180 / Math.PI).toFixed(0)}×${(FOCO.alto * 180 / Math.PI).toFixed(0)}°` : FOCO.candidato ? ` · dwell ${FOCO.candidato}` : ""} · resto ${(FOCO.atenua * 100).toFixed(0)}%`;
         setFocoLive(prev => (prev === txt ? prev : txt));
       }
       { // Z8
@@ -1379,6 +1379,38 @@ export default function DebugMenu() {
             onChange={v => { DBG_FOCO.FOCO_GRACIA_S = v; setFoco(o => ({ ...o, FOCO_GRACIA_S: v })); }} />
           <NumField label="FOCO_COOLDOWN_S" value={foco.FOCO_COOLDOWN_S} step={0.05} min={0} max={5} note="s entre transiciones"
             onChange={v => { DBG_FOCO.FOCO_COOLDOWN_S = v; setFoco(o => ({ ...o, FOCO_COOLDOWN_S: v })); }} />
+          <NumField label="FOCO_ENTRADA_MARGEN_DEG" value={foco.FOCO_ENTRADA_MARGEN_DEG} step={0.5} min={0} max={15} note="Z20 ° región de entrada"
+            onChange={v => { DBG_FOCO.FOCO_ENTRADA_MARGEN_DEG = v; setFoco(o => ({ ...o, FOCO_ENTRADA_MARGEN_DEG: v })); }} />
+          <NumField label="FOCO_PARPADEO_S" value={foco.FOCO_PARPADEO_S} step={0.01} min={0} max={1} note="Z20 s tolerados sin hit"
+            onChange={v => { DBG_FOCO.FOCO_PARPADEO_S = v; setFoco(o => ({ ...o, FOCO_PARPADEO_S: v })); }} />
+          <NumField label="FOCO_ESCALA_MIN" value={foco.FOCO_ESCALA_MIN} step={0.01} min={0.5} max={1} note="Z20 aparición mínima"
+            onChange={v => { DBG_FOCO.FOCO_ESCALA_MIN = v; setFoco(o => ({ ...o, FOCO_ESCALA_MIN: v })); }} />
+          <div style={ROW}>
+            <span>FOCO_ANILLO <span style={NOTE}>Z20 progreso del dwell</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !foco.FOCO_ANILLO;
+              DBG_FOCO.FOCO_ANILLO = v;
+              setFoco(o => ({ ...o, FOCO_ANILLO: v }));
+            }}>{foco.FOCO_ANILLO ? "ON" : "off"}</button>
+          </div>
+          <ColorField label="FOCO_ANILLO_COLOR" value={foco.FOCO_ANILLO_COLOR} note="Z20"
+            onChange={v => { DBG_FOCO.FOCO_ANILLO_COLOR = v; setFoco(o => ({ ...o, FOCO_ANILLO_COLOR: v })); }} />
+          <NumField label="FOCO_ANILLO_RADIO" value={foco.FOCO_ANILLO_RADIO} step={0.05} min={1} max={4} note="Z20 × retícula"
+            onChange={v => { DBG_FOCO.FOCO_ANILLO_RADIO = v; setFoco(o => ({ ...o, FOCO_ANILLO_RADIO: v })); }} />
+          <div style={ROW}>
+            <span>FOCO_BORDE <span style={NOTE}>Z20 brillo de borde</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !foco.FOCO_BORDE;
+              DBG_FOCO.FOCO_BORDE = v;
+              setFoco(o => ({ ...o, FOCO_BORDE: v }));
+            }}>{foco.FOCO_BORDE ? "ON" : "off"}</button>
+          </div>
+          <ColorField label="FOCO_BORDE_COLOR" value={foco.FOCO_BORDE_COLOR} note="Z20"
+            onChange={v => { DBG_FOCO.FOCO_BORDE_COLOR = v; setFoco(o => ({ ...o, FOCO_BORDE_COLOR: v })); }} />
+          <NumField label="FOCO_BORDE_ALFA" value={foco.FOCO_BORDE_ALFA} step={0.05} min={0} max={1} note="Z20"
+            onChange={v => { DBG_FOCO.FOCO_BORDE_ALFA = v; setFoco(o => ({ ...o, FOCO_BORDE_ALFA: v })); }} />
+          <NumField label="FOCO_BORDE_ANCHO" value={foco.FOCO_BORDE_ANCHO} step={0.005} min={0.002} max={0.2} note="Z20 fracción"
+            onChange={v => { DBG_FOCO.FOCO_BORDE_ANCHO = v; setFoco(o => ({ ...o, FOCO_BORDE_ANCHO: v })); }} />
           <div style={ROW}>
             <span>estado <span style={NOTE}>{focoLive}</span></span>
           </div>

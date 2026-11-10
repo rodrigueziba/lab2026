@@ -113,3 +113,80 @@ export function calcularFocoObjetivo(
   }
   FOCO.pct = Math.max(mx, my);
 }
+
+// ── Z20: máquina de estados PURA del foco ─────────────────────────────────────
+// paso(estado, entrada, dt): sin allocations (entrada y estado son objetos reutilizados).
+// Devuelve "entrar" cuando el dwell se completa (el que llama calcula el objetivo con la
+// cámara y, recién ahí, pone fase "entrando"), "salir" cuando empieza la salida, o "".
+export interface EntradaFoco {
+  sujeto: FocoId | null;   // subpanel bajo la retícula (región + margen de entrada), o ninguno
+  habilitado: boolean;     // proyecto abierto y subpaneles aparecidos (escala ≥ FOCO_ESCALA_MIN)
+  dentroFoco: boolean;     // la retícula está dentro del subpanel en foco (+ margen de salida)
+}
+export const ENTRADA_FOCO: EntradaFoco = { sujeto: null, habilitado: false, dentroFoco: false };
+
+export const FOCO_PASO = {
+  dwell: 0,           // s acumulados con la retícula sobre el candidato
+  sinHit: 0,          // s seguidos sin hit (tolerancia a parpadeos)
+  fuera: 0,           // s seguidos fuera del subpanel en foco (gracia de salida)
+  desdeTransicion: 1e9, // s desde la última transición (cooldown)
+  progreso: 0,        // 0–1 del dwell (anillo)
+  motivo: "",         // último motivo de cambio (log)
+};
+
+export function resetPasoFoco(): void {
+  FOCO_PASO.dwell = 0; FOCO_PASO.sinHit = 0; FOCO_PASO.fuera = 0; FOCO_PASO.progreso = 0;
+  FOCO_PASO.desdeTransicion = 1e9; FOCO_PASO.motivo = "";
+}
+
+export function pasoFoco(e: EntradaFoco, dt: number): "entrar" | "salir" | "" {
+  const F = DBG_FOCO, P = FOCO_PASO;
+  const dur = Math.max(0.001, F.FOCO_MS / 1000);
+  P.desdeTransicion += dt;
+  // animación de entrada / salida
+  if (FOCO.fase === "entrando") { FOCO.f = Math.min(1, FOCO.f + dt / dur); if (FOCO.f >= 1) FOCO.fase = "foco"; }
+  else if (FOCO.fase === "saliendo") { FOCO.f = Math.max(0, FOCO.f - dt / dur); if (FOCO.f <= 0) { FOCO.fase = "nada"; FOCO.id = null; } }
+  FOCO.fEase = easingFoco(FOCO.f);
+  const objAt = FOCO.fase === "entrando" || FOCO.fase === "foco" ? Math.min(1, Math.max(0, F.FOCO_OTROS_OPACIDAD)) : 1;
+  FOCO.atenua += (objAt - FOCO.atenua) * (1 - Math.exp(-dt * 3 / dur));
+  const cooldownOk = P.desdeTransicion >= F.FOCO_COOLDOWN_S;
+  let res: "entrar" | "salir" | "" = "";
+
+  if (!F.SUB_FOCO || !e.habilitado) {
+    if (FOCO.fase === "entrando" || FOCO.fase === "foco") {
+      FOCO.fase = "saliendo"; P.desdeTransicion = 0; P.motivo = "salida: proyecto cerrándose / deshabilitado"; res = "salir";
+    }
+    FOCO.candidato = null; P.dwell = 0; P.sinHit = 0;
+  } else if (FOCO.fase === "nada") {
+    if (e.sujeto) {
+      if (FOCO.candidato !== e.sujeto) {
+        if (FOCO.candidato) P.motivo = `cambio de sujeto ${FOCO.candidato} → ${e.sujeto}`;
+        FOCO.candidato = e.sujeto; P.dwell = 0;
+      }
+      P.sinHit = 0;
+      P.dwell += dt;
+    } else if (FOCO.candidato) {
+      P.sinHit += dt;
+      if (P.sinHit >= F.FOCO_PARPADEO_S) { P.motivo = "sin hit"; FOCO.candidato = null; P.dwell = 0; P.sinHit = 0; }
+      else P.motivo = "parpadeo tolerado";
+    }
+    if (FOCO.candidato && P.dwell >= Math.max(0, F.FOCO_DWELL_S)) {
+      if (cooldownOk) {
+        FOCO.id = FOCO.candidato; FOCO.fase = "entrando"; FOCO.f = 0; FOCO.tFuera = 0;
+        P.desdeTransicion = 0; P.fuera = 0; P.motivo = "dwell completo → entrada"; res = "entrar";
+        FOCO.candidato = null; P.dwell = 0;
+      } else P.motivo = "dwell completo, esperando cooldown";
+    }
+  } else if (FOCO.fase === "entrando" || FOCO.fase === "foco") {
+    if (e.dentroFoco) P.fuera = 0;
+    else {
+      P.fuera += dt;
+      if (P.fuera >= F.FOCO_GRACIA_S && cooldownOk) {
+        FOCO.fase = "saliendo"; P.desdeTransicion = 0; P.fuera = 0; P.motivo = "salida: fuera del subpanel (gracia)"; res = "salir";
+      }
+    }
+  }
+  P.progreso = FOCO.fase === "nada" && FOCO.candidato
+    ? (F.FOCO_DWELL_S > 0 ? Math.min(1, P.dwell / F.FOCO_DWELL_S) : 1) : 0;
+  return res;
+}

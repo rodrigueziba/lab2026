@@ -156,6 +156,17 @@ export const DBG_FOCO = {
   FOCO_GRACIA_S:       0.4,   // fuera del margen este tiempo → sale del foco
   FOCO_COOLDOWN_S:     0.25,  // mínimo entre transiciones (evita oscilar)
   FOCO_MS:             450,   // duración de entrada y salida
+  // Z20: robustez + feedback del dwell
+  FOCO_ENTRADA_MARGEN_DEG: 2, // la región de cada subpanel se agranda esto para elegir el sujeto
+  FOCO_PARPADEO_S:     0.15,  // pérdidas de hit más cortas no reinician el dwell
+  FOCO_ESCALA_MIN:     0.95,  // el subpanel debe estar aparecido al menos esto para contar
+  FOCO_ANILLO:         true,  // anillo de progreso alrededor de la retícula durante el dwell
+  FOCO_ANILLO_COLOR:   "#FF9A1F" as string,
+  FOCO_ANILLO_RADIO:   1.55,  // radio del anillo (× radio de la retícula)
+  FOCO_BORDE:          true,  // brillo ámbar en el borde del subpanel apuntado
+  FOCO_BORDE_COLOR:    "#FF9A1F" as string,
+  FOCO_BORDE_ALFA:     0.7,   // intensidad máxima del brillo de borde
+  FOCO_BORDE_ANCHO:    0.025, // ancho del borde (fracción del lado menor)
 };
 
 // ── Z12: log de diagnóstico de la máquina de estados del panel (apagado por defecto) ──
