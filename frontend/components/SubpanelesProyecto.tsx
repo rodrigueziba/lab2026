@@ -14,7 +14,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SUBPANELES, DBG_PRIORIDAD } from "@/lib/debugConfig";
+import { DBG_SUBPANELES, DBG_PRIORIDAD, DBG_AISLAR_UI } from "@/lib/debugConfig";
+import { ponerEnCapaUI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
+import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 
 // Z10: el conjunto se dibuja después de los paneles en órbita (renderOrder 0)
 const RO = DBG_PRIORIDAD.RENDER_ORDER_BLOQUE;
@@ -193,7 +195,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
   const lineaMatRef = useRef<THREE.ShaderMaterial>(null);
 
   // estado de animación / interacción (refs: sin re-render por frame)
-  const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false, capaUI: false }); // Z5: tDentro; Z8: escala; Z16: capa UI
+  const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false, capaUI: false, dtViejo: false }); // Z5: tDentro; Z8: escala; Z16/Z17: capa UI
   const ui = useRef({
     pagina: 0, paginas: [[""]] as string[][], indice: 0,
     hover: null as string | null, sobre: null as "historia" | "galeria" | "ficha" | null,
@@ -403,6 +405,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     A.t = objetivo > A.t ? Math.min(1, A.t + paso) : Math.max(0, A.t - paso);
     if (A.t <= 0) {
       if (g.visible) g.visible = false;
+      if (A.capaUI) { A.capaUI = false; ponerEnCapaUI(g, false); } // Z17
       LINTERNA_STATE.retener = false;
       if (INTERACT_STATE.panelBloqueo) INTERACT_STATE.panelBloqueo = false; // Z5
       return;
@@ -465,9 +468,12 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       hw = gw = Ld.latW ?? hw; hh = gh = Ld.latH ?? hh;
       fw = Ld.fichaW ?? fw;    fh = Ld.fichaH ?? fh;
     }
-    // Z16: capa de interfaz (depthTest off) solo para este grupo, solo en el domo cercano
-    const capaUI = domo && D.DOMO_CAPA_UI;
-    if (capaUI !== A.capaUI) { A.capaUI = capaUI; _depthTestDe = !capaUI; g.traverse(fijarDepthTest); }
+    // Z17: capa de interfaz = pase propio (capa CAPA_UI) con depth limpio; depthTest normal.
+    // El modo de Z16 (depthTest off en la escena) queda solo detrás de DOMO_CAPA_DEPTHTEST_VIEJO.
+    const capaUI = domo && D.DOMO_CAPA_UI && RETRO_FLAGS.enabled;
+    if (capaUI !== A.capaUI) { A.capaUI = capaUI; ponerEnCapaUI(g, capaUI); if (capaUI) CAPA_UI_ESTADO.activa = true; }
+    const dtViejo = domo && D.DOMO_CAPA_DEPTHTEST_VIEJO;
+    if (dtViejo !== A.dtViejo) { A.dtViejo = dtViejo; _depthTestDe = !dtViejo; g.traverse(fijarDepthTest); }
     const s = Math.max(0.001, e);
 
     const hist = historiaRef.current, gal = galeriaRef.current, fic = fichaRef.current;
@@ -563,6 +569,18 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       if (li) { li.visible = la > 0.01; li.position.set(-(px + gapL / 2), 0, 0.01); li.quaternion.identity(); li.scale.set(gapL, LINEA_GROSOR_M, 1); }
       if (ld) { ld.visible = la > 0.01; ld.position.set(px + gapL / 2, 0, 0.01);    ld.quaternion.identity(); ld.scale.set(gapL, LINEA_GROSOR_M, 1); }
       if (lb) { lb.visible = la > 0.01; lb.position.set(0, -(py + gapA / 2), 0.01); lb.quaternion.setFromAxisAngle(_Z, _PI2); lb.scale.set(gapA, LINEA_GROSOR_M, 1); }
+    }
+
+    // Z17: aislar elementos (debug). "todo" = normal.
+    {
+      const M = DBG_AISLAR_UI.MODO;
+      const todos = M === "todo" || M === "sin_marco" || M === "sin_orbita";
+      if (hist) hist.visible = todos || M === "historia";
+      if (gal)  gal.visible  = todos || M === "galeria";
+      if (fic)  fic.visible  = todos || M === "ficha";
+      const pm0 = ACERC.panel?.mesh;
+      if (pm0) pm0.visible = todos || M === "panel";
+      if (M !== "todo" && M !== "sin_orbita") { if (li) li.visible = false; if (ld) ld.visible = false; if (lb) lb.visible = false; }
     }
 
     // pantalla CRT

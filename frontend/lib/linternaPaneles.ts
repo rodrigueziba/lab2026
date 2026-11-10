@@ -6,10 +6,11 @@
 // allocations por frame (vectores reutilizados).
 
 import * as THREE from "three";
-import { DBG_LINTERNA, DBG_ORBITAS, DBG_ACERC, DBG_SUBPANELES, DBG_PRIORIDAD, DBG_LOG_PANEL } from "@/lib/debugConfig";
+import { DBG_LINTERNA, DBG_ORBITAS, DBG_ACERC, DBG_SUBPANELES, DBG_PRIORIDAD, DBG_LOG_PANEL, DBG_AISLAR_UI } from "@/lib/debugConfig";
 import { calcularLayoutBloque, calcularLayoutConcavo, calcularLayoutDomo, type LayoutBloque } from "@/lib/subpanelLayout";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
+import { CAPA_UI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
 
 export interface PanelLinterna {
   pivot:    THREE.Object3D | null;   // grupo que gira con la fase propia del panel
@@ -223,7 +224,12 @@ function iniciarAcercamiento(p: PanelLinterna, camera: THREE.Camera, now: number
   ACERC.escalaDesde = p.escalaAcerc ?? 1;
   const mat = mesh.material as THREE.Material;
   ACERC.depthTestPrevio = mat.depthTest;
-  if (ACERC.layout.domo && DBG_SUBPANELES.DOMO_CAPA_UI) mat.depthTest = false;
+  // Z17: el conjunto del domo va a la capa de interfaz (pase propio en RetroPostFX, depth limpio).
+  // Sin post-proceso no hay pase → queda en la escena normal. El modo viejo de Z16 (depthTest off,
+  // con el bug de los cortes) queda detrás de DOMO_CAPA_DEPTHTEST_VIEJO solo para comparar.
+  if (ACERC.layout.domo && DBG_SUBPANELES.DOMO_CAPA_UI && RETRO_FLAGS.enabled) {
+    mesh.layers.set(CAPA_UI); CAPA_UI_ESTADO.activa = true;
+  } else if (ACERC.layout.domo && DBG_SUBPANELES.DOMO_CAPA_DEPTHTEST_VIEJO) mat.depthTest = false;
   p.acercado = true;
   return true;
 }
@@ -247,6 +253,7 @@ function cancelarAcercamiento(): void {
   if (p?.mesh) {
     p.mesh.position.copy(ACERC.restPos); p.mesh.quaternion.copy(ACERC.restQuat); p.mesh.renderOrder = ACERC.renderOrderPrevio;
     ((p.mesh as THREE.Mesh).material as THREE.Material).depthTest = ACERC.depthTestPrevio; // Z16
+    p.mesh.layers.set(0); p.mesh.visible = true; CAPA_UI_ESTADO.activa = false;             // Z17
   }
   if (p) p.escalaAcerc = 1; // Z16
   // Z10: los demás vuelven al instante (los paneles se ocultan igual con el visualizador)
@@ -307,6 +314,7 @@ function tickAcercamiento(now: number, dt: number, camera: THREE.Camera): void {
       m.position.copy(ACERC.restPos); m.quaternion.copy(ACERC.restQuat);
       m.renderOrder = ACERC.renderOrderPrevio;                     // Z10
       ((m as THREE.Mesh).material as THREE.Material).depthTest = ACERC.depthTestPrevio; // Z16
+      m.layers.set(0); m.visible = true; CAPA_UI_ESTADO.activa = false;                 // Z17
       p.escalaAcerc = 1;
       p.acercado = false;                                          // retoma la órbita desde su fase
       logPanel("retornando → orbita", "llegó a su fase congelada", p);
@@ -562,6 +570,7 @@ function tickPrioridad(dt: number, camera: THREE.Camera): void {
     let atenua = 1, oculta = 1;
     if (activo && p !== ACERC.panel) {
       atenua = THREE.MathUtils.clamp(P.ATENUAR_BRILLO, 0, 1);
+      if (DBG_AISLAR_UI.MODO !== "todo") oculta = 0;   // Z17: aislar la interfaz (debug)
       if (P.OCULTAR_SOLAPADOS && p.mesh && L.concavo) {
         // Z14: región angular del conjunto cóncavo (incluye los laterales a ±yaw)
         p.mesh.getWorldPosition(_pv).sub(ACERC.camPos0);

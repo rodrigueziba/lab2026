@@ -137,6 +137,11 @@ export const DBG_PRIORIDAD = {
   RENDER_ORDER_BLOQUE: 20,   // renderOrder del conjunto abierto (los paneles en órbita usan 0)
 };
 
+// ── Z17: aislar elementos de la interfaz del domo (debug; "todo" = normal) ──
+export const DBG_AISLAR_UI = {
+  MODO: "todo" as "todo" | "panel" | "historia" | "galeria" | "ficha" | "sin_marco" | "sin_orbita",
+};
+
 // ── Z12: log de diagnóstico de la máquina de estados del panel (apagado por defecto) ──
 export const DBG_LOG_PANEL = {
   LOG_ACTIVO: false, // true = console.info en cada transición (motivo, ángulo al centro, tiempo)
@@ -171,7 +176,8 @@ export const DBG_SUBPANELES = {
   DOMO_SEP_DEG:      3,      // separación angular entre bordes
   DOMO_YAW_MAX_DEG:  50,     // borde exterior de los laterales (para verse sin girar en 16:9)
   DOMO_PITCH_MAX_DEG: 25,    // límite del pitch del marco capturado (evita piso/techo)
-  DOMO_CAPA_UI:      true,   // el conjunto se dibuja como capa de interfaz (depthTest off, renderOrder alto)
+  DOMO_CAPA_UI:      true,   // Z17: el conjunto se dibuja en un pase propio (capa UI) antes del bloom/CRT, depth limpio
+  DOMO_CAPA_DEPTHTEST_VIEJO: false, // Z16 (con bug): depthTest off en la escena; solo para comparar
   SUB_RETENER_PAD_M: 0.25,   // Z5 (era 1.0 sobre el conjunto): margen alrededor de cada subpanel y del panel
   SUB_LINEAS:        true,   // líneas guía punteadas ámbar hacia el panel
   SUB_PUNTERO:       true,   // Z5: retícula clara en el centro de pantalla con el panel abierto

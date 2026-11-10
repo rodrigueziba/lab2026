@@ -10,6 +10,8 @@ import { RenderPass }      from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ShaderPass }      from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass }      from "three/addons/postprocessing/OutputPass.js";
+import { Pass }            from "three/addons/postprocessing/Pass.js";
+import { CAPA_UI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
 import { RetroCRTShader, CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { DBG_RETRO_FX, DBG_FLASH } from "@/lib/debugConfig";
 import { flashBoost, FLASH_STATE, medicionFlashLista, medirPicoFlash } from "@/lib/curtainFlash";
@@ -20,6 +22,34 @@ const QUALITY_BLOOM_SCALE: Record<string, number> = {
   low: 0.25, medium: 0.5, high: 1.0,
 };
 const CURVE_ANIM_MS = 400;
+
+// Z17: pase de la interfaz del domo cercano. Dibuja SOLO la capa CAPA_UI sobre el resultado de
+// la escena, con el depth buffer limpio (depthTest normal entre los elementos de la interfaz,
+// sin mezclarse con sillas/piso/cúpula). Va antes del bloom y del CRT → el CRT se aplica igual.
+// Si no hay nada en la capa, no hace nada. Sin allocations por frame.
+class CapaUIPass extends Pass {
+  private readonly escena: THREE.Scene;
+  private readonly camara: THREE.Camera;
+  constructor(escena: THREE.Scene, camara: THREE.Camera) {
+    super();
+    this.escena = escena; this.camara = camara;
+    this.needsSwap = false;               // dibuja encima del mismo buffer que dejó el RenderPass
+  }
+  render(renderer: THREE.WebGLRenderer, _w: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget): void {
+    if (!CAPA_UI_ESTADO.activa) return;
+    const cam = this.camara, esc = this.escena;
+    const mascara = cam.layers.mask, auto = renderer.autoClear, fondo = esc.background;
+    cam.layers.set(CAPA_UI);
+    renderer.autoClear = false;
+    esc.background = null;                // que no se vuelva a dibujar/limpiar el fondo
+    renderer.setRenderTarget(this.renderToScreen ? null : readBuffer);
+    renderer.clearDepth();
+    renderer.render(esc, cam);
+    esc.background = fondo;
+    renderer.autoClear = auto;
+    cam.layers.mask = mascara;
+  }
+}
 // G2: ShaderPass CLONA los uniforms que recibe (UniformsUtils.clone), así que lo que
 // se escribía en CRT_UNIFORMS nunca llegaba al shader. Estos se reconectan al objeto
 // compartido (los del destello/glare siempre; el resto solo con DBG_RETRO_FX.crtUniformsVivos).
@@ -50,6 +80,7 @@ export default function RetroPostFX() {
 
     const composer = new EffectComposer(gl);
     composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(new CapaUIPass(scene, camera)); // Z17: interfaz del domo, antes del bloom y del CRT
 
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(w * bloomScale, h * bloomScale),

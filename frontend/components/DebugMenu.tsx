@@ -31,6 +31,7 @@ import {
   DBG_ACERC,
   DBG_PRIORIDAD,
   DBG_LOG_PANEL,
+  DBG_AISLAR_UI,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { LINTERNA_STATE, ORBITAS_INFO, ACERC } from "@/lib/linternaPaneles";
@@ -336,6 +337,7 @@ export default function DebugMenu() {
   const [acerc, setAcerc] = useState({ ...DBG_ACERC });     // Z8
   const [prio, setPrio] = useState({ ...DBG_PRIORIDAD });   // Z10
   const [logPanelOn, setLogPanelOn] = useState(DBG_LOG_PANEL.LOG_ACTIVO); // Z12
+  const [aislar, setAislar] = useState(DBG_AISLAR_UI.MODO);                // Z17
   const [acercLive, setAcercLive] = useState("orbita");     // Z8
   const [orbInfo, setOrbInfo] = useState("");               // Z7: tabla de anillos
   // P1: paneles SILLAS — constantes + estado en vivo (mismo poll)
@@ -1205,6 +1207,30 @@ export default function DebugMenu() {
               DBG_SUBPANELES.DOMO_CAPA_UI = v;
               setSubp(x => ({ ...x, DOMO_CAPA_UI: v }));
             }}>{subp.DOMO_CAPA_UI ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>DOMO_CAPA_DEPTHTEST_VIEJO <span style={NOTE}>Z17 modo Z16 (con cortes), comparar</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !subp.DOMO_CAPA_DEPTHTEST_VIEJO;
+              DBG_SUBPANELES.DOMO_CAPA_DEPTHTEST_VIEJO = v;
+              setSubp(x => ({ ...x, DOMO_CAPA_DEPTHTEST_VIEJO: v }));
+            }}>{subp.DOMO_CAPA_DEPTHTEST_VIEJO ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>DBG_AISLAR_UI <span style={NOTE}>Z17 ver cada elemento solo</span></span>
+            <select style={{ ...INPUT, width: 120 }} value={aislar} onChange={e => {
+              const v = e.target.value as typeof DBG_AISLAR_UI.MODO;
+              DBG_AISLAR_UI.MODO = v;
+              setAislar(v);
+            }}>
+              <option value="todo">todo</option>
+              <option value="panel">solo panel</option>
+              <option value="historia">solo HISTORIA</option>
+              <option value="galeria">solo GALERÍA</option>
+              <option value="ficha">solo FICHA</option>
+              <option value="sin_marco">sin marco SEL ni líneas</option>
+              <option value="sin_orbita">sin paneles en órbita</option>
+            </select>
           </div>
           <NumField label="SUB_YAW_DEG" value={subp.SUB_YAW_DEG} step={1} min={10} max={80} note="Z14 laterales (mín.)"
             onChange={v => { DBG_SUBPANELES.SUB_YAW_DEG = v; setSubp(x => ({ ...x, SUB_YAW_DEG: v })); }} />

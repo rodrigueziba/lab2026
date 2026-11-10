@@ -10,7 +10,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { LINTERNA_STATE, ACERC } from "@/lib/linternaPaneles";
-import { DBG_LINTERNA, DBG_PRIORIDAD, DBG_SUBPANELES } from "@/lib/debugConfig";
+import { DBG_LINTERNA, DBG_PRIORIDAD, DBG_SUBPANELES, DBG_AISLAR_UI } from "@/lib/debugConfig";
+import { CAPA_UI } from "@/lib/retro/capaUI";
+import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 
 const LABEL_W_M = 2.2;   // ancho del rótulo en metros (canvas 512×64 → 8:1)
 const LABEL_H_M = LABEL_W_M / 8;
@@ -74,8 +76,12 @@ export default function PanelSelMarco({ ancho, alto }: { ancho: number; alto: nu
     const target = s.marco?.mesh;
     if (!target || s.selAlpha < 0.01) { mesh.visible = false; return; }
     mesh.visible = true;
-    // Z16: con el domo cercano el marco es parte de la capa de interfaz (sin depthTest)
-    mat.depthTest = !(ACERC.layout.domo && ACERC.fase !== "orbita" && DBG_SUBPANELES.DOMO_CAPA_UI);
+    // Z17: con el domo cercano el marco va en la capa de interfaz (pase propio, depthTest normal)
+    const enCapa = ACERC.layout.domo === true && ACERC.fase !== "orbita" && DBG_SUBPANELES.DOMO_CAPA_UI && RETRO_FLAGS.enabled;
+    mesh.layers.set(enCapa ? CAPA_UI : 0);
+    mat.depthTest = !(ACERC.layout.domo && ACERC.fase !== "orbita" && DBG_SUBPANELES.DOMO_CAPA_DEPTHTEST_VIEJO);
+    // Z17: aislar (debug) — el marco solo con "todo" o "sin_orbita"
+    if (DBG_AISLAR_UI.MODO !== "todo" && DBG_AISLAR_UI.MODO !== "sin_orbita") { mesh.visible = false; return; }
 
     // tamaño en metros (MARCO_PAD_M en vivo)
     const pad = Math.max(0, DBG_LINTERNA.MARCO_PAD_M);
