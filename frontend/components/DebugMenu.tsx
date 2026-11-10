@@ -34,6 +34,7 @@ import {
   DBG_AISLAR_UI,
   DBG_FOCO,
   DBG_VIDEO,
+  DBG_PISO_ICONOS,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { LINTERNA_STATE, ORBITAS_INFO, ACERC } from "@/lib/linternaPaneles";
@@ -343,6 +344,7 @@ export default function DebugMenu() {
   const [aislar, setAislar] = useState(DBG_AISLAR_UI.MODO);                // Z17
   const [foco, setFoco] = useState({ ...DBG_FOCO });                        // Z19
   const [video, setVideo] = useState({ ...DBG_VIDEO });                     // video etapa 1
+  const [piso, setPiso] = useState({ ...DBG_PISO_ICONOS });                 // Z23
   const [focoLive, setFocoLive] = useState("nada");                          // Z19
   const [acercLive, setAcercLive] = useState("orbita");     // Z8
   const [orbInfo, setOrbInfo] = useState("");               // Z7: tabla de anillos
@@ -1348,6 +1350,39 @@ export default function DebugMenu() {
             onChange={v => { DBG_PRIORIDAD.OCULTAR_PROF_M = v; setPrio(o => ({ ...o, OCULTAR_PROF_M: v })); }} />
           <NumField label="RENDER_ORDER_BLOQUE" value={prio.RENDER_ORDER_BLOQUE} step={1} min={1} max={100} note="al montar"
             onChange={v => { DBG_PRIORIDAD.RENDER_ORDER_BLOQUE = v; setPrio(o => ({ ...o, RENDER_ORDER_BLOQUE: v })); }} />
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Iconos del piso Z23 <span style={NOTE}>(live)</span></span>
+          <div style={ROW}>
+            <span>PISO_ICONOS <span style={NOTE}>visible</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !piso.PISO_ICONOS;
+              DBG_PISO_ICONOS.PISO_ICONOS = v;
+              setPiso(o => ({ ...o, PISO_ICONOS: v }));
+            }}>{piso.PISO_ICONOS ? "ON" : "off"}</button>
+          </div>
+          <NumField label="DIST_M" value={piso.DIST_M} step={0.1} min={0.5} max={15} note="m delante (acotado al telón)"
+            onChange={v => { DBG_PISO_ICONOS.DIST_M = v; setPiso(o => ({ ...o, DIST_M: v })); }} />
+          <NumField label="MARGEN_TELON_M" value={piso.MARGEN_TELON_M} step={0.05} min={0} max={3} note="m"
+            onChange={v => { DBG_PISO_ICONOS.MARGEN_TELON_M = v; setPiso(o => ({ ...o, MARGEN_TELON_M: v })); }} />
+          <NumField label="SEP_M" value={piso.SEP_M} step={0.1} min={0.5} max={10} note="m entre iconos"
+            onChange={v => { DBG_PISO_ICONOS.SEP_M = v; setPiso(o => ({ ...o, SEP_M: v })); }} />
+          <NumField label="TAM_M" value={piso.TAM_M} step={0.05} min={0.2} max={5} note="m"
+            onChange={v => { DBG_PISO_ICONOS.TAM_M = v; setPiso(o => ({ ...o, TAM_M: v })); }} />
+          <NumField label="BRILLO_MAX" value={piso.BRILLO_MAX} step={0.02} min={0} max={2} note="reflejo"
+            onChange={v => { DBG_PISO_ICONOS.BRILLO_MAX = v; setPiso(o => ({ ...o, BRILLO_MAX: v })); }} />
+          <NumField label="ENTRA_DEG" value={piso.ENTRA_DEG} step={0.5} min={1} max={60} note="° cono"
+            onChange={v => { DBG_PISO_ICONOS.ENTRA_DEG = v; setPiso(o => ({ ...o, ENTRA_DEG: v })); }} />
+          <NumField label="SALE_DEG" value={piso.SALE_DEG} step={0.5} min={1} max={90} note="° cono"
+            onChange={v => { DBG_PISO_ICONOS.SALE_DEG = v; setPiso(o => ({ ...o, SALE_DEG: v })); }} />
+          <NumField label="SURCO" value={piso.SURCO} step={0.02} min={0} max={1} note="oscurecimiento"
+            onChange={v => { DBG_PISO_ICONOS.SURCO = v; setPiso(o => ({ ...o, SURCO: v })); }} />
+          <NumField label="BISEL" value={piso.BISEL} step={0.01} min={0} max={1} note="borde"
+            onChange={v => { DBG_PISO_ICONOS.BISEL = v; setPiso(o => ({ ...o, BISEL: v })); }} />
+          <NumField label="SUAV_S" value={piso.SUAV_S} step={0.05} min={0.01} max={3} note="s"
+            onChange={v => { DBG_PISO_ICONOS.SUAV_S = v; setPiso(o => ({ ...o, SUAV_S: v })); }} />
+          <NumField label="FADE_MS" value={piso.FADE_MS} step={50} min={0} max={5000} note="ms"
+            onChange={v => { DBG_PISO_ICONOS.FADE_MS = v; setPiso(o => ({ ...o, FADE_MS: v })); }} />
 
           <div style={DIVIDER} />
           <span style={LABEL}>Video — etapa 1 (reproductor aparte) <span style={NOTE}>(live)</span></span>

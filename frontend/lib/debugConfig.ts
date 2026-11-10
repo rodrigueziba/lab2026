@@ -181,6 +181,22 @@ export const DBG_VIDEO = {
   YT_RELOCK:       true,  // al cerrar el modal se vuelve a capturar el mouse
 };
 
+// ── Z23: iconos grabados en el piso (silla = SILLAS a la izquierda, luz = TARIMA a la derecha) ──
+export const DBG_PISO_ICONOS = {
+  PISO_ICONOS:     true,  // false = sin iconos
+  DIST_M:          4.0,   // distancia delante de la posición inicial (se acota para no pasar el telón)
+  MARGEN_TELON_M:  0.3,   // separación mínima entre el borde del icono y el telón
+  SEP_M:           3.0,   // separación entre los centros de los dos iconos
+  TAM_M:           1.4,   // lado de cada icono
+  BRILLO_MAX:      0.38,  // intensidad máxima del reflejo al mirarlos
+  ENTRA_DEG:       12,    // cono de mirada: empieza a reflejar
+  SALE_DEG:        20,    // cono de mirada: deja de reflejar (histéresis)
+  SURCO:           0.52,  // oscurecimiento del piso bajo el trazo
+  BISEL:           0.10,  // brillo del bisel (borde inferior derecho)
+  SUAV_S:          0.3,   // suavizado temporal del reflejo
+  FADE_MS:         800,   // fundido de aparición / desaparición
+};
+
 // ── Z12: log de diagnóstico de la máquina de estados del panel (apagado por defecto) ──
 export const DBG_LOG_PANEL = {
   LOG_ACTIVO: false, // true = console.info en cada transición (motivo, ángulo al centro, tiempo)

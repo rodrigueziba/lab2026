@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<g transform="rotate(-34 385 150) translate(511 6) scale(-0.40 0.40)" fill="#fff" stroke="none">
+<rect x="212" y="10" width="40" height="76" rx="9"/>
+<path d="M148 306 L148 112 L296 112 L296 176" fill="none" stroke="#fff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M170 158 L300 214 L246 440 L110 350 Q46 300 66 224 Q96 168 170 158 Z"/>
+<path fill-rule="evenodd" d="M262 272 L394 284 L386 436 L236 436 Q226 352 262 272 Z M316 300 C284 302 262 336 266 374 C270 410 296 424 322 418 C356 410 372 372 366 338 C360 310 338 298 316 300 Z"/>
+<path d="M272 262 L338 206 L462 198 L426 258 Z"/>
+<path d="M402 284 L492 306 L462 442 L394 436 Z"/>
+<path d="M236 446 L388 446 L408 506 L264 538 Z"/>
+<path d="M256 276 L226 300 L196 452 L228 436 Z"/>
+</g>
+<g stroke="#fff" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<path d="M364 170 L70 428" stroke-width="15"/>
+<path d="M364 170 L112 417" stroke-width="13"/>
+<path d="M364 170 L154 412" stroke-width="11"/>
+<path d="M364 170 L195 409" stroke-width="10"/>
+<path d="M364 170 L237 408" stroke-width="8"/>
+<path d="M364 170 L279 409" stroke-width="7"/>
+<path d="M364 170 L320 411" stroke-width="6"/>
+<path d="M364 170 L362 416" stroke-width="5"/>
+<path d="M364 170 L404 425" stroke-width="4"/>
+<ellipse cx="240" cy="448" rx="184" ry="32" stroke-width="20"/>
+</g></svg>

@@ -19,6 +19,7 @@ import DebugMenu from "./DebugMenu";
 import CurtainFlash from "./CurtainFlash"; // F1: destello al atravesar el telón
 import FlashAviso from "./FlashAviso"; // G2: aviso de fotosensibilidad (flag, off por defecto)
 import VideoModal from "./VideoModal"; // video etapa 1: reproductor aparte (modal)
+import PisoIconos from "./PisoIconos"; // Z23: iconos grabados en el piso (silla / luz)
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
 import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
@@ -461,6 +462,8 @@ function Scene() {
       {RETRO_FLAGS.enabled && <RetroPostFX />}
       {/* N6: red velvet curtain — visible until player crosses the plane */}
       {curtainVisible && <Curtain />}
+      {/* Z23: iconos de los dos caminos grabados en el piso, entre el inicio y el telón */}
+      <PisoIconos />
       <Room />
       <DiagonalSpot />
       <Tarima />

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<g transform="translate(14 -30) scale(0.97)" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+<!-- fondo: patas y respaldo finos -->
+<path d="M226 226 L226 384" stroke-width="16"/>
+<path d="M420 266 L424 420" stroke-width="16"/>
+<path d="M222 226 L212 58" stroke-width="16"/>
+<path d="M420 266 L410 98" stroke-width="16"/>
+<path d="M214 58 L410 98" stroke-width="16"/>
+<path d="M218 136 L414 176" stroke-width="11"/>
+<path d="M222 226 L420 266" stroke-width="15"/>
+<!-- frente: asiento y patas anchas -->
+<path d="M420 266 L318 342" stroke-width="20"/>
+<path d="M222 226 L120 302" stroke-width="22"/>
+<path d="M120 302 L318 342" stroke-width="28"/>
+<path d="M120 302 L114 466" stroke-width="30"/>
+<path d="M318 342 L314 506" stroke-width="30"/>
+</g></svg>
