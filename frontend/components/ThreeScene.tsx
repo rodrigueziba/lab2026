@@ -29,6 +29,7 @@ import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAu
 import CameraFeedback from "./CameraFeedback";
 import dynamic from "next/dynamic";
 const RetroPostFX = dynamic(() => import("@/components/RetroPostFX"), { ssr: false });
+const DialogoTerminal = dynamic(() => import("@/components/DialogoTerminal"), { ssr: false }); // Z27
 
 const ZONA_LUZ    = new THREE.Vector3(0, 1.6,  0);
 const ZONA_SILLAS = new THREE.Vector3(0, 1.6, -6); // G2: 1 m further
@@ -795,6 +796,7 @@ export default function ThreeScene() {
       <CurtainFlash />
       <FlashAviso />
       <VideoModal />
+      <DialogoTerminal />
       <NearLecternHUD />
       <AudioGestureHUD />
       {DEBUG_ENABLED && DBG_SILLAS.debugOverlays && <PrismDebugOverlay />}

@@ -36,6 +36,8 @@ import {
   DBG_VIDEO,
   DBG_PISO_ICONOS,
   DBG_INICIO,
+  DBG_DIALOGO,
+  DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { LINTERNA_STATE, ORBITAS_INFO, ACERC } from "@/lib/linternaPaneles";
@@ -48,6 +50,7 @@ import { DBG_STAR_MAT, DBG_DOME_MAT } from "./FaceDome";
 import { STORE, storeSubscribe, activateVisualizerOnce, resetVizActivated, PANELES_SILLAS } from "@/lib/alightStore";
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
+import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado"; // Z27
 
 type Tab = "SILLAS" | "TARIMA";
 
@@ -345,6 +348,7 @@ export default function DebugMenu() {
   const [aislar, setAislar] = useState(DBG_AISLAR_UI.MODO);                // Z17
   const [foco, setFoco] = useState({ ...DBG_FOCO });                        // Z19
   const [video, setVideo] = useState({ ...DBG_VIDEO });                     // video etapa 1
+  const [dlg, setDlg] = useState({ ...DBG_DIALOGO });                      // Z27
   const [piso, setPiso] = useState({ ...DBG_PISO_ICONOS });                 // Z23
   const [inicio, setInicio] = useState({ ...DBG_INICIO });                  // Z24
   const [focoLive, setFocoLive] = useState("nada");                          // Z19
@@ -431,6 +435,11 @@ export default function DebugMenu() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Z27: la terminal de diálogo lee si el menú está abierto (marca de líneas pendientes)
+  useEffect(() => {
+    DEBUG_MENU_ESTADO.visible = DEBUG_ENABLED && visible;
+  }, [visible]);
 
   // ── Spotlight handlers (changes apply on next scene load) ─────────────────
   const setSpotField = (key: keyof typeof DBG_SPOTLIGHT, val: number | string) => {
@@ -1392,6 +1401,44 @@ export default function DebugMenu() {
           <NumField label="FADE_MS" value={piso.FADE_MS} step={50} min={0} max={5000} note="ms"
             onChange={v => { DBG_PISO_ICONOS.FADE_MS = v; setPiso(o => ({ ...o, FADE_MS: v })); }} />
 
+          <div style={DIVIDER} />
+          <span style={LABEL}>Diálogo Z27 (terminal) <span style={NOTE}>(live)</span></span>
+          <div style={ROW}>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); abrirDialogo(); }}>Probar diálogo</button>
+            <button style={INPUT} onClick={() => cerrarDialogo()}>Cerrar</button>
+          </div>
+          <div style={ROW}>
+            <span>MARCAR_PENDIENTES <span style={NOTE}>[LÍNEA PENDIENTE id]</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !dlg.MARCAR_PENDIENTES;
+              DBG_DIALOGO.MARCAR_PENDIENTES = v;
+              setDlg(o => ({ ...o, MARCAR_PENDIENTES: v }));
+            }}>{dlg.MARCAR_PENDIENTES ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>POSICION</span>
+            <button style={INPUT} onClick={() => {
+              const orden = ["abajo", "izquierda", "derecha"] as const;
+              const v = orden[(orden.indexOf(dlg.POSICION) + 1) % orden.length];
+              DBG_DIALOGO.POSICION = v;
+              setDlg(o => ({ ...o, POSICION: v }));
+              window.dispatchEvent(new CustomEvent("alight:dialogo-config"));
+            }}>{dlg.POSICION}</button>
+          </div>
+          <NumField label="VEL_CPS" value={dlg.VEL_CPS} step={2} min={0} max={200} note="letras/s (0 = instantáneo)"
+            onChange={v => { DBG_DIALOGO.VEL_CPS = v; setDlg(o => ({ ...o, VEL_CPS: v })); }} />
+          <NumField label="PAUSA_MS" value={dlg.PAUSA_MS} step={50} min={0} max={3000} note="entre líneas"
+            onChange={v => { DBG_DIALOGO.PAUSA_MS = v; setDlg(o => ({ ...o, PAUSA_MS: v })); }} />
+          <NumField label="ANCHO_VW" value={dlg.ANCHO_VW} step={1} min={20} max={60} note="% viewport"
+            onChange={v => { DBG_DIALOGO.ANCHO_VW = v; setDlg(o => ({ ...o, ANCHO_VW: v })); window.dispatchEvent(new CustomEvent("alight:dialogo-config")); }} />
+          <NumField label="ALTO_VH" value={dlg.ALTO_VH} step={1} min={10} max={60} note="% viewport, máx."
+            onChange={v => { DBG_DIALOGO.ALTO_VH = v; setDlg(o => ({ ...o, ALTO_VH: v })); window.dispatchEvent(new CustomEvent("alight:dialogo-config")); }} />
+          <NumField label="MARGEN_PX" value={dlg.MARGEN_PX} step={2} min={0} max={200} note="px al borde"
+            onChange={v => { DBG_DIALOGO.MARGEN_PX = v; setDlg(o => ({ ...o, MARGEN_PX: v })); window.dispatchEvent(new CustomEvent("alight:dialogo-config")); }} />
+          <NumField label="FUENTE_PX" value={dlg.FUENTE_PX} step={1} min={10} max={32} note="px"
+            onChange={v => { DBG_DIALOGO.FUENTE_PX = v; setDlg(o => ({ ...o, FUENTE_PX: v })); window.dispatchEvent(new CustomEvent("alight:dialogo-config")); }} />
+          <NumField label="HISTORIAL" value={dlg.HISTORIAL} step={1} min={1} max={20} note="líneas"
+            onChange={v => { DBG_DIALOGO.HISTORIAL = v; setDlg(o => ({ ...o, HISTORIAL: v })); }} />
           <div style={DIVIDER} />
           <span style={LABEL}>Video — etapa 1 (reproductor aparte) <span style={NOTE}>(live)</span></span>
           <div style={ROW}>

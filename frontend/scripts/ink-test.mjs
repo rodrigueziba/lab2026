@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearDialogo } from '../lib/dialogo/dialogoInk.ts';
+import { planDePaso, lineaEco, TEXTO_FIN } from '../lib/dialogo/terminalFlujo.ts'; // Z27
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const json = fs.readFileSync(path.join(root, 'public/alight/dialogo/dialogo-luz.json'), 'utf8');
@@ -67,6 +68,42 @@ caso("irA('premio_otorgado') deja premio = true", d => {
   check(d.leerPremio() === true, 'premio = true');
   d.escribirPremio(false);
   check(d.leerPremio() === false, 'escribirPremio(false) funciona');
+});
+
+// ── Z27: lógica de la terminal (lib/dialogo/terminalFlujo.ts) ──
+const textoLinea = l => l.segmentos.map(x => x.texto).join('');
+caso('Z27 terminal: 1 → A veces → No (eco y vuelta a 1.b)', d => {
+  const p1 = planDePaso(d.iniciar(), false);
+  check(p1.lineas.length === 1 && p1.lineas[0].tipo === 'entidad' && !p1.fin && p1.opciones.length === 4, '1: una línea de entidad y 4 opciones');
+  const eco = lineaEco(p1.opciones[2]);
+  check(eco.tipo === 'eco' && textoLinea(eco) === '> A veces.', 'eco "> A veces."');
+  const pc = planDePaso(d.elegir(p1.opciones[2].indice), false);
+  check(pc.id === '1.c' && pc.opciones[1].texto === 'No.', '1.c con opción 2 = No.');
+  const pb = planDePaso(d.elegir(pc.opciones[1].indice), false);
+  check(pb.id === '1.b' && textoLinea(pb.lineas[0]) === '¿Qué estás buscando?' && !pb.fin, 'vuelve a 1.b');
+});
+caso('Z27 terminal: pendiente 1.d.a sin y con MARCAR_PENDIENTES', d => {
+  d.iniciar(); d.elegir(3);
+  const paso = d.elegir(0);
+  const sin = planDePaso(paso, false);
+  check(sin.fin && sin.lineas.length === 1 && sin.lineas[0].tipo === 'fin' && textoLinea(sin.lineas[0]) === TEXTO_FIN, 'sin marca: "[ fin de la transmisión ]" y fin');
+  const con = planDePaso(paso, true);
+  check(con.fin && con.lineas.length === 1 && textoLinea(con.lineas[0]) === '[LÍNEA PENDIENTE 1.d.a]', 'con marca: "[LÍNEA PENDIENTE 1.d.a]" y fin');
+});
+caso('Z27 terminal: 1.b.d pendiente CON texto (texto primero, después el cierre)', d => {
+  d.iniciar(); d.elegir(1);
+  const pl = planDePaso(d.elegir(3), false);
+  check(pl.id === '1.b.d' && pl.lineas.length === 2 && pl.lineas[0].tipo === 'entidad' && pl.lineas[1].tipo === 'fin' && pl.fin, '1.b.d: entidad + fin');
+});
+caso('Z27 terminal: 1.b.a efecto sin texto', d => {
+  d.iniciar(); d.elegir(1);
+  const pl = planDePaso(d.elegir(0), false);
+  check(pl.efecto === 'ir_tarima_sin_publico' && pl.id === '1.b.a' && pl.fin && pl.lineas.length === 1 && pl.lineas[0].tipo === 'fin', '1.b.a: efecto, fin, solo línea de cierre');
+});
+caso('Z27 terminal: 1.a efecto con texto en cursiva', d => {
+  d.iniciar();
+  const pl = planDePaso(d.elegir(0), false);
+  check(pl.efecto === 'juego_alarma' && pl.lineas[0].segmentos.some(x => x.estilo === 'cursiva' && x.texto === 'luz') && pl.fin, '1.a: efecto juego_alarma, *luz*, fin');
 });
 
 console.log(`\n${ok} OK · ${fallas} fallas`);

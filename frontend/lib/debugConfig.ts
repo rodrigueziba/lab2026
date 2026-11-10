@@ -755,3 +755,20 @@ export const DBG_RETRO = {
   crtCurve:  0.08,   // J5: indicator CRT barrel distortion — live
   crtScan:   0.30,   // J5: indicator CRT scanline intensity — live
 };
+
+// ── Z27: terminal de diálogo (DialogoTerminal.tsx) ───────────────────────────
+export const DBG_DIALOGO = {
+  VEL_CPS:           38,     // caracteres por segundo al tipear (0 = instantáneo) — live
+  PAUSA_MS:          350,    // pausa entre líneas y antes de mostrar las opciones — live
+  MARCAR_PENDIENTES: false,  // con el menú debug abierto: "[LÍNEA PENDIENTE id]" en vez de fin — live
+  POSICION:          "abajo" as "abajo" | "izquierda" | "derecha", // tercio inferior o costado — live
+  ANCHO_VW:          46,     // ancho en % del viewport (tope 60) — live
+  ALTO_VH:           34,     // alto máximo de la pantalla en % del viewport — live
+  MARGEN_PX:         24,     // separación del borde de la ventana — live
+  FUENTE_PX:         17,     // tamaño del texto — live
+  HISTORIAL:         6,      // líneas visibles (las anteriores se atenúan) — live
+};
+
+// Z27: visibilidad del menú de debug (Shift), la escribe DebugMenu. La terminal la lee para
+// decidir si marca las líneas pendientes.
+export const DEBUG_MENU_ESTADO = { visible: false };
