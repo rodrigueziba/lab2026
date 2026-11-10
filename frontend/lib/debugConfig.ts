@@ -181,13 +181,20 @@ export const DBG_VIDEO = {
   YT_RELOCK:       true,  // al cerrar el modal se vuelve a capturar el mouse
 };
 
+// ── Z24: posición inicial del usuario (Z22) ────────────────────────────────────
+export const DBG_INICIO = {
+  INICIO_RETROCESO_M: 5,  // el usuario arranca esto más atrás que la base (−10, 1.6, −7), lejos del telón; recargar
+};
+
 // ── Z23: iconos grabados en el piso (silla = SILLAS a la izquierda, luz = TARIMA a la derecha) ──
 export const DBG_PISO_ICONOS = {
   PISO_ICONOS:     true,  // false = sin iconos
-  DIST_M:          4.0,   // distancia delante de la posición inicial (se acota para no pasar el telón)
-  MARGEN_TELON_M:  0.3,   // separación mínima entre el borde del icono y el telón
+  DIST_M:          4.0,   // Z23 (sin uso desde Z24: los iconos se ubican respecto del telón)
+  MARGEN_TELON_M:  0.3,   // Z23 (sin uso desde Z24)
+  DIST_TELON_M:    1.0,   // Z24: distancia del centro de los iconos al telón donde estaban en Z23
+  ICONOS_ACERCAR_M: 2.0,  // Z24: se acercan al usuario (se alejan del telón) esto más
   SEP_M:           3.0,   // separación entre los centros de los dos iconos
-  TAM_M:           1.4,   // lado de cada icono
+  ICONOS_TAMANO_M: 2.0,   // Z24 (era TAM_M 1.4): lado de cada icono, para leerse desde 5 m más atrás
   BRILLO_MAX:      0.38,  // intensidad máxima del reflejo al mirarlos
   ENTRA_DEG:       12,    // cono de mirada: empieza a reflejar
   SALE_DEG:        20,    // cono de mirada: deja de reflejar (histéresis)

@@ -35,6 +35,7 @@ import {
   DBG_FOCO,
   DBG_VIDEO,
   DBG_PISO_ICONOS,
+  DBG_INICIO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { LINTERNA_STATE, ORBITAS_INFO, ACERC } from "@/lib/linternaPaneles";
@@ -345,6 +346,7 @@ export default function DebugMenu() {
   const [foco, setFoco] = useState({ ...DBG_FOCO });                        // Z19
   const [video, setVideo] = useState({ ...DBG_VIDEO });                     // video etapa 1
   const [piso, setPiso] = useState({ ...DBG_PISO_ICONOS });                 // Z23
+  const [inicio, setInicio] = useState({ ...DBG_INICIO });                  // Z24
   const [focoLive, setFocoLive] = useState("nada");                          // Z19
   const [acercLive, setAcercLive] = useState("orbita");     // Z8
   const [orbInfo, setOrbInfo] = useState("");               // Z7: tabla de anillos
@@ -1352,6 +1354,10 @@ export default function DebugMenu() {
             onChange={v => { DBG_PRIORIDAD.RENDER_ORDER_BLOQUE = v; setPrio(o => ({ ...o, RENDER_ORDER_BLOQUE: v })); }} />
 
           <div style={DIVIDER} />
+          <span style={LABEL}>Inicio Z24 <span style={NOTE}>(recargar)</span></span>
+          <NumField label="INICIO_RETROCESO_M" value={inicio.INICIO_RETROCESO_M} step={0.5} min={0} max={20} note="m lejos del telón"
+            onChange={v => { DBG_INICIO.INICIO_RETROCESO_M = v; setInicio(o => ({ ...o, INICIO_RETROCESO_M: v })); }} />
+          <div style={DIVIDER} />
           <span style={LABEL}>Iconos del piso Z23 <span style={NOTE}>(live)</span></span>
           <div style={ROW}>
             <span>PISO_ICONOS <span style={NOTE}>visible</span></span>
@@ -1361,14 +1367,14 @@ export default function DebugMenu() {
               setPiso(o => ({ ...o, PISO_ICONOS: v }));
             }}>{piso.PISO_ICONOS ? "ON" : "off"}</button>
           </div>
-          <NumField label="DIST_M" value={piso.DIST_M} step={0.1} min={0.5} max={15} note="m delante (acotado al telón)"
-            onChange={v => { DBG_PISO_ICONOS.DIST_M = v; setPiso(o => ({ ...o, DIST_M: v })); }} />
-          <NumField label="MARGEN_TELON_M" value={piso.MARGEN_TELON_M} step={0.05} min={0} max={3} note="m"
-            onChange={v => { DBG_PISO_ICONOS.MARGEN_TELON_M = v; setPiso(o => ({ ...o, MARGEN_TELON_M: v })); }} />
+          <NumField label="DIST_TELON_M" value={piso.DIST_TELON_M} step={0.1} min={0} max={15} note="Z24 m antes del telón"
+            onChange={v => { DBG_PISO_ICONOS.DIST_TELON_M = v; setPiso(o => ({ ...o, DIST_TELON_M: v })); }} />
+          <NumField label="ICONOS_ACERCAR_M" value={piso.ICONOS_ACERCAR_M} step={0.1} min={-5} max={15} note="Z24 m hacia el usuario"
+            onChange={v => { DBG_PISO_ICONOS.ICONOS_ACERCAR_M = v; setPiso(o => ({ ...o, ICONOS_ACERCAR_M: v })); }} />
           <NumField label="SEP_M" value={piso.SEP_M} step={0.1} min={0.5} max={10} note="m entre iconos"
             onChange={v => { DBG_PISO_ICONOS.SEP_M = v; setPiso(o => ({ ...o, SEP_M: v })); }} />
-          <NumField label="TAM_M" value={piso.TAM_M} step={0.05} min={0.2} max={5} note="m"
-            onChange={v => { DBG_PISO_ICONOS.TAM_M = v; setPiso(o => ({ ...o, TAM_M: v })); }} />
+          <NumField label="ICONOS_TAMANO_M" value={piso.ICONOS_TAMANO_M} step={0.05} min={0.2} max={6} note="Z24 m"
+            onChange={v => { DBG_PISO_ICONOS.ICONOS_TAMANO_M = v; setPiso(o => ({ ...o, ICONOS_TAMANO_M: v })); }} />
           <NumField label="BRILLO_MAX" value={piso.BRILLO_MAX} step={0.02} min={0} max={2} note="reflejo"
             onChange={v => { DBG_PISO_ICONOS.BRILLO_MAX = v; setPiso(o => ({ ...o, BRILLO_MAX: v })); }} />
           <NumField label="ENTRA_DEG" value={piso.ENTRA_DEG} step={0.5} min={1} max={60} note="° cono"

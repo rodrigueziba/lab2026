@@ -8,6 +8,7 @@
 import { useRef, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { anclarTelon } from "@/lib/inicioEscena";
 import { DBG_SILLAS, DBG_FLASH } from "@/lib/debugConfig";
 import { FLASH_STATE, flashDrivesCurtain } from "@/lib/curtainFlash";
 
@@ -284,14 +285,16 @@ export default function Curtain() {
     if (fwdLen > 1e-5) { fwdVec.x /= fwdLen; fwdVec.z /= fwdLen; }
     else               { fwdVec.x  = 0;       fwdVec.z  = -1; }
 
-    const fwdX   = fwdVec.x;
-    const fwdZ   = fwdVec.z;
+    // Z24: el telón se ancla en el mundo (base histórica + curtainDistM sobre el forward inicial):
+    // no se mueve con la posición inicial del usuario (INICIO_RETROCESO_M) ni al re-mostrarse.
+    const ancla  = anclarTelon(fwdVec.x, fwdVec.z);
+    const fwdX   = ancla.fx;
+    const fwdZ   = ancla.fz;
     const rightX = -fwdZ;  // 90° CW in XZ plane
     const rightZ =  fwdX;
 
-    const distM   = DBG_SILLAS.curtainDistM;
-    const centerX = camera.position.x + fwdX * distM;
-    const centerZ = camera.position.z + fwdZ * distM;
+    const centerX = ancla.cx;
+    const centerZ = ancla.cz;
 
     const s = buildSim(
       DBG_SILLAS.curtainWidthM, DBG_SILLAS.curtainHeightM,

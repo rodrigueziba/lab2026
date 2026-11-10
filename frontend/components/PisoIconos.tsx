@@ -13,10 +13,14 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_PISO_ICONOS, DBG_SILLAS } from "@/lib/debugConfig";
+import { DBG_PISO_ICONOS } from "@/lib/debugConfig";
+import { anclarTelon } from "@/lib/inicioEscena";
 import { INTERACT_STATE } from "@/lib/alightStore";
 
 const ICONOS = ["/alight/icons/icono-silla.svg", "/alight/icons/icono-luz.svg"] as const;
+// Z24: engrosado leve por código (dilatación de la máscara en px de 1024) para que los trazos
+// finos de la silla nueva (11–16 / 512) sobrevivan un nivel más de mipmap a distancia.
+const DILATAR_PX = [2, 0] as const;
 const TAM_TEX = 1024;
 const ALTURA_M = 0.004;           // separación mínima sobre el piso (+ polygonOffset)
 
@@ -56,13 +60,18 @@ const FRAG = /* glsl */`
 `;
 
 /** Rasteriza un SVG a una máscara empaquetada (R = trazo, G = trazo difuminado). */
-function rasterizar(url: string): Promise<THREE.CanvasTexture> {
+function rasterizar(url: string, dilatar = 0): Promise<THREE.CanvasTexture> {
   return new Promise((res, rej) => {
     const img = new Image();
     img.onload = () => {
       const nitido = document.createElement("canvas"); nitido.width = nitido.height = TAM_TEX;
       const cn = nitido.getContext("2d")!;
       cn.drawImage(img, 0, 0, TAM_TEX, TAM_TEX);
+      // Z24: dilatación = el mismo dibujo corrido en un círculo de radio `dilatar` (solo al cargar)
+      if (dilatar > 0) for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        cn.drawImage(img, Math.cos(a) * dilatar, Math.sin(a) * dilatar, TAM_TEX, TAM_TEX);
+      }
       const difuso = document.createElement("canvas"); difuso.width = difuso.height = TAM_TEX;
       const cd = difuso.getContext("2d")!;
       cd.filter = "blur(14px)";                     // si el navegador no lo soporta, el halo es el trazo
@@ -106,13 +115,12 @@ export default function PisoIconos() {
   const _f = useMemo(() => new THREE.Vector3(), []);
   const _p = useMemo(() => new THREE.Vector3(), []);
 
+  // Z24: referencia = el ANCLA del telón (fija en el mundo), no la posición del usuario
   useEffect(() => {
     const f = new THREE.Vector3();
     camera.getWorldDirection(f);
-    f.y = 0;
-    if (f.lengthSq() < 1e-6) f.set(0, 0, -1);
-    f.normalize();
-    base.current = { x: camera.position.x, z: camera.position.z, fx: f.x, fz: f.z, listo: true };
+    const A = anclarTelon(f.x, f.z);                              // ya fijada por el telón, o se fija acá igual
+    base.current = { x: A.cx, z: A.cz, fx: A.fx, fz: A.fz, listo: true };
   }, [camera]);
 
   // máscaras (una por icono), anisotropía máxima; se liberan al desmontar
@@ -121,7 +129,7 @@ export default function PisoIconos() {
     const texs: THREE.Texture[] = [];
     const aniso = gl.capabilities.getMaxAnisotropy();
     ICONOS.forEach((url, i) => {
-      rasterizar(url).then(t => {
+      rasterizar(url, DILATAR_PX[i]).then(t => {
         if (!vivo) { t.dispose(); return; }
         t.anisotropy = aniso;
         texs.push(t);
@@ -165,9 +173,10 @@ export default function PisoIconos() {
     E.fade = objetivo > E.fade ? Math.min(1, E.fade + paso) : objetivo < E.fade ? Math.max(0, E.fade - paso) : E.fade;
     const visible = E.fade > 0.001;
 
-    // posición: delante de la posición inicial, acotada para no llegar al telón
-    const tam = Math.max(0.1, D.TAM_M);
-    const dist = Math.max(tam / 2 + 0.2, Math.min(D.DIST_M, DBG_SILLAS.curtainDistM - tam / 2 - D.MARGEN_TELON_M));
+    // Z24: posición respecto del telón: su centro queda DIST_TELON_M + ICONOS_ACERCAR_M antes del
+    // telón (hacia el usuario). B = centro del telón; dist negativa = hacia atrás desde el telón.
+    const tam = Math.max(0.1, D.ICONOS_TAMANO_M);
+    const dist = -Math.max(tam / 2 + 0.1, D.DIST_TELON_M + D.ICONOS_ACERCAR_M);
     const rx = -B.fz, rz = B.fx;                                   // derecha (como en Curtain)
     const yaw = Math.atan2(-B.fx, -B.fz);
 

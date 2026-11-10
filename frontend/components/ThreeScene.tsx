@@ -20,6 +20,7 @@ import CurtainFlash from "./CurtainFlash"; // F1: destello al atravesar el teló
 import FlashAviso from "./FlashAviso"; // G2: aviso de fotosensibilidad (flag, off por defecto)
 import VideoModal from "./VideoModal"; // video etapa 1: reproductor aparte (modal)
 import PisoIconos from "./PisoIconos"; // Z23: iconos grabados en el piso (silla / luz)
+import { posicionInicial } from "@/lib/inicioEscena"; // Z24
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
 import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
@@ -196,7 +197,8 @@ function Player() {
   const rightPos    = useMemo(() => new THREE.Vector3( LECTERN_PLACE_X, 1.6, 0), []);
   const { camera }  = useThree();
 
-  useEffect(() => { camera.position.set(-10, 1.6, -7); }, [camera]);
+  // Z24: posición inicial con retroceso (lejos del telón); el telón queda anclado en el mundo
+  useEffect(() => { camera.position.set(...posicionInicial()); }, [camera]);
 
   useEffect(() => {
     const onSit = () => {
@@ -253,6 +255,9 @@ function Player() {
     };
     const onResetCurtain  = () => {
       INTERACT_STATE.experienceState = 'cortina';
+      // Z24: el reset del telón devuelve al usuario a la posición inicial, mirando al telón
+      camera.position.set(...posicionInicial());
+      camera.rotation.set(0, 0, 0);
       window.dispatchEvent(new CustomEvent("alight:curtain-reshow"));
     };
 
@@ -281,7 +286,7 @@ function Player() {
       window.removeEventListener("alight:debug-skip-curtain",    onSkipCurtain);
       window.removeEventListener("alight:debug-reset-curtain",   onResetCurtain);
     };
-  }, []);
+  }, [camera]); // Z24: el reset del telón reposiciona la cámara (camera es estable en R3F)
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -780,7 +785,7 @@ export default function ThreeScene() {
       <Canvas
         style={{ width: "100vw", height: "100vh" }}
         shadows
-        camera={{ position: [-10, 1.6, -7], fov: 90 }}
+        camera={{ position: posicionInicial(), fov: 90 }}
         gl={{ antialias: true }}
       >
         <Scene />

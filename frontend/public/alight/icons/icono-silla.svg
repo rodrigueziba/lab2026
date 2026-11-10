@@ -1,17 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-<g transform="translate(14 -30) scale(0.97)" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
-<!-- fondo: patas y respaldo finos -->
-<path d="M226 226 L226 384" stroke-width="16"/>
-<path d="M420 266 L424 420" stroke-width="16"/>
-<path d="M222 226 L212 58" stroke-width="16"/>
-<path d="M420 266 L410 98" stroke-width="16"/>
-<path d="M214 58 L410 98" stroke-width="16"/>
-<path d="M218 136 L414 176" stroke-width="11"/>
-<path d="M222 226 L420 266" stroke-width="15"/>
-<!-- frente: asiento y patas anchas -->
-<path d="M420 266 L318 342" stroke-width="20"/>
-<path d="M222 226 L120 302" stroke-width="22"/>
-<path d="M120 302 L318 342" stroke-width="28"/>
-<path d="M120 302 L114 466" stroke-width="30"/>
-<path d="M318 342 L314 506" stroke-width="30"/>
+<g transform="translate(34 -14) scale(0.97)" stroke-linecap="round" stroke-linejoin="round" stroke="#fff">
+<path d="M278 214 L280 372" fill="none" stroke-width="15"/>
+<path d="M440 274 L446 424" fill="none" stroke-width="16"/>
+<polygon points="282,214 438,272 290,346 276,334" fill="#fff" stroke-width="14"/>
+<polygon points="102,120 250,173 258,330 110,280" fill="#fff" stroke-width="16"/>
+<path d="M112 296 L104 452" fill="none" stroke-width="30"/>
+<path d="M276 346 L274 512" fill="none" stroke-width="30"/>
 </g></svg>
