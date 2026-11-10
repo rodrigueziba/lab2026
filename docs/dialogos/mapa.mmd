@@ -1,0 +1,52 @@
+flowchart TD
+  N_n_1["1<br/>¿No es suficiente?"]:::cerrado
+  N_n_1_a["1.a<br/>Quizás la luz no es para vos."]:::efecto
+  N_premio_otorgado["1.a.premio<br/>Quizás tenés otras habilidades o …"]:::efecto
+  N_n_1_b["1.b<br/>¿Qué estás buscando?"]:::cerrado
+  N_n_1_b_a["1.b.a<br/>⚙ ir_tarima_sin_publico"]:::efecto
+  N_n_1_b_b["1.b.b<br/>¿Por qué crees que no te entiende…"]:::cerrado
+  N_p_1_b_b_a["1.b.b.a<br/>(sin texto)"]:::pendiente
+  N_p_1_b_b_b["1.b.b.b<br/>(sin texto)"]:::pendiente
+  N_p_1_b_b_c["1.b.b.c<br/>(sin texto)"]:::pendiente
+  N_p_1_b_b_d["1.b.b.d<br/>(sin texto)"]:::pendiente
+  N_n_1_b_c["1.b.c<br/>¿Qué te inquieta?"]:::cerrado
+  N_p_1_b_c_a["1.b.c.a<br/>(sin texto)"]:::pendiente
+  N_p_1_b_c_b["1.b.c.b<br/>(sin texto)"]:::pendiente
+  N_p_1_b_c_c["1.b.c.c<br/>(sin texto)"]:::pendiente
+  N_p_1_b_c_d["1.b.c.d<br/>(sin texto)"]:::pendiente
+  N_n_1_b_d["1.b.d<br/>Me gustaría saberlo también. ¿Vos…"]:::pendiente
+  N_n_1_c["1.c<br/>¿Crees que alguna vez va a ser su…"]:::cerrado
+  N_p_1_c_c["1.c.c<br/>(sin texto)"]:::pendiente
+  N_p_1_c_d["1.c.d<br/>(sin texto)"]:::pendiente
+  N_n_1_d["1.d<br/>Yo creo que nos motiva lo mismo e…"]:::cerrado
+  N_p_1_d_a["1.d.a<br/>(sin texto)"]:::pendiente
+  N_p_1_d_b["1.d.b<br/>(sin texto)"]:::pendiente
+  N_p_1_d_c["1.d.c<br/>(sin texto)"]:::pendiente
+  N_p_1_d_d["1.d.d<br/>(sin texto)"]:::pendiente
+  N_n_1 -->|"Sí."| N_n_1_a
+  N_n_1 -->|"No."| N_n_1_b
+  N_n_1 -->|"A veces."| N_n_1_c
+  N_n_1 -->|"¿Para vos sí?"| N_n_1_d
+  N_n_1_b -->|"Entretenerme."| N_n_1_b_a
+  N_n_1_b -->|"Que me entiendan."| N_n_1_b_b
+  N_n_1_b -->|"Saber más."| N_n_1_b_c
+  N_n_1_b -->|"Entender de qué va to…"| N_n_1_b_d
+  N_n_1_b_b -->|"No están a mi altura."| N_p_1_b_b_a
+  N_n_1_b_b -->|"No sé expresarme."| N_p_1_b_b_b
+  N_n_1_b_b -->|"A veces siento que es…"| N_p_1_b_b_c
+  N_n_1_b_b -->|"¿Por qué crees que lo…"| N_p_1_b_b_d
+  N_n_1_b_c -->|"¿Por qué estoy acá?"| N_p_1_b_c_a
+  N_n_1_b_c -->|"¿Qué viene después?"| N_p_1_b_c_b
+  N_n_1_b_c -->|"¿Qué tiene que ver co…"| N_p_1_b_c_c
+  N_n_1_b_c -->|"Lo mismo que a vos."| N_p_1_b_c_d
+  N_n_1_c -->|"Si."| N_n_1_a
+  N_n_1_c -->|"No."| N_n_1_b
+  N_n_1_c -->|"No tendría por qué se…"| N_p_1_c_c
+  N_n_1_c -->|"¿Vos también te diste…"| N_p_1_c_d
+  N_n_1_d -->|"No sé de qué estas ha…"| N_p_1_d_a
+  N_n_1_d -->|"Nada nunca es sufic…"| N_p_1_d_b
+  N_n_1_d -->|"¿Para qué es todo est…"| N_p_1_d_c
+  N_n_1_d -->|"Hay que hacer algo en…"| N_p_1_d_d
+  classDef cerrado fill:#2E9E5B,stroke:#12101A,color:#fff;
+  classDef pendiente fill:#F4B62E,stroke:#12101A,color:#12101A;
+  classDef efecto fill:#1F7FB8,stroke:#12101A,color:#fff;
