@@ -142,6 +142,22 @@ export const DBG_AISLAR_UI = {
   MODO: "todo" as "todo" | "panel" | "historia" | "galeria" | "ficha" | "sin_marco" | "sin_orbita",
 };
 
+// ── Z19: FOCO de un subpanel (HISTORIA / GALERÍA / FICHA) dentro del domo esférico — live ──
+export const DBG_FOCO = {
+  SUB_FOCO:            true,  // false = sin foco (comportamiento Z18)
+  FOCO_DWELL_S:        1.0,   // segundos con la retícula sobre el subpanel para entrar en foco (0 = inmediato)
+  FOCO_RADIO_M:        1.6,   // radio del parche en foco (más cerca → tapa al resto por profundidad)
+  FOCO_PANTALLA:       0.80,  // fracción del viewport (ancho y alto) que ocupa, mirado de frente
+  FOCO_ANG_MAX_DEG:    90,    // tope del ancho / alto angular en foco
+  FOCO_SEGUIR_MIRADA:  0.35,  // el centro se corre hacia la mirada esta fracción
+  FOCO_DESPL_MAX_DEG:  15,    // máximo corrimiento del centro hacia la mirada
+  FOCO_OTROS_OPACIDAD: 0.35,  // brillo del resto del conjunto mientras hay foco
+  FOCO_SALIDA_MARGEN_DEG: 4,  // histéresis: margen alrededor del subpanel agrandado antes de contar la salida
+  FOCO_GRACIA_S:       0.4,   // fuera del margen este tiempo → sale del foco
+  FOCO_COOLDOWN_S:     0.25,  // mínimo entre transiciones (evita oscilar)
+  FOCO_MS:             450,   // duración de entrada y salida
+};
+
 // ── Z12: log de diagnóstico de la máquina de estados del panel (apagado por defecto) ──
 export const DBG_LOG_PANEL = {
   LOG_ACTIVO: false, // true = console.info en cada transición (motivo, ángulo al centro, tiempo)

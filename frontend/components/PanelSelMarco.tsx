@@ -12,6 +12,7 @@ import * as THREE from "three";
 import { LINTERNA_STATE, ACERC } from "@/lib/linternaPaneles";
 import { DBG_LINTERNA, DBG_PRIORIDAD, DBG_SUBPANELES, DBG_AISLAR_UI } from "@/lib/debugConfig";
 import { CAPA_UI } from "@/lib/retro/capaUI";
+import { FOCO } from "@/lib/focoSubpanel";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 
 const LABEL_W_M = 2.2;   // ancho del rótulo en metros (canvas 512×64 → 8:1)
@@ -92,7 +93,7 @@ export default function PanelSelMarco({ ancho, alto }: { ancho: number; alto: nu
     u.uHalf.value.set(hx, hy);
     u.uLabelBox.value.set(-hx, hy + LABEL_GAP_M, LABEL_W_M, LABEL_H_M);
     u.uProgress.value = s.sel === s.marco ? s.progreso : 0;
-    u.uAlpha.value = s.selAlpha;
+    u.uAlpha.value = s.selAlpha * FOCO.atenua; // Z19: atenuado mientras hay un subpanel en foco
 
     // pose del panel seleccionado (mundo) + escala de su fade
     target.getWorldPosition(_pos);

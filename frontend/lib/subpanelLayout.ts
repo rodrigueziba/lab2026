@@ -48,7 +48,7 @@ const FW = FICHA_SIZE.w / 2,    FH = FICHA_SIZE.h / 2;
 
 /** Punto de contenido (coordenadas normalizadas −1..1 por eje) → ¿visible tras el barrel?
  *  El CRT muestra en c_pantalla el contenido de c·(1 + curva·|c|²); se invierte por Newton. */
-function visible(xn: number, yn: number, curva: number, lim: number): boolean {
+export function visible(xn: number, yn: number, curva: number, lim: number): boolean { // Z19: exportada
   const r = Math.hypot(xn, yn);
   let s = 1;
   if (curva > 0 && r > 1e-6) {

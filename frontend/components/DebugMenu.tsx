@@ -32,9 +32,11 @@ import {
   DBG_PRIORIDAD,
   DBG_LOG_PANEL,
   DBG_AISLAR_UI,
+  DBG_FOCO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
 import { LINTERNA_STATE, ORBITAS_INFO, ACERC } from "@/lib/linternaPaneles";
+import { FOCO } from "@/lib/focoSubpanel";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { setVizVolume, restartVizAudio, BAND_STATE, BAND_U2_DEBUG, reshuffleAssignment, N5_STATE } from "@/lib/vizAudio";
@@ -338,6 +340,8 @@ export default function DebugMenu() {
   const [prio, setPrio] = useState({ ...DBG_PRIORIDAD });   // Z10
   const [logPanelOn, setLogPanelOn] = useState(DBG_LOG_PANEL.LOG_ACTIVO); // Z12
   const [aislar, setAislar] = useState(DBG_AISLAR_UI.MODO);                // Z17
+  const [foco, setFoco] = useState({ ...DBG_FOCO });                        // Z19
+  const [focoLive, setFocoLive] = useState("nada");                          // Z19
   const [acercLive, setAcercLive] = useState("orbita");     // Z8
   const [orbInfo, setOrbInfo] = useState("");               // Z7: tabla de anillos
   // P1: paneles SILLAS — constantes + estado en vivo (mismo poll)
@@ -360,6 +364,10 @@ export default function DebugMenu() {
         const L = LINTERNA_STATE;
         const txt = `${L.habilitada ? "habilitada" : "NO habilitada (movimiento bloqueado)"} · ${L.fase}${L.sel ? ` · panel ${L.sel.indice} · ${L.sel.angulo.toFixed(1)}° · ${Math.round(L.progreso * 100)}%` : ""}${L.apagada ? " · apagada" : ""}`;
         setLinternaLive(prev => (prev === txt ? prev : txt));
+      }
+      { // Z19
+        const txt = `${FOCO.fase}${FOCO.id ? ` · ${FOCO.id} · ${Math.round(FOCO.f * 100)}% · pantalla ${(FOCO.pct * 100).toFixed(0)}% · ${(FOCO.ancho * 180 / Math.PI).toFixed(0)}×${(FOCO.alto * 180 / Math.PI).toFixed(0)}°` : FOCO.candidato ? ` · dwell ${FOCO.candidato}` : ""} · resto ${(FOCO.atenua * 100).toFixed(0)}%`;
+        setFocoLive(prev => (prev === txt ? prev : txt));
       }
       { // Z8
         const L = ACERC.layout;
@@ -1338,6 +1346,42 @@ export default function DebugMenu() {
             onChange={v => { DBG_PRIORIDAD.OCULTAR_PROF_M = v; setPrio(o => ({ ...o, OCULTAR_PROF_M: v })); }} />
           <NumField label="RENDER_ORDER_BLOQUE" value={prio.RENDER_ORDER_BLOQUE} step={1} min={1} max={100} note="al montar"
             onChange={v => { DBG_PRIORIDAD.RENDER_ORDER_BLOQUE = v; setPrio(o => ({ ...o, RENDER_ORDER_BLOQUE: v })); }} />
+
+          <div style={DIVIDER} />
+          <span style={LABEL}>Foco Z19 — subpanel agrandado <span style={NOTE}>(live)</span></span>
+          <div style={ROW}>
+            <span>SUB_FOCO</span>
+            <button style={INPUT} onClick={() => {
+              const v = !foco.SUB_FOCO;
+              DBG_FOCO.SUB_FOCO = v;
+              setFoco(o => ({ ...o, SUB_FOCO: v }));
+            }}>{foco.SUB_FOCO ? "ON" : "off"}</button>
+          </div>
+          <NumField label="FOCO_DWELL_S" value={foco.FOCO_DWELL_S} step={0.1} min={0} max={5} note="s (0 = inmediato)"
+            onChange={v => { DBG_FOCO.FOCO_DWELL_S = v; setFoco(o => ({ ...o, FOCO_DWELL_S: v })); }} />
+          <NumField label="FOCO_MS" value={foco.FOCO_MS} step={25} min={50} max={3000} note="ms entrada/salida"
+            onChange={v => { DBG_FOCO.FOCO_MS = v; setFoco(o => ({ ...o, FOCO_MS: v })); }} />
+          <NumField label="FOCO_RADIO_M" value={foco.FOCO_RADIO_M} step={0.1} min={0.3} max={5} note="m"
+            onChange={v => { DBG_FOCO.FOCO_RADIO_M = v; setFoco(o => ({ ...o, FOCO_RADIO_M: v })); }} />
+          <NumField label="FOCO_PANTALLA" value={foco.FOCO_PANTALLA} step={0.01} min={0.2} max={1} note="fracción del viewport"
+            onChange={v => { DBG_FOCO.FOCO_PANTALLA = v; setFoco(o => ({ ...o, FOCO_PANTALLA: v })); }} />
+          <NumField label="FOCO_ANG_MAX_DEG" value={foco.FOCO_ANG_MAX_DEG} step={1} min={10} max={150} note="° tope"
+            onChange={v => { DBG_FOCO.FOCO_ANG_MAX_DEG = v; setFoco(o => ({ ...o, FOCO_ANG_MAX_DEG: v })); }} />
+          <NumField label="FOCO_SEGUIR_MIRADA" value={foco.FOCO_SEGUIR_MIRADA} step={0.05} min={0} max={1} note="fracción"
+            onChange={v => { DBG_FOCO.FOCO_SEGUIR_MIRADA = v; setFoco(o => ({ ...o, FOCO_SEGUIR_MIRADA: v })); }} />
+          <NumField label="FOCO_DESPL_MAX_DEG" value={foco.FOCO_DESPL_MAX_DEG} step={1} min={0} max={60} note="° tope corrimiento"
+            onChange={v => { DBG_FOCO.FOCO_DESPL_MAX_DEG = v; setFoco(o => ({ ...o, FOCO_DESPL_MAX_DEG: v })); }} />
+          <NumField label="FOCO_OTROS_OPACIDAD" value={foco.FOCO_OTROS_OPACIDAD} step={0.05} min={0} max={1} note="brillo del resto"
+            onChange={v => { DBG_FOCO.FOCO_OTROS_OPACIDAD = v; setFoco(o => ({ ...o, FOCO_OTROS_OPACIDAD: v })); }} />
+          <NumField label="FOCO_SALIDA_MARGEN_DEG" value={foco.FOCO_SALIDA_MARGEN_DEG} step={0.5} min={0} max={30} note="° histéresis"
+            onChange={v => { DBG_FOCO.FOCO_SALIDA_MARGEN_DEG = v; setFoco(o => ({ ...o, FOCO_SALIDA_MARGEN_DEG: v })); }} />
+          <NumField label="FOCO_GRACIA_S" value={foco.FOCO_GRACIA_S} step={0.05} min={0} max={5} note="s fuera"
+            onChange={v => { DBG_FOCO.FOCO_GRACIA_S = v; setFoco(o => ({ ...o, FOCO_GRACIA_S: v })); }} />
+          <NumField label="FOCO_COOLDOWN_S" value={foco.FOCO_COOLDOWN_S} step={0.05} min={0} max={5} note="s entre transiciones"
+            onChange={v => { DBG_FOCO.FOCO_COOLDOWN_S = v; setFoco(o => ({ ...o, FOCO_COOLDOWN_S: v })); }} />
+          <div style={ROW}>
+            <span>estado <span style={NOTE}>{focoLive}</span></span>
+          </div>
 
           <div style={DIVIDER} />
           <span style={LABEL}>Subpaneles Z4 — HISTORIA / GALERÍA / FICHA <span style={NOTE}>(live)</span></span>

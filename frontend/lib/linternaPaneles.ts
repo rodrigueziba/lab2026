@@ -11,6 +11,7 @@ import { calcularLayoutBloque, calcularLayoutConcavo, calcularLayoutDomo, calcul
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CAPA_UI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
+import { FOCO } from "@/lib/focoSubpanel";
 
 export interface PanelLinterna {
   pivot:    THREE.Object3D | null;   // grupo que gira con la fase propia del panel
@@ -494,6 +495,9 @@ const _cf = new THREE.Vector3();
 const _cr = new THREE.Vector3();
 function cierrePorPantalla(camera: THREE.Camera, now: number): boolean {
   const L = ACERC.layout;
+  // Z19: con un subpanel en foco el cierre queda SUSPENDIDO (el foco tiene su propia salida con
+  // histéresis y gracia); recién al volver a 'nada' cuenta otra vez la región del conjunto.
+  if (FOCO.fase !== "nada") { ACERC.miraDentro = true; ACERC.tFuera = 0; return false; }
   camera.getWorldPosition(_cam);
   camera.getWorldDirection(_cf);
   // Z14: conjunto cóncavo → región ANGULAR en el mundo (yaw sobre la vertical, elevación),

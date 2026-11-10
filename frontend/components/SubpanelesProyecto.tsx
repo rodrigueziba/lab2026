@@ -17,7 +17,10 @@ import * as THREE from "three";
 import { DBG_SUBPANELES, DBG_PRIORIDAD, DBG_AISLAR_UI } from "@/lib/debugConfig";
 import { ponerEnCapaUI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
 import { crearParche, actualizarParche, uvDeParche, UV_PARCHE, type ParamsParche } from "@/lib/retro/parcheEsferico";
+import { FOCO, resetFoco, easingFoco, calcularFocoObjetivo, type FocoId } from "@/lib/focoSubpanel";
+import { DBG_FOCO } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
+import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
 
 // Z10: el conjunto se dibuja después de los paneles en órbita (renderOrder 0)
 const RO = DBG_PRIORIDAD.RENDER_ORDER_BLOQUE;
@@ -60,6 +63,7 @@ const PANTALLA_VERT = /* glsl */`
 const PANTALLA_FRAG = /* glsl */`
   uniform sampler2D uMap, uOverlay;
   uniform float uHas, uTexAspect, uScreenAspect, uAmbar, uScan, uCurva;
+  uniform float uAtenua; // Z19: brillo relativo mientras otro subpanel está en foco
   varying vec2 vUv;
   void main() {
     vec2 c = vUv * 2.0 - 1.0;
@@ -79,7 +83,7 @@ const PANTALLA_FRAG = /* glsl */`
     col *= 1.0 - 0.35 * dot(c, c) * 0.5;             // viñeta del tubo
     float ov = texture2D(uOverlay, uv).a;            // PLAY / T-03 / LOCACIÓN
     col = mix(col, amber * 1.15, ov);
-    gl_FragColor = vec4(col, 1.0);
+    gl_FragColor = vec4(col * uAtenua, 1.0);
   }
 `;
 
@@ -123,6 +127,35 @@ const _pp: ParamsParche = { yaw: 0, pitch: 0, ancho: 0.1, alto: 0.1, R: 3, curva
 const _qfi = new THREE.Quaternion();
 const _eo = new THREE.Vector3(), _ed = new THREE.Vector3();
 const _box = { yaw: 0, pitch: 0, ancho: 0, alto: 0 };
+// Z19: parámetros EFECTIVOS (aparición + foco) de cada subpanel: los usan la geometría y el raycast
+type EF = { yaw: number; pitch: number; ancho: number; alto: number; R: number };
+const _efH: EF = { yaw: 0, pitch: 0, ancho: 0, alto: 0, R: 3 };
+const _efG: EF = { yaw: 0, pitch: 0, ancho: 0, alto: 0, R: 3 };
+const _efF: EF = { yaw: 0, pitch: 0, ancho: 0, alto: 0, R: 3 };
+const _qCamM = new THREE.Quaternion();
+const ORDEN_H: FocoId[] = ["historia", "galeria", "ficha"];   // orden de prueba del raycast (el de foco primero)
+const ORDEN_G: FocoId[] = ["galeria", "historia", "ficha"];
+const ORDEN_F: FocoId[] = ["ficha", "historia", "galeria"];
+function efDe(id: FocoId): EF { return id === "historia" ? _efH : id === "galeria" ? _efG : _efF; }
+/** base → (si está en foco) mezcla hacia el objetivo del foco. */
+function ponerEF(ef: EF, id: FocoId, yaw: number, pitch: number, ancho: number, alto: number, R: number): void {
+  const k = FOCO.id === id ? FOCO.fEase : 0;
+  ef.yaw = yaw + (FOCO.yaw - yaw) * k; ef.pitch = pitch + (FOCO.pitch - pitch) * k;
+  ef.ancho = ancho + (FOCO.ancho - ancho) * k; ef.alto = alto + (FOCO.alto - alto) * k;
+  ef.R = R + (FOCO.R - R) * k;
+}
+/** Intersección del rayo (en el marco) con la esfera de radio R centrada en el ojo → yaw/pitch. */
+const _hitEsf = { ok: false, t: 0, yaw: 0, pitch: 0 };
+function rayoEsfera(o: THREE.Vector3, d: THREE.Vector3, R: number): void {
+  const b = o.dot(d), c = o.lengthSq() - R * R, disc = b * b - c;
+  _hitEsf.ok = false;
+  if (disc < 0) return;
+  const t = -b + Math.sqrt(disc);
+  if (t <= 0) return;
+  const hx = o.x + d.x * t, hy = o.y + d.y * t, hz = o.z + d.z * t;
+  _hitEsf.ok = true; _hitEsf.t = t;
+  _hitEsf.yaw = Math.atan2(hx, -hz); _hitEsf.pitch = Math.asin(THREE.MathUtils.clamp(hy / R, -1, 1));
+}
 function ponerParche(geo: THREE.BufferGeometry, yaw: number, pitch: number, ancho: number, alto: number, R: number, curva: number, vertical: boolean): void {
   _pp.yaw = yaw; _pp.pitch = pitch; _pp.ancho = Math.max(1e-4, ancho); _pp.alto = Math.max(1e-4, alto);
   _pp.R = R; _pp.curva = curva; _pp.vertical = vertical;
@@ -235,7 +268,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
   }, []);
 
   // estado de animación / interacción (refs: sin re-render por frame)
-  const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false, capaUI: false, dtViejo: false, esfVersion: -1, esfT: -1, panelOculto: false }); // Z5…Z18
+  const anim = useRef({ t: 0, abierto: false, tDentro: 0, escala: 1, avisoEscala: false, capaUI: false, dtViejo: false, esfVersion: -1, esfT: -1, panelOculto: false, focoK: -1, focoId: "" as string }); // Z5…Z19
   const ui = useRef({
     pagina: 0, paginas: [[""]] as string[][], indice: 0,
     hover: null as string | null, sobre: null as "historia" | "galeria" | "ficha" | null,
@@ -254,6 +287,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     uMap: { value: vacia as THREE.Texture }, uOverlay: { value: vacia as THREE.Texture },
     uHas: { value: 0 }, uTexAspect: { value: 1.5 }, uScreenAspect: { value: GALERIA_PANTALLA.w / GALERIA_PANTALLA.h },
     uAmbar: { value: 1 }, uScan: { value: 0.28 }, uCurva: { value: 0.08 },
+    uAtenua: { value: 1 }, // Z19
   }), [vacia]);
   const uniformsLinea = useMemo(() => ({ uAlpha: { value: 0 }, uLen: { value: 1 } }), []);
 
@@ -289,9 +323,12 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       INTERACT_STATE.panelBloqueo = false; // Z5
       setEst(prev => (prev ? { ...prev, abierto: false } : prev));
     };
+    const onViz = () => { resetFoco(); }; // Z19: visualizer-activate cancela el foco
+    window.addEventListener("alight:visualizer-activate", onViz);
     window.addEventListener("alight:panel-abierto", onAbierto);
     window.addEventListener("alight:panel-cerrado", onCerrado);
     return () => {
+      window.removeEventListener("alight:visualizer-activate", onViz);
       window.removeEventListener("alight:panel-abierto", onAbierto);
       window.removeEventListener("alight:panel-cerrado", onCerrado);
       LINTERNA_STATE.retener = false;
@@ -398,6 +435,8 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       if (e.button !== 0 || !document.pointerLockElement || !anim.current.abierto || anim.current.t < 0.95) return;
       const u = ui.current, d = lienzos.current.datos;
       if (!u.hover || !d) return;
+      // Z19: durante la entrada/salida del foco el botón se mueve bajo la retícula → se ignora
+      if (FOCO.fase === "entrando" || FOCO.fase === "saliendo") return;
       // Z11: cooldown — no se reentra mientras dura el clic anterior
       const ahora = performance.now();
       if (ahora - u.tClic < DBG_SUBPANELES.PUNTERO_COOLDOWN_MS) return;
@@ -450,6 +489,13 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       if (domoRef.current && domoRef.current.visible) domoRef.current.visible = false;
       if (A.panelOculto) { A.panelOculto = false; if (ACERC.panel?.mesh) ACERC.panel.mesh.visible = true; }
       A.esfT = -1;
+      // Z19: sin conjunto no hay foco; brillos de vuelta a 1
+      if (FOCO.fase !== "nada" || FOCO.atenua !== 1) {
+        resetFoco(); FOCO.atenua = 1;
+        histMatRef.current?.color.setScalar(1); galMatRef.current?.color.setScalar(1); fichaMatRef.current?.color.setScalar(1);
+        if (pantMatRef.current) pantMatRef.current.uniforms.uAtenua.value = 1;
+        if (ACERC.panel?.uAtenua) ACERC.panel.uAtenua.value = 1;
+      }
       LINTERNA_STATE.retener = false;
       if (INTERACT_STATE.panelBloqueo) INTERACT_STATE.panelBloqueo = false; // Z5
       return;
@@ -663,26 +709,32 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       if (pLinR.current) pLinR.current.visible = verLineas;
       if (pLinB.current) pLinB.current.visible = verLineas;
       // geometría: solo mientras anima o si cambió el layout (resize)
-      if (A.esfT !== e || A.esfVersion !== ACERC.layoutVersion) {
-        A.esfT = e; A.esfVersion = ACERC.layoutVersion;
-        const pY = L.pYaw ?? 0, pP = L.pPitch ?? 0, pA = L.pAncho ?? 0.8, pH = L.pAlto ?? 0.5;
+      // Z19: parámetros efectivos de cada subpanel (aparición desde el panel + mezcla de foco)
+      const pY = L.pYaw ?? 0, pP = L.pPitch ?? 0, pA = L.pAncho ?? 0.8, pH = L.pAlto ?? 0.5;
+      {
+        const k0 = 0.12;                                           // tamaño inicial relativo (sale del panel)
+        const lY = L.lYaw ?? 0, lP = L.lPitch ?? 0, lA = L.lAncho ?? 0.5, lH = L.lAlto ?? 0.6;
+        const fY = L.fYaw ?? 0, fP = L.fPitch ?? 0, fA = L.fAncho ?? 0.7, fH = L.fAlto ?? 0.35;
+        const ka = k0 + (1 - k0) * e;
+        ponerEF(_efH, "historia", pY + (-lY - pY) * e, pP + (lP - pP) * e, lA * ka, lH * ka, R);
+        ponerEF(_efG, "galeria",  pY + ( lY - pY) * e, pP + (lP - pP) * e, lA * ka, lH * ka, R);
+        ponerEF(_efF, "ficha",    pY + (fY - pY) * e, pP + (fP - pP) * e, fA * ka, fH * ka, R);
+      }
+      const focoK = FOCO.fEase, focoId = FOCO.id ?? "";
+      if (A.esfT !== e || A.esfVersion !== ACERC.layoutVersion || A.focoK !== focoK || A.focoId !== focoId) {
+        A.esfT = e; A.esfVersion = ACERC.layoutVersion; A.focoK = focoK; A.focoId = focoId;
         // panel: del plano tangente (igual al panel real que llegó) a la esfera
         ponerParche(geos.panel, pY, pP, pA, pH, R, e, false);
-        // laterales y FICHA: salen del panel (yaw/pitch/ancho/alto animados desde su centro)
-        const k0 = 0.12;                                           // tamaño inicial relativo
-        const lY = L.lYaw ?? 0, lP = L.lPitch ?? 0, lA = L.lAncho ?? 0.5, lH = L.lAlto ?? 0.6;
-        const ka = k0 + (1 - k0) * e;
-        ponerParche(geos.hist, pY + (-lY - pY) * e, pP + (lP - pP) * e, lA * ka, lH * ka, R, 1, false);
-        ponerParche(geos.gal,  pY + ( lY - pY) * e, pP + (lP - pP) * e, lA * ka, lH * ka, R, 1, false);
-        // pantalla CRT de GALERÍA: sub-parche (rect. GALERIA_PANTALLA) apenas delante
+        ponerParche(geos.hist, _efH.yaw, _efH.pitch, _efH.ancho, _efH.alto, _efH.R, 1, false);
+        ponerParche(geos.gal,  _efG.yaw, _efG.pitch, _efG.ancho, _efG.alto, _efG.R, 1, false);
+        // pantalla CRT de GALERÍA: sub-parche (rect. GALERIA_PANTALLA) apenas delante de GALERÍA
         {
-          const gy = pY + (lY - pY) * e, gp = pP + (lP - pP) * e, ga = lA * ka, gh2 = lH * ka;
           const ux = (GALERIA_PANTALLA.x + GALERIA_PANTALLA.w / 2) / GALERIA_SIZE.w - 0.5;
           const vy = 0.5 - (GALERIA_PANTALLA.y + GALERIA_PANTALLA.h / 2) / GALERIA_SIZE.h;
-          ponerParche(geos.pant, gy + ux * ga, gp + vy * gh2, ga * GALERIA_PANTALLA.w / GALERIA_SIZE.w, gh2 * GALERIA_PANTALLA.h / GALERIA_SIZE.h, R - 0.006, 1, false);
+          ponerParche(geos.pant, _efG.yaw + ux * _efG.ancho, _efG.pitch + vy * _efG.alto,
+            _efG.ancho * GALERIA_PANTALLA.w / GALERIA_SIZE.w, _efG.alto * GALERIA_PANTALLA.h / GALERIA_SIZE.h, _efG.R * 0.998, 1, false);
         }
-        const fY = L.fYaw ?? 0, fP = L.fPitch ?? 0, fA = L.fAncho ?? 0.7, fH = L.fAlto ?? 0.35;
-        ponerParche(geos.fic, pY + (fY - pY) * e, pP + (fP - pP) * e, fA * ka, fH * ka, R, 1, false);
+        ponerParche(geos.fic, _efF.yaw, _efF.pitch, _efF.ancho, _efF.alto, _efF.R, 1, false);
         // líneas guía: arcos sobre la esfera entre bordes (un poco delante)
         const gr = Math.max(0.05, D.ESF_LINEA_GROSOR_DEG) * Math.PI / 180, sep = L.sep ?? 0.05;
         ponerParche(geos.linL, pY - pA / 2 - sep / 2, pP, sep, gr, R - 0.01, 1, false);
@@ -690,7 +742,19 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
         ponerParche(geos.linB, pY, pP - pH / 2 - sep / 2, gr, sep, R - 0.01, 1, true);
         if (lm) lm.uniforms.uLen.value = Math.max(0.05, R * sep);
       }
-      if (lm) lm.uniforms.uAlpha.value = la;
+      if (lm) lm.uniforms.uAlpha.value = la * FOCO.atenua;           // Z19: atenuadas con foco
+      // Z19: prioridad (renderOrder único superior + radio menor) y atenuación del resto
+      const fid = FOCO.fase !== "nada" ? FOCO.id : null;
+      if (pHist.current) pHist.current.renderOrder = fid === "historia" ? RO + 10 : RO + 1;
+      if (pGal.current)  pGal.current.renderOrder  = fid === "galeria"  ? RO + 10 : RO + 2;
+      if (pPant.current) pPant.current.renderOrder = fid === "galeria"  ? RO + 11 : RO + 3;
+      if (pFic.current)  pFic.current.renderOrder  = fid === "ficha"    ? RO + 10 : RO + 4;
+      const at = FOCO.atenua;
+      histMatRef.current?.color.setScalar(fid === "historia" ? 1 : at);
+      galMatRef.current?.color.setScalar(fid === "galeria" ? 1 : at);
+      fichaMatRef.current?.color.setScalar(fid === "ficha" ? 1 : at);
+      if (pantMatRef.current) pantMatRef.current.uniforms.uAtenua.value = fid === "galeria" ? 1 : at;
+      if (ACERC.panel?.uAtenua) ACERC.panel.uAtenua.value = at;     // el panel central (Z10 no lo toca)
     } else if (A.panelOculto && ACERC.panel?.mesh) {
       // se apagó el modo esférico con el panel abierto: el panel real vuelve a verse
       A.panelOculto = false; ACERC.panel.mesh.visible = true;
@@ -711,43 +775,34 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
     let dentroAlgo = false;
     let tMin = 1e9;                                   // Z14: distancia al primer impacto (retícula)
     const pad = Math.max(0, D.SUB_RETENER_PAD_M);
-    // Z18: con el domo esférico, una sola intersección rayo–esfera y la inversa del mapeo de cada parche
+    // Z18/Z19: rayo–esfera (centrada en el ojo) por radio y la inversa del mapeo de cada parche,
+    // con los parámetros EFECTIVOS (pose animada real, incluido el foco). El de foco va primero.
     if (esferico) {
-      const L = ACERC.layout, R = L.d;
+      const L = ACERC.layout;
       _qfi.copy(ACERC.qF).invert();
       _eo.copy(_v.cam).sub(ACERC.camPos0).applyQuaternion(_qfi);   // ojo actual en el marco
       _ed.copy(_v.fwd).applyQuaternion(_qfi);
-      const b = _eo.dot(_ed), c = _eo.lengthSq() - R * R, disc = b * b - c;
-      if (disc >= 0) {
-        const tS = -b + Math.sqrt(disc);
-        if (tS > 0) {
-          const hx = _eo.x + _ed.x * tS, hy = _eo.y + _ed.y * tS, hz = _eo.z + _ed.z * tS;
-          const yawH = Math.atan2(hx, -hz), pitchH = Math.asin(THREE.MathUtils.clamp(hy / R, -1, 1));
-          const mAng = pad / R;
-          // HISTORIA (−lYaw), GALERÍA (+lYaw), FICHA y panel
-          _box.pitch = L.lPitch ?? 0; _box.ancho = L.lAncho ?? 0; _box.alto = L.lAlto ?? 0;
-          _box.yaw = -(L.lYaw ?? 0);
-          if (uvDeParche(yawH, pitchH, _box, mAng / Math.max(1e-3, _box.ancho))) {
-            dentroAlgo = true; tMin = tS;
-            if (listo && UV_PARCHE.u >= 0 && UV_PARCHE.u <= 1 && UV_PARCHE.v >= 0 && UV_PARCHE.v <= 1) {
-              sobre = "historia"; _hit.cx = UV_PARCHE.u * HISTORIA_SIZE.w; _hit.cy = UV_PARCHE.v * HISTORIA_SIZE.h;
-            }
-          }
-          _box.yaw = L.lYaw ?? 0;
-          if (!sobre && uvDeParche(yawH, pitchH, _box, mAng / Math.max(1e-3, _box.ancho))) {
-            dentroAlgo = true; tMin = tS;
-            if (listo && UV_PARCHE.u >= 0 && UV_PARCHE.u <= 1 && UV_PARCHE.v >= 0 && UV_PARCHE.v <= 1) {
-              sobre = "galeria"; _hit.cx = UV_PARCHE.u * GALERIA_SIZE.w; _hit.cy = UV_PARCHE.v * GALERIA_SIZE.h;
-            }
-          }
-          _box.yaw = L.fYaw ?? 0; _box.pitch = L.fPitch ?? 0; _box.ancho = L.fAncho ?? 0; _box.alto = L.fAlto ?? 0;
-          if (!sobre && uvDeParche(yawH, pitchH, _box, mAng / Math.max(1e-3, _box.ancho))) {
-            dentroAlgo = true; tMin = tS;
-            if (listo && UV_PARCHE.u >= 0 && UV_PARCHE.u <= 1 && UV_PARCHE.v >= 0 && UV_PARCHE.v <= 1) sobre = "ficha";
-          }
-          _box.yaw = L.pYaw ?? 0; _box.pitch = L.pPitch ?? 0; _box.ancho = L.pAncho ?? 0; _box.alto = L.pAlto ?? 0;
-          if (uvDeParche(yawH, pitchH, _box, mAng / Math.max(1e-3, _box.ancho))) { dentroAlgo = true; tMin = Math.min(tMin, tS); }
+      const mAng = pad / Math.max(0.5, L.d);
+      const orden: FocoId[] = FOCO.id === "galeria" ? ORDEN_G : FOCO.id === "ficha" ? ORDEN_F : ORDEN_H;
+      for (const id of orden) {
+        const ef = efDe(id);
+        rayoEsfera(_eo, _ed, ef.R);
+        if (!_hitEsf.ok) continue;
+        _box.yaw = ef.yaw; _box.pitch = ef.pitch; _box.ancho = ef.ancho; _box.alto = ef.alto;
+        if (!uvDeParche(_hitEsf.yaw, _hitEsf.pitch, _box, mAng / Math.max(1e-3, ef.ancho))) continue;
+        dentroAlgo = true; tMin = Math.min(tMin, _hitEsf.t);
+        if (listo && UV_PARCHE.u >= 0 && UV_PARCHE.u <= 1 && UV_PARCHE.v >= 0 && UV_PARCHE.v <= 1) {
+          sobre = id;
+          if (id === "historia") { _hit.cx = UV_PARCHE.u * HISTORIA_SIZE.w; _hit.cy = UV_PARCHE.v * HISTORIA_SIZE.h; }
+          if (id === "galeria")  { _hit.cx = UV_PARCHE.u * GALERIA_SIZE.w;  _hit.cy = UV_PARCHE.v * GALERIA_SIZE.h; }
+          break;
         }
+      }
+      // panel central (cuenta como "dentro")
+      rayoEsfera(_eo, _ed, L.d);
+      if (_hitEsf.ok) {
+        _box.yaw = L.pYaw ?? 0; _box.pitch = L.pPitch ?? 0; _box.ancho = L.pAncho ?? 0; _box.alto = L.pAlto ?? 0;
+        if (uvDeParche(_hitEsf.yaw, _hitEsf.pitch, _box, mAng / Math.max(1e-3, _box.ancho))) { dentroAlgo = true; tMin = Math.min(tMin, _hitEsf.t); }
       }
     } else
     // subpaneles: planos unitarios escalados → UV directo (con margen `pad` solo para retener)
@@ -778,6 +833,52 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
       else if (hPrev === "sig" && ui.current.sobre === "galeria" && dentroAmpliado(GALERIA_BOTONES.sig, _hit.cx, _hit.cy, mH)) hover = "sig";
       else if (dentro(GALERIA_BOTONES.ant, _hit.cx, _hit.cy)) hover = "ant";
       else if (dentro(GALERIA_BOTONES.sig, _hit.cx, _hit.cy)) hover = "sig";
+    }
+
+    // ── Z19: FOCO de un subpanel (dwell → entrando → foco → saliendo), con histéresis y cooldown ──
+    {
+      const F = DBG_FOCO;
+      const dur = Math.max(1, F.FOCO_MS);
+      const activo = F.SUB_FOCO && esferico && A.abierto && listo;
+      if (FOCO.fase === "entrando") { FOCO.f = Math.min(1, FOCO.f + dt * 1000 / dur); if (FOCO.f >= 1) FOCO.fase = "foco"; }
+      else if (FOCO.fase === "saliendo") { FOCO.f = Math.max(0, FOCO.f - dt * 1000 / dur); if (FOCO.f <= 0) { FOCO.fase = "nada"; FOCO.id = null; } }
+      FOCO.fEase = easingFoco(FOCO.f);
+      const objAt = FOCO.fase === "entrando" || FOCO.fase === "foco" ? THREE.MathUtils.clamp(F.FOCO_OTROS_OPACIDAD, 0, 1) : 1;
+      FOCO.atenua += (objAt - FOCO.atenua) * (1 - Math.exp(-dt * 3000 / dur));
+      const cooldownOk = now - FOCO.tUltima >= F.FOCO_COOLDOWN_S * 1000;
+      if (!activo) {
+        if (FOCO.fase === "entrando" || FOCO.fase === "foco") { FOCO.fase = "saliendo"; FOCO.tUltima = now; }
+        FOCO.candidato = null;
+      } else if (FOCO.fase === "nada") {
+        // dwell sobre un subpanel (estricto, sin margen)
+        if (sobre) {
+          if (FOCO.candidato !== sobre) { FOCO.candidato = sobre; FOCO.tCand = now; }
+          if (now - FOCO.tCand >= F.FOCO_DWELL_S * 1000 && cooldownOk) {
+            const L = ACERC.layout, id = sobre as FocoId;
+            const yc = id === "historia" ? -(L.lYaw ?? 0) : id === "galeria" ? (L.lYaw ?? 0) : (L.fYaw ?? 0);
+            const pc = id === "ficha" ? (L.fPitch ?? 0) : (L.lPitch ?? 0);
+            const w = id === "ficha" ? (L.fAncho ?? 0.7) : (L.lAncho ?? 0.5), h = id === "ficha" ? (L.fAlto ?? 0.35) : (L.lAlto ?? 0.6);
+            camera.getWorldQuaternion(_tq);
+            _qCamM.copy(_qfi).multiply(_tq);                         // cámara actual en el marco
+            const pcam = camera as THREE.PerspectiveCamera;
+            calcularFocoObjetivo(yc, pc, w, h, _qCamM, pcam.isPerspectiveCamera ? pcam.fov : 60,
+              pcam.isPerspectiveCamera ? pcam.aspect : 16 / 9, RETRO_FLAGS.enabled ? (CRT_UNIFORMS.uCurve.value as number) : 0);
+            FOCO.id = id; FOCO.fase = "entrando"; FOCO.f = 0; FOCO.tUltima = now; FOCO.tFuera = 0; FOCO.candidato = null;
+          }
+        } else FOCO.candidato = null;
+      } else if ((FOCO.fase === "entrando" || FOCO.fase === "foco") && FOCO.id) {
+        // salida con histéresis: margen alrededor del subpanel agrandado + gracia + cooldown
+        const ef = efDe(FOCO.id);
+        rayoEsfera(_eo, _ed, ef.R);
+        _box.yaw = ef.yaw; _box.pitch = ef.pitch; _box.ancho = ef.ancho; _box.alto = ef.alto;
+        const m = Math.max(0, F.FOCO_SALIDA_MARGEN_DEG) * Math.PI / 180;
+        const dentroFoco = _hitEsf.ok && uvDeParche(_hitEsf.yaw, _hitEsf.pitch, _box, m / Math.max(1e-3, Math.min(ef.ancho, ef.alto)));
+        if (dentroFoco) FOCO.tFuera = 0;
+        else {
+          if (FOCO.tFuera === 0) FOCO.tFuera = now;
+          if (now - FOCO.tFuera >= F.FOCO_GRACIA_S * 1000 && cooldownOk) { FOCO.fase = "saliendo"; FOCO.tUltima = now; FOCO.tFuera = 0; }
+        }
+      }
     }
 
     // Z5: gracia — si el puntero sale, espera PUNTERO_GRACIA_MS antes de soltar el panel
@@ -876,7 +977,7 @@ export default function SubpanelesProyecto({ panelAncho, panelAlto }: { panelAnc
         <shaderMaterial uniforms={uniformsLinea} vertexShader={PANTALLA_VERT} fragmentShader={LINEA_FRAG} transparent depthWrite={false} />
       </mesh>
       {/* puntero: aro claro donde apunta la mirada (mockup: círculo sobre SIG ▶) */}
-      <mesh ref={punteroRef} renderOrder={RO + 9} visible={false}> {/* Z18: único (era RO + 5) */}
+      <mesh ref={punteroRef} renderOrder={RO + 12} visible={false}> {/* Z19: encima del subpanel en foco (era RO + 9) */}
         <ringGeometry args={[0.18, 0.24, 32]} />
         <meshBasicMaterial color="#FFF3DC" transparent opacity={0.85} depthWrite={false} toneMapped={false} fog={false} />
       </mesh>
