@@ -20,7 +20,7 @@ import CurtainFlash from "./CurtainFlash"; // F1: destello al atravesar el teló
 import FlashAviso from "./FlashAviso"; // G2: aviso de fotosensibilidad (flag, off por defecto)
 import VideoModal from "./VideoModal"; // video etapa 1: reproductor aparte (modal)
 import PisoIconos from "./PisoIconos"; // Z23: iconos grabados en el piso (silla / luz)
-import { posicionInicial } from "@/lib/inicioEscena"; // Z24
+import { posicionInicial, aplicarSpawn } from "@/lib/inicioEscena"; // Z24/Z25
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
 import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
@@ -197,8 +197,8 @@ function Player() {
   const rightPos    = useMemo(() => new THREE.Vector3( LECTERN_PLACE_X, 1.6, 0), []);
   const { camera }  = useThree();
 
-  // Z24: posición inicial con retroceso (lejos del telón); el telón queda anclado en el mundo
-  useEffect(() => { camera.position.set(...posicionInicial()); }, [camera]);
+  // Z24/Z25: spawn único (posición + yaw al centro del telón + pitch); el telón queda anclado en el mundo
+  useEffect(() => { aplicarSpawn(camera); }, [camera]);
 
   useEffect(() => {
     const onSit = () => {
@@ -256,8 +256,7 @@ function Player() {
     const onResetCurtain  = () => {
       INTERACT_STATE.experienceState = 'cortina';
       // Z24: el reset del telón devuelve al usuario a la posición inicial, mirando al telón
-      camera.position.set(...posicionInicial());
-      camera.rotation.set(0, 0, 0);
+      aplicarSpawn(camera); // Z25: mismo spawn que al cargar
       window.dispatchEvent(new CustomEvent("alight:curtain-reshow"));
     };
 
@@ -785,7 +784,9 @@ export default function ThreeScene() {
       <Canvas
         style={{ width: "100vw", height: "100vh" }}
         shadows
-        camera={{ position: posicionInicial(), fov: 90 }}
+        // Z25: rotation explícita → R3F no hace camera.lookAt(0,0,0); el spawn lo fija aplicarSpawn
+        camera={{ position: posicionInicial(), rotation: [0, 0, 0], fov: 90 }}
+        onCreated={({ camera: cam }) => aplicarSpawn(cam)}
         gl={{ antialias: true }}
       >
         <Scene />

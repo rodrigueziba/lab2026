@@ -1357,6 +1357,8 @@ export default function DebugMenu() {
           <span style={LABEL}>Inicio Z24 <span style={NOTE}>(recargar)</span></span>
           <NumField label="INICIO_RETROCESO_M" value={inicio.INICIO_RETROCESO_M} step={0.5} min={0} max={20} note="m lejos del telón"
             onChange={v => { DBG_INICIO.INICIO_RETROCESO_M = v; setInicio(o => ({ ...o, INICIO_RETROCESO_M: v })); }} />
+          <NumField label="INICIO_PITCH_DEG" value={inicio.INICIO_PITCH_DEG} step={1} min={-20} max={20} note="Z25 ° mirada inicial"
+            onChange={v => { DBG_INICIO.INICIO_PITCH_DEG = v; setInicio(o => ({ ...o, INICIO_PITCH_DEG: v })); }} />
           <div style={DIVIDER} />
           <span style={LABEL}>Iconos del piso Z23 <span style={NOTE}>(live)</span></span>
           <div style={ROW}>

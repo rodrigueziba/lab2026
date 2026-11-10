@@ -287,7 +287,7 @@ export default function Curtain() {
 
     // Z24: el telón se ancla en el mundo (base histórica + curtainDistM sobre el forward inicial):
     // no se mueve con la posición inicial del usuario (INICIO_RETROCESO_M) ni al re-mostrarse.
-    const ancla  = anclarTelon(fwdVec.x, fwdVec.z);
+    const ancla  = anclarTelon(); // Z25: eje fijo de la escena (no la mirada de la cámara al montarse)
     const fwdX   = ancla.fx;
     const fwdZ   = ancla.fz;
     const rightX = -fwdZ;  // 90° CW in XZ plane

@@ -17,7 +17,9 @@ import { DBG_PISO_ICONOS } from "@/lib/debugConfig";
 import { anclarTelon } from "@/lib/inicioEscena";
 import { INTERACT_STATE } from "@/lib/alightStore";
 
-const ICONOS = ["/alight/icons/icono-silla.svg", "/alight/icons/icono-luz.svg"] as const;
+// Z25: parámetro de versión contra la caché del navegador (una sola ruta; timestamp de carga del módulo)
+const V_ICONOS = Date.now().toString(36);
+const ICONOS = [`/alight/icons/icono-silla.svg?v=${V_ICONOS}`, `/alight/icons/icono-luz.svg?v=${V_ICONOS}`] as const;
 // Z24: engrosado leve por código (dilatación de la máscara en px de 1024) para que los trazos
 // finos de la silla nueva (11–16 / 512) sobrevivan un nivel más de mipmap a distancia.
 const DILATAR_PX = [2, 0] as const;
@@ -117,9 +119,7 @@ export default function PisoIconos() {
 
   // Z24: referencia = el ANCLA del telón (fija en el mundo), no la posición del usuario
   useEffect(() => {
-    const f = new THREE.Vector3();
-    camera.getWorldDirection(f);
-    const A = anclarTelon(f.x, f.z);                              // ya fijada por el telón, o se fija acá igual
+    const A = anclarTelon();                                      // Z25: ancla fija (no depende de la cámara)
     base.current = { x: A.cx, z: A.cz, fx: A.fx, fz: A.fz, listo: true };
   }, [camera]);
 

@@ -183,7 +183,8 @@ export const DBG_VIDEO = {
 
 // ── Z24: posición inicial del usuario (Z22) ────────────────────────────────────
 export const DBG_INICIO = {
-  INICIO_RETROCESO_M: 5,  // el usuario arranca esto más atrás que la base (−10, 1.6, −7), lejos del telón; recargar
+  INICIO_RETROCESO_M: 5,  // Z25: el usuario arranca curtainDistM + esto antes del telón, sobre su eje; recargar
+  INICIO_PITCH_DEG:   0,  // Z25: pitch inicial (0 = horizontal; bajar la mirada corta el borde superior del telón)
 };
 
 // ── Z23: iconos grabados en el piso (silla = SILLAS a la izquierda, luz = TARIMA a la derecha) ──
