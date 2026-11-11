@@ -25,7 +25,9 @@ services:
     environment:
       - WATCHPACK_POLLING=true
       - NODE_OPTIONS=--max-old-space-size=4096
-    command: sh -c "npm install --legacy-peer-deps && npm run dev -- --webpack"
+    # El volumen frontend_node_modules conserva un .package-lock.json oculto: si queda
+    # viejo, `npm install` dice "up to date" y no instala deps nuevas (p. ej. inkjs).
+    command: sh -c "rm -f node_modules/.package-lock.json && npm install --legacy-peer-deps && npm run dev -- --webpack"
     ports:
       - "3001:3000" 
 

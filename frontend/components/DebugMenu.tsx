@@ -1869,6 +1869,17 @@ export default function DebugMenu() {
             onChange={v => { DBG_DIALOGO.FUENTE_PX = v; setDlg(o => ({ ...o, FUENTE_PX: v })); window.dispatchEvent(new CustomEvent("alight:dialogo-config")); }} />
           <NumField label="HISTORIAL" value={dlg.HISTORIAL} step={1} min={1} max={20} note="líneas"
             onChange={v => { DBG_DIALOGO.HISTORIAL = v; setDlg(o => ({ ...o, HISTORIAL: v })); }} />
+          <NumField label="CURSOR_PARPADEO_S" value={dlg.CURSOR_PARPADEO_S} step={0.1} min={0.1} max={5} note="Z35 cursor >"
+            onChange={v => { DBG_DIALOGO.CURSOR_PARPADEO_S = v; setDlg(o => ({ ...o, CURSOR_PARPADEO_S: v })); window.dispatchEvent(new CustomEvent("alight:dialogo-config")); }} />
+          <div style={ROW}>
+            <span>RESALTADO_INVERTIDO <span style={NOTE}>Z35</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !dlg.RESALTADO_INVERTIDO;
+              DBG_DIALOGO.RESALTADO_INVERTIDO = v;
+              setDlg(o => ({ ...o, RESALTADO_INVERTIDO: v }));
+              window.dispatchEvent(new CustomEvent("alight:dialogo-config"));
+            }}>{dlg.RESALTADO_INVERTIDO ? "ON" : "off"}</button>
+          </div>
           <div style={DIVIDER} />
           <span style={LABEL}>Video — etapa 1 (reproductor aparte) <span style={NOTE}>(live)</span></span>
           <div style={ROW}>

@@ -52,3 +52,51 @@ export function largoSegmentos(segs: readonly Segmento[]): number {
   for (const s of segs) n += s.texto.length;
   return n;
 }
+
+// ── Z35: teclado de la terminal (lógica PURA; la usa DialogoTerminal y la testea scripts/ink-test.mjs) ──
+// ↑ ↓ / W S: mover el resaltado entre opciones, con vuelta al otro extremo.
+// Enter: si la línea se está escribiendo, la completa; con las opciones visibles, elige la resaltada.
+// 1–4: elige directo. Espacio: sale del diálogo (reemplaza a Escape). Escape: no se intercepta
+// (con pointer lock el navegador libera el mouse igual). Teclas repetidas (e.repeat): se consumen sin
+// efecto. "consumir" = preventDefault + stopPropagation (solo para las teclas propias de la terminal).
+export type FaseTerminal = "cerrado" | "cargando" | "escribiendo" | "opciones" | "fin" | "error";
+export interface TeclaTerminal { code: string; key: string; repeat: boolean }
+export type AccionTecla =
+  | { tipo: "nada"; consumir: boolean }
+  | { tipo: "mover"; sel: number; consumir: true }
+  | { tipo: "elegir"; indice: number; consumir: true }
+  | { tipo: "completar"; consumir: true }
+  | { tipo: "salir"; consumir: true };
+
+const NADA_PROPIA: AccionTecla = { tipo: "nada", consumir: true };
+const NADA_AJENA: AccionTecla = { tipo: "nada", consumir: false };
+
+/** Índice con vuelta al otro extremo (n > 0). */
+export function moverSel(sel: number, delta: number, n: number): number {
+  if (n <= 0) return 0;
+  return (((sel + delta) % n) + n) % n;
+}
+
+export function accionTecla(t: TeclaTerminal, fase: FaseTerminal, nOpciones: number, sel: number): AccionTecla {
+  const c = t.code, k = t.key;
+  if (c === "Space" || k === " ") return t.repeat ? NADA_PROPIA : { tipo: "salir", consumir: true };
+  if (c === "Enter" || c === "NumpadEnter" || k === "Enter") {
+    if (t.repeat) return NADA_PROPIA;
+    if (fase === "escribiendo") return { tipo: "completar", consumir: true };
+    if (fase === "opciones" && nOpciones > 0) return { tipo: "elegir", indice: Math.min(Math.max(0, sel), nOpciones - 1), consumir: true };
+    return NADA_PROPIA;
+  }
+  const arriba = c === "ArrowUp" || c === "KeyW";
+  const abajo = c === "ArrowDown" || c === "KeyS";
+  if (arriba || abajo) {
+    if (t.repeat || fase !== "opciones" || nOpciones <= 0) return NADA_PROPIA;
+    return { tipo: "mover", sel: moverSel(sel, arriba ? -1 : 1, nOpciones), consumir: true };
+  }
+  const m = /^(?:Digit|Numpad)([1-4])$/.exec(c);
+  const num = m ? Number(m[1]) : (k.length === 1 && k >= "1" && k <= "4" ? Number(k) : 0);
+  if (num) {
+    if (t.repeat || fase !== "opciones" || num > nOpciones) return NADA_PROPIA;
+    return { tipo: "elegir", indice: num - 1, consumir: true };
+  }
+  return NADA_AJENA;   // Escape, Shift y todo lo demás: no se tocan
+}

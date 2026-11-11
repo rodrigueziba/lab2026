@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearDialogo } from '../lib/dialogo/dialogoInk.ts';
-import { planDePaso, lineaEco, TEXTO_FIN } from '../lib/dialogo/terminalFlujo.ts'; // Z27
+import { planDePaso, lineaEco, TEXTO_FIN, accionTecla, moverSel } from '../lib/dialogo/terminalFlujo.ts'; // Z27 · Z35
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const json = fs.readFileSync(path.join(root, 'public/alight/dialogo/dialogo-luz.json'), 'utf8');
@@ -105,6 +105,35 @@ caso('Z27 terminal: 1.a efecto con texto en cursiva', d => {
   const pl = planDePaso(d.elegir(0), false);
   check(pl.efecto === 'juego_alarma' && pl.lineas[0].segmentos.some(x => x.estilo === 'cursiva' && x.texto === 'luz') && pl.fin, '1.a: efecto juego_alarma, *luz*, fin');
 });
+
+// ── Z35: teclado de la terminal (terminalFlujo.accionTecla) ──
+console.log('\nZ35 terminal: teclado');
+const T = (code, key = '', repeat = false) => ({ code, key, repeat });
+const A = (t, fase, n, sel) => accionTecla(t, fase, n, sel);
+check(moverSel(0, -1, 4) === 3 && moverSel(3, 1, 4) === 0 && moverSel(1, 1, 4) === 2, 'moverSel: vuelta 1→última y última→1');
+check(A(T('ArrowUp'), 'opciones', 4, 0).sel === 3, '↑ en la opción 1 → la última (índice 3)');
+check(A(T('ArrowDown'), 'opciones', 4, 3).sel === 0, '↓ en la última → la primera');
+check(A(T('KeyW', 'w'), 'opciones', 4, 2).sel === 1 && A(T('KeyS', 's'), 'opciones', 4, 2).sel === 3, 'W sube y S baja');
+check(A(T('ArrowDown'), 'opciones', 2, 1).sel === 0, 'con 2 opciones también hay vuelta');
+const enterEscr = A(T('Enter', 'Enter'), 'escribiendo', 0, 0);
+check(enterEscr.tipo === 'completar' && enterEscr.consumir, 'Enter mientras se escribe → completar');
+const enterOpc = A(T('Enter', 'Enter'), 'opciones', 4, 2);
+check(enterOpc.tipo === 'elegir' && enterOpc.indice === 2, 'Enter con opciones → elige la resaltada (3)');
+check(A(T('NumpadEnter', 'Enter'), 'opciones', 4, 1).indice === 1, 'Enter del teclado numérico también');
+check(A(T('Enter', 'Enter'), 'fin', 0, 0).tipo === 'nada' && A(T('Enter', 'Enter'), 'fin', 0, 0).consumir, 'Enter en el fin: nada, pero se consume (no activa la navbar)');
+const rep = ['ArrowUp', 'KeyS', 'Enter', 'Space', 'Digit2'].map(c => A(T(c, c === 'Space' ? ' ' : '', true), 'opciones', 4, 0));
+check(rep.every(a => a.tipo === 'nada' && a.consumir), 'e.repeat: ninguna tecla repetida hace algo (y se consume)');
+check(A(T('Digit1', '1'), 'opciones', 4, 3).indice === 0 && A(T('Numpad4', '4'), 'opciones', 4, 0).indice === 3, '1–4 directo (fila y numérico)');
+check(A(T('Digit4', '4'), 'opciones', 3, 0).tipo === 'nada', '4 con 3 opciones: nada');
+check(A(T('Digit2', '2'), 'escribiendo', 0, 0).tipo === 'nada', '1–4 mientras se escribe: nada');
+const esp = A(T('Space', ' '), 'escribiendo', 0, 0);
+check(esp.tipo === 'salir' && esp.consumir && A(T('Space', ' '), 'opciones', 4, 1).tipo === 'salir', 'Espacio sale (escribiendo y con opciones)');
+const esc = A(T('Escape', 'Escape'), 'opciones', 4, 0);
+check(esc.tipo === 'nada' && !esc.consumir, 'Escape: no hace nada y NO se intercepta (pointer lock nativo)');
+const sh = A(T('ShiftLeft', 'Shift'), 'opciones', 4, 0);
+check(sh.tipo === 'nada' && !sh.consumir, 'Shift: no se intercepta (menú debug)');
+check(A(T('KeyW', 'w'), 'escribiendo', 0, 0).consumir && A(T('ArrowDown'), 'cargando', 0, 0).consumir, 'W/flechas se consumen aunque no haya opciones (no mueven ni scrollean)');
+check(!A(T('KeyA', 'a'), 'opciones', 4, 0).consumir && !A(T('KeyD', 'd'), 'opciones', 4, 0).consumir, 'A y D no se interceptan');
 
 console.log(`\n${ok} OK · ${fallas} fallas`);
 process.exit(fallas ? 1 : 0);

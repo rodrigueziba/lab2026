@@ -767,6 +767,8 @@ export const DBG_DIALOGO = {
   MARGEN_PX:         24,     // separación del borde de la ventana — live
   FUENTE_PX:         17,     // tamaño del texto — live
   HISTORIAL:         6,      // líneas visibles (las anteriores se atenúan) — live
+  CURSOR_PARPADEO_S: 1.1,    // Z35: período del parpadeo suave del cursor ">" de la opción resaltada — live
+  RESALTADO_INVERTIDO: true, // Z35: fila resaltada invertida (ámbar de fondo); false = solo el cursor ">" — live
 };
 
 // Z27: visibilidad del menú de debug (Shift), la escribe DebugMenu. La terminal la lee para

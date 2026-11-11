@@ -1,12 +1,15 @@
 "use client";
 // Z27: terminal de diálogo del camino LUZ: overlay HTML sobre el canvas (no se conecta al mundo:
 // eso es Z28). Se abre con 'alight:dialogo-abrir' { knot? } (botón "Probar diálogo" del menú debug)
-// y se cierra con Escape o 'alight:dialogo-cerrar'.
-// - La entidad tipea letra por letra (DBG_DIALOGO.VEL_CPS); Espacio o clic completa la línea.
+// y se cierra con Espacio (Z35; antes Escape) o 'alight:dialogo-cerrar'.
+// - La entidad tipea letra por letra (DBG_DIALOGO.VEL_CPS); Enter o clic completa la línea (Z35; antes Espacio).
 // - Opciones numeradas 1–4, solo por teclado. La elección queda como eco "> texto".
+// - Z35: ↑ ↓ / W S mueven el resaltado (con vuelta), Enter elige la resaltada, 1–4 directo, Espacio sale
+//   (reemplaza a Escape, que ya no se intercepta). Lógica pura en terminalFlujo.accionTecla.
 // - Efectos: 'alight:dialogo-efecto' { efecto, id } (no ejecuta nada en el mundo).
 //   Final sin opciones: 'alight:dialogo-fin' { id }. Lógica de líneas en lib/dialogo/terminalFlujo.ts.
-// - Teclado: solo 1–4, Espacio y Escape, en captura y solo mientras está activa. Shift y el
+// - Teclado: solo las teclas de la terminal (↑ ↓ W S Enter Espacio 1–4), en captura y solo mientras
+//   está activa; los keyup de W/S/flechas pasan (el Player suelta la tecla). Shift, Escape y el
 //   pointer lock no se tocan. Clics del panel no llegan a document (drei re-captura el mouse ahí).
 // - Sin innerHTML: cursiva/negrita son <em>/<strong> armados desde los segmentos.
 // - Timers (setInterval/setTimeout) y listeners se liberan al cerrar y al desmontar.
@@ -16,8 +19,8 @@ import type { ReactNode } from "react";
 import { DBG_DIALOGO, DEBUG_MENU_ESTADO } from "@/lib/debugConfig";
 import { cargarDialogo } from "@/lib/dialogo/dialogoInk";
 import type { DialogoInk, OpcionDialogo, PasoDialogo, Segmento } from "@/lib/dialogo/dialogoInk";
-import { planDePaso, lineaEco, largoSegmentos } from "@/lib/dialogo/terminalFlujo";
-import type { Linea, PlanPaso } from "@/lib/dialogo/terminalFlujo";
+import { planDePaso, lineaEco, largoSegmentos, accionTecla } from "@/lib/dialogo/terminalFlujo";
+import type { Linea, PlanPaso, FaseTerminal } from "@/lib/dialogo/terminalFlujo";
 import { DIALOGO_STATE } from "@/lib/dialogo/dialogoEstado";
 
 const C = { beige: "#E8DCC4", carbon: "#3A3B3C", negro: "#12101A", ambar: "#FF9A1F", ambarFondo: "#2A1400", oxido: "#C0552F" };
@@ -28,9 +31,10 @@ const GLOW = "0 0 6px rgba(255,154,31,0.55), 0 0 14px rgba(255,120,20,0.25), 0.6
 const CSS = `
 @keyframes dlgCursor { 0%,49% { opacity: 1 } 50%,100% { opacity: 0 } }
 @keyframes dlgFlicker { 0% { opacity: .97 } 50% { opacity: 1 } 100% { opacity: .98 } }
+@keyframes dlgSel { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
 `;
 
-type Fase = "cerrado" | "cargando" | "escribiendo" | "opciones" | "fin" | "error";
+type Fase = FaseTerminal;
 interface LineaH extends Linea { k: number }
 
 function renderSegmentos(segs: readonly Segmento[], limite: number): ReactNode[] {
@@ -56,6 +60,7 @@ export default function DialogoTerminal() {
   const [actual, setActual] = useState<LineaH | null>(null);
   const [mostrados, setMostrados] = useState(0);
   const [opciones, setOpciones] = useState<OpcionDialogo[]>([]);
+  const [sel, setSel] = useState(0);   // Z35: opción resaltada
   const [nodo, setNodo] = useState("");
   const [cfg, setCfg] = useState(() => ({ ...DBG_DIALOGO }));
 
@@ -72,6 +77,7 @@ export default function DialogoTerminal() {
     let total = 0;
     let t0 = 0;
     let k = 0;
+    let selL = 0;                                     // Z35: opción resaltada (espejo local de sel)
     let sesion = 0;                                   // invalida cargas/timers de una apertura previa
     let intervalo: ReturnType<typeof setInterval> | null = null;
     let pausa: ReturnType<typeof setTimeout> | null = null;
@@ -125,6 +131,7 @@ export default function DialogoTerminal() {
         window.dispatchEvent(new CustomEvent("alight:dialogo-fin", { detail: { id: plan?.id ?? "" } }));
         return;
       }
+      selL = 0; setSel(0);                            // Z35: al aparecer, resaltada la primera
       setOpciones(plan.opciones);
       ponerFase("opciones");
     };
@@ -198,23 +205,21 @@ export default function DialogoTerminal() {
     const onCerrar = () => cerrar();
     const onConfig = () => setCfg({ ...DBG_DIALOGO });
 
-    // Captura en window: corre antes que cualquier otro keydown de la app. Solo 1–4, Espacio y
-    // Escape, solo con la terminal activa y nunca con el foco en un campo de texto (menú debug).
+    // Captura en window: corre antes que cualquier otro keydown de la app. Solo las teclas de la
+    // terminal (Z35: terminalFlujo.accionTecla), solo con la terminal activa y nunca con el foco en un
+    // campo de texto (menú debug). Escape y Shift no se tocan.
     const onKey = (e: KeyboardEvent) => {
       if (!activo) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
-      if (e.key === "Escape") { e.stopPropagation(); cerrar(); return; }
-      if (e.code === "Space" || e.key === " ") {
-        e.preventDefault(); e.stopPropagation();
-        if (!e.repeat) completar();
-        return;
-      }
-      const m = /^(?:Digit|Numpad)([1-4])$/.exec(e.code);
-      const num = m ? Number(m[1]) : (e.key >= "1" && e.key <= "4" && e.key.length === 1 ? Number(e.key) : 0);
-      if (num) {
-        e.preventDefault(); e.stopPropagation();
-        if (!e.repeat) elegir(num - 1);
+      const a = accionTecla(e, faseL, plan && faseL === "opciones" ? plan.opciones.length : 0, selL);
+      if (a.consumir) { e.preventDefault(); e.stopPropagation(); }
+      switch (a.tipo) {
+        case "mover": selL = a.sel; setSel(a.sel); break;
+        case "elegir": elegir(a.indice); break;
+        case "completar": completar(); break;
+        case "salir": cerrar(); break;   // = Escape de Z27/Z28: 'alight:dialogo-cerrado', sin 'dialogo-fin'
+        default: break;
       }
     };
     // Con el mouse capturado (pointer lock) los clics van al canvas: un clic izquierdo también
@@ -223,15 +228,26 @@ export default function DialogoTerminal() {
       if (activo && e.button === 0 && document.pointerLockElement) completar();
     };
     const onCompletar = () => completar();
-    // Espacio sobre un botón con foco lo "clickea" al soltar: también se consume el keyup
+    // Espacio (y Enter) sobre un botón con foco lo "clickea" al soltar: también se consume el keyup.
+    // Ojo: el keyup de Espacio que cerró la terminal llega con activo=false: se consume igual una vez.
+    let consumirKeyUpEspacio = false;
     const onKeyUp = (e: KeyboardEvent) => {
-      if (activo && (e.code === "Space" || e.key === " ")) { e.preventDefault(); e.stopPropagation(); }
+      const esp = e.code === "Space" || e.key === " ";
+      const ent = e.code === "Enter" || e.code === "NumpadEnter" || e.key === "Enter";
+      if ((activo && (esp || ent)) || (esp && consumirKeyUpEspacio)) {
+        e.preventDefault(); e.stopPropagation();
+        if (esp) consumirKeyUpEspacio = false;
+      }
+    };
+    const onKeyDownEsp = (e: KeyboardEvent) => {
+      if (activo && (e.code === "Space" || e.key === " ")) consumirKeyUpEspacio = true;
     };
 
     window.addEventListener("alight:dialogo-abrir", onAbrir);
     window.addEventListener("alight:dialogo-cerrar", onCerrar);
     window.addEventListener("alight:dialogo-config", onConfig);
     window.addEventListener("alight:dialogo-completar", onCompletar);
+    window.addEventListener("keydown", onKeyDownEsp, true);   // antes que onKey (que puede cerrar)
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("keyup", onKeyUp, true);
     window.addEventListener("mousedown", onMouseDown);
@@ -242,6 +258,7 @@ export default function DialogoTerminal() {
       window.removeEventListener("alight:dialogo-cerrar", onCerrar);
       window.removeEventListener("alight:dialogo-config", onConfig);
       window.removeEventListener("alight:dialogo-completar", onCompletar);
+      window.removeEventListener("keydown", onKeyDownEsp, true);
       window.removeEventListener("keydown", onKey, true);
       window.removeEventListener("keyup", onKeyUp, true);
       window.removeEventListener("mousedown", onMouseDown);
@@ -312,12 +329,23 @@ export default function DialogoTerminal() {
               )}
               {fase === "opciones" && (
                 <div style={{ marginTop: fs * 0.5 }}>
-                  {opciones.map((o, i) => (
-                    <div key={o.indice} style={{ whiteSpace: "pre-wrap" }}>
-                      <span style={{ display: "inline-block", minWidth: fs * 2.2, color: C.beige, fontWeight: 700 }}>{i + 1}.</span>
-                      {renderSegmentos(o.segmentos, Number.MAX_SAFE_INTEGER)}
-                    </div>
-                  ))}
+                  {opciones.map((o, i) => {
+                    // Z35: fila resaltada invertida (fondo ámbar, texto del fondo de pantalla) con cursor ">"
+                    const on = i === sel;
+                    const inv = on && cfg.RESALTADO_INVERTIDO;
+                    return (
+                      <div key={o.indice} style={{ whiteSpace: "pre-wrap", display: "flex", alignItems: "baseline",
+                        background: inv ? C.ambar : "transparent", color: inv ? C.ambarFondo : undefined,
+                        textShadow: inv ? "none" : undefined, padding: "0 6px", margin: "0 -6px", borderRadius: 2 }}>
+                        <span style={{ display: "inline-block", width: fs * 1.1, fontWeight: 700,
+                          animation: on ? `dlgSel ${Math.max(0.1, cfg.CURSOR_PARPADEO_S)}s ease-in-out infinite` : undefined }}>
+                          {on ? ">" : ""}
+                        </span>
+                        <span style={{ display: "inline-block", minWidth: fs * 2.2, color: inv ? C.ambarFondo : C.beige, fontWeight: 700 }}>{i + 1}.</span>
+                        <span>{renderSegmentos(o.segmentos, Number.MAX_SAFE_INTEGER)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -330,11 +358,13 @@ export default function DialogoTerminal() {
         </div>
       </div>
       {/* pie: serigrafía de controles */}
-      <div style={{ display: "flex", justifyContent: "space-between", padding: "0 12px 8px", gap: 10,
-        fontSize: 10, letterSpacing: "0.18em", color: "#8A8478", whiteSpace: "nowrap", overflow: "hidden" }}>
-        <span>1–4 · RESPONDER</span>
-        <span>ESPACIO · COMPLETAR</span>
-        <span>ESC · CORTAR</span>
+      {/* Z35: leyenda nueva (antes "1–4 · RESPONDER / ESPACIO · COMPLETAR / ESC · CORTAR") */}
+      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", padding: "0 12px 8px", columnGap: 10, rowGap: 2,
+        fontSize: 10, letterSpacing: "0.14em", color: "#8A8478", whiteSpace: "nowrap" }}>
+        <span>↑ ↓ / W S · MOVER</span>
+        <span>ENTER · ELEGIR</span>
+        <span>1–4 · DIRECTO</span>
+        <span>ESPACIO · SALIR</span>
       </div>
     </div>
   );

@@ -199,7 +199,7 @@ export default function LuzLejana() {
       if (s.cierre) clearTimeout(s.cierre);
       s.cierre = setTimeout(() => { s.cierre = null; cerrarDialogo(); }, Math.max(0, DBG_LUZ.CIERRE_DIALOGO_MS));
     };
-    const onCerrado = () => liberar();   // Escape u otro cierre a mitad del diálogo
+    const onCerrado = () => liberar();   // Espacio (Z35; antes Escape) u otro cierre a mitad del diálogo
 
     const onTeleport = () => {
       if (LUZ_STATE.fase === "girando" || LUZ_STATE.fase === "dialogo") return;

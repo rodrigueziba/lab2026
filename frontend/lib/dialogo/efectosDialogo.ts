@@ -147,8 +147,15 @@ function irTarimaSinPublico(): void {
   EFECTOS_STATE.sinPublico = true;
   // con el diálogo abierto (bajo la luz) LuzLejana fija la mirada hasta el fin: se espera a ese evento
   if (DIALOGO_STATE.activo) {
-    const onFin = () => { window.removeEventListener("alight:dialogo-fin", onFin); llevarATarima(c); };
-    window.addEventListener("alight:dialogo-fin", onFin);
+    // Z35: si el usuario sale con Espacio antes del fin ('alight:dialogo-cerrado'), el efecto se completa
+    // igual (el mundo no queda a medias) y una sola vez
+    const listo = () => {
+      window.removeEventListener("alight:dialogo-fin", listo);
+      window.removeEventListener("alight:dialogo-cerrado", listo);
+      llevarATarima(c);
+    };
+    window.addEventListener("alight:dialogo-fin", listo);
+    window.addEventListener("alight:dialogo-cerrado", listo);
   } else {
     llevarATarima(c);
   }
