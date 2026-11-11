@@ -20,9 +20,11 @@ import CurtainFlash from "./CurtainFlash"; // F1: destello al atravesar el teló
 import FlashAviso from "./FlashAviso"; // G2: aviso de fotosensibilidad (flag, off por defecto)
 import VideoModal from "./VideoModal"; // video etapa 1: reproductor aparte (modal)
 import PisoIconos from "./PisoIconos"; // Z23: iconos grabados en el piso (silla / luz)
+import LuzLejana from "./LuzLejana"; // Z28: camino LUZ (luz lejana, estrellas, diálogo)
+import { moverConLimites } from "@/lib/caminoLuz"; // Z28: límites sala ∪ exterior
 import { posicionInicial, aplicarSpawn } from "@/lib/inicioEscena"; // Z24/Z25
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
-import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ } from "@/lib/debugConfig";
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
@@ -94,6 +96,8 @@ function Room() {
   const wallsRef = useRef<THREE.Group>(null);
   const floorRef = useRef<THREE.Mesh>(null);
   const diskRef  = useRef<THREE.Mesh>(null);
+  const paredOesteRef = useRef<THREE.Mesh>(null); // Z28: x = −40, lado de la luz
+  const paredSurRef   = useRef<THREE.Mesh>(null); // Z28: z = −40, lado de la luz
   // H1.1: ceiling hidden in vizActive (blocks DomeVisualizer sphere via depth test).
   // Z2: walls hidden in vizActive (visible through DomeSky after Y1 made sky sphere transparent).
   // AA1: floor (80×80 square) hidden in vizActive.
@@ -101,6 +105,10 @@ function Room() {
   useFrame(() => {
     if (ceilRef.current)  ceilRef.current.visible  = !_D.vizActive;
     if (wallsRef.current) wallsRef.current.visible = !_D.vizActive;
+    // Z28: las dos paredes del lado de la luz se abren (exterior oscuro con luz y estrellas)
+    const abiertas = DBG_LUZ.CAMINO_LUZ && DBG_LUZ.PAREDES_ABIERTAS;
+    if (paredOesteRef.current) paredOesteRef.current.visible = !abiertas;
+    if (paredSurRef.current)   paredSurRef.current.visible   = !abiertas;
     if (floorRef.current) floorRef.current.visible = !_D.vizActive;
     if (diskRef.current)  diskRef.current.visible  =
       _D.vizActive && DBG_SILLAS.domoShaderEnMalla && !DBG_SILLAS.domoOriginal;
@@ -118,7 +126,7 @@ function Room() {
       </mesh>
       {/* Z2: walls wrapped in a group — hidden when visualizer active (like ceiling) */}
       <group ref={wallsRef}>
-        <mesh position={[0, 11, -40]}>
+        <mesh ref={paredSurRef} position={[0, 11, -40]}>
           <planeGeometry args={[80, 22]} />
           <meshStandardMaterial color="#080809" roughness={1} />
         </mesh>
@@ -126,7 +134,7 @@ function Room() {
           <planeGeometry args={[80, 22]} />
           <meshStandardMaterial color="#080809" roughness={1} />
         </mesh>
-        <mesh position={[-40, 11, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <mesh ref={paredOesteRef} position={[-40, 11, 0]} rotation={[0, Math.PI / 2, 0]}>
           <planeGeometry args={[80, 22]} />
           <meshStandardMaterial color="#080809" roughness={1} />
         </mesh>
@@ -370,7 +378,7 @@ function Player() {
 
     if (dir.current.lengthSq() > 0) {
       dir.current.normalize().multiplyScalar(0.12);
-      cam.position.add(dir.current);
+      moverConLimites(cam.position, dir.current); // Z28: antes cam.position.add(dir) sin límites
     }
     cam.position.y = 1.6;
 
@@ -469,6 +477,8 @@ function Scene() {
       {curtainVisible && <Curtain />}
       {/* Z23: iconos de los dos caminos grabados en el piso, entre el inicio y el telón */}
       <PisoIconos />
+      {/* Z28: luz lejana detrás del inicio (camino LUZ), estrellas y salida de la sala */}
+      <LuzLejana />
       <Room />
       <DiagonalSpot />
       <Tarima />

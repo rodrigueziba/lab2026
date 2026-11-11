@@ -423,9 +423,29 @@ export function stopVizAudio(): void {
   _delay = null; _echoFeedback = null; _echoOutGain = null;
   _convolver = null; _reverbOutGain = null; _masterGain = null;
   _lpCur = 20000; _hpCur = 20; _echoFBCur = 0; _echoMxCur = 0; _revMxCur = 0; _rateCur = 1.0;
+  _pausadoPorArea = false; // Z28
   VIZ_AUDIO_DEBUG.ctxState = "closed";
   VIZ_AUDIO_DEBUG.paused   = true;
   VIZ_AUDIO_DEBUG.rms      = 0;
+}
+
+// ── Z28: pausa por salir del área ─────────────────────────────────────────────
+// Pausa el elemento (la posición de la pista queda) y suspende el contexto (también el ruido
+// del monolito). Solo reanuda lo que esta pausa detuvo. Sin cambios si la música no arrancó.
+let _pausadoPorArea = false;
+export function pausarVizAudio(): void {
+  if (_pausadoPorArea || !_vizAudioEl || !_vizCtx) return;
+  _pausadoPorArea = !_vizAudioEl.paused;
+  if (!_pausadoPorArea) return;
+  try { _vizAudioEl.pause(); } catch { /* */ }
+  void _vizCtx.suspend().catch(() => { /* */ });
+}
+export function reanudarVizAudio(): void {
+  if (!_pausadoPorArea) return;
+  _pausadoPorArea = false;
+  if (!_vizAudioEl || !_vizCtx) return;
+  const el = _vizAudioEl;
+  void _vizCtx.resume().then(() => el.play()).catch(err => console.warn("[VizAudio] reanudar:", err));
 }
 
 // ── setVizVolume ───────────────────────────────────────────────────────────────

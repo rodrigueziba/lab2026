@@ -37,6 +37,7 @@ import {
   DBG_PISO_ICONOS,
   DBG_INICIO,
   DBG_DIALOGO,
+  DBG_LUZ,
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -51,6 +52,8 @@ import { STORE, storeSubscribe, activateVisualizerOnce, resetVizActivated, PANEL
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado"; // Z27
+import { LUZ_STATE } from "@/lib/caminoLuz"; // Z28
+import { PAUSA } from "@/lib/pausaExperiencia"; // Z28
 
 type Tab = "SILLAS" | "TARIMA";
 
@@ -349,6 +352,7 @@ export default function DebugMenu() {
   const [foco, setFoco] = useState({ ...DBG_FOCO });                        // Z19
   const [video, setVideo] = useState({ ...DBG_VIDEO });                     // video etapa 1
   const [dlg, setDlg] = useState({ ...DBG_DIALOGO });                      // Z27
+  const [luz, setLuz] = useState({ ...DBG_LUZ });                          // Z28
   const [piso, setPiso] = useState({ ...DBG_PISO_ICONOS });                 // Z23
   const [inicio, setInicio] = useState({ ...DBG_INICIO });                  // Z24
   const [focoLive, setFocoLive] = useState("nada");                          // Z19
@@ -1401,6 +1405,108 @@ export default function DebugMenu() {
           <NumField label="FADE_MS" value={piso.FADE_MS} step={50} min={0} max={5000} note="ms"
             onChange={v => { DBG_PISO_ICONOS.FADE_MS = v; setPiso(o => ({ ...o, FADE_MS: v })); }} />
 
+          <div style={DIVIDER} />
+          <span style={LABEL}>Camino LUZ Z28 <span style={NOTE}>(live)</span></span>
+          <div style={ROW}>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:debug-teleport-luz")); }}>Teletransportar a la luz</button>
+          </div>
+          <div style={{ ...ROW, ...NOTE }}>
+            <span>d={LUZ_STATE.dLuz.toFixed(1)} m · k={LUZ_STATE.cercania.toFixed(2)} · {LUZ_STATE.fase}{LUZ_STATE.fuera ? " · FUERA" : ""}{PAUSA.activa ? " · PAUSA" : ""}</span>
+          </div>
+          <div style={ROW}>
+            <span>CAMINO_LUZ</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.CAMINO_LUZ;
+              DBG_LUZ.CAMINO_LUZ = v;
+              setLuz(o => ({ ...o, CAMINO_LUZ: v }));
+            }}>{luz.CAMINO_LUZ ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>LUZ_POS_MANUAL</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.LUZ_POS_MANUAL;
+              DBG_LUZ.LUZ_POS_MANUAL = v;
+              setLuz(o => ({ ...o, LUZ_POS_MANUAL: v }));
+            }}>{luz.LUZ_POS_MANUAL ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>PAREDES_ABIERTAS</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.PAREDES_ABIERTAS;
+              DBG_LUZ.PAREDES_ABIERTAS = v;
+              setLuz(o => ({ ...o, PAREDES_ABIERTAS: v }));
+            }}>{luz.PAREDES_ABIERTAS ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>LIMITES</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.LIMITES;
+              DBG_LUZ.LIMITES = v;
+              setLuz(o => ({ ...o, LIMITES: v }));
+            }}>{luz.LIMITES ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>PAUSA</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.PAUSA;
+              DBG_LUZ.PAUSA = v;
+              setLuz(o => ({ ...o, PAUSA: v }));
+            }}>{luz.PAUSA ? "ON" : "off"}</button>
+          </div>
+          <NumField label="LUZ_DISTANCIA_M" value={luz.LUZ_DISTANCIA_M} step={1} min={0} max={200} note="m desde el inicio"
+            onChange={v => { DBG_LUZ.LUZ_DISTANCIA_M = v; setLuz(o => ({ ...o, LUZ_DISTANCIA_M: v })); }} />
+          <NumField label="LUZ_POS_X" value={luz.LUZ_POS_X} step={0.5} min={-300} max={300} note="m (manual)"
+            onChange={v => { DBG_LUZ.LUZ_POS_X = v; setLuz(o => ({ ...o, LUZ_POS_X: v })); }} />
+          <NumField label="LUZ_POS_Z" value={luz.LUZ_POS_Z} step={0.5} min={-300} max={300} note="m (manual)"
+            onChange={v => { DBG_LUZ.LUZ_POS_Z = v; setLuz(o => ({ ...o, LUZ_POS_Z: v })); }} />
+          <NumField label="LUZ_ALTURA_M" value={luz.LUZ_ALTURA_M} step={0.1} min={1} max={20} note="m"
+            onChange={v => { DBG_LUZ.LUZ_ALTURA_M = v; setLuz(o => ({ ...o, LUZ_ALTURA_M: v })); }} />
+          <NumField label="LUZ_HALO_M" value={luz.LUZ_HALO_M} step={0.1} min={0.2} max={20} note="m"
+            onChange={v => { DBG_LUZ.LUZ_HALO_M = v; setLuz(o => ({ ...o, LUZ_HALO_M: v })); }} />
+          <NumField label="LUZ_INT_LEJOS" value={luz.LUZ_INT_LEJOS} step={0.05} min={0} max={10} note="lejos"
+            onChange={v => { DBG_LUZ.LUZ_INT_LEJOS = v; setLuz(o => ({ ...o, LUZ_INT_LEJOS: v })); }} />
+          <NumField label="LUZ_INT_CERCA" value={luz.LUZ_INT_CERCA} step={0.05} min={0} max={10} note="debajo"
+            onChange={v => { DBG_LUZ.LUZ_INT_CERCA = v; setLuz(o => ({ ...o, LUZ_INT_CERCA: v })); }} />
+          <NumField label="LUZ_D_LEJOS_M" value={luz.LUZ_D_LEJOS_M} step={1} min={1} max={200} note="m"
+            onChange={v => { DBG_LUZ.LUZ_D_LEJOS_M = v; setLuz(o => ({ ...o, LUZ_D_LEJOS_M: v })); }} />
+          <NumField label="LUZ_D_CERCA_M" value={luz.LUZ_D_CERCA_M} step={0.5} min={0} max={50} note="m"
+            onChange={v => { DBG_LUZ.LUZ_D_CERCA_M = v; setLuz(o => ({ ...o, LUZ_D_CERCA_M: v })); }} />
+          <NumField label="LUZ_CURVA" value={luz.LUZ_CURVA} step={0.1} min={0.1} max={8} note="exponente"
+            onChange={v => { DBG_LUZ.LUZ_CURVA = v; setLuz(o => ({ ...o, LUZ_CURVA: v })); }} />
+          <NumField label="CONO_RADIO_M" value={luz.CONO_RADIO_M} step={0.1} min={0.2} max={10} note="m"
+            onChange={v => { DBG_LUZ.CONO_RADIO_M = v; setLuz(o => ({ ...o, CONO_RADIO_M: v })); }} />
+          <NumField label="CONO_OPACIDAD" value={luz.CONO_OPACIDAD} step={0.01} min={0} max={1} note=""
+            onChange={v => { DBG_LUZ.CONO_OPACIDAD = v; setLuz(o => ({ ...o, CONO_OPACIDAD: v })); }} />
+          <NumField label="CONO_D_INICIO_M" value={luz.CONO_D_INICIO_M} step={1} min={1} max={100} note="m"
+            onChange={v => { DBG_LUZ.CONO_D_INICIO_M = v; setLuz(o => ({ ...o, CONO_D_INICIO_M: v })); }} />
+          <NumField label="POZO_OPACIDAD" value={luz.POZO_OPACIDAD} step={0.01} min={0} max={1} note=""
+            onChange={v => { DBG_LUZ.POZO_OPACIDAD = v; setLuz(o => ({ ...o, POZO_OPACIDAD: v })); }} />
+          <NumField label="ESTRELLAS_MAX" value={luz.ESTRELLAS_MAX} step={0.05} min={0} max={2} note="opacidad"
+            onChange={v => { DBG_LUZ.ESTRELLAS_MAX = v; setLuz(o => ({ ...o, ESTRELLAS_MAX: v })); }} />
+          <NumField label="ESTRELLAS_D_LEJOS_M" value={luz.ESTRELLAS_D_LEJOS_M} step={1} min={1} max={200} note="m"
+            onChange={v => { DBG_LUZ.ESTRELLAS_D_LEJOS_M = v; setLuz(o => ({ ...o, ESTRELLAS_D_LEJOS_M: v })); }} />
+          <NumField label="ESTRELLAS_D_CERCA_M" value={luz.ESTRELLAS_D_CERCA_M} step={0.5} min={0} max={50} note="m"
+            onChange={v => { DBG_LUZ.ESTRELLAS_D_CERCA_M = v; setLuz(o => ({ ...o, ESTRELLAS_D_CERCA_M: v })); }} />
+          <NumField label="ESTRELLAS_TAM_PX" value={luz.ESTRELLAS_TAM_PX} step={0.1} min={0.5} max={10} note="px"
+            onChange={v => { DBG_LUZ.ESTRELLAS_TAM_PX = v; setLuz(o => ({ ...o, ESTRELLAS_TAM_PX: v })); }} />
+          <NumField label="EXTERIOR_RADIO_M" value={luz.EXTERIOR_RADIO_M} step={1} min={5} max={100} note="m caminable"
+            onChange={v => { DBG_LUZ.EXTERIOR_RADIO_M = v; setLuz(o => ({ ...o, EXTERIOR_RADIO_M: v })); }} />
+          <NumField label="AREA_HIST_M" value={luz.AREA_HIST_M} step={0.25} min={0} max={5} note="m"
+            onChange={v => { DBG_LUZ.AREA_HIST_M = v; setLuz(o => ({ ...o, AREA_HIST_M: v })); }} />
+          <NumField label="ACTIVACION_M" value={luz.ACTIVACION_M} step={0.25} min={0.5} max={10} note="m"
+            onChange={v => { DBG_LUZ.ACTIVACION_M = v; setLuz(o => ({ ...o, ACTIVACION_M: v })); }} />
+          <NumField label="ACTIVACION_SALIDA_M" value={luz.ACTIVACION_SALIDA_M} step={0.25} min={0.5} max={15} note="m"
+            onChange={v => { DBG_LUZ.ACTIVACION_SALIDA_M = v; setLuz(o => ({ ...o, ACTIVACION_SALIDA_M: v })); }} />
+          <NumField label="GIRO_MS" value={luz.GIRO_MS} step={50} min={0} max={5000} note="ms"
+            onChange={v => { DBG_LUZ.GIRO_MS = v; setLuz(o => ({ ...o, GIRO_MS: v })); }} />
+          <NumField label="PITCH_MAX_DEG" value={luz.PITCH_MAX_DEG} step={1} min={0} max={89} note="°"
+            onChange={v => { DBG_LUZ.PITCH_MAX_DEG = v; setLuz(o => ({ ...o, PITCH_MAX_DEG: v })); }} />
+          <NumField label="CIERRE_DIALOGO_MS" value={luz.CIERRE_DIALOGO_MS} step={100} min={0} max={10000} note="ms"
+            onChange={v => { DBG_LUZ.CIERRE_DIALOGO_MS = v; setLuz(o => ({ ...o, CIERRE_DIALOGO_MS: v })); }} />
+          <NumField label="TELEPORT_DIST_M" value={luz.TELEPORT_DIST_M} step={0.5} min={1} max={30} note="m"
+            onChange={v => { DBG_LUZ.TELEPORT_DIST_M = v; setLuz(o => ({ ...o, TELEPORT_DIST_M: v })); }} />
+          <ColorField label="LUZ_COLOR" value={luz.LUZ_COLOR}
+            onChange={v => { DBG_LUZ.LUZ_COLOR = v; setLuz(o => ({ ...o, LUZ_COLOR: v })); }} />
           <div style={DIVIDER} />
           <span style={LABEL}>Diálogo Z27 (terminal) <span style={NOTE}>(live)</span></span>
           <div style={ROW}>

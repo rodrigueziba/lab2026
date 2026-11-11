@@ -772,3 +772,48 @@ export const DBG_DIALOGO = {
 // Z27: visibilidad del menú de debug (Shift), la escribe DebugMenu. La terminal la lee para
 // decidir si marca las líneas pendientes.
 export const DEBUG_MENU_ESTADO = { visible: false };
+
+// ── Z28: camino LUZ (luz lejana, estrellas, salida de la sala, diálogo) ──────
+export const DBG_LUZ = {
+  CAMINO_LUZ:          true,   // false = sin luz, sin estrellas, sin límites nuevos ni pausa (comportamiento previo)
+  // posición: LUZ_DISTANCIA_M desde el spawn (Z25), en sentido opuesto al telón; o manual
+  LUZ_DISTANCIA_M:     40,     // m desde el punto de inicio — live
+  LUZ_POS_MANUAL:      false,  // true = usar LUZ_POS_X / LUZ_POS_Z — live
+  LUZ_POS_X:           -46.9,  // m (solo con LUZ_POS_MANUAL)
+  LUZ_POS_Z:           -32.8,  // m (solo con LUZ_POS_MANUAL)
+  LUZ_ALTURA_M:        4.5,    // altura del centro de la luz — live
+  LUZ_COLOR:           "#FFE2A8" as string,
+  LUZ_HALO_M:          3.2,    // diámetro del halo (sprite) — live
+  // intensidad según cercanía: lejos → cerca, k = t^LUZ_CURVA
+  LUZ_INT_LEJOS:       0.45,   // tenue a lo lejos — live
+  LUZ_INT_CERCA:       2.2,    // debajo — live
+  LUZ_D_LEJOS_M:       45,     // a partir de acá intensidad mínima — live
+  LUZ_D_CERCA_M:       2,      // a partir de acá intensidad máxima — live
+  LUZ_CURVA:           2.0,    // exponente de la curva (1 = lineal, >1 sube al final) — live
+  // cono de luz sobre el suelo
+  CONO_RADIO_M:        2.4,    // radio del cono en el suelo — live
+  CONO_OPACIDAD:       0.22,   // opacidad máxima del cono — live
+  CONO_D_INICIO_M:     16,     // el cono empieza a verse a esta distancia — live
+  POZO_OPACIDAD:       0.35,   // charco de luz en el suelo — live
+  // estrellas (un solo Points)
+  ESTRELLAS_N:         1400,   // cantidad (recargar)
+  ESTRELLAS_MAX:       0.85,   // opacidad máxima — live
+  ESTRELLAS_D_LEJOS_M: 40,     // empiezan a encenderse a esta distancia de la luz — live
+  ESTRELLAS_D_CERCA_M: 4,      // brillo máximo — live
+  ESTRELLAS_TAM_PX:    2.2,    // tamaño base en px — live
+  // sala y salida
+  SALA_MEDIA_M:        40,     // media del cuadrado de la sala (paredes a ±40)
+  SALA_MARGEN_M:       0.5,    // no se camina a menos de esto de una pared cerrada
+  PAREDES_ABIERTAS:    true,   // oculta las paredes oeste (x=−40) y sur (z=−40), las del lado de la luz — live
+  LIMITES:             true,   // límites de movimiento: sala ∪ exterior alrededor de la luz — live
+  EXTERIOR_RADIO_M:    26,     // radio caminable (y del suelo exterior) alrededor de la luz — live
+  AREA_HIST_M:         1,      // histéresis de salir/volver al área (pausa) — live
+  // activación del diálogo
+  ACTIVACION_M:        2,      // radio horizontal bajo la luz — live
+  ACTIVACION_SALIDA_M: 3,      // hay que salir de este radio para rearmar — live
+  GIRO_MS:             1500,   // giro de cámara hacia la luz — live
+  PITCH_MAX_DEG:       55,     // tope de mirada hacia arriba — live
+  CIERRE_DIALOGO_MS:   2500,   // tras alight:dialogo-fin, se cierra la terminal — live
+  TELEPORT_DIST_M:     4,      // botón "Teletransportar a la luz": queda a esta distancia, mirándola
+  PAUSA:               true,   // pausar la experiencia al salir del área — live
+};

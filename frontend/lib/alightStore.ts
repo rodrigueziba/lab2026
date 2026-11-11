@@ -134,6 +134,14 @@ export function skipDomeDawnState(clockT: number): void {
   _domeDawnCompleteT = clockT - 9999;
 }
 
+// Z28: pausa de la experiencia — congela los dos amaneceres (U9 y W3) corriendo sus marcas de
+// tiempo dt segundos hacia adelante cada frame en pausa. Su progreso se mide con clock.elapsedTime,
+// que sigue corriendo; así el amanecer queda donde estaba y se retoma al volver. Sin allocations.
+export function congelarAmaneceres(dt: number): void {
+  if (_dawnPhase !== 'inactivo')     { _dawnStartT += dt;     _dawnCompleteT += dt; }
+  if (_domeDawnPhase !== 'inactivo') { _domeDawnStartT += dt; _domeDawnCompleteT += dt; }
+}
+
 // Interaction mode — shared between Player (ThreeScene) and LecternSystem
 export const INTERACT_STATE = {
   mode:         "none" as "none" | "image" | "sound",

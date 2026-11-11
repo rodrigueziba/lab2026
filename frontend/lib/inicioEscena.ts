@@ -36,6 +36,13 @@ export function posicionInicial(): [number, number, number] {
   return [A.cx - A.fx * d, INICIO_BASE.y, A.cz - A.fz * d];
 }
 
+/** Z28: igual que posicionInicial pero escribe en `out` (sin allocations, para useFrame). */
+export function posicionInicialEn(out: { x: number; y: number; z: number }): void {
+  const A = anclarTelon();
+  const d = DBG_SILLAS.curtainDistM + Math.max(0, DBG_INICIO.INICIO_RETROCESO_M);
+  out.x = A.cx - A.fx * d; out.y = INICIO_BASE.y; out.z = A.cz - A.fz * d;
+}
+
 /** Z25: yaw que mira exactamente al centro del telón (sobre el eje) y pitch de debug. */
 export function rotacionInicial(): { pitch: number; yaw: number } {
   const A = anclarTelon();
