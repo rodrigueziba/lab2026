@@ -804,17 +804,20 @@ export const DBG_LUZ = {
   // Z30: cielo estrellado procedural (lib/estrellasCielo.glsl.ts, CieloEstrellado.tsx)
   ESTRELLAS_MODO_VIEJO:    false,  // true = vuelve el Points de Z28 (y se apaga el cielo shader) — live
   ESTRELLAS_SOLO_FUERA:    false,  // true = solo fuera de la sala (como Z28) — live
-  ESTRELLAS_DIST_INICIO_M: 75,     // distancia a la luz desde la que empiezan a verse (tenues) — live
-  ESTRELLAS_DIST_PLENO_M:  6,      // distancia a la luz con el cielo completo — live
-  ESTRELLAS_CURVA:         1.6,    // exponente de la rampa (más alto = arranca más tenue) — live
+  ESTRELLAS_MODO_Z30:      false,  // Z31: true = rampa vieja de Z30 (inicio absoluto ESTRELLAS_DIST_INICIO_M) — live
+  ESTRELLAS_DIST_INICIO_M: 75,     // Z30 (solo con ESTRELLAS_MODO_Z30): distancia absoluta de inicio — live
+  ESTRELLAS_MARGEN_INICIO_M: 1.5,  // Z31: el reveal empieza en dSpawn − margen (0 en el spawn) — live
+  ESTRELLAS_DIST_PLENO_M:  2,      // Z31 (era 6): reveal = 1 a esta distancia o menos (= radio de activación) — live
+  ESTRELLAS_CURVA:         1.3,    // Z31 (era 1.6): exponente sobre el smoothstep — live
   ESTRELLAS_REVEAL_MAX:    1,      // tope de uReveal — live
-  ESTRELLAS_INERCIA_S:     0.6,    // constante de tiempo del suavizado del reveal (anti parpadeo) — live
+  ESTRELLAS_INERCIA_S:     0.5,    // Z31 (era 0.6): constante de tiempo del suavizado del reveal — live
   ESTRELLAS_ATENUAR_EN_VISUALIZADOR: 0.15, // factor dentro del área con visualizador o secuencias SILLAS/TARIMA — live
   ESTRELLAS_ATEN_TRANS_S:  1.2,    // constante de tiempo de esa atenuación — live
   ESTRELLAS_FORZAR_REVEAL: -1,     // −1 = automático; 0..1 fuerza uReveal (probar sin caminar) — live
   ESTRELLAS_CALIDAD:       3,      // capas por píxel: 3 alta · 2 media · 1 baja — live
   ESTRELLAS_DEPTH_TEST:    true,   // true = paredes, tarima y objetos tapan el cielo; false = encima de todo — live
-  ESTRELLAS_SOBRE_TECHO:   false,  // true = el techo (y=22) deja de escribir profundidad: estrellas también arriba — live
+  ESTRELLAS_SOBRE_TECHO:   false,  // true = el techo (y=22) deja de escribir profundidad siempre (Z30) — live
+  ESTRELLAS_SALA_SIN_PROFUNDIDAD: true, // Z31: con el cielo visible, techo y paredes no escriben profundidad → cielo continuo — live
   ESTRELLAS_CONGELAR_EN_PAUSA: false, // true = el titilar y la deriva se congelan con la pausa Z28 — live
   ESTRELLAS_TOPE:          1.0,    // tope por canal de la salida (bloom threshold 0.92: solo los núcleos más fuertes brillan) — live
   ESTRELLAS_U_BRILLO:      1.6,    // uBrillo — live

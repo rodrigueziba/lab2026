@@ -7,17 +7,24 @@
 // SILLAS/TARIMA. Orden de dibujo: renderOrder 10 como la luz de Z28 (después del caparazón del domo y
 // de DomeSky, que no escriben profundidad); con ESTRELLAS_DEPTH_TEST las paredes y objetos la tapan.
 // Lo monta LuzLejana. uTime se escribe solo acá, una vez por frame.
+//
+// Z31: (1) recorte en "caja": no era el far (radio 300 < far 1000) ni las subdivisiones ni el culling; eran
+// el techo (y=22) y las paredes cerradas, que escriben profundidad y con depthTest tapaban el cielo (sus
+// aristas son los bordes rectos/diagonales que cambian al girar). Ahora el shader v2 dibuja el cielo en el
+// plano lejano (z = w·0.9999) y, mientras el cielo está visible, techo y paredes dejan de escribir
+// profundidad (ESTRELLAS_SALA_SIN_PROFUNDIDAD): cielo continuo, pero tarima, prisma, público, telón y
+// piso siguen tapándolo. (2) reveal relativo al spawn: 0 en el spawn, 1 bajo la luz (revealPorDistancia).
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_LUZ } from "@/lib/debugConfig";
-import { LUZ_STATE, CIELO_STATE } from "@/lib/caminoLuz";
+import { LUZ_STATE, CIELO_STATE, revealPorDistancia } from "@/lib/caminoLuz";
 import { INTERACT_STATE, PANELES_SILLAS, isVizActivated } from "@/lib/alightStore";
 import { PAUSA } from "@/lib/pausaExperiencia";
 import { ESTRELLAS_VERT, ESTRELLAS_FRAG } from "@/lib/luz/estrellasCielo.glsl";
 
-const CIELO_R = 300;   // > domo (30) y > sala (±40, techo 22); < far de la cámara (1000)
+const CIELO_R_FAR = 0.9;   // Z31: radio = 0.9 · camera.far (era 300 fijo); el vertex v2 lo lleva al plano lejano
 
 // uniforms de módulo (mismo patrón que CONO_UNIFORMS / DOME_SHELL_UNIFORMS)
 const CIELO_UNIFORMS = {
@@ -40,15 +47,21 @@ export default function CieloEstrellado() {
     t: 0,
     tinte: DBG_LUZ.ESTRELLAS_TINTE_HORIZONTE,
     techo: null as THREE.Mesh | null,
+    paredes: [] as THREE.Material[],   // Z31: materiales de las 4 paredes (se buscan una vez)
+    paredesBuscadas: false,
   });
+  const radio = useMemo(() => CIELO_R_FAR * ((camera as THREE.PerspectiveCamera).far || 1000), [camera]);
 
-  // al desmontar: el techo vuelve a escribir profundidad
+  // al desmontar: techo y paredes vuelven a escribir profundidad
   useEffect(() => {
     const s = st.current;
     return () => {
       const m = s.techo?.material as THREE.Material | undefined;
       if (m) m.depthWrite = true;
+      for (const pm of s.paredes) pm.depthWrite = true;
       s.techo = null;
+      s.paredes.length = 0;
+      s.paredesBuscadas = false;
       CIELO_STATE.reveal = 0;
     };
   }, []);
@@ -59,23 +72,41 @@ export default function CieloEstrellado() {
     if (!(DBG_LUZ.ESTRELLAS_CONGELAR_EN_PAUSA && PAUSA.activa)) s.t += dt;
     CIELO_UNIFORMS.uTime.value = s.t;
 
-    // ── techo (y = 22): deja de escribir profundidad solo con ESTRELLAS_SOBRE_TECHO ──
+    // ── techo y paredes (búsqueda una sola vez; la profundidad se decide al final del frame) ──
     if (!s.techo) s.techo = (scene.getObjectByName("room-ceiling") as THREE.Mesh | undefined) ?? null;
-    const on = DBG_LUZ.CAMINO_LUZ && !DBG_LUZ.ESTRELLAS_MODO_VIEJO;
-    if (s.techo) {
-      const m = s.techo.material as THREE.Material;
-      const dw = !(on && DBG_LUZ.ESTRELLAS_SOBRE_TECHO);
-      if (m.depthWrite !== dw) m.depthWrite = dw;
+    if (!s.paredesBuscadas) {
+      const g = scene.getObjectByName("room-walls");
+      if (g) {
+        s.paredesBuscadas = true;
+        for (const c of g.children) {
+          const mm = (c as THREE.Mesh).material;
+          if (mm && !Array.isArray(mm)) s.paredes.push(mm);
+        }
+      }
     }
+    const on = DBG_LUZ.CAMINO_LUZ && !DBG_LUZ.ESTRELLAS_MODO_VIEJO;
 
     const mesh = meshRef.current;
     if (!mesh) return;
-    if (!on) { mesh.visible = false; CIELO_STATE.reveal = 0; CIELO_STATE.objetivo = 0; return; }
+    if (!on) {
+      mesh.visible = false; CIELO_STATE.reveal = 0; CIELO_STATE.objetivo = 0;
+      aplicarProfundidadSala(s, false, false);
+      return;
+    }
 
-    // ── reveal objetivo: rampa por distancia a la luz ──
-    const ini = DBG_LUZ.ESTRELLAS_DIST_INICIO_M, ple = DBG_LUZ.ESTRELLAS_DIST_PLENO_M;
-    const t = Math.min(1, Math.max(0, (ini - LUZ_STATE.dLuz) / Math.max(1e-3, ini - ple)));
-    let obj = Math.pow(t * t * (3 - 2 * t), Math.max(0.05, DBG_LUZ.ESTRELLAS_CURVA)) * DBG_LUZ.ESTRELLAS_REVEAL_MAX;
+    // ── reveal objetivo ──
+    let obj: number;
+    if (DBG_LUZ.ESTRELLAS_MODO_Z30) {
+      // Z30: inicio absoluto
+      obj = revealPorDistancia(LUZ_STATE.dLuz, DBG_LUZ.ESTRELLAS_DIST_INICIO_M, 0, DBG_LUZ.ESTRELLAS_DIST_PLENO_M,
+        DBG_LUZ.ESTRELLAS_CURVA, DBG_LUZ.ESTRELLAS_REVEAL_MAX);
+    } else {
+      // Z31: relativo al spawn (0 en el spawn y más lejos; 1 en el radio del diálogo)
+      obj = revealPorDistancia(LUZ_STATE.dLuz, LUZ_STATE.dSpawn, DBG_LUZ.ESTRELLAS_MARGEN_INICIO_M,
+        DBG_LUZ.ESTRELLAS_DIST_PLENO_M, DBG_LUZ.ESTRELLAS_CURVA, DBG_LUZ.ESTRELLAS_REVEAL_MAX);
+      // con el diálogo activo (giro + terminal) el cielo queda completo
+      if (LUZ_STATE.fase === "girando" || LUZ_STATE.fase === "dialogo") obj = DBG_LUZ.ESTRELLAS_REVEAL_MAX;
+    }
     if (DBG_LUZ.ESTRELLAS_SOLO_FUERA) {
       const borde = Math.max(Math.abs(camera.position.x), Math.abs(camera.position.z));
       obj *= THREE.MathUtils.smoothstep(borde, DBG_LUZ.SALA_MEDIA_M - 2, DBG_LUZ.SALA_MEDIA_M + 2);
@@ -92,6 +123,7 @@ export default function CieloEstrellado() {
     // ── inercia (exponencial, independiente de los fps) ──
     CIELO_STATE.aten   += (atenObj - CIELO_STATE.aten) * (1 - Math.exp(-dt / Math.max(0.01, DBG_LUZ.ESTRELLAS_ATEN_TRANS_S)));
     CIELO_STATE.reveal += (obj - CIELO_STATE.reveal) * (1 - Math.exp(-dt / Math.max(0.01, DBG_LUZ.ESTRELLAS_INERCIA_S)));
+    if (obj === 0 && CIELO_STATE.reveal < 0.002) CIELO_STATE.reveal = 0;   // Z31: vuelve a 0 exacto
     let r = CIELO_STATE.reveal * CIELO_STATE.aten;
     if (DBG_LUZ.ESTRELLAS_FORZAR_REVEAL >= 0) r = Math.min(1, DBG_LUZ.ESTRELLAS_FORZAR_REVEAL);
 
@@ -110,16 +142,30 @@ export default function CieloEstrellado() {
     const mat = matRef.current;
     if (mat && mat.depthTest !== DBG_LUZ.ESTRELLAS_DEPTH_TEST) mat.depthTest = DBG_LUZ.ESTRELLAS_DEPTH_TEST;
 
-    mesh.visible = r > 0.002;
-    mesh.position.copy(camera.position);
+    const visible = r > 0.002;
+    mesh.visible = visible;                 // sin cielo no se dibuja (no gasta GPU)
+    mesh.position.copy(camera.position);    // solo posición: sin rotación ni escala
+    aplicarProfundidadSala(s, visible && DBG_LUZ.ESTRELLAS_SALA_SIN_PROFUNDIDAD,
+      DBG_LUZ.ESTRELLAS_SOBRE_TECHO || (visible && DBG_LUZ.ESTRELLAS_SALA_SIN_PROFUNDIDAD));
   });
 
   return (
     <mesh ref={meshRef} renderOrder={10} frustumCulled={false} visible={false}>
-      <sphereGeometry args={[CIELO_R, 48, 24]} />
+      <sphereGeometry args={[radio, 64, 32]} />
       <shaderMaterial ref={matRef} vertexShader={ESTRELLAS_VERT} fragmentShader={ESTRELLAS_FRAG}
         uniforms={CIELO_UNIFORMS} side={THREE.BackSide} transparent depthWrite={false}
         depthTest={DBG_LUZ.ESTRELLAS_DEPTH_TEST} blending={THREE.AdditiveBlending} fog={false} />
     </mesh>
   );
+}
+
+/** Z31: techo y paredes sin escritura de profundidad mientras el cielo está visible (cambiar depthWrite
+ *  no recompila el material). Solo escribe si cambia. */
+function aplicarProfundidadSala(
+  s: { techo: THREE.Mesh | null; paredes: THREE.Material[] },
+  paredesSin: boolean, techoSin: boolean,
+): void {
+  const tm = s.techo?.material as THREE.Material | undefined;
+  if (tm && tm.depthWrite === techoSin) tm.depthWrite = !techoSin;
+  for (const pm of s.paredes) if (pm.depthWrite === paredesSin) pm.depthWrite = !paredesSin;
 }

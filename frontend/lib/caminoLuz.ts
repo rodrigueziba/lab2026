@@ -17,6 +17,7 @@ export type FaseLuz = "libre" | "girando" | "dialogo" | "rearmar";
 export const LUZ_STATE = {
   x: 0, z: 0, y: 4.5,      // posición actual de la luz (recalculada cada frame desde DBG_LUZ)
   dLuz: 999,               // distancia horizontal cámara → luz (m)
+  dSpawn: 40,              // Z31: distancia horizontal spawn → luz (m), recalculada con la posición
   cercania: 0,             // 0 lejos … 1 debajo (curva aplicada)
   fuera: false,            // el usuario está fuera del área (con histéresis) → experiencia en pausa
   fase: "libre" as FaseLuz,
@@ -28,10 +29,21 @@ export const CIELO_STATE = { reveal: 0, aten: 1, objetivo: 0 };
 /** Recalcula la posición de la luz desde las constantes (barato, sin allocations). */
 export function actualizarPosLuz(): void {
   LUZ_STATE.y = DBG_LUZ.LUZ_ALTURA_M;
-  if (DBG_LUZ.LUZ_POS_MANUAL) { LUZ_STATE.x = DBG_LUZ.LUZ_POS_X; LUZ_STATE.z = DBG_LUZ.LUZ_POS_Z; return; }
   posicionInicialEn(_spawn);
-  LUZ_STATE.x = _spawn.x - EJE_TELON.fx * DBG_LUZ.LUZ_DISTANCIA_M;
-  LUZ_STATE.z = _spawn.z - EJE_TELON.fz * DBG_LUZ.LUZ_DISTANCIA_M;
+  if (DBG_LUZ.LUZ_POS_MANUAL) { LUZ_STATE.x = DBG_LUZ.LUZ_POS_X; LUZ_STATE.z = DBG_LUZ.LUZ_POS_Z; }
+  else {
+    LUZ_STATE.x = _spawn.x - EJE_TELON.fx * DBG_LUZ.LUZ_DISTANCIA_M;
+    LUZ_STATE.z = _spawn.z - EJE_TELON.fz * DBG_LUZ.LUZ_DISTANCIA_M;
+  }
+  LUZ_STATE.dSpawn = Math.hypot(LUZ_STATE.x - _spawn.x, LUZ_STATE.z - _spawn.z);   // Z31
+}
+
+/** Z31: reveal objetivo del cielo (0..max) en función de la distancia d a la luz. Pura, sin estado:
+ *  0 a dSpawn − margen o más lejos; 1·max a dPleno o más cerca; entre medio smoothstep^curva. */
+export function revealPorDistancia(d: number, dSpawn: number, margen: number, dPleno: number, curva: number, max: number): number {
+  const ini = dSpawn - margen;
+  const t = Math.min(1, Math.max(0, (ini - d) / Math.max(1e-3, ini - dPleno)));
+  return Math.pow(t * t * (3 - 2 * t), Math.max(0.05, curva)) * max;
 }
 
 /** ¿El punto (x,z) es caminable? */

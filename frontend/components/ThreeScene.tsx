@@ -125,7 +125,7 @@ function Room() {
         <meshStandardMaterial color="#0d0d0f" roughness={0.95} />
       </mesh>
       {/* Z2: walls wrapped in a group — hidden when visualizer active (like ceiling) */}
-      <group ref={wallsRef}>
+      <group ref={wallsRef} name="room-walls">{/* Z31: CieloEstrellado lo busca por nombre */}
         <mesh ref={paredSurRef} position={[0, 11, -40]}>
           <planeGeometry args={[80, 22]} />
           <meshStandardMaterial color="#080809" roughness={1} />

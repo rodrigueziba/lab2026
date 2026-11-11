@@ -1,12 +1,17 @@
-// Shader del cielo estrellado (adaptacion de Nightsky Shader Elective, tmoe1354, Shadertoy WcjGRz, CC BY-NC-SA 3.0).
-// Se usa en un ShaderMaterial sobre una esfera grande con side: BackSide, transparent, depthWrite false,
-// blending AdditiveBlending, fog false. uReveal (0..1) lo conduce la distancia a la luz.
-// Z30 (alight): agregados uCapas (calidad 1..3) y uTope (tope por canal antes del bloom). Sin
-// colorspace_fragment ni tonemapping_fragment: la salida es lineal y la convierte el OutputPass del composer.
+// Shader del cielo estrellado v2 (adaptacion de Nightsky Shader Elective, tmoe1354, Shadertoy WcjGRz, CC BY-NC-SA 3.0).
+// ShaderMaterial sobre una esfera que SIGUE a la camara (solo posicion), side BackSide, transparent,
+// depthWrite false, depthTest false, AdditiveBlending, fog false, frustumCulled false.
+// El vertex shader fija z = w * 0.9999, asi el far de la camara nunca recorta la esfera.
+// uReveal (0..1): 0 = no se dibuja nada; 1 = cielo completo (bajo la luz). Las capas aparecen por etapas.
+// Z31 (alight): sobre la v2 se reincorporan uCapas (calidad 1..3) y uTope (tope por canal antes del bloom)
+// de Z30. Sin colorspace_fragment ni tonemapping_fragment: salida lineal, la convierte el OutputPass.
 export const ESTRELLAS_VERT = /* glsl */ `varying vec3 vDir;
 void main(){
   vDir = normalize(position);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  // z = w * 0.9999: el cielo queda SIEMPRE en el plano lejano, asi el far de la camara nunca lo recorta
+  p.z = p.w * 0.9999;
+  gl_Position = p;
 }
 `;
 export const ESTRELLAS_FRAG = /* glsl */ `// Cielo estrellado procedural para alight.
@@ -55,7 +60,7 @@ vec3 capa(vec3 d, float escala, float densidad, float tam, float seed){
   nucleo *= nucleo;
   // el halo se apaga antes de llegar al borde de la celda (el centro queda a >=0.25 de cada cara)
   float halo = exp(-dist / (tamEst * 2.5)) * 0.12 * smoothstep(0.24, 0.05, dist);
-  float titila = 1.0 + uTwinkle * 0.45 * sin(uTime * (2.0 + 5.0 * h.x) + 6.2831 * h.y);
+  float titila = 1.0 + uTwinkle * clamp(uReveal, 0.3, 1.0) * 0.45 * sin(uTime * (2.0 + 5.0 * h.x) + 6.2831 * h.y);
   // color: de azulado a calido segun hash (el original lo sacaba de una textura)
   vec3 col = mix(vec3(0.70, 0.82, 1.0), vec3(1.0, 0.86, 0.66), h.z);
   return col * (nucleo + halo) * (0.35 + 1.6 * mag) * titila;
@@ -75,23 +80,29 @@ void main(){
   cl = min(cl, 1.0 - dot(q, normalize(vec3( 0.20, 0.85,-0.50))));
   cl = min(cl, 1.0 - dot(q, normalize(vec3(-0.80, 0.35,-0.40))));
   cl = min(cl, 1.0 - dot(q, normalize(vec3( 0.55, 0.40,-0.75))));
-  float spots = 1.0 - smoothstep(0.0, 0.20, cl);
-  float banda = exp(-pow(dot(q, normalize(vec3(0.35, 0.55, -0.75))) * 5.0, 2.0));
+  // aparicion por etapas segun uReveal (0 = nada, 1 = cielo completo bajo la luz)
+  float r  = clamp(uReveal, 0.0, 1.0);
+  float g1 = smoothstep(0.02, 0.45, r);   // primeras estrellas chicas
+  float g2 = smoothstep(0.18, 0.65, r);   // capa media
+  float g3 = smoothstep(0.35, 0.85, r);   // las grandes y brillantes
+  float gs = smoothstep(0.50, 1.00, r);   // manchones y banda (maxima expresividad)
+  float gv = smoothstep(0.25, 0.90, r);   // velo azul del horizonte
+  float spots = (1.0 - smoothstep(0.0, 0.20, cl)) * gs;
+  float banda = exp(-pow(dot(q, normalize(vec3(0.35, 0.55, -0.75))) * 5.0, 2.0)) * gs;
   float dens  = clamp(uDensidad + 0.35 * spots + 0.20 * banda, 0.0, 1.0);
 
-  // Z30: calidad por uniform (rama coherente en toda la pantalla). Baja: solo las chicas.
   vec3 est = vec3(0.0);
-  est += capa(q, 38.0, dens * 0.55, 0.075, 1.0);                       // chicas, muchas
-  if (uCapas > 1.5) est += capa(q, 22.0, dens * 0.40, 0.065, 7.0);
-  if (uCapas > 2.5) est += capa(q, 11.0, dens * 0.30, 0.055, 13.0);   // grandes, pocas
+  est += capa(q, 38.0, dens * 0.55, 0.075, 1.0) * g1;   // chicas, muchas
+  if (uCapas > 1.5) est += capa(q, 22.0, dens * 0.40, 0.065, 7.0)  * g2;   // Z30: calidad
+  if (uCapas > 2.5) est += capa(q, 11.0, dens * 0.30, 0.055, 13.0) * g3;  // grandes, pocas
 
   // horizonte: las estrellas se apagan abajo y aparece un velo azul (como el degradado del original)
   float alto = clamp(d.y, 0.0, 1.0);
   float visible = smoothstep(0.0, 0.16, d.y);
-  vec3 velo = uTinteHorizonte * pow(1.0 - alto, 3.0) * 0.20 * step(0.0, d.y + 0.05);
-  velo += vec3(0.010, 0.012, 0.030) * (0.4 + 0.6 * banda + 0.5 * spots) * visible;
+  vec3 velo = uTinteHorizonte * pow(1.0 - alto, 3.0) * 0.20 * step(0.0, d.y + 0.05) * gv;
+  velo += vec3(0.010, 0.012, 0.030) * (0.4 + 0.6 * banda + 0.5 * spots) * visible * gv;
 
-  vec3 col = (est * visible * 1.3 + velo) * uBrillo * uReveal;
+  vec3 col = (est * visible * 1.3 + velo) * uBrillo * (0.55 + 0.45 * r);
   col = min(col, vec3(uTope));          // Z30
   gl_FragColor = vec4(col, 1.0);
 }

@@ -1492,7 +1492,23 @@ export default function DebugMenu() {
           <div style={DIVIDER} />
           <span style={LABEL}>Cielo estrellado Z30 <span style={NOTE}>(live)</span></span>
           <div style={{ ...ROW, ...NOTE }}>
-            <span>reveal={CIELO_STATE.reveal.toFixed(2)} · obj={CIELO_STATE.objetivo.toFixed(2)} · aten={CIELO_STATE.aten.toFixed(2)}</span>
+            <span>reveal={CIELO_STATE.reveal.toFixed(2)} · obj={CIELO_STATE.objetivo.toFixed(2)} · aten={CIELO_STATE.aten.toFixed(2)} · dSpawn={LUZ_STATE.dSpawn.toFixed(1)} m</span>
+          </div>
+          <div style={ROW}>
+            <span>ESTRELLAS_MODO_Z30</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.ESTRELLAS_MODO_Z30;
+              DBG_LUZ.ESTRELLAS_MODO_Z30 = v;
+              setLuz(o => ({ ...o, ESTRELLAS_MODO_Z30: v }));
+            }}>{luz.ESTRELLAS_MODO_Z30 ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>ESTRELLAS_SALA_SIN_PROFUNDIDAD</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.ESTRELLAS_SALA_SIN_PROFUNDIDAD;
+              DBG_LUZ.ESTRELLAS_SALA_SIN_PROFUNDIDAD = v;
+              setLuz(o => ({ ...o, ESTRELLAS_SALA_SIN_PROFUNDIDAD: v }));
+            }}>{luz.ESTRELLAS_SALA_SIN_PROFUNDIDAD ? "ON" : "off"}</button>
           </div>
           <div style={ROW}>
             <span>ESTRELLAS_MODO_VIEJO</span>
@@ -1545,7 +1561,9 @@ export default function DebugMenu() {
                 setLuz(o => ({ ...o, ESTRELLAS_FORZAR_REVEAL: v }));
               }} />
           </div>
-          <NumField label="ESTRELLAS_DIST_INICIO_M" value={luz.ESTRELLAS_DIST_INICIO_M} step={1} min={1} max={300} note="m"
+          <NumField label="ESTRELLAS_MARGEN_INICIO_M" value={luz.ESTRELLAS_MARGEN_INICIO_M} step={0.1} min={0} max={20} note="m antes del spawn"
+            onChange={v => { DBG_LUZ.ESTRELLAS_MARGEN_INICIO_M = v; setLuz(o => ({ ...o, ESTRELLAS_MARGEN_INICIO_M: v })); }} />
+          <NumField label="ESTRELLAS_DIST_INICIO_M" value={luz.ESTRELLAS_DIST_INICIO_M} step={1} min={1} max={300} note="m (solo MODO_Z30)"
             onChange={v => { DBG_LUZ.ESTRELLAS_DIST_INICIO_M = v; setLuz(o => ({ ...o, ESTRELLAS_DIST_INICIO_M: v })); }} />
           <NumField label="ESTRELLAS_DIST_PLENO_M" value={luz.ESTRELLAS_DIST_PLENO_M} step={0.5} min={0} max={100} note="m"
             onChange={v => { DBG_LUZ.ESTRELLAS_DIST_PLENO_M = v; setLuz(o => ({ ...o, ESTRELLAS_DIST_PLENO_M: v })); }} />
