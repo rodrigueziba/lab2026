@@ -877,3 +877,10 @@ export const DBG_MOV = {
   PASO_POR_FRAME_M:  0.12,  // paso por frame del modo anterior (POR_DELTA false) — live
   DT_MAX_S:          0.1,   // tope del delta: un tirón de frames no se convierte en un salto — live
 };
+
+// ── Z38: máquina única del amanecer (lib/amanecer.ts) ──
+export const DBG_AMANECER = {
+  UNIFICADO:          true,   // false = las dos máquinas viejas (U9 alightStore + W3) exactamente como antes — live
+  AMANECER_DUR_S:     10,     // duración de la fase 1 (única). amanecerDurS / domeAmanecerDurS quedan para el modo viejo — live
+  MONOLITOS_CAPTURA:  true,   // Monoliths captura el reflejo (envMap) con 'alight:dawn-complete' — live
+};

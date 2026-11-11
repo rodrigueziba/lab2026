@@ -7,10 +7,14 @@
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_AMANECER } from "@/lib/debugConfig";
 import { VIZ_SUN_AZ_DEG, VIZ_SUN_EL_DEG } from "@/lib/vizSunState";
 import { BAND_STATE } from "@/lib/vizAudio";
 import { getDawnState, finishDawnPhase1, resetDawn, skipDawnToFinal } from "@/lib/alightStore";
+import { estadoCompat, resetAmanecer, skipAmanecer, type EstadoCompat } from "@/lib/amanecer"; // Z38
+
+// Z38: estado único del amanecer en el formato viejo (reutilizado, sin allocations)
+const _dawnU: EstadoCompat = { phase: "inactivo", startT: 0, completeT: 0, sectorDeg: 0 };
 
 // ── Geometry constants ────────────────────────────────────────────────────────
 const DOME_R = 28;
@@ -499,9 +503,11 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
     const p3 = gp[3];  // LÍNEAS
 
     // ── U9: dawn sequence overrides — all local floats, no allocations ───────
-    if (dawnResetRef.current) { dawnResetRef.current = false; resetDawn(); }
-    if (dawnSkipRef.current)  { dawnSkipRef.current  = false; skipDawnToFinal(t_s); }
-    const dawn      = getDawnState();
+    // Z38: con UNIFICADO lee la máquina única (lib/amanecer.ts); si no, la U9 vieja (alightStore)
+    const unif = DBG_AMANECER.UNIFICADO;
+    if (dawnResetRef.current) { dawnResetRef.current = false; if (unif) resetAmanecer(); else resetDawn(); }
+    if (dawnSkipRef.current)  { dawnSkipRef.current  = false; if (unif) skipAmanecer(); else skipDawnToFinal(t_s); }
+    const dawn      = unif ? estadoCompat(t_s, DBG_SILLAS.amanecerDurS, _dawnU) : getDawnState();
     const DEG_NORM  = 1 / 360;  // normalizing factor (degrees → 0–1)
     let effG0       = g0;
     let effG2       = g2;
@@ -532,7 +538,7 @@ export default function VizPanorama({ growRef, flowRef, kickRef }: VizPanoramaPr
       dawnFrenteRev = t * 1.2 - 0.1;
       dawnFondoRev  = dawnMediasRev = dawnLineRev = -0.1;
       overRev    = true;
-      if (rawT >= 1.0) finishDawnPhase1(t_s);
+      if (rawT >= 1.0 && !unif) finishDawnPhase1(t_s);   // Z38: la máquina única emite su propio evento
     } else {
       // completo — phase 2 staggered reveals
       const p2T  = t_s - dawn.completeT;

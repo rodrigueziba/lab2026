@@ -40,6 +40,7 @@ import {
   DBG_LUZ,
   DBG_EFECTOS, // Z29
   DBG_MOV, // Z34
+  DBG_AMANECER, // Z38
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -56,6 +57,7 @@ import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado"; // Z27
 import { LUZ_STATE, CIELO_STATE } from "@/lib/caminoLuz"; // Z28 · Z30
 import { PAUSA } from "@/lib/pausaExperiencia"; // Z28
+import { AMANECER } from "@/lib/amanecer"; // Z38
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
 
 type Tab = "SILLAS" | "TARIMA";
@@ -309,6 +311,7 @@ export default function DebugMenu() {
   const [avisoDesbloqueo, setAvisoDesbloqueo] = useState(false);
   const [efx, setEfx] = useState({ ...DBG_EFECTOS });
   const [mov, setMov] = useState({ ...DBG_MOV });                          // Z34
+  const [amn, setAmn] = useState({ ...DBG_AMANECER });                     // Z38
   const [tab, setTab]         = useState<Tab>("SILLAS");
   const [spot,     setSpot]     = useState({ ...DBG_SPOTLIGHT });
   const [stars,    setStars]    = useState({ ...DBG_STARS });
@@ -2343,7 +2346,7 @@ export default function DebugMenu() {
 
           <div style={DIVIDER} />
           <span style={LABEL}>U9 — Secuencia amanecer <span style={NOTE}>(debug)</span></span>
-          <NumField label="amanecerDurS"       value={sillas.amanecerDurS}       step={1}    min={1}   max={60}   note="duración fase 1 (s)"
+          <NumField label="amanecerDurS"       value={sillas.amanecerDurS}       step={1}    min={1}   max={60}   note="fase 1 (s) — solo modo viejo (Z38)"
             onChange={v => { DBG_SILLAS.amanecerDurS       = v; setSillas(s => ({ ...s, amanecerDurS:       v })); }} />
           <NumField label="amanecerSectorDeg"  value={sillas.amanecerSectorDeg}  step={10}   min={10}  max={360}  note="ancho sector (°)"
             onChange={v => { DBG_SILLAS.amanecerSectorDeg  = v; setSillas(s => ({ ...s, amanecerSectorDeg:  v })); }} />
@@ -2353,6 +2356,29 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.amanecerP2StaggerS = v; setSillas(s => ({ ...s, amanecerP2StaggerS: v })); }} />
           <NumField label="amanecerP2GrowS"    value={sillas.amanecerP2GrowS}    step={0.5}  min={0.5} max={10}   note="duración crecimiento fase 2 (s)"
             onChange={v => { DBG_SILLAS.amanecerP2GrowS    = v; setSillas(s => ({ ...s, amanecerP2GrowS:    v })); }} />
+          {/* Z38: máquina única del amanecer — único par de botones (antes había uno para U9 y otro para W3) */}
+          <span style={LABEL}>Amanecer Z38 <span style={NOTE}>(máquina única)</span></span>
+          <div style={{ ...ROW, ...NOTE }}>
+            <span>fase={AMANECER.fase} · p1={AMANECER.p1.toFixed(2)} · tFin={AMANECER.tFin > 9000 ? "skip" : AMANECER.tFin.toFixed(1)} s · sector={AMANECER.sectorDeg}° · eventos={AMANECER.emitidos}</span>
+          </div>
+          <div style={ROW}>
+            <span>UNIFICADO</span>
+            <button style={INPUT} onClick={() => {
+              const v = !amn.UNIFICADO;
+              DBG_AMANECER.UNIFICADO = v;
+              setAmn(o => ({ ...o, UNIFICADO: v }));
+            }}>{amn.UNIFICADO ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>MONOLITOS_CAPTURA</span>
+            <button style={INPUT} onClick={() => {
+              const v = !amn.MONOLITOS_CAPTURA;
+              DBG_AMANECER.MONOLITOS_CAPTURA = v;
+              setAmn(o => ({ ...o, MONOLITOS_CAPTURA: v }));
+            }}>{amn.MONOLITOS_CAPTURA ? "ON" : "off"}</button>
+          </div>
+          <NumField label="AMANECER_DUR_S" value={amn.AMANECER_DUR_S} step={0.5} min={0.5} max={60} note="fase 1 (s), única"
+            onChange={v => { DBG_AMANECER.AMANECER_DUR_S = v; setAmn(o => ({ ...o, AMANECER_DUR_S: v })); }} />
           <div style={ROW}>
             <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
               onClick={() => window.dispatchEvent(new CustomEvent('alight:dawn-reset'))}>
@@ -2486,7 +2512,7 @@ export default function DebugMenu() {
 
           <div style={DIVIDER} />
           <span style={LABEL}>W3 — Amanecer DomeSky <span style={NOTE}>(debug)</span></span>
-          <NumField label="domeAmanecerDurS"    value={sillas.domeAmanecerDurS}    step={1}   min={1}   max={60}  note="duración fase 1 (s)"
+          <NumField label="domeAmanecerDurS"    value={sillas.domeAmanecerDurS}    step={1}   min={1}   max={60}  note="fase 1 (s) — solo modo viejo (Z38)"
             onChange={v => { DBG_SILLAS.domeAmanecerDurS    = v; setSillas(s => ({ ...s, domeAmanecerDurS:    v })); }} />
           <NumField label="domeRevDelayMontS"   value={sillas.domeRevDelayMontS}   step={0.5} min={0}   max={20}  note="delay MONTAÑAS strata (s)"
             onChange={v => { DBG_SILLAS.domeRevDelayMontS   = v; setSillas(s => ({ ...s, domeRevDelayMontS:   v })); }} />
@@ -2498,16 +2524,6 @@ export default function DebugMenu() {
             onChange={v => { DBG_SILLAS.domeRevDelayCieloS  = v; setSillas(s => ({ ...s, domeRevDelayCieloS:  v })); }} />
           <NumField label="domeRevDurS"         value={sillas.domeRevDurS}         step={0.5} min={0.5} max={20}  note="duración de cada reveal (s)"
             onChange={v => { DBG_SILLAS.domeRevDurS         = v; setSillas(s => ({ ...s, domeRevDurS:         v })); }} />
-          <div style={ROW}>
-            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
-              onClick={() => window.dispatchEvent(new CustomEvent('alight:dome-dawn-reset'))}>
-              Reiniciar amanecer
-            </button>
-            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer", marginLeft: 6 }}
-              onClick={() => window.dispatchEvent(new CustomEvent('alight:dome-dawn-skip'))}>
-              Saltar al final
-            </button>
-          </div>
 
           <div style={DIVIDER} />
           <span style={LABEL}>W4 — DomeSky ajuste de shader <span style={NOTE}>(live sin recrear material)</span></span>

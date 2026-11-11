@@ -7,7 +7,7 @@
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_AMANECER } from "@/lib/debugConfig"; // Z38
 import { setMonolithProximity } from "@/lib/vizAudio";
 import { createBasePlateTex } from "@/lib/retro/decals";
 
@@ -446,7 +446,8 @@ export default function Monoliths() {
   }, [gl]); // mats are stable useMemo — excluded to avoid immutability rule
 
   useEffect(() => {
-    const onDawn = () => { captureEnvRef.current = true; };
+    // Z38: la captura se puede apagar (DBG_AMANECER.MONOLITOS_CAPTURA)
+    const onDawn = () => { if (DBG_AMANECER.MONOLITOS_CAPTURA) captureEnvRef.current = true; };
     window.addEventListener("alight:dawn-complete", onDawn);
     return () => window.removeEventListener("alight:dawn-complete", onDawn);
   }, []);

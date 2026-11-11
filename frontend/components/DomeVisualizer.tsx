@@ -7,9 +7,14 @@
 import { useRef, useEffect, useMemo, useState, Suspense } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS, DOME_METERS, DBG_DOME_LIVE } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_AMANECER, DOME_METERS, DBG_DOME_LIVE } from "@/lib/debugConfig";
 import { prepareVizAudio, stopVizAudio, getVizBands, BAND_STATE, N5_STATE } from "@/lib/vizAudio";
 import { getDawnState, getDomeDawnState, startDomeDawn, finishDomeDawnPhase1, resetDomeDawnState, skipDomeDawnState } from "@/lib/alightStore";
+import { estadoCompat, resetAmanecer, skipAmanecer, easeOut3, type EstadoCompat } from "@/lib/amanecer"; // Z38
+
+// Z38: estado único del amanecer en el formato viejo (W3 y cielo U9; reutilizados, sin allocations)
+const _dawnW3: EstadoCompat = { phase: "inactivo", startT: 0, completeT: 0, sectorDeg: 0 };
+const _dawnSky: EstadoCompat = { phase: "inactivo", startT: 0, completeT: 0, sectorDeg: 0 };
 import { getHazEnteredOnce, getHazBandOn } from "@/lib/haz";
 import { VIZ_SUN_AZ_DEG, VIZ_SUN_EL_DEG } from "@/lib/vizSunState";
 import VizPanorama from "./VizPanorama";
@@ -450,10 +455,15 @@ function DomeSkyAnchor() {
     const onLQ    = () => { setLowQuality(DBG_SILLAS.domeLowQuality); };
     window.addEventListener('alight:dome-dawn-reset', onReset);
     window.addEventListener('alight:dome-dawn-skip',  onSkip);
+    // Z38: el par único de eventos (botones "Reiniciar amanecer" / "Saltar al final") también actúa acá
+    window.addEventListener('alight:dawn-reset', onReset);
+    window.addEventListener('alight:dawn-skip',  onSkip);
     window.addEventListener('alight:dome-lq-change',  onLQ);
     return () => {
       window.removeEventListener('alight:dome-dawn-reset', onReset);
       window.removeEventListener('alight:dome-dawn-skip',  onSkip);
+      window.removeEventListener('alight:dawn-reset', onReset);
+      window.removeEventListener('alight:dawn-skip',  onSkip);
       window.removeEventListener('alight:dome-lq-change',  onLQ);
     };
   }, []);
@@ -475,20 +485,22 @@ function DomeSkyAnchor() {
     const clockT = clock.elapsedTime;
 
     // W3: manejar reset/skip desde DebugMenu
+    const unif = DBG_AMANECER.UNIFICADO;   // Z38: máquina única (lib/amanecer.ts) o W3 viejo
     if (_dawnReset.current) {
       _dawnReset.current = false;
-      resetDomeDawnState();
+      if (unif) resetAmanecer(); else resetDomeDawnState();
       s.dawn = 0; s.revMont = 0; s.revLin = 0; s.revSol = 0; s.revCielo = 0;
     }
     if (_dawnSkip.current) {
       _dawnSkip.current = false;
-      skipDomeDawnState(clockT);
+      if (unif) skipAmanecer(); else skipDomeDawnState(clockT);
       s.dawn = 1; s.revMont = 1; s.revLin = 1; s.revSol = 1; s.revCielo = 1;
     }
 
     // W3: disparar amanecer con el primer haz que se activa
-    const domeDawn = getDomeDawnState();
-    if (domeDawn.phase === 'inactivo') {
+    // Z38: con UNIFICADO no se consulta getHazBandOn: el disparo único lo hace HazSystem (primer haz on)
+    const domeDawn = unif ? estadoCompat(clockT, DBG_SILLAS.domeAmanecerDurS, _dawnW3) : getDomeDawnState();
+    if (!unif && domeDawn.phase === 'inactivo') {
       for (let i = 0; i < 4; i++) {
         if (getHazBandOn(i)) { startDomeDawn(clockT); break; }
       }
@@ -498,8 +510,8 @@ function DomeSkyAnchor() {
     const amanecerDur = DBG_SILLAS.domeAmanecerDurS;
     if (domeDawn.phase === 'amanecer') {
       const raw = Math.min((clockT - domeDawn.startT) / amanecerDur, 1);
-      s.dawn = _easeOut3Dawn(raw);
-      if (raw >= 1) finishDomeDawnPhase1(clockT);
+      s.dawn = unif ? easeOut3(raw) : _easeOut3Dawn(raw);   // Z38: misma curva, compartida
+      if (raw >= 1 && !unif) finishDomeDawnPhase1(clockT);  // Z38: la máquina única emite su evento
     } else if (domeDawn.phase === 'completo') {
       s.dawn = 1;
       const elapsed = clockT - domeDawn.completeT;
@@ -782,7 +794,7 @@ export default function DomeVisualizer() {
     SU.uSkyVis.value    = DBG_SILLAS.u7VisSky     ? 1.0 : 0.0;
     SU.uSkyMagenta.value = DBG_SILLAS.u7MagentaIdx === 4 ? 1.0 : 0.0;
     // U9: dawn sky progress — replaces uGrow2 in sky gradient section
-    { const ds = getDawnState();
+    { const ds = DBG_AMANECER.UNIFICADO ? estadoCompat(clock.elapsedTime, DBG_SILLAS.amanecerDurS, _dawnSky) : getDawnState(); // Z38
       SU.uDawnSkyT.value = ds.phase === 'completo' ? 1.0
         : ds.phase === 'amanecer' ? THREE.MathUtils.clamp((clock.elapsedTime - ds.startT) / DBG_SILLAS.amanecerDurS, 0, 1)
         : 0.0; }
