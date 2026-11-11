@@ -115,7 +115,7 @@ function Room() {
   });
   return (
     <group>
-      <mesh ref={floorRef} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh ref={floorRef} name="room-floor" rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[80, 80]} />
         <meshStandardMaterial color="#0d0d0f" roughness={0.95} />
       </mesh>

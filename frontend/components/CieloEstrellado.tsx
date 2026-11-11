@@ -14,6 +14,13 @@
 // plano lejano (z = w·0.9999) y, mientras el cielo está visible, techo y paredes dejan de escribir
 // profundidad (ESTRELLAS_SALA_SIN_PROFUNDIDAD): cielo continuo, pero tarima, prisma, público, telón y
 // piso siguen tapándolo. (2) reveal relativo al spawn: 0 en el spawn, 1 bajo la luz (revealPorDistancia).
+//
+// Z32: cambios de tono ("caja"): con blending aditivo el cielo se SUMABA sobre superficies de tonos
+// distintos (caparazón violáceo, techo más oscuro, fondo #0a0812 en el hueco junto a las paredes
+// abiertas) y cada una dejaba su tono. Ahora (ESTRELLAS_COBERTURA) la salida es premultiplicada con
+// cobertura (v3) y CustomBlending One / OneMinusSrcAlpha: el cielo reemplaza lo de atrás según uReveal.
+// Orden: renderOrder −0.5 → después de DomeSky (−1) y del caparazón (que pasa de 0 a −1 SOLO mientras el
+// cielo es visible) y antes de todo transparente con 0 (telón, prisma, paneles, iconos) y de la luz (10).
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -37,7 +44,13 @@ const CIELO_UNIFORMS = {
   uTinteHorizonte: { value: new THREE.Color(DBG_LUZ.ESTRELLAS_TINTE_HORIZONTE) },
   uCapas:          { value: DBG_LUZ.ESTRELLAS_CALIDAD },
   uTope:           { value: DBG_LUZ.ESTRELLAS_TOPE },
+  uCobertura:      { value: DBG_LUZ.ESTRELLAS_COBERTURA ? 1 : 0 },   // Z32
 };
+
+const RO_CIELO_COBERTURA = -0.5;   // Z32: entre fondos (−1) y transparentes (0)
+const RO_CIELO_ADITIVO   = 10;     // Z30/Z31: como la luz
+const RO_CASCARON_CIELO  = -1;     // Z32: caparazón mientras el cielo es visible (igual que DomeSky; desempata por id)
+const RO_CASCARON_BASE   = 0;      // valor original del caparazón (sin prop renderOrder en ExperienceDome)
 
 export default function CieloEstrellado() {
   const { camera, scene } = useThree();
@@ -49,6 +62,9 @@ export default function CieloEstrellado() {
     techo: null as THREE.Mesh | null,
     paredes: [] as THREE.Material[],   // Z31: materiales de las 4 paredes (se buscan una vez)
     paredesBuscadas: false,
+    cascaron: null as THREE.Object3D | null,   // Z32
+    buscarT: 2,
+    cobertura: !DBG_LUZ.ESTRELLAS_COBERTURA,   // fuerza la primera aplicación del blending
   });
   const radio = useMemo(() => CIELO_R_FAR * ((camera as THREE.PerspectiveCamera).far || 1000), [camera]);
 
@@ -59,6 +75,8 @@ export default function CieloEstrellado() {
       const m = s.techo?.material as THREE.Material | undefined;
       if (m) m.depthWrite = true;
       for (const pm of s.paredes) pm.depthWrite = true;
+      if (s.cascaron) s.cascaron.renderOrder = RO_CASCARON_BASE;   // Z32
+      s.cascaron = null;
       s.techo = null;
       s.paredes.length = 0;
       s.paredesBuscadas = false;
@@ -91,6 +109,7 @@ export default function CieloEstrellado() {
     if (!on) {
       mesh.visible = false; CIELO_STATE.reveal = 0; CIELO_STATE.objetivo = 0;
       aplicarProfundidadSala(s, false, false);
+      if (s.cascaron) s.cascaron.renderOrder = RO_CASCARON_BASE;
       return;
     }
 
@@ -142,15 +161,42 @@ export default function CieloEstrellado() {
     const mat = matRef.current;
     if (mat && mat.depthTest !== DBG_LUZ.ESTRELLAS_DEPTH_TEST) mat.depthTest = DBG_LUZ.ESTRELLAS_DEPTH_TEST;
 
+    // ── Z32: blending (cobertura vs aditivo) y orden de dibujo; solo escribe si cambia ──
+    const cob = DBG_LUZ.ESTRELLAS_COBERTURA;
+    if (mat && s.cobertura !== cob) {
+      s.cobertura = cob;
+      if (cob) {
+        mat.blending = THREE.CustomBlending;
+        mat.blendEquation = THREE.AddEquation;
+        mat.blendSrc = THREE.OneFactor;
+        mat.blendDst = THREE.OneMinusSrcAlphaFactor;
+      } else {
+        mat.blending = THREE.AdditiveBlending;
+      }
+      CIELO_UNIFORMS.uCobertura.value = cob ? 1 : 0;
+      mesh.renderOrder = cob ? RO_CIELO_COBERTURA : RO_CIELO_ADITIVO;
+    }
+
     const visible = r > 0.002;
     mesh.visible = visible;                 // sin cielo no se dibuja (no gasta GPU)
+    // Z32: el caparazón del domo se dibuja antes que el cielo solo mientras el cielo es visible
+    if (s.cascaron && !s.cascaron.parent) s.cascaron = null;   // ExperienceDome se desmontó
+    s.buscarT += dt;
+    if (!s.cascaron && visible && s.buscarT > 1) {   // como mucho una búsqueda por segundo (TARIMA no lo monta)
+      s.buscarT = 0;
+      s.cascaron = scene.getObjectByName("domo-cascaron") ?? null;
+    }
+    if (s.cascaron) {
+      const ro = visible && cob ? RO_CASCARON_CIELO : RO_CASCARON_BASE;
+      if (s.cascaron.renderOrder !== ro) s.cascaron.renderOrder = ro;
+    }
     mesh.position.copy(camera.position);    // solo posición: sin rotación ni escala
     aplicarProfundidadSala(s, visible && DBG_LUZ.ESTRELLAS_SALA_SIN_PROFUNDIDAD,
       DBG_LUZ.ESTRELLAS_SOBRE_TECHO || (visible && DBG_LUZ.ESTRELLAS_SALA_SIN_PROFUNDIDAD));
   });
 
   return (
-    <mesh ref={meshRef} renderOrder={10} frustumCulled={false} visible={false}>
+    <mesh ref={meshRef} name="cielo-estrellas" renderOrder={DBG_LUZ.ESTRELLAS_COBERTURA ? RO_CIELO_COBERTURA : RO_CIELO_ADITIVO} frustumCulled={false} visible={false}>
       <sphereGeometry args={[radio, 64, 32]} />
       <shaderMaterial ref={matRef} vertexShader={ESTRELLAS_VERT} fragmentShader={ESTRELLAS_FRAG}
         uniforms={CIELO_UNIFORMS} side={THREE.BackSide} transparent depthWrite={false}

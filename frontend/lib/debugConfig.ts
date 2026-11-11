@@ -817,6 +817,7 @@ export const DBG_LUZ = {
   ESTRELLAS_CALIDAD:       3,      // capas por píxel: 3 alta · 2 media · 1 baja — live
   ESTRELLAS_DEPTH_TEST:    true,   // true = paredes, tarima y objetos tapan el cielo; false = encima de todo — live
   ESTRELLAS_SOBRE_TECHO:   false,  // true = el techo (y=22) deja de escribir profundidad siempre (Z30) — live
+  ESTRELLAS_COBERTURA:     true,   // Z32: el cielo CUBRE lo de atrás (premultiplicado, renderOrder −0.5); false = aditivo de Z31 (renderOrder 10) — live
   ESTRELLAS_SALA_SIN_PROFUNDIDAD: true, // Z31: con el cielo visible, techo y paredes no escriben profundidad → cielo continuo — live
   ESTRELLAS_CONGELAR_EN_PAUSA: false, // true = el titilar y la deriva se congelan con la pausa Z28 — live
   ESTRELLAS_TOPE:          1.0,    // tope por canal de la salida (bloom threshold 0.92: solo los núcleos más fuertes brillan) — live
@@ -840,4 +841,19 @@ export const DBG_LUZ = {
   CIERRE_DIALOGO_MS:   2500,   // tras alight:dialogo-fin, se cierra la terminal — live
   TELEPORT_DIST_M:     4,      // botón "Teletransportar a la luz": queda a esta distancia, mirándola
   PAUSA:               true,   // pausar la experiencia al salir del área — live
+};
+
+// ── Z32: diagnóstico TEMPORAL del cielo estrellado (panel plegado en el DebugMenu) ──
+// Con ACTIVO false no hace nada. Oculta superficies con material.visible (no pelea con los useFrame que
+// manejan object.visible) y publica una tabla de colores / renderOrder / transparencia / profundidad.
+export const DBG_DIAG_CIELO = {
+  ACTIVO:               false,
+  OCULTAR_CASCARON:     false,  // caparazón del domo original (domo-cascaron)
+  OCULTAR_CIELO_DOMO:   false,  // cielo/arte interior del domo (domo-cielo, DomeSky)
+  OCULTAR_TECHO:        false,  // room-ceiling
+  OCULTAR_PAREDES:      false,  // room-walls (las 4, incluidas las abiertas)
+  OCULTAR_PISO:         false,  // room-floor
+  OCULTAR_SUELO_EXT:    false,  // luz-suelo-exterior
+  SIN_FOG:              false,  // scene.fog = null (recompila materiales: solo para diagnóstico)
+  FONDO_TESTIGO:        false,  // scene.background magenta: muestra dónde se ve el fondo
 };

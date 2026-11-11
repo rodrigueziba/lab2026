@@ -1,10 +1,14 @@
-// Shader del cielo estrellado v2 (adaptacion de Nightsky Shader Elective, tmoe1354, Shadertoy WcjGRz, CC BY-NC-SA 3.0).
-// ShaderMaterial sobre una esfera que SIGUE a la camara (solo posicion), side BackSide, transparent,
-// depthWrite false, depthTest false, AdditiveBlending, fog false, frustumCulled false.
-// El vertex shader fija z = w * 0.9999, asi el far de la camara nunca recorta la esfera.
-// uReveal (0..1): 0 = no se dibuja nada; 1 = cielo completo (bajo la luz). Las capas aparecen por etapas.
-// Z31 (alight): sobre la v2 se reincorporan uCapas (calidad 1..3) y uTope (tope por canal antes del bloom)
-// de Z30. Sin colorspace_fragment ni tonemapping_fragment: salida lineal, la convierte el OutputPass.
+// Shader del cielo estrellado v3 (adaptacion de Nightsky Shader Elective, tmoe1354, Shadertoy WcjGRz, CC BY-NC-SA 3.0).
+// ShaderMaterial sobre una esfera que SIGUE a la camara (solo posicion), side BackSide, transparent: true,
+// depthWrite false, depthTest true (los objetos solidos lo tapan), fog false, frustumCulled false.
+// BLENDING (cambio de v3): THREE.CustomBlending, blendEquation AddEquation, blendSrc OneFactor,
+// blendDst OneMinusSrcAlphaFactor (salida premultiplicada). Asi el cielo REEMPLAZA lo que hay detras
+// (domo viejo, techo, paredes) segun uReveal y deja un fondo uniforme, sin bordes ni cambios de color.
+// El vertex shader fija z = w * 0.9999, asi el far de la camara nunca lo recorta.
+// uReveal (0..1): 0 = no se dibuja nada (cobertura 0); 1 = cielo completo bajo la luz.
+// Z32 (alight): merge de la v3 con lo agregado en Z30/Z31: uCapas (calidad 1..3), uTope (tope por canal
+// antes del bloom) y uCobertura (1 = salida premultiplicada con cobertura; 0 = alfa 1 para el blending
+// aditivo de Z31, flag ESTRELLAS_COBERTURA). Sin colorspace_fragment ni tonemapping_fragment.
 export const ESTRELLAS_VERT = /* glsl */ `varying vec3 vDir;
 void main(){
   vDir = normalize(position);
@@ -31,6 +35,7 @@ uniform float uPan;           // rad/s, deriva lenta del cielo
 uniform vec3  uTinteHorizonte;
 uniform float uCapas;         // Z30: 3 alta, 2 media, 1 baja
 uniform float uTope;          // Z30: tope por canal (que no se queme en el bloom)
+uniform float uCobertura;     // Z32: 1 = cobertura premultiplicada, 0 = aditivo (Z31)
 
 float hash13(vec3 p3){
   p3 = fract(p3 * .1031);
@@ -99,12 +104,20 @@ void main(){
   // horizonte: las estrellas se apagan abajo y aparece un velo azul (como el degradado del original)
   float alto = clamp(d.y, 0.0, 1.0);
   float visible = smoothstep(0.0, 0.16, d.y);
-  vec3 velo = uTinteHorizonte * pow(1.0 - alto, 3.0) * 0.20 * step(0.0, d.y + 0.05) * gv;
-  velo += vec3(0.010, 0.012, 0.030) * (0.4 + 0.6 * banda + 0.5 * spots) * visible * gv;
+  vec3 velo = uTinteHorizonte * pow(1.0 - alto, 3.0) * 0.20 * step(0.0, d.y + 0.05);
+  velo += vec3(0.010, 0.012, 0.030) * (0.4 + 0.6 * banda + 0.5 * spots) * visible;
+  // por debajo del horizonte: fondo casi negro (cubre lo que haya detras, sin cortes)
+  velo = mix(vec3(0.004, 0.005, 0.012), velo, smoothstep(-0.05, 0.02, d.y));
 
-  vec3 col = (est * visible * 1.3 + velo) * uBrillo * (0.55 + 0.45 * r);
-  col = min(col, vec3(uTope));          // Z30
-  gl_FragColor = vec4(col, 1.0);
+  // COBERTURA: el cielo "reemplaza" lo que hay detras (domo viejo, techo, paredes) en la medida que crece uReveal.
+  // Con uReveal = 0 la cobertura es 0 y no se dibuja nada; con 1 el fondo es uniforme y no se notan bordes.
+  float cob = gv;
+  vec3 base = velo * uBrillo * (0.55 + 0.45 * r);
+  vec3 est2 = est * visible * 1.3 * uBrillo * (0.55 + 0.45 * r);
+  // salida PREMULTIPLICADA: resultado = rgb + fondo * (1 - alpha)
+  vec3 rgb = min(base * cob + est2, vec3(uTope));   // Z30: tope por canal
+  // Z32: con uCobertura = 0 (blending aditivo de Z31) el alfa es 1 y solo se suma
+  gl_FragColor = vec4(rgb, uCobertura > 0.5 ? cob : 1.0);
 }
 `;
 export const ESTRELLAS_UNIFORMS_DEFAULT = {

@@ -19,6 +19,7 @@ import { INTERACT_STATE, isVizActivated } from "@/lib/alightStore";
 import { instalarPausa, tickPausa } from "@/lib/pausaExperiencia";
 import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado";
 import CieloEstrellado from "@/components/CieloEstrellado";   // Z30
+import DiagnosticoCielo from "@/components/DiagnosticoCielo"; // Z32
 
 const ESTRELLAS_R = 400;   // radio de la esfera de estrellas (sigue a la cámara)
 const DOMO_EXT_R  = 30;    // caparazón del domo (DOME_R + 2 en ExperienceDome)
@@ -332,29 +333,30 @@ export default function LuzLejana() {
     <>
       <group ref={raizRef}>
         {/* fuente: un solo sprite aditivo con halo (sin luces reales) */}
-        <sprite ref={spriteRef} renderOrder={10}>
+        <sprite ref={spriteRef} name="luz-sprite" renderOrder={10}>
           <spriteMaterial map={halo} transparent depthWrite={false} blending={THREE.AdditiveBlending} fog={false} />
         </sprite>
         {/* cono sobre el suelo (cilindro abierto unitario, escalado en useFrame) */}
-        <mesh ref={conoRef} renderOrder={10} frustumCulled={false}>
+        <mesh ref={conoRef} name="luz-cono" renderOrder={10} frustumCulled={false}>
           <cylinderGeometry args={[0.06, 1, 1, 48, 1, true]} />
           <shaderMaterial vertexShader={CONO_VERT} fragmentShader={CONO_FRAG} uniforms={CONO_UNIFORMS}
             transparent depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
         </mesh>
         {/* charco de luz en el suelo */}
-        <mesh ref={pozoRef} rotation={[-Math.PI / 2, 0, 0]} renderOrder={10}>
+        <mesh ref={pozoRef} name="luz-pozo" rotation={[-Math.PI / 2, 0, 0]} renderOrder={10}>
           <circleGeometry args={[1, 64]} />
           <shaderMaterial vertexShader={POZO_VERT} fragmentShader={POZO_FRAG} uniforms={POZO_UNIFORMS}
             transparent depthWrite={false} blending={THREE.AdditiveBlending} />
         </mesh>
         {/* suelo exterior oscuro alrededor de la luz (mismo material que el piso de la sala) */}
-        <mesh ref={sueloRef} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <mesh ref={sueloRef} name="luz-suelo-exterior" rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <circleGeometry args={[1, 96]} />
           <meshStandardMaterial color="#0d0d0f" roughness={0.95} />
         </mesh>
       </group>
       {/* Z30: cielo estrellado procedural (reemplaza al Points; este queda tras ESTRELLAS_MODO_VIEJO) */}
       <CieloEstrellado />
+      <DiagnosticoCielo />{/* Z32: diagnóstico temporal (inactivo salvo DBG_DIAG_CIELO.ACTIVO) */}
       {/* estrellas: un solo Points que sigue a la cámara; fondo (renderOrder bajo, sin profundidad) */}
       <points ref={estrellasRef} geometry={geoEstrellas} renderOrder={-2} frustumCulled={false} visible={false}>
         <shaderMaterial vertexShader={ESTRELLAS_VERT} fragmentShader={ESTRELLAS_FRAG} uniforms={ESTRELLAS_UNIFORMS}

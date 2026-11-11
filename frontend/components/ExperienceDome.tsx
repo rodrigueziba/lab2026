@@ -916,7 +916,7 @@ export default function ExperienceDome() {
           the rim is never visible to the player.
           G1: depthWrite=false prevents shell from occluding DomeVisualizer sphere.
           opacity lerps to 0 when visualizer active (domeShellOpacity default=0). */}
-      <mesh ref={shellRef}>
+      <mesh ref={shellRef} name="domo-cascaron">{/* Z32: nombre para CieloEstrellado y diagnóstico */}
         <sphereGeometry args={[DOME_R + 2, 48, 32, 0, Math.PI * 2, 0, Math.PI * 0.52]} />
         <shaderMaterial
           vertexShader={SHELL_VERT}
@@ -928,7 +928,7 @@ export default function ExperienceDome() {
         />
       </mesh>
       {/* AA2: sky shader mesh — misma geometría; DomeSky material aplicado imperativo en useFrame */}
-      <mesh ref={skyShellRef} renderOrder={-1} frustumCulled={false} visible={false}>
+      <mesh ref={skyShellRef} name="domo-cielo" renderOrder={-1} frustumCulled={false} visible={false}>
         <sphereGeometry args={[DOME_R + 2, 48, 32, 0, Math.PI * 2, 0, Math.PI * 0.52]} />
       </mesh>
 

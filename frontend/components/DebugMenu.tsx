@@ -38,6 +38,7 @@ import {
   DBG_INICIO,
   DBG_DIALOGO,
   DBG_LUZ,
+  DBG_DIAG_CIELO, // Z32 (temporal)
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -52,7 +53,7 @@ import { STORE, storeSubscribe, activateVisualizerOnce, resetVizActivated, PANEL
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado"; // Z27
-import { LUZ_STATE, CIELO_STATE } from "@/lib/caminoLuz"; // Z28 · Z30
+import { LUZ_STATE, CIELO_STATE, DIAG_CIELO } from "@/lib/caminoLuz"; // Z28 · Z30 · Z32
 import { PAUSA } from "@/lib/pausaExperiencia"; // Z28
 
 type Tab = "SILLAS" | "TARIMA";
@@ -353,6 +354,7 @@ export default function DebugMenu() {
   const [video, setVideo] = useState({ ...DBG_VIDEO });                     // video etapa 1
   const [dlg, setDlg] = useState({ ...DBG_DIALOGO });                      // Z27
   const [luz, setLuz] = useState({ ...DBG_LUZ });                          // Z28
+  const [diag, setDiag] = useState({ ...DBG_DIAG_CIELO });                 // Z32 (temporal)
   const [piso, setPiso] = useState({ ...DBG_PISO_ICONOS });                 // Z23
   const [inicio, setInicio] = useState({ ...DBG_INICIO });                  // Z24
   const [focoLive, setFocoLive] = useState("nada");                          // Z19
@@ -1495,6 +1497,14 @@ export default function DebugMenu() {
             <span>reveal={CIELO_STATE.reveal.toFixed(2)} · obj={CIELO_STATE.objetivo.toFixed(2)} · aten={CIELO_STATE.aten.toFixed(2)} · dSpawn={LUZ_STATE.dSpawn.toFixed(1)} m</span>
           </div>
           <div style={ROW}>
+            <span>ESTRELLAS_COBERTURA</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.ESTRELLAS_COBERTURA;
+              DBG_LUZ.ESTRELLAS_COBERTURA = v;
+              setLuz(o => ({ ...o, ESTRELLAS_COBERTURA: v }));
+            }}>{luz.ESTRELLAS_COBERTURA ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
             <span>ESTRELLAS_MODO_Z30</span>
             <button style={INPUT} onClick={() => {
               const v = !luz.ESTRELLAS_MODO_Z30;
@@ -1591,6 +1601,92 @@ export default function DebugMenu() {
             onChange={v => { DBG_LUZ.ESTRELLAS_U_PAN = v; setLuz(o => ({ ...o, ESTRELLAS_U_PAN: v })); }} />
           <ColorField label="ESTRELLAS_TINTE_HORIZONTE" value={luz.ESTRELLAS_TINTE_HORIZONTE}
             onChange={v => { DBG_LUZ.ESTRELLAS_TINTE_HORIZONTE = v; setLuz(o => ({ ...o, ESTRELLAS_TINTE_HORIZONTE: v })); }} />
+          {/* Z32: diagnóstico TEMPORAL del cielo (plegado por defecto) */}
+          <details>
+            <summary style={{ ...NOTE, cursor: "pointer" }}>Diagnóstico cielo Z32 (temporal)</summary>
+              <div style={ROW}>
+                <span>ACTIVO</span>
+                <button style={INPUT} onClick={e => {
+                  e.currentTarget.blur();
+                  const v = !diag.ACTIVO;
+                  DBG_DIAG_CIELO.ACTIVO = v;
+                  setDiag(o => ({ ...o, ACTIVO: v }));
+                }}>{diag.ACTIVO ? "ON" : "off"}</button>
+              </div>
+              <div style={ROW}>
+                <span>OCULTAR_CASCARON</span>
+                <button style={INPUT} onClick={e => {
+                  e.currentTarget.blur();
+                  const v = !diag.OCULTAR_CASCARON;
+                  DBG_DIAG_CIELO.OCULTAR_CASCARON = v;
+                  setDiag(o => ({ ...o, OCULTAR_CASCARON: v }));
+                }}>{diag.OCULTAR_CASCARON ? "ON" : "off"}</button>
+              </div>
+              <div style={ROW}>
+                <span>OCULTAR_CIELO_DOMO</span>
+                <button style={INPUT} onClick={e => {
+                  e.currentTarget.blur();
+                  const v = !diag.OCULTAR_CIELO_DOMO;
+                  DBG_DIAG_CIELO.OCULTAR_CIELO_DOMO = v;
+                  setDiag(o => ({ ...o, OCULTAR_CIELO_DOMO: v }));
+                }}>{diag.OCULTAR_CIELO_DOMO ? "ON" : "off"}</button>
+              </div>
+              <div style={ROW}>
+                <span>OCULTAR_TECHO</span>
+                <button style={INPUT} onClick={e => {
+                  e.currentTarget.blur();
+                  const v = !diag.OCULTAR_TECHO;
+                  DBG_DIAG_CIELO.OCULTAR_TECHO = v;
+                  setDiag(o => ({ ...o, OCULTAR_TECHO: v }));
+                }}>{diag.OCULTAR_TECHO ? "ON" : "off"}</button>
+              </div>
+              <div style={ROW}>
+                <span>OCULTAR_PAREDES</span>
+                <button style={INPUT} onClick={e => {
+                  e.currentTarget.blur();
+                  const v = !diag.OCULTAR_PAREDES;
+                  DBG_DIAG_CIELO.OCULTAR_PAREDES = v;
+                  setDiag(o => ({ ...o, OCULTAR_PAREDES: v }));
+                }}>{diag.OCULTAR_PAREDES ? "ON" : "off"}</button>
+              </div>
+              <div style={ROW}>
+                <span>OCULTAR_PISO</span>
+                <button style={INPUT} onClick={e => {
+                  e.currentTarget.blur();
+                  const v = !diag.OCULTAR_PISO;
+                  DBG_DIAG_CIELO.OCULTAR_PISO = v;
+                  setDiag(o => ({ ...o, OCULTAR_PISO: v }));
+                }}>{diag.OCULTAR_PISO ? "ON" : "off"}</button>
+              </div>
+              <div style={ROW}>
+                <span>OCULTAR_SUELO_EXT</span>
+                <button style={INPUT} onClick={e => {
+                  e.currentTarget.blur();
+                  const v = !diag.OCULTAR_SUELO_EXT;
+                  DBG_DIAG_CIELO.OCULTAR_SUELO_EXT = v;
+                  setDiag(o => ({ ...o, OCULTAR_SUELO_EXT: v }));
+                }}>{diag.OCULTAR_SUELO_EXT ? "ON" : "off"}</button>
+              </div>
+              <div style={ROW}>
+                <span>SIN_FOG</span>
+                <button style={INPUT} onClick={e => {
+                  e.currentTarget.blur();
+                  const v = !diag.SIN_FOG;
+                  DBG_DIAG_CIELO.SIN_FOG = v;
+                  setDiag(o => ({ ...o, SIN_FOG: v }));
+                }}>{diag.SIN_FOG ? "ON" : "off"}</button>
+              </div>
+              <div style={ROW}>
+                <span>FONDO_TESTIGO</span>
+                <button style={INPUT} onClick={e => {
+                  e.currentTarget.blur();
+                  const v = !diag.FONDO_TESTIGO;
+                  DBG_DIAG_CIELO.FONDO_TESTIGO = v;
+                  setDiag(o => ({ ...o, FONDO_TESTIGO: v }));
+                }}>{diag.FONDO_TESTIGO ? "ON" : "off"}</button>
+              </div>
+              <pre data-diag-cielo style={{ ...NOTE, whiteSpace: "pre-wrap", fontSize: 9 }}>{DIAG_CIELO.tabla}</pre>
+          </details>
           <div style={DIVIDER} />
           <NumField label="EXTERIOR_RADIO_M" value={luz.EXTERIOR_RADIO_M} step={1} min={5} max={100} note="m caminable"
             onChange={v => { DBG_LUZ.EXTERIOR_RADIO_M = v; setLuz(o => ({ ...o, EXTERIOR_RADIO_M: v })); }} />
