@@ -1505,6 +1505,18 @@ export default function DebugMenu() {
             }}>{luz.ESTRELLAS_COBERTURA ? "ON" : "off"}</button>
           </div>
           <div style={ROW}>
+            <span>ESTRELLAS_COB_MODO_Z32</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.ESTRELLAS_COB_MODO_Z32;
+              DBG_LUZ.ESTRELLAS_COB_MODO_Z32 = v;
+              setLuz(o => ({ ...o, ESTRELLAS_COB_MODO_Z32: v }));
+            }}>{luz.ESTRELLAS_COB_MODO_Z32 ? "ON" : "off"}</button>
+          </div>
+          <NumField label="ESTRELLAS_COBERTURA_RAPIDA" value={luz.ESTRELLAS_COBERTURA_RAPIDA} step={0.01} min={0.001} max={1} note="reveal con cobertura 1"
+            onChange={v => { DBG_LUZ.ESTRELLAS_COBERTURA_RAPIDA = v; setLuz(o => ({ ...o, ESTRELLAS_COBERTURA_RAPIDA: v })); }} />
+          <ColorField label="ESTRELLAS_FONDO_COLOR" value={luz.ESTRELLAS_FONDO_COLOR}
+            onChange={v => { DBG_LUZ.ESTRELLAS_FONDO_COLOR = v; setLuz(o => ({ ...o, ESTRELLAS_FONDO_COLOR: v })); }} />
+          <div style={ROW}>
             <span>ESTRELLAS_MODO_Z30</span>
             <button style={INPUT} onClick={() => {
               const v = !luz.ESTRELLAS_MODO_Z30;

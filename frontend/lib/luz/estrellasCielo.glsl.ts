@@ -36,6 +36,9 @@ uniform vec3  uTinteHorizonte;
 uniform float uCapas;         // Z30: 3 alta, 2 media, 1 baja
 uniform float uTope;          // Z30: tope por canal (que no se queme en el bloom)
 uniform float uCobertura;     // Z32: 1 = cobertura premultiplicada, 0 = aditivo (Z31)
+uniform vec3  uFondo;         // Z33: color efectivo del fondo de la escena (mismo espacio que la salida)
+uniform float uCobRapida;     // Z33: reveal con el que la cobertura llega a 1 (default 0.12)
+uniform float uModoZ32;       // Z33: 1 = fórmula de cobertura de Z32 (cob = gv), para comparar
 
 float hash13(vec3 p3){
   p3 = fract(p3 * .1031);
@@ -107,12 +110,17 @@ void main(){
   vec3 velo = uTinteHorizonte * pow(1.0 - alto, 3.0) * 0.20 * step(0.0, d.y + 0.05);
   velo += vec3(0.010, 0.012, 0.030) * (0.4 + 0.6 * banda + 0.5 * spots) * visible;
   // por debajo del horizonte: fondo casi negro (cubre lo que haya detras, sin cortes)
-  velo = mix(vec3(0.004, 0.005, 0.012), velo, smoothstep(-0.05, 0.02, d.y));
+  // Z33: bajo el horizonte, el color del fondo de la escena (Z32: casi negro fijo)
+  bool z32 = uModoZ32 > 0.5 || uCobertura < 0.5;
+  velo = mix(z32 ? vec3(0.004, 0.005, 0.012) : uFondo, velo, smoothstep(-0.05, 0.02, d.y));
 
   // COBERTURA: el cielo "reemplaza" lo que hay detras (domo viejo, techo, paredes) en la medida que crece uReveal.
   // Con uReveal = 0 la cobertura es 0 y no se dibuja nada; con 1 el fondo es uniforme y no se notan bordes.
-  float cob = gv;
-  vec3 base = velo * uBrillo * (0.55 + 0.45 * r);
+  // Z33: cobertura DESACOPLADA del brillo: sube rápido (0 → uCobRapida) con el color del fondo de la escena,
+  // y recién después (gv) aparece el velo. Así unifica los tonos de atrás sin cambio de brillo visible.
+  float cob = z32 ? gv : smoothstep(0.0, max(uCobRapida, 1e-3), r);
+  vec3 veloFinal = velo * uBrillo * (0.55 + 0.45 * r);
+  vec3 base = z32 ? veloFinal : mix(uFondo, veloFinal, gv);
   vec3 est2 = est * visible * 1.3 * uBrillo * (0.55 + 0.45 * r);
   // salida PREMULTIPLICADA: resultado = rgb + fondo * (1 - alpha)
   vec3 rgb = min(base * cob + est2, vec3(uTope));   // Z30: tope por canal

@@ -818,6 +818,9 @@ export const DBG_LUZ = {
   ESTRELLAS_DEPTH_TEST:    true,   // true = paredes, tarima y objetos tapan el cielo; false = encima de todo — live
   ESTRELLAS_SOBRE_TECHO:   false,  // true = el techo (y=22) deja de escribir profundidad siempre (Z30) — live
   ESTRELLAS_COBERTURA:     true,   // Z32: el cielo CUBRE lo de atrás (premultiplicado, renderOrder −0.5); false = aditivo de Z31 (renderOrder 10) — live
+  ESTRELLAS_COBERTURA_RAPIDA: 0.12, // Z33: reveal con el que la cobertura llega a 1 (desacoplada del brillo) — live
+  ESTRELLAS_FONDO_COLOR:   "#0a0812" as string, // Z33: color de fondo que usa la cobertura (= scene.background) — live
+  ESTRELLAS_COB_MODO_Z32:  false,  // Z33: true = cobertura de Z32 (cob = gv), para comparar — live
   ESTRELLAS_SALA_SIN_PROFUNDIDAD: true, // Z31: con el cielo visible, techo y paredes no escriben profundidad → cielo continuo — live
   ESTRELLAS_CONGELAR_EN_PAUSA: false, // true = el titilar y la deriva se congelan con la pausa Z28 — live
   ESTRELLAS_TOPE:          1.0,    // tope por canal de la salida (bloom threshold 0.92: solo los núcleos más fuertes brillan) — live

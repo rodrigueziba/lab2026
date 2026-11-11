@@ -30,6 +30,7 @@ import { LUZ_STATE, CIELO_STATE, revealPorDistancia } from "@/lib/caminoLuz";
 import { INTERACT_STATE, PANELES_SILLAS, isVizActivated } from "@/lib/alightStore";
 import { PAUSA } from "@/lib/pausaExperiencia";
 import { ESTRELLAS_VERT, ESTRELLAS_FRAG } from "@/lib/luz/estrellasCielo.glsl";
+import { RETRO_FLAGS } from "@/lib/retro/retroFlags";   // Z33
 
 const CIELO_R_FAR = 0.9;   // Z31: radio = 0.9 · camera.far (era 300 fijo); el vertex v2 lo lleva al plano lejano
 
@@ -45,6 +46,9 @@ const CIELO_UNIFORMS = {
   uCapas:          { value: DBG_LUZ.ESTRELLAS_CALIDAD },
   uTope:           { value: DBG_LUZ.ESTRELLAS_TOPE },
   uCobertura:      { value: DBG_LUZ.ESTRELLAS_COBERTURA ? 1 : 0 },   // Z32
+  uFondo:          { value: new THREE.Color(DBG_LUZ.ESTRELLAS_FONDO_COLOR) },   // Z33 (lineal, ver fondoAUniform)
+  uCobRapida:      { value: DBG_LUZ.ESTRELLAS_COBERTURA_RAPIDA },               // Z33
+  uModoZ32:        { value: DBG_LUZ.ESTRELLAS_COB_MODO_Z32 ? 1 : 0 },          // Z33
 };
 
 const RO_CIELO_COBERTURA = -0.5;   // Z32: entre fondos (−1) y transparentes (0)
@@ -63,6 +67,8 @@ export default function CieloEstrellado() {
     paredes: [] as THREE.Material[],   // Z31: materiales de las 4 paredes (se buscan una vez)
     paredesBuscadas: false,
     cascaron: null as THREE.Object3D | null,   // Z32
+    fondoHex: "",                              // Z33: último ESTRELLAS_FONDO_COLOR aplicado
+    fondoRetro: !RETRO_FLAGS.enabled,          // Z33: con qué pipeline se convirtió
     buscarT: 2,
     cobertura: !DBG_LUZ.ESTRELLAS_COBERTURA,   // fuerza la primera aplicación del blending
   });
@@ -154,6 +160,14 @@ export default function CieloEstrellado() {
     CIELO_UNIFORMS.uPan.value      = DBG_LUZ.ESTRELLAS_U_PAN;
     CIELO_UNIFORMS.uCapas.value    = DBG_LUZ.ESTRELLAS_CALIDAD;
     CIELO_UNIFORMS.uTope.value     = DBG_LUZ.ESTRELLAS_TOPE;
+    CIELO_UNIFORMS.uCobRapida.value = DBG_LUZ.ESTRELLAS_COBERTURA_RAPIDA;
+    CIELO_UNIFORMS.uModoZ32.value   = DBG_LUZ.ESTRELLAS_COB_MODO_Z32 ? 1 : 0;
+    // Z33: uFondo solo cuando cambia el color o el pipeline (no todos los frames)
+    if (s.fondoHex !== DBG_LUZ.ESTRELLAS_FONDO_COLOR || s.fondoRetro !== RETRO_FLAGS.enabled) {
+      s.fondoHex = DBG_LUZ.ESTRELLAS_FONDO_COLOR;
+      s.fondoRetro = RETRO_FLAGS.enabled;
+      fondoAUniform(s.fondoHex, s.fondoRetro, CIELO_UNIFORMS.uFondo.value);
+    }
     if (s.tinte !== DBG_LUZ.ESTRELLAS_TINTE_HORIZONTE) {
       s.tinte = DBG_LUZ.ESTRELLAS_TINTE_HORIZONTE;
       CIELO_UNIFORMS.uTinteHorizonte.value.set(s.tinte);
@@ -214,4 +228,18 @@ function aplicarProfundidadSala(
   const tm = s.techo?.material as THREE.Material | undefined;
   if (tm && tm.depthWrite === techoSin) tm.depthWrite = !techoSin;
   for (const pm of s.paredes) if (pm.depthWrite === paredesSin) pm.depthWrite = !paredesSin;
+}
+
+/** Z33: color de fondo para uFondo, en el MISMO espacio que la salida del shader (que no tiene
+ *  colorspace_fragment). Con el post-proceso (RETRO_FLAGS.enabled) la escena se dibuja en un render
+ *  target del EffectComposer: three limpia el fondo en el espacio de trabajo (lineal) — ver
+ *  getUnlitUniformColorSpace — y el OutputPass convierte todo junto. Sin post-proceso se dibuja directo
+ *  al canvas y three limpia en outputColorSpace (sRGB), así que el valor se pasa a sRGB. */
+const _tmpRGB = { r: 0, g: 0, b: 0 };
+function fondoAUniform(hex: string, retro: boolean, out: THREE.Color): void {
+  out.set(hex);   // sRGB hex → espacio de trabajo lineal (ColorManagement)
+  if (!retro) {
+    out.getRGB(_tmpRGB, THREE.SRGBColorSpace);
+    out.setRGB(_tmpRGB.r, _tmpRGB.g, _tmpRGB.b, THREE.LinearSRGBColorSpace);   // valores crudos sRGB
+  }
 }
