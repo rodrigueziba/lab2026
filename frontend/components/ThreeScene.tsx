@@ -22,6 +22,7 @@ import VideoModal from "./VideoModal"; // video etapa 1: reproductor aparte (mod
 import PisoIconos from "./PisoIconos"; // Z23: iconos grabados en el piso (silla / luz)
 import LuzLejana from "./LuzLejana"; // Z28: camino LUZ (luz lejana, estrellas, diálogo)
 import { moverConLimites } from "@/lib/caminoLuz"; // Z28: límites sala ∪ exterior
+import { EFECTOS_STATE } from "@/lib/dialogo/efectosEstado"; // Z29: bloqueo de la zona TARIMA en juego_alarma
 import { posicionInicial, aplicarSpawn } from "@/lib/inicioEscena"; // Z24/Z25
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
 import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ } from "@/lib/debugConfig";
@@ -383,7 +384,8 @@ function Player() {
     cam.position.y = 1.6;
 
     // N6: zone choices blocked until player has passed the curtain
-    if (!triggered.current && INTERACT_STATE.experienceState !== 'cortina') {
+    // Z29: durante juego_alarma la zona TARIMA no dispara ("tocar la tarima" es otra cosa)
+    if (!triggered.current && INTERACT_STATE.experienceState !== 'cortina' && !EFECTOS_STATE.bloqueaZonaTarima) {
       if (cam.position.distanceTo(ZONA_LUZ) < 2.5) {
         triggered.current = true;
         window.dispatchEvent(new CustomEvent("alight:chose-light"));

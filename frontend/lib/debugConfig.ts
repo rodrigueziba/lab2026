@@ -860,3 +860,24 @@ export const DBG_DIAG_CIELO = {
   SIN_FOG:              false,  // scene.fog = null (recompila materiales: solo para diagnóstico)
   FONDO_TESTIGO:        false,  // scene.background magenta: muestra dónde se ve el fondo
 };
+
+// ── Z29: efectos del diálogo (lib/dialogo/efectosDialogo.ts) — todo live ──
+export const DBG_EFECTOS = {
+  EFECTOS_DIALOGO:       true,   // false = los tags "# efecto:" no ejecutan nada (comportamiento Z28)
+  // juego_alarma
+  ALARMA_VOLUMEN:        0.8,    // ganancia de alarm.mp3
+  ALARMA_REF_M:          4,      // distancia de referencia del panner (volumen pleno hasta acá)
+  ALARMA_MAX_M:          90,     // distancia máxima del panner
+  ALARMA_ROLLOFF:        1.0,    // caída con la distancia (modelo "inverse")
+  ALARMA_ALTURA_M:       0.8,    // altura de la fuente sobre el centro de la tarima
+  FUNDIDO_APAGAR_MS:     1200,   // luces → LUCES_MIN
+  FUNDIDO_ENCENDER_MS:   2000,   // luces → 1 al tocar la tarima
+  LUCES_MIN:             0,      // multiplicador de intensidad con las luces apagadas
+  TOQUE_MARGEN_M:        0.35,   // "tocar la tarima" = entrar a su planta + este margen
+  ZONA_REARME_M:         3.5,    // tras el premio, la zona TARIMA se rearma al alejarse a más de esto del centro
+  CIERRE_PREMIO_MS:      4000,   // tras el fin de la línea del premio se cierra la terminal
+  PREMIO_DURACION_S:     3600,   // vigencia del premio en localStorage
+  // ir_tarima_sin_publico
+  ATRILES_DELAY_MS:      800,    // tras elegir TARIMA, se piden los atriles (alight:request-lecterns)
+  AVISO_DESBLOQUEO_MS:   6000,   // aviso tenue "menú desbloqueado"
+};

@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { useFaceTracking } from "@/hooks/useFaceTracking";
 import { CHAIR_Z } from "./Chairs";
 import { PEOPLE_MIN_DELAY_MS } from "@/lib/debugConfig";
+import { EFECTOS_STATE } from "@/lib/dialogo/efectosEstado"; // Z29: ir_tarima_sin_publico
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 const CHAIR_X  = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5] as const;
@@ -393,11 +394,12 @@ export default function Audience() {
     const check = () => {
       if (!starsReady.current || !faceReady.current) return;
       if (activatedRef.current !== null || timerPending.current) return;
+      if (EFECTOS_STATE.sinPublico) return;   // Z29: TARIMA sin público (los atriles los pide el efecto)
       const elapsed = Date.now() - starsTime.current;
       const delay   = Math.max(0, PEOPLE_MIN_DELAY_MS - elapsed);
       timerPending.current = true;
       setTimeout(() => {
-        if (activatedRef.current !== null) return;
+        if (activatedRef.current !== null || EFECTOS_STATE.sinPublico) { timerPending.current = false; return; }
         activatedRef.current = Date.now();
         window.dispatchEvent(new CustomEvent("alight:people-visible"));
       }, delay);

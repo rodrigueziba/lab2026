@@ -39,6 +39,7 @@ import {
   DBG_DIALOGO,
   DBG_LUZ,
   DBG_DIAG_CIELO, // Z32 (temporal)
+  DBG_EFECTOS, // Z29
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -55,6 +56,7 @@ import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado"; // Z27
 import { LUZ_STATE, CIELO_STATE, DIAG_CIELO } from "@/lib/caminoLuz"; // Z28 · Z30 · Z32
 import { PAUSA } from "@/lib/pausaExperiencia"; // Z28
+import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
 
 type Tab = "SILLAS" | "TARIMA";
 
@@ -302,6 +304,10 @@ function N5ProximityOverlay() {
 
 export default function DebugMenu() {
   const [visible, setVisible] = useState(false);
+  // Z29: el premio (localStorage, 1 h) desbloquea el menú aunque DEBUG_ENABLED sea false
+  const [premio, setPremio] = useState(() => leerPremio());
+  const [avisoDesbloqueo, setAvisoDesbloqueo] = useState(false);
+  const [efx, setEfx] = useState({ ...DBG_EFECTOS });
   const [tab, setTab]         = useState<Tab>("SILLAS");
   const [spot,     setSpot]     = useState({ ...DBG_SPOTLIGHT });
   const [stars,    setStars]    = useState({ ...DBG_STARS });
@@ -447,6 +453,29 @@ export default function DebugMenu() {
     DEBUG_MENU_ESTADO.visible = DEBUG_ENABLED && visible;
   }, [visible]);
 
+  // Z29: premio otorgado → menú visible + aviso tenue de desbloqueo; premio borrado o vencido → se relee
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const onPremio = () => {
+      setPremio(true);
+      setVisible(true);
+      setAvisoDesbloqueo(true);
+      if (t) clearTimeout(t);
+      t = setTimeout(() => setAvisoDesbloqueo(false), Math.max(0, DBG_EFECTOS.AVISO_DESBLOQUEO_MS));
+    };
+    const onCambio = () => setPremio(leerPremio());
+    // el premio vence aunque la página siga abierta: se relee cada minuto
+    const iv = setInterval(onCambio, 60_000);
+    window.addEventListener("alight:premio-otorgado", onPremio);
+    window.addEventListener("alight:premio-cambio", onCambio);
+    return () => {
+      if (t) clearTimeout(t);
+      clearInterval(iv);
+      window.removeEventListener("alight:premio-otorgado", onPremio);
+      window.removeEventListener("alight:premio-cambio", onCambio);
+    };
+  }, []);
+
   // ── Spotlight handlers (changes apply on next scene load) ─────────────────
   const setSpotField = (key: keyof typeof DBG_SPOTLIGHT, val: number | string) => {
     (DBG_SPOTLIGHT as Record<string, number | string>)[key] = val;
@@ -470,7 +499,16 @@ export default function DebugMenu() {
     }
   };
 
-  if (!DEBUG_ENABLED || !visible) return null;
+  // Z29: aviso tenue de desbloqueo (también con el menú cerrado)
+  const aviso = avisoDesbloqueo ? (
+    <div style={{ position: "fixed", left: "50%", top: 18, transform: "translateX(-50%)", zIndex: 4000, pointerEvents: "none",
+      fontFamily: "ui-monospace, Menlo, monospace", fontSize: 11, letterSpacing: "0.22em", color: "rgba(255,154,31,0.55)",
+      textShadow: "0 0 6px rgba(255,154,31,0.35)" }}>
+      ▸ MENÚ DE CONTROL DESBLOQUEADO · SHIFT
+    </div>
+  ) : null;
+
+  if (!(DEBUG_ENABLED || premio) || !visible) return aviso;
 
   // U8: stop all pointer/mouse/click/wheel events from bubbling out of the panel.
   // React SyntheticEvent.stopPropagation() also calls nativeEvent.stopPropagation(),
@@ -498,6 +536,15 @@ export default function DebugMenu() {
           onClick={() => setVisible(false)}
         >✕</span>
       </div>
+      {aviso}
+
+      {/* Z29: premio — opción del mapa de decisiones (todavía sin implementar) */}
+      {premio && (
+        <div style={ROW}>
+          <span>ver mapa de decisiones <span style={NOTE}>(pendiente de implementar)</span></span>
+          <button style={{ ...INPUT, opacity: 0.4, cursor: "not-allowed" }} disabled>off</button>
+        </div>
+      )}
 
       <div style={{ marginBottom: 10 }}>
         {(["SILLAS", "TARIMA"] as Tab[]).map(t => (
@@ -1407,6 +1454,52 @@ export default function DebugMenu() {
           <NumField label="FADE_MS" value={piso.FADE_MS} step={50} min={0} max={5000} note="ms"
             onChange={v => { DBG_PISO_ICONOS.FADE_MS = v; setPiso(o => ({ ...o, FADE_MS: v })); }} />
 
+          <div style={DIVIDER} />
+          <span style={LABEL}>Efectos del diálogo Z29 <span style={NOTE}>(live)</span></span>
+          <div style={{ ...ROW, ...NOTE }}>
+            <span>{EFECTOS_STATE.alarmaActiva ? "ALARMA · " : ""}{EFECTOS_STATE.alarmaSonando ? "SONANDO · " : ""}{EFECTOS_STATE.audioCtx ? `ctx=${EFECTOS_STATE.audioCtx} · ` : ""}luces={EFECTOS_STATE.luces.toFixed(2)}{EFECTOS_STATE.sinPublico ? " · sin público" : ""} · premio={premio ? `sí (vence ${new Date(EFECTOS_STATE.premioVence).toLocaleTimeString()})` : "no"}</span>
+          </div>
+          <div style={ROW}>
+            <span>EFECTOS_DIALOGO</span>
+            <button style={INPUT} onClick={() => {
+              const v = !efx.EFECTOS_DIALOGO;
+              DBG_EFECTOS.EFECTOS_DIALOGO = v;
+              setEfx(o => ({ ...o, EFECTOS_DIALOGO: v }));
+            }}>{efx.EFECTOS_DIALOGO ? "ON" : "off"}</button>
+          </div>
+          <div style={{ ...ROW, flexWrap: "wrap", gap: 4 }}>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); probarEfecto("juego_alarma"); }}>Probar efecto: juego_alarma</button>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); probarEfecto("ir_tarima_sin_publico"); }}>Probar efecto: ir_tarima_sin_publico</button>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:debug-tocar-tarima")); }}>Probar efecto: premio (tocar tarima)</button>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:debug-detener-alarma")); }}>Detener alarma</button>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); borrarPremio(); }}>Borrar premio</button>
+          </div>
+          <NumField label="ALARMA_VOLUMEN" value={efx.ALARMA_VOLUMEN} step={0.05} min={0} max={4} note=""
+            onChange={v => { DBG_EFECTOS.ALARMA_VOLUMEN = v; setEfx(o => ({ ...o, ALARMA_VOLUMEN: v })); }} />
+          <NumField label="ALARMA_REF_M" value={efx.ALARMA_REF_M} step={0.5} min={0.1} max={50} note="m"
+            onChange={v => { DBG_EFECTOS.ALARMA_REF_M = v; setEfx(o => ({ ...o, ALARMA_REF_M: v })); }} />
+          <NumField label="ALARMA_MAX_M" value={efx.ALARMA_MAX_M} step={5} min={1} max={500} note="m"
+            onChange={v => { DBG_EFECTOS.ALARMA_MAX_M = v; setEfx(o => ({ ...o, ALARMA_MAX_M: v })); }} />
+          <NumField label="ALARMA_ROLLOFF" value={efx.ALARMA_ROLLOFF} step={0.1} min={0} max={10} note=""
+            onChange={v => { DBG_EFECTOS.ALARMA_ROLLOFF = v; setEfx(o => ({ ...o, ALARMA_ROLLOFF: v })); }} />
+          <NumField label="ALARMA_ALTURA_M" value={efx.ALARMA_ALTURA_M} step={0.1} min={0} max={10} note="m"
+            onChange={v => { DBG_EFECTOS.ALARMA_ALTURA_M = v; setEfx(o => ({ ...o, ALARMA_ALTURA_M: v })); }} />
+          <NumField label="FUNDIDO_APAGAR_MS" value={efx.FUNDIDO_APAGAR_MS} step={100} min={0} max={10000} note="ms"
+            onChange={v => { DBG_EFECTOS.FUNDIDO_APAGAR_MS = v; setEfx(o => ({ ...o, FUNDIDO_APAGAR_MS: v })); }} />
+          <NumField label="FUNDIDO_ENCENDER_MS" value={efx.FUNDIDO_ENCENDER_MS} step={100} min={0} max={10000} note="ms"
+            onChange={v => { DBG_EFECTOS.FUNDIDO_ENCENDER_MS = v; setEfx(o => ({ ...o, FUNDIDO_ENCENDER_MS: v })); }} />
+          <NumField label="LUCES_MIN" value={efx.LUCES_MIN} step={0.05} min={0} max={1} note="mult."
+            onChange={v => { DBG_EFECTOS.LUCES_MIN = v; setEfx(o => ({ ...o, LUCES_MIN: v })); }} />
+          <NumField label="TOQUE_MARGEN_M" value={efx.TOQUE_MARGEN_M} step={0.05} min={0} max={3} note="m"
+            onChange={v => { DBG_EFECTOS.TOQUE_MARGEN_M = v; setEfx(o => ({ ...o, TOQUE_MARGEN_M: v })); }} />
+          <NumField label="ZONA_REARME_M" value={efx.ZONA_REARME_M} step={0.25} min={0} max={20} note="m"
+            onChange={v => { DBG_EFECTOS.ZONA_REARME_M = v; setEfx(o => ({ ...o, ZONA_REARME_M: v })); }} />
+          <NumField label="CIERRE_PREMIO_MS" value={efx.CIERRE_PREMIO_MS} step={250} min={0} max={30000} note="ms"
+            onChange={v => { DBG_EFECTOS.CIERRE_PREMIO_MS = v; setEfx(o => ({ ...o, CIERRE_PREMIO_MS: v })); }} />
+          <NumField label="PREMIO_DURACION_S" value={efx.PREMIO_DURACION_S} step={60} min={1} max={86400} note="s"
+            onChange={v => { DBG_EFECTOS.PREMIO_DURACION_S = v; setEfx(o => ({ ...o, PREMIO_DURACION_S: v })); }} />
+          <NumField label="ATRILES_DELAY_MS" value={efx.ATRILES_DELAY_MS} step={100} min={0} max={10000} note="ms"
+            onChange={v => { DBG_EFECTOS.ATRILES_DELAY_MS = v; setEfx(o => ({ ...o, ATRILES_DELAY_MS: v })); }} />
           <div style={DIVIDER} />
           <span style={LABEL}>Camino LUZ Z28 <span style={NOTE}>(live)</span></span>
           <div style={ROW}>

@@ -12,8 +12,8 @@ export const TARIMA_H = CAM_Y / 6;          // ≈ 0.267 m
 // C2: reduce W and D by 20% while keeping height unchanged.
 // G1: reduce by additional 5% over previous 0.8 value
 const TARIMA_SCALE_XZ = 0.8 * 0.95;         // 0.76
-const TARIMA_W = 4.2 * TARIMA_SCALE_XZ;     // 3.192 m
-const TARIMA_D = 4.2 * TARIMA_SCALE_XZ;     // 3.192 m
+export const TARIMA_W = 4.2 * TARIMA_SCALE_XZ;     // 3.192 m (Z29: exportado para "tocar la tarima")
+export const TARIMA_D = 4.2 * TARIMA_SCALE_XZ;     // 3.192 m
 
 // R5: flag to disable retro styling (set false to revert to TARIMA_MAT_LEGACY)
 const R5_TARIMA_RETRO = true;
