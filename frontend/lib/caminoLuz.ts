@@ -22,6 +22,9 @@ export const LUZ_STATE = {
   fase: "libre" as FaseLuz,
 };
 
+/** Z30: estado del cielo estrellado (lo escribe CieloEstrellado, lo lee el menú de debug). */
+export const CIELO_STATE = { reveal: 0, aten: 1, objetivo: 0 };
+
 /** Recalcula la posición de la luz desde las constantes (barato, sin allocations). */
 export function actualizarPosLuz(): void {
   LUZ_STATE.y = DBG_LUZ.LUZ_ALTURA_M;

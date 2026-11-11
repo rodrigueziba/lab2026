@@ -52,7 +52,7 @@ import { STORE, storeSubscribe, activateVisualizerOnce, resetVizActivated, PANEL
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado"; // Z27
-import { LUZ_STATE } from "@/lib/caminoLuz"; // Z28
+import { LUZ_STATE, CIELO_STATE } from "@/lib/caminoLuz"; // Z28 · Z30
 import { PAUSA } from "@/lib/pausaExperiencia"; // Z28
 
 type Tab = "SILLAS" | "TARIMA";
@@ -1489,6 +1489,91 @@ export default function DebugMenu() {
             onChange={v => { DBG_LUZ.ESTRELLAS_D_CERCA_M = v; setLuz(o => ({ ...o, ESTRELLAS_D_CERCA_M: v })); }} />
           <NumField label="ESTRELLAS_TAM_PX" value={luz.ESTRELLAS_TAM_PX} step={0.1} min={0.5} max={10} note="px"
             onChange={v => { DBG_LUZ.ESTRELLAS_TAM_PX = v; setLuz(o => ({ ...o, ESTRELLAS_TAM_PX: v })); }} />
+          <div style={DIVIDER} />
+          <span style={LABEL}>Cielo estrellado Z30 <span style={NOTE}>(live)</span></span>
+          <div style={{ ...ROW, ...NOTE }}>
+            <span>reveal={CIELO_STATE.reveal.toFixed(2)} · obj={CIELO_STATE.objetivo.toFixed(2)} · aten={CIELO_STATE.aten.toFixed(2)}</span>
+          </div>
+          <div style={ROW}>
+            <span>ESTRELLAS_MODO_VIEJO</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.ESTRELLAS_MODO_VIEJO;
+              DBG_LUZ.ESTRELLAS_MODO_VIEJO = v;
+              setLuz(o => ({ ...o, ESTRELLAS_MODO_VIEJO: v }));
+            }}>{luz.ESTRELLAS_MODO_VIEJO ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>ESTRELLAS_SOLO_FUERA</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.ESTRELLAS_SOLO_FUERA;
+              DBG_LUZ.ESTRELLAS_SOLO_FUERA = v;
+              setLuz(o => ({ ...o, ESTRELLAS_SOLO_FUERA: v }));
+            }}>{luz.ESTRELLAS_SOLO_FUERA ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>ESTRELLAS_DEPTH_TEST</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.ESTRELLAS_DEPTH_TEST;
+              DBG_LUZ.ESTRELLAS_DEPTH_TEST = v;
+              setLuz(o => ({ ...o, ESTRELLAS_DEPTH_TEST: v }));
+            }}>{luz.ESTRELLAS_DEPTH_TEST ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>ESTRELLAS_SOBRE_TECHO</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.ESTRELLAS_SOBRE_TECHO;
+              DBG_LUZ.ESTRELLAS_SOBRE_TECHO = v;
+              setLuz(o => ({ ...o, ESTRELLAS_SOBRE_TECHO: v }));
+            }}>{luz.ESTRELLAS_SOBRE_TECHO ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>ESTRELLAS_CONGELAR_EN_PAUSA</span>
+            <button style={INPUT} onClick={() => {
+              const v = !luz.ESTRELLAS_CONGELAR_EN_PAUSA;
+              DBG_LUZ.ESTRELLAS_CONGELAR_EN_PAUSA = v;
+              setLuz(o => ({ ...o, ESTRELLAS_CONGELAR_EN_PAUSA: v }));
+            }}>{luz.ESTRELLAS_CONGELAR_EN_PAUSA ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>forzar reveal <span style={NOTE}>{luz.ESTRELLAS_FORZAR_REVEAL < 0 ? "auto" : luz.ESTRELLAS_FORZAR_REVEAL.toFixed(2)}</span></span>
+            <input type="range" min={-0.05} max={1} step={0.01} style={{ flex: 1 }}
+              value={luz.ESTRELLAS_FORZAR_REVEAL}
+              onChange={e => {
+                const raw = parseFloat(e.target.value);
+                const v = raw < 0 ? -1 : raw;   // tope izquierdo = automático
+                DBG_LUZ.ESTRELLAS_FORZAR_REVEAL = v;
+                setLuz(o => ({ ...o, ESTRELLAS_FORZAR_REVEAL: v }));
+              }} />
+          </div>
+          <NumField label="ESTRELLAS_DIST_INICIO_M" value={luz.ESTRELLAS_DIST_INICIO_M} step={1} min={1} max={300} note="m"
+            onChange={v => { DBG_LUZ.ESTRELLAS_DIST_INICIO_M = v; setLuz(o => ({ ...o, ESTRELLAS_DIST_INICIO_M: v })); }} />
+          <NumField label="ESTRELLAS_DIST_PLENO_M" value={luz.ESTRELLAS_DIST_PLENO_M} step={0.5} min={0} max={100} note="m"
+            onChange={v => { DBG_LUZ.ESTRELLAS_DIST_PLENO_M = v; setLuz(o => ({ ...o, ESTRELLAS_DIST_PLENO_M: v })); }} />
+          <NumField label="ESTRELLAS_CURVA" value={luz.ESTRELLAS_CURVA} step={0.1} min={0.1} max={8} note="exponente"
+            onChange={v => { DBG_LUZ.ESTRELLAS_CURVA = v; setLuz(o => ({ ...o, ESTRELLAS_CURVA: v })); }} />
+          <NumField label="ESTRELLAS_REVEAL_MAX" value={luz.ESTRELLAS_REVEAL_MAX} step={0.05} min={0} max={2} note=""
+            onChange={v => { DBG_LUZ.ESTRELLAS_REVEAL_MAX = v; setLuz(o => ({ ...o, ESTRELLAS_REVEAL_MAX: v })); }} />
+          <NumField label="ESTRELLAS_INERCIA_S" value={luz.ESTRELLAS_INERCIA_S} step={0.05} min={0} max={5} note="s"
+            onChange={v => { DBG_LUZ.ESTRELLAS_INERCIA_S = v; setLuz(o => ({ ...o, ESTRELLAS_INERCIA_S: v })); }} />
+          <NumField label="ESTRELLAS_ATENUAR_EN_VISUALIZADOR" value={luz.ESTRELLAS_ATENUAR_EN_VISUALIZADOR} step={0.01} min={0} max={1} note="factor"
+            onChange={v => { DBG_LUZ.ESTRELLAS_ATENUAR_EN_VISUALIZADOR = v; setLuz(o => ({ ...o, ESTRELLAS_ATENUAR_EN_VISUALIZADOR: v })); }} />
+          <NumField label="ESTRELLAS_ATEN_TRANS_S" value={luz.ESTRELLAS_ATEN_TRANS_S} step={0.1} min={0} max={10} note="s"
+            onChange={v => { DBG_LUZ.ESTRELLAS_ATEN_TRANS_S = v; setLuz(o => ({ ...o, ESTRELLAS_ATEN_TRANS_S: v })); }} />
+          <NumField label="ESTRELLAS_CALIDAD" value={luz.ESTRELLAS_CALIDAD} step={1} min={1} max={3} note="capas 3/2/1"
+            onChange={v => { DBG_LUZ.ESTRELLAS_CALIDAD = v; setLuz(o => ({ ...o, ESTRELLAS_CALIDAD: v })); }} />
+          <NumField label="ESTRELLAS_TOPE" value={luz.ESTRELLAS_TOPE} step={0.05} min={0.1} max={10} note="por canal"
+            onChange={v => { DBG_LUZ.ESTRELLAS_TOPE = v; setLuz(o => ({ ...o, ESTRELLAS_TOPE: v })); }} />
+          <NumField label="ESTRELLAS_U_BRILLO" value={luz.ESTRELLAS_U_BRILLO} step={0.05} min={0} max={10} note="uBrillo"
+            onChange={v => { DBG_LUZ.ESTRELLAS_U_BRILLO = v; setLuz(o => ({ ...o, ESTRELLAS_U_BRILLO: v })); }} />
+          <NumField label="ESTRELLAS_U_DENSIDAD" value={luz.ESTRELLAS_U_DENSIDAD} step={0.01} min={0} max={1} note="uDensidad"
+            onChange={v => { DBG_LUZ.ESTRELLAS_U_DENSIDAD = v; setLuz(o => ({ ...o, ESTRELLAS_U_DENSIDAD: v })); }} />
+          <NumField label="ESTRELLAS_U_TWINKLE" value={luz.ESTRELLAS_U_TWINKLE} step={0.05} min={0} max={2} note="uTwinkle"
+            onChange={v => { DBG_LUZ.ESTRELLAS_U_TWINKLE = v; setLuz(o => ({ ...o, ESTRELLAS_U_TWINKLE: v })); }} />
+          <NumField label="ESTRELLAS_U_PAN" value={luz.ESTRELLAS_U_PAN} step={0.005} min={-0.5} max={0.5} note="uPan rad/s"
+            onChange={v => { DBG_LUZ.ESTRELLAS_U_PAN = v; setLuz(o => ({ ...o, ESTRELLAS_U_PAN: v })); }} />
+          <ColorField label="ESTRELLAS_TINTE_HORIZONTE" value={luz.ESTRELLAS_TINTE_HORIZONTE}
+            onChange={v => { DBG_LUZ.ESTRELLAS_TINTE_HORIZONTE = v; setLuz(o => ({ ...o, ESTRELLAS_TINTE_HORIZONTE: v })); }} />
+          <div style={DIVIDER} />
           <NumField label="EXTERIOR_RADIO_M" value={luz.EXTERIOR_RADIO_M} step={1} min={5} max={100} note="m caminable"
             onChange={v => { DBG_LUZ.EXTERIOR_RADIO_M = v; setLuz(o => ({ ...o, EXTERIOR_RADIO_M: v })); }} />
           <NumField label="AREA_HIST_M" value={luz.AREA_HIST_M} step={0.25} min={0} max={5} note="m"

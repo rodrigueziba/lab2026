@@ -18,6 +18,7 @@ import { LUZ_STATE, actualizarPosLuz, fueraDelArea, curvaCercania } from "@/lib/
 import { INTERACT_STATE, isVizActivated } from "@/lib/alightStore";
 import { instalarPausa, tickPausa } from "@/lib/pausaExperiencia";
 import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado";
+import CieloEstrellado from "@/components/CieloEstrellado";   // Z30
 
 const ESTRELLAS_R = 400;   // radio de la esfera de estrellas (sigue a la cámara)
 const DOMO_EXT_R  = 30;    // caparazón del domo (DOME_R + 2 en ExperienceDome)
@@ -229,7 +230,7 @@ export default function LuzLejana() {
   useFrame(({ clock }, dt) => {
     const on = DBG_LUZ.CAMINO_LUZ;
     if (raizRef.current) raizRef.current.visible = on;
-    if (estrellasRef.current) estrellasRef.current.visible = on && ESTRELLAS_UNIFORMS.uOpacidad.value > 0.002;
+    if (estrellasRef.current) estrellasRef.current.visible = on && DBG_LUZ.ESTRELLAS_MODO_VIEJO && ESTRELLAS_UNIFORMS.uOpacidad.value > 0.002;
 
     // ── área y pausa ──
     const fuera = on && fueraDelArea(camera.position.x, camera.position.z, LUZ_STATE.fuera);
@@ -352,6 +353,8 @@ export default function LuzLejana() {
           <meshStandardMaterial color="#0d0d0f" roughness={0.95} />
         </mesh>
       </group>
+      {/* Z30: cielo estrellado procedural (reemplaza al Points; este queda tras ESTRELLAS_MODO_VIEJO) */}
+      <CieloEstrellado />
       {/* estrellas: un solo Points que sigue a la cámara; fondo (renderOrder bajo, sin profundidad) */}
       <points ref={estrellasRef} geometry={geoEstrellas} renderOrder={-2} frustumCulled={false} visible={false}>
         <shaderMaterial vertexShader={ESTRELLAS_VERT} fragmentShader={ESTRELLAS_FRAG} uniforms={ESTRELLAS_UNIFORMS}

@@ -801,6 +801,27 @@ export const DBG_LUZ = {
   ESTRELLAS_D_LEJOS_M: 40,     // empiezan a encenderse a esta distancia de la luz — live
   ESTRELLAS_D_CERCA_M: 4,      // brillo máximo — live
   ESTRELLAS_TAM_PX:    2.2,    // tamaño base en px — live
+  // Z30: cielo estrellado procedural (lib/estrellasCielo.glsl.ts, CieloEstrellado.tsx)
+  ESTRELLAS_MODO_VIEJO:    false,  // true = vuelve el Points de Z28 (y se apaga el cielo shader) — live
+  ESTRELLAS_SOLO_FUERA:    false,  // true = solo fuera de la sala (como Z28) — live
+  ESTRELLAS_DIST_INICIO_M: 75,     // distancia a la luz desde la que empiezan a verse (tenues) — live
+  ESTRELLAS_DIST_PLENO_M:  6,      // distancia a la luz con el cielo completo — live
+  ESTRELLAS_CURVA:         1.6,    // exponente de la rampa (más alto = arranca más tenue) — live
+  ESTRELLAS_REVEAL_MAX:    1,      // tope de uReveal — live
+  ESTRELLAS_INERCIA_S:     0.6,    // constante de tiempo del suavizado del reveal (anti parpadeo) — live
+  ESTRELLAS_ATENUAR_EN_VISUALIZADOR: 0.15, // factor dentro del área con visualizador o secuencias SILLAS/TARIMA — live
+  ESTRELLAS_ATEN_TRANS_S:  1.2,    // constante de tiempo de esa atenuación — live
+  ESTRELLAS_FORZAR_REVEAL: -1,     // −1 = automático; 0..1 fuerza uReveal (probar sin caminar) — live
+  ESTRELLAS_CALIDAD:       3,      // capas por píxel: 3 alta · 2 media · 1 baja — live
+  ESTRELLAS_DEPTH_TEST:    true,   // true = paredes, tarima y objetos tapan el cielo; false = encima de todo — live
+  ESTRELLAS_SOBRE_TECHO:   false,  // true = el techo (y=22) deja de escribir profundidad: estrellas también arriba — live
+  ESTRELLAS_CONGELAR_EN_PAUSA: false, // true = el titilar y la deriva se congelan con la pausa Z28 — live
+  ESTRELLAS_TOPE:          1.0,    // tope por canal de la salida (bloom threshold 0.92: solo los núcleos más fuertes brillan) — live
+  ESTRELLAS_U_BRILLO:      1.6,    // uBrillo — live
+  ESTRELLAS_U_DENSIDAD:    0.85,   // uDensidad — live
+  ESTRELLAS_U_TWINKLE:     1.0,    // uTwinkle — live
+  ESTRELLAS_U_PAN:         0.01,   // uPan (rad/s) — live
+  ESTRELLAS_TINTE_HORIZONTE: "#1a2e73" as string, // uTinteHorizonte — live
   // sala y salida
   SALA_MEDIA_M:        40,     // media del cuadrado de la sala (paredes a ±40)
   SALA_MARGEN_M:       0.5,    // no se camina a menos de esto de una pared cerrada
