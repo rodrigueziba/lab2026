@@ -41,6 +41,7 @@ import {
   DBG_EFECTOS, // Z29
   DBG_MOV, // Z34
   DBG_AMANECER, // Z38
+  DBG_SECUENCIA, // Z39
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -58,6 +59,8 @@ import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado"; // Z2
 import { LUZ_STATE, CIELO_STATE } from "@/lib/caminoLuz"; // Z28 · Z30
 import { PAUSA } from "@/lib/pausaExperiencia"; // Z28
 import { AMANECER } from "@/lib/amanecer"; // Z38
+import { RELOJ, esperasPendientes } from "@/lib/relojExperiencia"; // Z39
+import { SECUENCIA } from "@/lib/secuenciaSillas"; // Z39
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
 
 type Tab = "SILLAS" | "TARIMA";
@@ -312,6 +315,7 @@ export default function DebugMenu() {
   const [efx, setEfx] = useState({ ...DBG_EFECTOS });
   const [mov, setMov] = useState({ ...DBG_MOV });                          // Z34
   const [amn, setAmn] = useState({ ...DBG_AMANECER });                     // Z38
+  const [sec, setSec] = useState({ ...DBG_SECUENCIA });                    // Z39
   const [tab, setTab]         = useState<Tab>("SILLAS");
   const [spot,     setSpot]     = useState({ ...DBG_SPOTLIGHT });
   const [stars,    setStars]    = useState({ ...DBG_STARS });
@@ -1457,6 +1461,25 @@ export default function DebugMenu() {
           <NumField label="FADE_MS" value={piso.FADE_MS} step={50} min={0} max={5000} note="ms"
             onChange={v => { DBG_PISO_ICONOS.FADE_MS = v; setPiso(o => ({ ...o, FADE_MS: v })); }} />
 
+          <div style={DIVIDER} />
+          <span style={LABEL}>Reloj de la experiencia Z39 <span style={NOTE}>(live)</span></span>
+          <div style={{ ...ROW, ...NOTE }}>
+            <span>tExp={RELOJ.tExp.toFixed(1)} s · esperas={esperasPendientes()} · revelado={SECUENCIA.activadoExpMs < 0 ? "—" : ((RELOJ.tExp * 1000 - SECUENCIA.activadoExpMs) / 1000).toFixed(1) + " s"} · dome-revealed={SECUENCIA.domeRevealedEmitido ? SECUENCIA.motivo : "no"}</span>
+          </div>
+          <div style={ROW}>
+            <span>RELOJ_UNIFICADO</span>
+            <button style={INPUT} onClick={() => {
+              const v = !sec.RELOJ_UNIFICADO;
+              DBG_SECUENCIA.RELOJ_UNIFICADO = v;
+              setSec(o => ({ ...o, RELOJ_UNIFICADO: v }));
+            }}>{sec.RELOJ_UNIFICADO ? "ON" : "off"}</button>
+          </div>
+          <NumField label="TOPE_REVELADO_S" value={sec.TOPE_REVELADO_S} step={0.5} min={1} max={60} note="s tope de seguridad"
+            onChange={v => { DBG_SECUENCIA.TOPE_REVELADO_S = v; setSec(o => ({ ...o, TOPE_REVELADO_S: v })); }} />
+          <NumField label="REVELADO_MIN_S" value={sec.REVELADO_MIN_S} step={0.1} min={0} max={30} note="s mínimo (antes 9,8 fijo)"
+            onChange={v => { DBG_SECUENCIA.REVELADO_MIN_S = v; setSec(o => ({ ...o, REVELADO_MIN_S: v })); }} />
+          <NumField label="REVELADO_POR_S" value={sec.REVELADO_POR_S} step={0.01} min={0.01} max={5} note="uReveal/s (0,42 = 0,007/frame)"
+            onChange={v => { DBG_SECUENCIA.REVELADO_POR_S = v; setSec(o => ({ ...o, REVELADO_POR_S: v })); }} />
           <div style={DIVIDER} />
           <span style={LABEL}>Movimiento Z34 <span style={NOTE}>(live)</span></span>
           <NumField label="VELOCIDAD_FACTOR" value={mov.VELOCIDAD_FACTOR} step={0.05} min={0} max={3} note="× WASD (1 = anterior)"

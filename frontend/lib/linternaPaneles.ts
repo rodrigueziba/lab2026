@@ -345,7 +345,7 @@ function emitir(nombre: string, detail: object) {
 function soltar() {
   const s = LINTERNA_STATE;
   if (s.abiertoIdx >= 0) emitir("alight:panel-cerrado", { indice: s.abiertoIdx });
-  if (ACERC.panel && ACERC.panel === s.sel) iniciarVuelta(performance.now()); // Z8
+  if (ACERC.panel && ACERC.panel === s.sel) iniciarVuelta(_relojLinterna()); // Z8 · Z39: mismo reloj que el tick
   s.sel = null; s.progreso = 0; s.abiertoIdx = -1; s.retener = false;
   s.fase = s.apagada ? "inactiva" : "buscando";
 }
@@ -384,6 +384,12 @@ const RAD = Math.PI / 180;
  * Avanza la fase de cada panel salvo la del seleccionado, calcula uLit por cono,
  * elige un único seleccionado con histéresis y corre el temporizador de apertura.
  */
+// Z39: reloj de la linterna. El tick recibe `now`; soltar() (que puede correr fuera del tick) usa la misma
+// función. Default performance.now (comportamiento anterior); ExperienceDome pone ahoraExp con RELOJ_UNIFICADO.
+const _perfNow = (): number => performance.now();
+let _relojLinterna: () => number = _perfNow;
+export function setRelojLinterna(fn: (() => number) | null): void { _relojLinterna = fn ?? _perfNow; }
+
 export function tickLinterna(camera: THREE.Camera, dt: number, now: number, activa: boolean, orbitan: boolean, habilitada = true): void {
   const s = LINTERNA_STATE;
   const D = DBG_LINTERNA;

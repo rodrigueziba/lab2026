@@ -12,12 +12,14 @@ import HazSystem from "./HazSystem";
 import HazRings from "./HazRings";
 import SymbolSystem from "./SymbolSystem";
 import Monoliths from "./Monoliths";
-import { DBG_SILLAS, DBG_PANELES, DBG_ORBITAS } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_PANELES, DBG_ORBITAS, DBG_SECUENCIA } from "@/lib/debugConfig";
+import { RELOJ, ahoraExp } from "@/lib/relojExperiencia"; // Z39
+import { SECUENCIA, iniciarRevelado, revelarFinal } from "@/lib/secuenciaSillas"; // Z39
 import { PRISM_CENTER_Y } from "./Prism"; // Z7: altura del origen de los haces
 import { resetEffects } from "@/lib/vizAudio";
 import { PANELES_SILLAS, tickPanelesSillas, installPanelesSillasListeners, panelesSillasVisibles, seleccionPanelesHabilitada } from "@/lib/alightStore";
 import { createPanelPlaceholder } from "@/lib/retro/panelPlaceholder";
-import { registrarPanelLinterna, tickLinterna, apagarLinterna, resetLinterna, type PanelLinterna, ORBITAS_INFO, type AnilloInfo } from "@/lib/linternaPaneles";
+import { registrarPanelLinterna, tickLinterna, apagarLinterna, resetLinterna, setRelojLinterna, type PanelLinterna, ORBITAS_INFO, type AnilloInfo } from "@/lib/linternaPaneles";
 import PanelSelMarco from "./PanelSelMarco";
 import SubpanelesProyecto from "./SubpanelesProyecto"; // Z4
 
@@ -694,6 +696,18 @@ function PanelMesh({ position, item, indice, azimuth, tiltZ, speed, bobAmp = 0, 
       }
     }
     if (!mat || activatedRef.current === null) return;
+    if (DBG_SECUENCIA.RELOJ_UNIFICADO && SECUENCIA.activadoExpMs >= 0) {
+      // Z39: escalonado con el reloj de la experiencia y avance por dt (0.42/s = 0.007/frame a 60 fps);
+      // en pausa RELOJ.dtExp = 0 y ahoraExp() no avanza → el revelado queda congelado
+      const el = (ahoraExp() - SECUENCIA.activadoExpMs) / 1000 - staggerSec;
+      const u = mat.uniforms.uReveal;
+      if (el > 0 && u.value < 1) {
+        u.value = Math.min(1, u.value + DBG_SECUENCIA.REVELADO_POR_S * RELOJ.dtExp);
+        // el último panel del escalonado: al completar, dome-revealed (con mínimo y tope en secuenciaSillas)
+        if (u.value >= 1 && staggerSec >= SECUENCIA.maxStagger) revelarFinal(DBG_SECUENCIA.REVELADO_MIN_S);
+      }
+      return;
+    }
     const elapsed = (Date.now() - activatedRef.current) / 1000 - staggerSec;
     if (elapsed > 0 && mat.uniforms.uReveal.value < 1) {
       mat.uniforms.uReveal.value = Math.min(1, mat.uniforms.uReveal.value + 0.007);
@@ -803,7 +817,10 @@ export default function ExperienceDome() {
     const onLanded = () => {
       if (activatedRef.current !== null) return;
       activatedRef.current = Date.now();
-      setTimeout(() => window.dispatchEvent(new CustomEvent("alight:dome-revealed")), 9_800);
+      // Z39: con RELOJ_UNIFICADO, dome-revealed lo emite el último panel al completar su revelado
+      // (mínimo REVELADO_MIN_S, tope TOPE_REVELADO_S, ambos con el reloj de la experiencia)
+      if (DBG_SECUENCIA.RELOJ_UNIFICADO) iniciarRevelado(DBG_SECUENCIA.TOPE_REVELADO_S);
+      else setTimeout(() => window.dispatchEvent(new CustomEvent("alight:dome-revealed")), 9_800);
     };
     // visualizer-activate → begin shell fade + mount DomeVisualizer; reset legacy effects (N2)
     const onVizOn  = () => { resetEffects(); apagarLinterna(); vizActiveRef.current = true;  setVizActive(true); }; // Z2: apaga la linterna
@@ -844,7 +861,11 @@ export default function ExperienceDome() {
   // G1/AA2: animate shell opacity; sky shell uses DomeSky material when vizActive+domoShaderEnMalla
   useFrame((_, dt) => {
     // P1: fade y visibilidad de los paneles SILLAS, derivados del store
-    tickPanelesSillas(performance.now());
+    // Z39: fundidos de paneles y linterna con el reloj de la experiencia (se congelan en la pausa)
+    const unifR = DBG_SECUENCIA.RELOJ_UNIFICADO;
+    const ahoraR = unifR ? ahoraExp() : performance.now();
+    setRelojLinterna(unifR ? ahoraExp : null);
+    tickPanelesSillas(ahoraR);
     // Z1: layout del marco desde el menú de debug (uniforms compartidos, sin allocations)
     PANEL_LAYOUT_UNIFORMS.uMargen.value = DBG_PANELES.PANEL_MARGEN;
     PANEL_LAYOUT_UNIFORMS.uRegla.value  = DBG_PANELES.PANEL_REGLA;
@@ -853,7 +874,7 @@ export default function ExperienceDome() {
     if (panelsRef.current) panelsRef.current.visible = PANELES_SILLAS.fase !== "oculto";
     // Z2: linterna (test de cono) + fase de órbita propia de cada panel
     // Z13: + selección habilitada recién con la liberación del movimiento
-    if (Z2_FASE_POR_PANEL) tickLinterna(camera, dt, performance.now(), panelesSillasVisibles(), PANELES_SILLAS.fase !== "oculto", seleccionPanelesHabilitada());
+    if (Z2_FASE_POR_PANEL) tickLinterna(camera, dt, ahoraR, panelesSillasVisibles(), PANELES_SILLAS.fase !== "oculto", seleccionPanelesHabilitada());
     if (shellRef.current) {
       shellRef.current.visible = !DBG_SILLAS.vizHideShell;
     }
@@ -885,6 +906,12 @@ export default function ExperienceDome() {
     () => (DBG_ORBITAS.ORB_ORDENADAS && Z7_ORBITAS_ORDENADAS_DEFAULT ? buildOrbitsZ7(urls, regen) : buildOrbits(urls.slice(0, MAX_PANELS))),
     // regen fuerza el recálculo con los valores actuales de DBG_ORBITAS
     [urls, regen]);
+  // Z39: staggerSec del último panel (el que dispara dome-revealed al terminar su revelado)
+  useEffect(() => {
+    let m = 0;
+    for (const o of orbits) if (o) for (const p of o.panels) m = Math.max(m, p.staggerSec);
+    SECUENCIA.maxStagger = m;
+  }, [orbits]);
 
   // P1: precompilar el shader de los paneles apenas se montan (oculto), para que su
   // aparición no compile programas. compile() solo recorre objetos visibles.

@@ -25,7 +25,9 @@ import { moverConLimites } from "@/lib/caminoLuz"; // Z28: límites sala ∪ ext
 import { EFECTOS_STATE } from "@/lib/dialogo/efectosEstado"; // Z29: bloqueo de la zona TARIMA en juego_alarma
 import { posicionInicial, aplicarSpawn } from "@/lib/inicioEscena"; // Z24/Z25
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
-import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV } from "@/lib/debugConfig";
+import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV, DBG_SECUENCIA } from "@/lib/debugConfig";
+import { crearEspera, type Espera } from "@/lib/relojExperiencia"; // Z39
+import { cancelarSecuencia } from "@/lib/secuenciaSillas"; // Z39
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
@@ -195,6 +197,7 @@ function Player() {
   const triggered   = useRef(false);
   const seated           = useRef(false);
   const releaseTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null); // N1: timer → sala_activa
+  const releaseEsperaRef = useRef<Espera | null>(null); // Z39: misma espera con el reloj de la experiencia (pausable)
   const pathRef          = useRef<"none" | "sillas" | "tarima">("none");
   const prismLanded = useRef(false);
   const prismNearRef = useRef(false); // within prismInteractM horizontally
@@ -222,14 +225,26 @@ function Player() {
     const onLight = () => { pathRef.current = "tarima"; _D.path = "tarima"; };
 
     // N1: dome-revealed → start release timer; release after releaseDelayMs
+    // Z39: con RELOJ_UNIFICADO la espera cuenta con el reloj de la experiencia (se congela en la pausa)
+    const liberarSala = () => {
+      seated.current = false;
+      INTERACT_STATE.movementLocked  = false;
+      INTERACT_STATE.experienceState = 'sala_activa';
+      window.dispatchEvent(new CustomEvent("alight:sala-activa"));
+    };
+    const cancelarLiberacion = () => {
+      if (releaseTimerRef.current) { clearTimeout(releaseTimerRef.current); releaseTimerRef.current = null; }
+      releaseEsperaRef.current?.cancel(); releaseEsperaRef.current = null;
+    };
     const activateSalaActiva = () => {
-      if (releaseTimerRef.current) clearTimeout(releaseTimerRef.current);
+      cancelarLiberacion();
+      if (DBG_SECUENCIA.RELOJ_UNIFICADO) {
+        releaseEsperaRef.current = crearEspera(DBG_SILLAS.releaseDelayMs, () => { releaseEsperaRef.current = null; liberarSala(); });
+        return;
+      }
       releaseTimerRef.current = setTimeout(() => {
         releaseTimerRef.current = null;
-        seated.current = false;
-        INTERACT_STATE.movementLocked  = false;
-        INTERACT_STATE.experienceState = 'sala_activa';
-        window.dispatchEvent(new CustomEvent("alight:sala-activa"));
+        liberarSala();
       }, DBG_SILLAS.releaseDelayMs);
     };
     const onReveal = () => { activateSalaActiva(); };
@@ -241,14 +256,14 @@ function Player() {
 
     // N1 debug shortcuts (dispatched by DebugMenu buttons)
     const onSkip = () => {
-      if (releaseTimerRef.current) { clearTimeout(releaseTimerRef.current); releaseTimerRef.current = null; }
+      cancelarLiberacion(); cancelarSecuencia();   // Z39: también las esperas del reloj (liberación, mínimo, tope)
       seated.current = false;
       INTERACT_STATE.movementLocked  = false;
       INTERACT_STATE.experienceState = 'sala_activa';
       window.dispatchEvent(new CustomEvent("alight:sala-activa"));
     };
     const onReset = () => {
-      if (releaseTimerRef.current) { clearTimeout(releaseTimerRef.current); releaseTimerRef.current = null; }
+      cancelarLiberacion(); cancelarSecuencia();   // Z39
       seated.current = false;
       triggered.current = false;
       INTERACT_STATE.movementLocked  = false;
@@ -282,7 +297,7 @@ function Player() {
     window.addEventListener("alight:debug-skip-curtain",    onSkipCurtain);
     window.addEventListener("alight:debug-reset-curtain",   onResetCurtain);
     return () => {
-      if (releaseTimerRef.current) clearTimeout(releaseTimerRef.current);
+      cancelarLiberacion();   // Z39: timeout viejo y espera del reloj
       window.removeEventListener("alight:chose-chairs",          onSit);
       window.removeEventListener("alight:chose-light",           onLight);
       window.removeEventListener("alight:dome-revealed",         onReveal);

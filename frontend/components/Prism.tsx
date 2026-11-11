@@ -6,7 +6,8 @@ import * as THREE from "three";
 import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
 import { TARIMA_H } from "./Tarima";
 import { INTERACT_STATE } from "@/lib/alightStore";
-import { DBG_PRISM } from "@/lib/debugConfig";
+import { DBG_PRISM, DBG_SECUENCIA } from "@/lib/debugConfig";
+import { RELOJ, ahoraExp } from "@/lib/relojExperiencia"; // Z39
 
 const PRISM_Y_START   = 22;
 const PRISM_CONE_HALF = 0.9;
@@ -99,6 +100,7 @@ export default function Prism() {
   const active      = useRef(false);
   const needStart   = useRef(false);
   const startClock  = useRef(0);
+  const startExp    = useRef(0);   // Z39: inicio de la bajada en el reloj de la experiencia (s)
   const landedRef   = useRef(false);
   // S2: time-tracking for translucency ramp-up
   const nearSince   = useRef<number | null>(null);
@@ -124,10 +126,12 @@ export default function Prism() {
 
     if (needStart.current) {
       startClock.current = clock.elapsedTime;
+      startExp.current   = RELOJ.tExp;   // Z39
       needStart.current  = false;
     }
 
-    const elapsed = clock.elapsedTime - startClock.current;
+    // Z39: con RELOJ_UNIFICADO la bajada se mide con el reloj de la experiencia (se congela en la pausa)
+    const elapsed = DBG_SECUENCIA.RELOJ_UNIFICADO ? RELOJ.tExp - startExp.current : clock.elapsedTime - startClock.current;
     const prog    = Math.min(1, elapsed / DESCEND_DUR);
     const ease    = 1 - Math.pow(1 - prog, 3);
 
@@ -180,8 +184,9 @@ export default function Prism() {
 
     // Glass translucency ramp (PRISM_TRANSLUCENT_MS)
     if (dist < nearM && landedRef.current) {
-      if (nearSince.current === null) nearSince.current = performance.now();
-      const frac   = Math.min(1, (performance.now() - nearSince.current) / DBG_PRISM.translucentMs);
+      const ahoraP = DBG_SECUENCIA.RELOJ_UNIFICADO ? ahoraExp() : performance.now();   // Z39
+      if (nearSince.current === null) nearSince.current = ahoraP;
+      const frac   = Math.min(1, (ahoraP - nearSince.current) / DBG_PRISM.translucentMs);
       GLASS_MAT.opacity = 1.0 - frac * (1.0 - DBG_PRISM.translucentOpacity);
     } else {
       nearSince.current = null;

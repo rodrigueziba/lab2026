@@ -884,3 +884,12 @@ export const DBG_AMANECER = {
   AMANECER_DUR_S:     10,     // duración de la fase 1 (única). amanecerDurS / domeAmanecerDurS quedan para el modo viejo — live
   MONOLITOS_CAPTURA:  true,   // Monoliths captura el reflejo (envMap) con 'alight:dawn-complete' — live
 };
+
+// ── Z39: reloj único de la experiencia y secuencia SILLAS por eventos (lib/relojExperiencia.ts,
+// lib/secuenciaSillas.ts) ──
+export const DBG_SECUENCIA = {
+  RELOJ_UNIFICADO:  true,   // false = exactamente lo anterior (clock.elapsedTime, setTimeout, Date.now, performance.now) — live
+  TOPE_REVELADO_S:  14,     // tope de seguridad: dome-revealed igual a los N s de experiencia desde prism-landed — live
+  REVELADO_MIN_S:   9.8,    // dome-revealed nunca antes que esto (= el setTimeout de 9_800 ms de antes) — live
+  REVELADO_POR_S:   0.42,   // avance de uReveal por segundo (= 0.007 por frame × 60 fps) — live
+};

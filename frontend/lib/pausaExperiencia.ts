@@ -8,9 +8,15 @@
 //  - Música del visualizador (vizAudio): pausa el elemento y suspende el AudioContext.
 //  - Audio de los atriles (audioEngine): con su propio togglePlayPause (STORE.audio.paused),
 //    solo si estaba sonando; al volver se reanuda solo si lo pausó esta pausa.
-//  - Amaneceres U9 (HazSystem/VizPanorama) y W3 (domo): congelados con congelarAmaneceres(dt).
+//  - Amaneceres U9 (HazSystem/VizPanorama) y W3 (domo): congelados con congelarAmaneceres(dt) en el modo
+//    viejo (DBG_AMANECER.UNIFICADO=false). Z38: la máquina única (lib/amanecer.ts) no avanza con PAUSA.activa.
+//  - Z39: reloj de la experiencia (lib/relojExperiencia.ts, DBG_SECUENCIA.RELOJ_UNIFICADO): no avanza con
+//    PAUSA.activa, así que quedan congelados la bajada del prisma, el revelado escalonado de los paneles, la
+//    espera de liberación (releaseDelayMs), el mínimo y el tope de dome-revealed, los fundidos de los paneles
+//    y la linterna (con su acercamiento), y la translucidez del prisma por cercanía.
 // Qué sigue corriendo (sin estado narrativo, costo bajo): animaciones en bucle de shaders (uTime),
-// órbitas de paneles, giro del prisma, público, cámara web, tela del telón.
+// órbitas de paneles, giro del prisma, público, cámara web, tela del telón, envolventes de audio del
+// visualizador (dt), y con RELOJ_UNIFICADO=false los relojes viejos de Z37 (clock, setTimeout, Date.now).
 
 import { pausarVizAudio, reanudarVizAudio } from "@/lib/vizAudio";
 import { togglePlayPause } from "@/lib/audioEngine";
