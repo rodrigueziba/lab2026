@@ -25,7 +25,7 @@ import { moverConLimites } from "@/lib/caminoLuz"; // Z28: límites sala ∪ ext
 import { EFECTOS_STATE } from "@/lib/dialogo/efectosEstado"; // Z29: bloqueo de la zona TARIMA en juego_alarma
 import { posicionInicial, aplicarSpawn } from "@/lib/inicioEscena"; // Z24/Z25
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
-import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ } from "@/lib/debugConfig";
+import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV } from "@/lib/debugConfig";
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
@@ -324,7 +324,7 @@ function Player() {
     };
   }, []);
 
-  useFrame(({ camera: cam }) => {
+  useFrame(({ camera: cam }, dt) => {
     // Always write player position so Prism.tsx can compute proximity shader
     INTERACT_STATE.playerPos.x = cam.position.x;
     INTERACT_STATE.playerPos.y = cam.position.y;
@@ -378,7 +378,12 @@ function Player() {
     if (keys.current.d) dir.current.sub(side.current);
 
     if (dir.current.lengthSq() > 0) {
-      dir.current.normalize().multiplyScalar(0.12);
+      // Z34: antes 0.12 m por frame fijo (7,2 m/s a 60 fps, dependía de los fps). Ahora por delta de tiempo
+      // (DBG_MOV.POR_DELTA) × VELOCIDAD_FACTOR. POR_DELTA false + factor 1 = comportamiento anterior exacto.
+      const paso = DBG_MOV.POR_DELTA
+        ? DBG_MOV.VELOCIDAD_BASE_MS * Math.min(dt, DBG_MOV.DT_MAX_S)
+        : DBG_MOV.PASO_POR_FRAME_M;
+      dir.current.normalize().multiplyScalar(paso * DBG_MOV.VELOCIDAD_FACTOR);
       moverConLimites(cam.position, dir.current); // Z28: antes cam.position.add(dir) sin límites
     }
     cam.position.y = 1.6;

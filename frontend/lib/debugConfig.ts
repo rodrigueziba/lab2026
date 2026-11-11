@@ -881,3 +881,12 @@ export const DBG_EFECTOS = {
   ATRILES_DELAY_MS:      800,    // tras elegir TARIMA, se piden los atriles (alight:request-lecterns)
   AVISO_DESBLOQUEO_MS:   6000,   // aviso tenue "menú desbloqueado"
 };
+
+// ── Z34: velocidad de caminata (WASD) — Player de ThreeScene, único lugar donde se camina ──
+export const DBG_MOV = {
+  VELOCIDAD_FACTOR:  0.5,   // multiplica la caminata (1.0 = velocidad anterior) — live
+  POR_DELTA:         true,  // true = m/s × delta de tiempo (igual a 30 o 144 fps); false = paso fijo por frame (Z33 y antes) — live
+  VELOCIDAD_BASE_MS: 7.2,   // m/s con factor 1 (= 0.12 m/frame × 60 fps, el valor anterior a 60 fps) — live
+  PASO_POR_FRAME_M:  0.12,  // paso por frame del modo anterior (POR_DELTA false) — live
+  DT_MAX_S:          0.1,   // tope del delta: un tirón de frames no se convierte en un salto — live
+};

@@ -40,6 +40,7 @@ import {
   DBG_LUZ,
   DBG_DIAG_CIELO, // Z32 (temporal)
   DBG_EFECTOS, // Z29
+  DBG_MOV, // Z34
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -308,6 +309,7 @@ export default function DebugMenu() {
   const [premio, setPremio] = useState(() => leerPremio());
   const [avisoDesbloqueo, setAvisoDesbloqueo] = useState(false);
   const [efx, setEfx] = useState({ ...DBG_EFECTOS });
+  const [mov, setMov] = useState({ ...DBG_MOV });                          // Z34
   const [tab, setTab]         = useState<Tab>("SILLAS");
   const [spot,     setSpot]     = useState({ ...DBG_SPOTLIGHT });
   const [stars,    setStars]    = useState({ ...DBG_STARS });
@@ -1454,6 +1456,24 @@ export default function DebugMenu() {
           <NumField label="FADE_MS" value={piso.FADE_MS} step={50} min={0} max={5000} note="ms"
             onChange={v => { DBG_PISO_ICONOS.FADE_MS = v; setPiso(o => ({ ...o, FADE_MS: v })); }} />
 
+          <div style={DIVIDER} />
+          <span style={LABEL}>Movimiento Z34 <span style={NOTE}>(live)</span></span>
+          <NumField label="VELOCIDAD_FACTOR" value={mov.VELOCIDAD_FACTOR} step={0.05} min={0} max={3} note="× WASD (1 = anterior)"
+            onChange={v => { DBG_MOV.VELOCIDAD_FACTOR = v; setMov(o => ({ ...o, VELOCIDAD_FACTOR: v })); }} />
+          <div style={ROW}>
+            <span>POR_DELTA</span>
+            <button style={INPUT} onClick={() => {
+              const v = !mov.POR_DELTA;
+              DBG_MOV.POR_DELTA = v;
+              setMov(o => ({ ...o, POR_DELTA: v }));
+            }}>{mov.POR_DELTA ? "ON" : "off"}</button>
+          </div>
+          <NumField label="VELOCIDAD_BASE_MS" value={mov.VELOCIDAD_BASE_MS} step={0.1} min={0.1} max={30} note="m/s con factor 1"
+            onChange={v => { DBG_MOV.VELOCIDAD_BASE_MS = v; setMov(o => ({ ...o, VELOCIDAD_BASE_MS: v })); }} />
+          <NumField label="PASO_POR_FRAME_M" value={mov.PASO_POR_FRAME_M} step={0.01} min={0.01} max={1} note="m/frame (POR_DELTA off)"
+            onChange={v => { DBG_MOV.PASO_POR_FRAME_M = v; setMov(o => ({ ...o, PASO_POR_FRAME_M: v })); }} />
+          <NumField label="DT_MAX_S" value={mov.DT_MAX_S} step={0.01} min={0.01} max={1} note="s"
+            onChange={v => { DBG_MOV.DT_MAX_S = v; setMov(o => ({ ...o, DT_MAX_S: v })); }} />
           <div style={DIVIDER} />
           <span style={LABEL}>Efectos del diálogo Z29 <span style={NOTE}>(live)</span></span>
           <div style={{ ...ROW, ...NOTE }}>
