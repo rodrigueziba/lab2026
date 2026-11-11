@@ -26,9 +26,6 @@ export const LUZ_STATE = {
 /** Z30: estado del cielo estrellado (lo escribe CieloEstrellado, lo lee el menú de debug). */
 export const CIELO_STATE = { reveal: 0, aten: 1, objetivo: 0 };
 
-/** Z32: tabla del diagnóstico temporal del cielo (la escribe DiagnosticoCielo, la muestra el DebugMenu). */
-export const DIAG_CIELO = { tabla: "" };
-
 /** Recalcula la posición de la luz desde las constantes (barato, sin allocations). */
 export function actualizarPosLuz(): void {
   LUZ_STATE.y = DBG_LUZ.LUZ_ALTURA_M;

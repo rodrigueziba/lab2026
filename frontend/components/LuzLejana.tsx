@@ -19,7 +19,6 @@ import { INTERACT_STATE, isVizActivated } from "@/lib/alightStore";
 import { instalarPausa, tickPausa } from "@/lib/pausaExperiencia";
 import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado";
 import CieloEstrellado from "@/components/CieloEstrellado";   // Z30
-import DiagnosticoCielo from "@/components/DiagnosticoCielo"; // Z32
 import EfectosDialogo from "@/components/EfectosDialogo";     // Z29
 
 const ESTRELLAS_R = 400;   // radio de la esfera de estrellas (sigue a la cámara)
@@ -358,7 +357,6 @@ export default function LuzLejana() {
       {/* Z30: cielo estrellado procedural (reemplaza al Points; este queda tras ESTRELLAS_MODO_VIEJO) */}
       <CieloEstrellado />
       <EfectosDialogo />{/* Z29: efectos de los tags del diálogo (no depende de CAMINO_LUZ) */}
-      <DiagnosticoCielo />{/* Z32: diagnóstico temporal (inactivo salvo DBG_DIAG_CIELO.ACTIVO) */}
       {/* estrellas: un solo Points que sigue a la cámara; fondo (renderOrder bajo, sin profundidad) */}
       <points ref={estrellasRef} geometry={geoEstrellas} renderOrder={-2} frustumCulled={false} visible={false}>
         <shaderMaterial vertexShader={ESTRELLAS_VERT} fragmentShader={ESTRELLAS_FRAG} uniforms={ESTRELLAS_UNIFORMS}

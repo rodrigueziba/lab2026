@@ -848,21 +848,6 @@ export const DBG_LUZ = {
   PAUSA:               true,   // pausar la experiencia al salir del área — live
 };
 
-// ── Z32: diagnóstico TEMPORAL del cielo estrellado (panel plegado en el DebugMenu) ──
-// Con ACTIVO false no hace nada. Oculta superficies con material.visible (no pelea con los useFrame que
-// manejan object.visible) y publica una tabla de colores / renderOrder / transparencia / profundidad.
-export const DBG_DIAG_CIELO = {
-  ACTIVO:               false,
-  OCULTAR_CASCARON:     false,  // caparazón del domo original (domo-cascaron)
-  OCULTAR_CIELO_DOMO:   false,  // cielo/arte interior del domo (domo-cielo, DomeSky)
-  OCULTAR_TECHO:        false,  // room-ceiling
-  OCULTAR_PAREDES:      false,  // room-walls (las 4, incluidas las abiertas)
-  OCULTAR_PISO:         false,  // room-floor
-  OCULTAR_SUELO_EXT:    false,  // luz-suelo-exterior
-  SIN_FOG:              false,  // scene.fog = null (recompila materiales: solo para diagnóstico)
-  FONDO_TESTIGO:        false,  // scene.background magenta: muestra dónde se ve el fondo
-};
-
 // ── Z29: efectos del diálogo (lib/dialogo/efectosDialogo.ts) — todo live ──
 export const DBG_EFECTOS = {
   EFECTOS_DIALOGO:       true,   // false = los tags "# efecto:" no ejecutan nada (comportamiento Z28)
