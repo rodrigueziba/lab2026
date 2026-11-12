@@ -899,3 +899,10 @@ export const DBG_CHECKPOINTS = {
   HABILITADOS:    true,   // false = el menú y ?checkpoint= no hacen nada (el efecto de ink ir_checkpoint sigue) — live
   ADELANTO_S:     1.0,    // s de reloj de la experiencia que se adelantan por frame para llegar a sala_activa — live
 };
+
+// ── Z41: layout de sillas, zona SILLAS, público y monolitos (lib/layoutSala.ts) ──
+export const DBG_LAYOUT = {
+  POSICIONES_NUEVAS:  true,   // false = exactamente las posiciones anteriores (offsets ignorados) — live
+  SILLAS_OFFSET_M:    4,      // sillas + ZONA_SILLAS + público se alejan de la tarima (dirección tarima → sillas) — live
+  MONOLITOS_OFFSET_M: 3,      // cada monolito se aleja de la tarima en dirección radial (sobre monolithDistM) — live
+};

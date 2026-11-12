@@ -7,7 +7,8 @@
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS, DBG_AMANECER } from "@/lib/debugConfig"; // Z38
+import { DBG_SILLAS, DBG_AMANECER, DBG_LAYOUT } from "@/lib/debugConfig"; // Z38
+import { monolitoEn, monolitoDistM } from "@/lib/layoutSala"; // Z41
 import { setMonolithProximity } from "@/lib/vizAudio";
 import { createBasePlateTex } from "@/lib/retro/decals";
 
@@ -359,6 +360,11 @@ export default function Monoliths() {
   const rightLightRef  = useRef<THREE.SpotLight>(null);
   const leftGlowRef    = useRef<THREE.Mesh>(null);
   const rightGlowRef   = useRef<THREE.Mesh>(null);
+  // Z41: cada monolito y todo lo anclado a él (base, placa, pantalla, aro, luces) cuelga de su grupo
+  const leftGroupRef   = useRef<THREE.Group>(null);
+  const rightGroupRef  = useRef<THREE.Group>(null);
+  const posL = useMemo(() => ({ x: 0, z: 0 }), []);
+  const posR = useMemo(() => ({ x: 0, z: 0 }), []);
 
   // V2 point light refs — rendered only when monolithLucesPropias is true
   const lWA1 = useRef<THREE.PointLight>(null);
@@ -414,13 +420,7 @@ export default function Monoliths() {
   const leftUniforms  = useMemo(() => ({ uTime: { value: 0 }, uReveal: { value: 0 }, uAudio: { value: 0 }, uMode: { value: 0 } }), []);
   const rightUniforms = useMemo(() => ({ uTime: { value: 0 }, uReveal: { value: 0 }, uAudio: { value: 0 }, uMode: { value: 1 } }), []);
 
-  useEffect(() => {
-    const dist = DBG_SILLAS.monolithDistM;
-    leftTarget.position.set(-dist, 0, 0);
-    rightTarget.position.set(dist, 0, 0);
-    leftTarget.updateMatrixWorld();
-    rightTarget.updateMatrixWorld();
-  }, [leftTarget, rightTarget]);
+  // Z41: los targets de los spots se ubican cada frame junto con los grupos (ver useFrame)
 
   useEffect(() => {
     const onOff = () => { activeRef.current = false; };
@@ -473,6 +473,18 @@ export default function Monoliths() {
       rightBodyMat.envMap = newRT.texture;
       rightBodyMat.needsUpdate = true;
       if (prev) prev.dispose();
+    }
+
+    // Z41: posición radial desde el centro de la tarima (monolithDistM + DBG_LAYOUT.MONOLITOS_OFFSET_M), en vivo
+    monolitoEn(-1, DBG_SILLAS.monolithDistM, DBG_LAYOUT, posL);
+    monolitoEn( 1, DBG_SILLAS.monolithDistM, DBG_LAYOUT, posR);
+    if (leftGroupRef.current)  leftGroupRef.current.position.set(posL.x, 0, posL.z);
+    if (rightGroupRef.current) rightGroupRef.current.position.set(posR.x, 0, posR.z);
+    if (leftTarget.position.x !== posL.x || leftTarget.position.z !== posL.z) {
+      leftTarget.position.set(posL.x, 0, posL.z); leftTarget.updateMatrixWorld();
+    }
+    if (rightTarget.position.x !== posR.x || rightTarget.position.z !== posR.z) {
+      rightTarget.position.set(posR.x, 0, posR.z); rightTarget.updateMatrixWorld();
     }
 
     const t = clock.elapsedTime;
@@ -534,11 +546,11 @@ export default function Monoliths() {
       return;
     }
 
-    const dist = DBG_SILLAS.monolithDistM;
+    // Z41: cercanía medida a la posición real de cada monolito (antes ±monolithDistM, z = 0)
     const cx   = camera.position.x;
     const cz   = camera.position.z;
-    const dL   = Math.sqrt((cx + dist) ** 2 + cz * cz);
-    const dR   = Math.sqrt((cx - dist) ** 2 + cz * cz);
+    const dL   = Math.sqrt((cx - posL.x) ** 2 + (cz - posL.z) ** 2);
+    const dR   = Math.sqrt((cx - posR.x) ** 2 + (cz - posR.z) ** 2);
 
     const start = DBG_SILLAS.monolithProxStartM;
     const full  = DBG_SILLAS.monolithProxFullM;
@@ -548,8 +560,6 @@ export default function Monoliths() {
     setMonolithProximity(proxL * op, proxR * op);
     rightUniforms.uAudio.value = proxR * 0.6;
   });
-
-  const dist = DBG_SILLAS.monolithDistM;
 
   // V3: screen lives in the lower non-twisted section of the column
   const TWIST_INICIO = DBG_SILLAS.monolithTwistInicio;
@@ -576,73 +586,79 @@ export default function Monoliths() {
       <primitive object={leftTarget} />
       <primitive object={rightTarget} />
 
-      {/* S1: dedicated SpotLights */}
-      <spotLight ref={leftLightRef}  position={[-dist, lightY, 0]} target={leftTarget}  intensity={0} color="#9fe6ff" angle={0.32} penumbra={0.6} castShadow={false} />
-      <spotLight ref={rightLightRef} position={[ dist, lightY, 0]} target={rightTarget} intensity={0} color="#9fe6ff" angle={0.32} penumbra={0.6} castShadow={false} />
-
-      {/* V3: point lights — only rendered when monolithLucesPropias is on (default off) */}
-      {DBG_SILLAS.monolithLucesPropias && <>
-        <pointLight ref={lWA1} position={[-dist + 1.1, 2.4, -0.4]} color="#FF9A1F" intensity={0} distance={7} decay={2} castShadow={false} />
-        <pointLight ref={lWA2} position={[-dist + 1.0, 0.7, -0.3]} color="#FF9A1F" intensity={0} distance={5} decay={2} castShadow={false} />
-        <pointLight ref={lWC}  position={[-dist - 0.4, 1.8,  0.5]} color="#4A90E2" intensity={0} distance={6} decay={2} castShadow={false} />
-        <pointLight ref={rWA1} position={[ dist - 1.1, 2.4, -0.4]} color="#FF9A1F" intensity={0} distance={7} decay={2} castShadow={false} />
-        <pointLight ref={rWA2} position={[ dist - 1.0, 0.7, -0.3]} color="#FF9A1F" intensity={0} distance={5} decay={2} castShadow={false} />
-        <pointLight ref={rWC}  position={[ dist + 0.4, 1.8,  0.5]} color="#4A90E2" intensity={0} distance={6} decay={2} castShadow={false} />
-      </>}
-
+      {/* Z41: grupos en (±(monolithDistM + MONOLITOS_OFFSET_M), 0); hijos en coordenadas locales (antes x = ±dist) */}
       {/* Left monolith — image channel */}
-      {/* V3: mesh at y=0; geometry spans from y=0 (base bottom) to y=H (top) */}
-      <mesh ref={leftBodyRef} position={[-dist, 0, 0]}>
-        <primitive object={leftBodyGeom} attach="geometry" />
-        <primitive object={leftBodyMat}  attach="material" />
-      </mesh>
-      {/* V3: separate base box mesh, same material instance (opacity follows) */}
-      {!DBG_SILLAS.monolithUseConchoidal && (
-        <mesh position={[-dist, BASE_H * 0.5, 0]}>
-          <boxGeometry args={[BASE_SIDE, BASE_H, BASE_SIDE]} />
-          <primitive object={leftBodyMat} attach="material" />
+      <group ref={leftGroupRef} position={[-monolitoDistM(DBG_SILLAS.monolithDistM, DBG_LAYOUT), 0, 0]}>
+        {/* S1: dedicated SpotLight */}
+        <spotLight ref={leftLightRef} position={[0, lightY, 0]} target={leftTarget} intensity={0} color="#9fe6ff" angle={0.32} penumbra={0.6} castShadow={false} />
+        {/* V3: point lights — only rendered when monolithLucesPropias is on (default off) */}
+        {DBG_SILLAS.monolithLucesPropias && <>
+          <pointLight ref={lWA1} position={[ 1.1, 2.4, -0.4]} color="#FF9A1F" intensity={0} distance={7} decay={2} castShadow={false} />
+          <pointLight ref={lWA2} position={[ 1.0, 0.7, -0.3]} color="#FF9A1F" intensity={0} distance={5} decay={2} castShadow={false} />
+          <pointLight ref={lWC}  position={[-0.4, 1.8,  0.5]} color="#4A90E2" intensity={0} distance={6} decay={2} castShadow={false} />
+        </>}
+        {/* V3: mesh at y=0; geometry spans from y=0 (base bottom) to y=H (top) */}
+        <mesh ref={leftBodyRef}>
+          <primitive object={leftBodyGeom} attach="geometry" />
+          <primitive object={leftBodyMat}  attach="material" />
         </mesh>
-      )}
-      {R5_MONOLITH_RETRO && plateMat && (
-        <mesh position={[-dist, PLATE_H_PLATE * 0.5, -BASE_SIDE * 0.5 + 0.001]}>
-          <boxGeometry args={[PLATE_W, PLATE_H_PLATE, PLATE_D_DEPTH]} />
-          <primitive object={plateMat} attach="material" />
+        {/* V3: separate base box mesh, same material instance (opacity follows) */}
+        {!DBG_SILLAS.monolithUseConchoidal && (
+          <mesh position={[0, BASE_H * 0.5, 0]}>
+            <boxGeometry args={[BASE_SIDE, BASE_H, BASE_SIDE]} />
+            <primitive object={leftBodyMat} attach="material" />
+          </mesh>
+        )}
+        {R5_MONOLITH_RETRO && plateMat && (
+          <mesh position={[0, PLATE_H_PLATE * 0.5, -BASE_SIDE * 0.5 + 0.001]}>
+            <boxGeometry args={[PLATE_W, PLATE_H_PLATE, PLATE_D_DEPTH]} />
+            <primitive object={plateMat} attach="material" />
+          </mesh>
+        )}
+        <mesh ref={leftScreenRef} position={[0, screenCenterY, screenZ]}>
+          <planeGeometry args={[screenW, screenH]} />
+          <shaderMaterial uniforms={leftUniforms} vertexShader={SCREEN_VERT} fragmentShader={SCREEN_FRAG} transparent depthWrite={false} side={THREE.FrontSide} />
         </mesh>
-      )}
-      <mesh ref={leftScreenRef} position={[-dist, screenCenterY, screenZ]}>
-        <planeGeometry args={[screenW, screenH]} />
-        <shaderMaterial uniforms={leftUniforms} vertexShader={SCREEN_VERT} fragmentShader={SCREEN_FRAG} transparent depthWrite={false} side={THREE.FrontSide} />
-      </mesh>
-      <mesh ref={leftGlowRef} position={[-dist, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[1.2, 32]} />
-        <primitive object={glowMat} attach="material" />
-      </mesh>
+        {/* aro del piso */}
+        <mesh ref={leftGlowRef} position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[1.2, 32]} />
+          <primitive object={glowMat} attach="material" />
+        </mesh>
+      </group>
 
       {/* Right monolith — sound channel */}
-      <mesh ref={rightBodyRef} position={[dist, 0, 0]}>
-        <primitive object={rightBodyGeom} attach="geometry" />
-        <primitive object={rightBodyMat}  attach="material" />
-      </mesh>
-      {!DBG_SILLAS.monolithUseConchoidal && (
-        <mesh position={[dist, BASE_H * 0.5, 0]}>
-          <boxGeometry args={[BASE_SIDE, BASE_H, BASE_SIDE]} />
-          <primitive object={rightBodyMat} attach="material" />
+      <group ref={rightGroupRef} position={[monolitoDistM(DBG_SILLAS.monolithDistM, DBG_LAYOUT), 0, 0]}>
+        <spotLight ref={rightLightRef} position={[0, lightY, 0]} target={rightTarget} intensity={0} color="#9fe6ff" angle={0.32} penumbra={0.6} castShadow={false} />
+        {DBG_SILLAS.monolithLucesPropias && <>
+          <pointLight ref={rWA1} position={[-1.1, 2.4, -0.4]} color="#FF9A1F" intensity={0} distance={7} decay={2} castShadow={false} />
+          <pointLight ref={rWA2} position={[-1.0, 0.7, -0.3]} color="#FF9A1F" intensity={0} distance={5} decay={2} castShadow={false} />
+          <pointLight ref={rWC}  position={[ 0.4, 1.8,  0.5]} color="#4A90E2" intensity={0} distance={6} decay={2} castShadow={false} />
+        </>}
+        <mesh ref={rightBodyRef}>
+          <primitive object={rightBodyGeom} attach="geometry" />
+          <primitive object={rightBodyMat}  attach="material" />
         </mesh>
-      )}
-      {R5_MONOLITH_RETRO && plateMat && (
-        <mesh position={[dist, PLATE_H_PLATE * 0.5, -BASE_SIDE * 0.5 + 0.001]}>
-          <boxGeometry args={[PLATE_W, PLATE_H_PLATE, PLATE_D_DEPTH]} />
-          <primitive object={plateMat} attach="material" />
+        {!DBG_SILLAS.monolithUseConchoidal && (
+          <mesh position={[0, BASE_H * 0.5, 0]}>
+            <boxGeometry args={[BASE_SIDE, BASE_H, BASE_SIDE]} />
+            <primitive object={rightBodyMat} attach="material" />
+          </mesh>
+        )}
+        {R5_MONOLITH_RETRO && plateMat && (
+          <mesh position={[0, PLATE_H_PLATE * 0.5, -BASE_SIDE * 0.5 + 0.001]}>
+            <boxGeometry args={[PLATE_W, PLATE_H_PLATE, PLATE_D_DEPTH]} />
+            <primitive object={plateMat} attach="material" />
+          </mesh>
+        )}
+        <mesh ref={rightScreenRef} position={[0, screenCenterY, screenZ]}>
+          <planeGeometry args={[screenW, screenH]} />
+          <shaderMaterial uniforms={rightUniforms} vertexShader={SCREEN_VERT} fragmentShader={SCREEN_FRAG} transparent depthWrite={false} side={THREE.FrontSide} />
         </mesh>
-      )}
-      <mesh ref={rightScreenRef} position={[dist, screenCenterY, screenZ]}>
-        <planeGeometry args={[screenW, screenH]} />
-        <shaderMaterial uniforms={rightUniforms} vertexShader={SCREEN_VERT} fragmentShader={SCREEN_FRAG} transparent depthWrite={false} side={THREE.FrontSide} />
-      </mesh>
-      <mesh ref={rightGlowRef} position={[dist, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[1.2, 32]} />
-        <primitive object={glowMat} attach="material" />
-      </mesh>
+        <mesh ref={rightGlowRef} position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[1.2, 32]} />
+          <primitive object={glowMat} attach="material" />
+        </mesh>
+      </group>
     </>
   );
 }

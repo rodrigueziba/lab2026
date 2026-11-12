@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { createWornPaintTex, createStripeBandTex } from "@/lib/retro/decals";
+import { DBG_LAYOUT } from "@/lib/debugConfig";
+import { SILLAS_BASE, desplazamientoSillasEn } from "@/lib/layoutSala"; // Z41
 
-export const CHAIR_Z = -3; // G2: 1 m más lejos de la tarima (era -2)
+export const CHAIR_Z = SILLAS_BASE.z; // G2: 1 m más lejos de la tarima (era -2). Z41: base; el offset lo aplica el grupo
 
-const POSITIONS_X = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5];
+const POSITIONS_X = SILLAS_BASE.xs; // Z41: misma fuente que el público (lib/layoutSala.ts)
+// Z41: desplazamiento en vivo del bloque (DBG_LAYOUT.SILLAS_OFFSET_M), reutilizado
+const _desp = { x: 0, z: 0 };
 const LEGS: [number, number][] = [[-0.2, -0.2], [-0.2, 0.2], [0.2, -0.2], [0.2, 0.2]];
 
 // R5: flag to toggle retro styling; legacy colors preserved below
@@ -61,11 +65,12 @@ function getUnitTex(idx: number): THREE.CanvasTexture {
 }
 
 function ChairRetro({ x, idx }: { x: number; idx: number }) {
-  const { scene } = useThree();
+  const groupRef = useRef<THREE.Group>(null);   // Z41: la banda cuelga de la silla (se mueve con el grupo)
   const addedRef = useRef(false);
 
   useEffect(() => {
-    if (addedRef.current) return;
+    const g = groupRef.current;
+    if (addedRef.current || !g) return;
     addedRef.current = true;
 
     const { stripe } = getChairMats();
@@ -76,21 +81,23 @@ function ChairRetro({ x, idx }: { x: number; idx: number }) {
       stripe,
     );
     // backrest front face at z = -0.21 − 0.02 = -0.23 (just in front)
-    sPlane.position.set(x, 1.02, CHAIR_Z - 0.23 - 0.001);
-    scene.add(sPlane);
+    // Z41: coordenadas locales de la silla (antes absolutas: x, 1.02, CHAIR_Z − 0.231 en la escena)
+    sPlane.position.set(0, 1.02, -0.23 - 0.001);
+    g.add(sPlane);
 
     return () => {
-      scene.remove(sPlane);
+      addedRef.current = false;
+      g.remove(sPlane);
       (sPlane.geometry as THREE.PlaneGeometry).dispose();
     };
-  }, [scene, x]);
+  }, [x]);
 
   const { body, leg } = getChairMats();
   const unitTex = getUnitTex(idx);
   const unitMat = new THREE.MeshStandardMaterial({ map: unitTex, roughness: 0.9, metalness: 0 });
 
   return (
-    <group position={[x, 0, CHAIR_Z]}>
+    <group ref={groupRef} position={[x, 0, CHAIR_Z]}>
       {/* seat — unit number on top */}
       <mesh position={[0, 0.44, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.48, 0.05, 0.46]} />
@@ -153,8 +160,16 @@ function ChairLegacy({ x }: { x: number }) {
 }
 
 export default function Chairs() {
+  const bloqueRef = useRef<THREE.Group>(null);
+  // Z41: todo el bloque se corre en la dirección tarima → sillas (en vivo; 0 / POSICIONES_NUEVAS=false = antes)
+  useFrame(() => {
+    const b = bloqueRef.current;
+    if (!b) return;
+    desplazamientoSillasEn(DBG_LAYOUT, _desp);
+    b.position.set(_desp.x, 0, _desp.z);
+  });
   return (
-    <group>
+    <group ref={bloqueRef}>
       {POSITIONS_X.map((x, idx) =>
         R5_CHAIRS_RETRO
           ? <ChairRetro key={x} x={x} idx={idx} />

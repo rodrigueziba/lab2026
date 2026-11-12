@@ -43,6 +43,7 @@ import {
   DBG_AMANECER, // Z38
   DBG_SECUENCIA, // Z39
   DBG_CHECKPOINTS, // Z40
+  DBG_LAYOUT, // Z41
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -319,6 +320,7 @@ export default function DebugMenu() {
   const [amn, setAmn] = useState({ ...DBG_AMANECER });                     // Z38
   const [sec, setSec] = useState({ ...DBG_SECUENCIA });                    // Z39
   const [ckf, setCkf] = useState({ ...DBG_CHECKPOINTS });                  // Z40
+  const [lay, setLay] = useState({ ...DBG_LAYOUT });                       // Z41
   const [tab, setTab]         = useState<Tab>("SILLAS");
   const [spot,     setSpot]     = useState({ ...DBG_SPOTLIGHT });
   const [stars,    setStars]    = useState({ ...DBG_STARS });
@@ -1497,6 +1499,27 @@ export default function DebugMenu() {
           </div>
           <NumField label="ADELANTO_S" value={ckf.ADELANTO_S} step={0.25} min={0.05} max={5} note="s de reloj por frame (sala_activa)"
             onChange={v => { DBG_CHECKPOINTS.ADELANTO_S = v; setCkf(o => ({ ...o, ADELANTO_S: v })); }} />
+          <div style={DIVIDER} />
+          {/* Z41: layout de sillas / zona SILLAS / público y monolitos (lib/layoutSala.ts) — todo en vivo */}
+          <span style={LABEL}>Layout Z41 <span style={NOTE}>(sillas, zona SILLAS, público, monolitos · live)</span></span>
+          <div style={ROW}>
+            <span>POSICIONES_NUEVAS <span style={NOTE}>off = posiciones anteriores</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !lay.POSICIONES_NUEVAS;
+              DBG_LAYOUT.POSICIONES_NUEVAS = v;
+              setLay(o => ({ ...o, POSICIONES_NUEVAS: v }));
+            }}>{lay.POSICIONES_NUEVAS ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>SILLAS_OFFSET_M <span style={NOTE}>{lay.SILLAS_OFFSET_M.toFixed(2)} m</span></span>
+            <input type="range" min={0} max={12} step={0.05} style={{ flex: 1 }} value={lay.SILLAS_OFFSET_M}
+              onChange={e => { const v = parseFloat(e.target.value); DBG_LAYOUT.SILLAS_OFFSET_M = v; setLay(o => ({ ...o, SILLAS_OFFSET_M: v })); }} />
+          </div>
+          <div style={ROW}>
+            <span>MONOLITOS_OFFSET_M <span style={NOTE}>{lay.MONOLITOS_OFFSET_M.toFixed(2)} m</span></span>
+            <input type="range" min={0} max={10} step={0.05} style={{ flex: 1 }} value={lay.MONOLITOS_OFFSET_M}
+              onChange={e => { const v = parseFloat(e.target.value); DBG_LAYOUT.MONOLITOS_OFFSET_M = v; setLay(o => ({ ...o, MONOLITOS_OFFSET_M: v })); }} />
+          </div>
           <div style={DIVIDER} />
           <span style={LABEL}>Reloj de la experiencia Z39 <span style={NOTE}>(live)</span></span>
           <div style={{ ...ROW, ...NOTE }}>

@@ -25,9 +25,10 @@ import { moverConLimites } from "@/lib/caminoLuz"; // Z28: límites sala ∪ ext
 import { EFECTOS_STATE } from "@/lib/dialogo/efectosEstado"; // Z29: bloqueo de la zona TARIMA en juego_alarma
 import { posicionInicial, aplicarSpawn } from "@/lib/inicioEscena"; // Z24/Z25
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
-import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV, DBG_SECUENCIA } from "@/lib/debugConfig";
+import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV, DBG_SECUENCIA, DBG_LAYOUT } from "@/lib/debugConfig";
 import { crearEspera, type Espera } from "@/lib/relojExperiencia"; // Z39
 import { cancelarSecuencia } from "@/lib/secuenciaSillas"; // Z39
+import { ZONA_TARIMA, ZONA_SILLAS_BASE, zonaSillasEn } from "@/lib/layoutSala"; // Z41
 import { BIG_MESH_DATA } from "@/lib/bigMeshData";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { prepareVizAudio, VIZ_AUDIO_DEBUG, VIZ_EFFECTS_DEBUG } from "@/lib/vizAudio";
@@ -36,8 +37,9 @@ import dynamic from "next/dynamic";
 const RetroPostFX = dynamic(() => import("@/components/RetroPostFX"), { ssr: false });
 const DialogoTerminal = dynamic(() => import("@/components/DialogoTerminal"), { ssr: false }); // Z27
 
-const ZONA_LUZ    = new THREE.Vector3(0, 1.6,  0);
-const ZONA_SILLAS = new THREE.Vector3(0, 1.6, -6); // G2: 1 m further
+// Z41: zonas desde lib/layoutSala.ts. ZONA_SILLAS se corre en vivo con las sillas (DBG_LAYOUT.SILLAS_OFFSET_M)
+const ZONA_LUZ    = new THREE.Vector3(ZONA_TARIMA.x, 1.6, ZONA_TARIMA.z);
+const ZONA_SILLAS = new THREE.Vector3(ZONA_SILLAS_BASE.x, 1.6, ZONA_SILLAS_BASE.z); // G2: 1 m further
 
 // ── F1: SILLAS visualizer activation — T1: moved to alightStore.activateVisualizerOnce() ──
 // _vizActivated / activateVisualizer / deactivateVisualizer were here; removed in T1.
@@ -406,10 +408,11 @@ function Player() {
     // N6: zone choices blocked until player has passed the curtain
     // Z29: durante juego_alarma la zona TARIMA no dispara ("tocar la tarima" es otra cosa)
     if (!triggered.current && INTERACT_STATE.experienceState !== 'cortina' && !EFECTOS_STATE.bloqueaZonaTarima) {
-      if (cam.position.distanceTo(ZONA_LUZ) < 2.5) {
+      zonaSillasEn(DBG_LAYOUT, ZONA_SILLAS);   // Z41: escribe x/z en el mismo Vector3 (sin allocations)
+      if (cam.position.distanceTo(ZONA_LUZ) < ZONA_TARIMA.radio) {
         triggered.current = true;
         window.dispatchEvent(new CustomEvent("alight:chose-light"));
-      } else if (cam.position.distanceTo(ZONA_SILLAS) < 2.5) {
+      } else if (cam.position.distanceTo(ZONA_SILLAS) < ZONA_SILLAS_BASE.radio) {
         triggered.current = true;
         window.dispatchEvent(new CustomEvent("alight:chose-chairs"));
         window.dispatchEvent(new CustomEvent("activar-prisma"));

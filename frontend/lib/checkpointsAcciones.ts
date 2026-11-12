@@ -13,7 +13,7 @@
 
 import * as THREE from "three";
 import type { Accion } from "@/lib/checkpoints";
-import { DBG_SECUENCIA, DBG_CHECKPOINTS } from "@/lib/debugConfig";
+import { DBG_SECUENCIA, DBG_CHECKPOINTS, DBG_LAYOUT } from "@/lib/debugConfig";
 import { aplicarSpawn, EJE_TELON } from "@/lib/inicioEscena";
 import { cerrarDialogo, DIALOGO_STATE } from "@/lib/dialogo/dialogoEstado";
 import { EFECTOS_STATE, guardarPremio } from "@/lib/dialogo/efectosEstado";
@@ -33,6 +33,7 @@ import { resetLinterna } from "@/lib/linternaPaneles";
 import { resetFoco } from "@/lib/focoSubpanel";
 import { LUZ_STATE, actualizarPosLuz } from "@/lib/caminoLuz";
 import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
+import { ZONA_TARIMA, zonaSillasEn, centroSillasEn } from "@/lib/layoutSala"; // Z41
 
 /** Montajes del anfitrión (CheckpointsHost): el paso "remontar" espera uno nuevo. */
 export const HOST = { montajes: 0, frames: 0 };
@@ -112,6 +113,14 @@ function limpiezaBase(): void {
   STORE.lights.globalIntensity = 1.0;
 }
 
+// Z41: zonas desde lib/layoutSala.ts (siguen a DBG_LAYOUT), salidas reutilizadas
+const _zona = { x: 0, z: 0 };
+const _sillas = { x: 0, z: 0 };
+/** En el centro de ZONA_SILLAS mirando a la tarima (la zona del Player dispara chose-chairs). */
+function irAZonaSillas(): void { zonaSillasEn(DBG_LAYOUT, _zona); colocar(_zona.x, _zona.z, ZONA_TARIMA.x, ZONA_TARIMA.z); }
+/** Sobre la tarima (ZONA_LUZ) mirando a las sillas. */
+function irAZonaTarima(): void { centroSillasEn(DBG_LAYOUT, _sillas); colocar(ZONA_TARIMA.x, ZONA_TARIMA.z, _sillas.x, _sillas.z); }
+
 let _montajesAntes = 0;
 let _amanecerEmitido = false;
 
@@ -138,9 +147,9 @@ export const ACCIONES_CHECKPOINT: Record<string, Accion> = {
   cruzarTelon: () => { window.dispatchEvent(new CustomEvent("alight:debug-skip-curtain")); return true; },
 
   // la zona ZONA_SILLAS del Player dispara chose-chairs + activar-prisma (flujo real)
-  irASillas: () => { colocar(0, -6, 0, 0); return true; },
+  irASillas: () => { irAZonaSillas(); return true; },
   // la zona ZONA_LUZ del Player dispara chose-light
-  irATarima: () => { colocar(0, 0, 0, -6); return true; },
+  irATarima: () => { irAZonaTarima(); return true; },
 
   esperarEvento: (p, ctx) => {
     const nombre = String(p[1]);
@@ -192,7 +201,7 @@ export const ACCIONES_CHECKPOINT: Record<string, Accion> = {
   premio: () => {
     guardarPremio();
     EFECTOS_STATE.bloqueaZonaTarima = true;
-    colocar(0, 0, 0, -6);
+    irAZonaTarima();
     window.dispatchEvent(new CustomEvent("alight:premio-otorgado"));
     return true;
   },

@@ -92,7 +92,9 @@ export function useFaceTracking() {
       FACE_TEX_REF.value = null;
       if (captureTimer.current) clearTimeout(captureTimer.current);
       if (rafIdRef.current)     cancelAnimationFrame(rafIdRef.current);
-      landmarkerRef.current?.close().catch(() => {});
+      // Z41: close() de MediaPipe no devuelve promesa → `.catch` sobre undefined tiraba abajo todo el árbol
+      // al desmontar (checkpoint que sale de TARIMA con la webcam iniciada)
+      try { void Promise.resolve(landmarkerRef.current?.close()).catch(() => {}); } catch { /* ya cerrado */ }
     };
   }, []);
 

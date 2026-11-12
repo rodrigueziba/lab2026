@@ -4,13 +4,16 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useFaceTracking } from "@/hooks/useFaceTracking";
-import { CHAIR_Z } from "./Chairs";
-import { PEOPLE_MIN_DELAY_MS } from "@/lib/debugConfig";
+import { PEOPLE_MIN_DELAY_MS, DBG_LAYOUT } from "@/lib/debugConfig";
+import { SILLAS_BASE, PUBLICO_INICIO_Z_BASE, asientoPublicoEn, inicioPublicoEn } from "@/lib/layoutSala"; // Z41
 import { EFECTOS_STATE } from "@/lib/dialogo/efectosEstado"; // Z29: ir_tarima_sin_publico
 
 // ── Layout ────────────────────────────────────────────────────────────────────
-const CHAIR_X  = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5] as const;
-const START_Z  = -20;
+// Z41: asientos y entrada derivados de lib/layoutSala.ts (las mismas constantes que Chairs.tsx)
+const CHAIR_X  = SILLAS_BASE.xs;
+const START_Z  = PUBLICO_INICIO_Z_BASE;
+const _asiento = { x: 0, z: 0 };   // Z41: salidas reutilizadas (sin allocations por frame)
+const _inicio  = { x: 0, z: 0 };
 const HIP_Y    = 0.78;
 const SIT_ROOT = 0.465 + 0.06 - HIP_Y;  // ≈ -0.255
 
@@ -222,6 +225,9 @@ function StickFigure({ index, activatedRef }: FigureProps) {
 
     const t  = clock.getElapsedTime();
     const pe = elapsed - phaseStart.current;
+    // Z41: asiento = el de la silla `index` (DBG_LAYOUT, en vivo); entrada corrida el mismo vector
+    asientoPublicoEn(index, DBG_LAYOUT, _asiento);
+    inicioPublicoEn(index, DBG_LAYOUT, _inicio);
 
     if (phase.current === "hidden") {
       phase.current        = "walking";
@@ -233,7 +239,8 @@ function StickFigure({ index, activatedRef }: FigureProps) {
       const prog = Math.min(1, pe / p.walkDur);
       const ease = 1 - Math.pow(1 - prog, 3);
 
-      root.current.position.z = THREE.MathUtils.lerp(START_Z, CHAIR_Z, ease);
+      root.current.position.x = THREE.MathUtils.lerp(_inicio.x, _asiento.x, ease);
+      root.current.position.z = THREE.MathUtils.lerp(_inicio.z, _asiento.z, ease);
       root.current.position.y = prog < 0.92
         ? Math.abs(Math.sin(t * 5.5 + index * 1.1)) * 0.032
         : 0;
@@ -253,7 +260,8 @@ function StickFigure({ index, activatedRef }: FigureProps) {
       const prog = Math.min(1, pe / p.sitDur);
       const ease = 1 - Math.pow(1 - prog, 2);
 
-      root.current.position.z = CHAIR_Z;
+      root.current.position.x = _asiento.x;
+      root.current.position.z = _asiento.z;
       root.current.position.y = THREE.MathUtils.lerp(0, SIT_ROOT, ease);
 
       if (lHip.current)  lHip.current.rotation.x  = THREE.MathUtils.lerp(0,  1.46, ease);
@@ -269,6 +277,8 @@ function StickFigure({ index, activatedRef }: FigureProps) {
     }
 
     if (phase.current === "disapproving") {
+      root.current.position.x = _asiento.x;   // Z41: sigue a la silla si el offset cambia en vivo
+      root.current.position.z = _asiento.z;
       // Solo cabeza: movimiento de desaprobación sutil. Brazos quietos (CrossedArms es estático).
       if (headG.current) {
         headG.current.rotation.y = Math.sin(pe * p.headSpeed + p.headPhase) * 0.52;
