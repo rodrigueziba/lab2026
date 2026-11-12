@@ -882,7 +882,7 @@ export const DBG_MOV = {
 export const DBG_AMANECER = {
   UNIFICADO:          true,   // false = las dos máquinas viejas (U9 alightStore + W3) exactamente como antes — live
   AMANECER_DUR_S:     10,     // duración de la fase 1 (única). amanecerDurS / domeAmanecerDurS quedan para el modo viejo — live
-  MONOLITOS_CAPTURA:  true,   // Monoliths captura el reflejo (envMap) con 'alight:dawn-complete' — live
+  MONOLITOS_CAPTURA:  false,  // Z40: false (era true) — la captura produce 1–3 s de colores falsos en toda la pantalla al completarse el amanecer — live
 };
 
 // ── Z39: reloj único de la experiencia y secuencia SILLAS por eventos (lib/relojExperiencia.ts,
@@ -892,4 +892,10 @@ export const DBG_SECUENCIA = {
   TOPE_REVELADO_S:  14,     // tope de seguridad: dome-revealed igual a los N s de experiencia desde prism-landed — live
   REVELADO_MIN_S:   9.8,    // dome-revealed nunca antes que esto (= el setTimeout de 9_800 ms de antes) — live
   REVELADO_POR_S:   0.42,   // avance de uReveal por segundo (= 0.007 por frame × 60 fps) — live
+};
+
+// ── Z40: checkpoints de la experiencia (lib/checkpoints.ts) ──
+export const DBG_CHECKPOINTS = {
+  HABILITADOS:    true,   // false = el menú y ?checkpoint= no hacen nada (el efecto de ink ir_checkpoint sigue) — live
+  ADELANTO_S:     1.0,    // s de reloj de la experiencia que se adelantan por frame para llegar a sala_activa — live
 };

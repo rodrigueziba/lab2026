@@ -21,6 +21,7 @@ import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado";
 import CieloEstrellado from "@/components/CieloEstrellado";   // Z30
 import EfectosDialogo from "@/components/EfectosDialogo";     // Z29
 import AmanecerReloj from "@/components/AmanecerReloj";       // Z38
+import CheckpointsHost from "@/components/CheckpointsHost";   // Z40
 
 const ESTRELLAS_R = 400;   // radio de la esfera de estrellas (sigue a la cámara)
 const DOMO_EXT_R  = 30;    // caparazón del domo (DOME_R + 2 en ExperienceDome)
@@ -358,6 +359,7 @@ export default function LuzLejana() {
       {/* Z30: cielo estrellado procedural (reemplaza al Points; este queda tras ESTRELLAS_MODO_VIEJO) */}
       <CieloEstrellado />
       <AmanecerReloj />{/* Z38: reloj único del amanecer */}
+      <CheckpointsHost />{/* Z40: ejecutor de checkpoints */}
       <EfectosDialogo />{/* Z29: efectos de los tags del diálogo (no depende de CAMINO_LUZ) */}
       {/* estrellas: un solo Points que sigue a la cámara; fondo (renderOrder bajo, sin profundidad) */}
       <points ref={estrellasRef} geometry={geoEstrellas} renderOrder={-2} frustumCulled={false} visible={false}>

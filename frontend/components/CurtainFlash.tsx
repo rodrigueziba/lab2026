@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
 import { FLASH_STATE, triggerCurtainFlash, tickCurtainFlash } from "@/lib/curtainFlash";
 import { DBG_FLASH } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
+import { CK_STATE } from "@/lib/checkpoints"; // Z40
 
 export default function CurtainFlash() {
   const divRef = useRef<HTMLDivElement>(null);
@@ -33,7 +34,8 @@ export default function CurtainFlash() {
       if (!triggerCurtainFlash(origen)) return;
       if (!raf) raf = requestAnimationFrame(loop);
     };
-    const onPassed = () => start("cortina");
+    // Z40: un checkpoint teletransporta la cámara a través del plano del telón: no es un cruce, sin destello
+    const onPassed = () => { if (CK_STATE.fase !== "aplicando") start("cortina"); };
     const onDebug  = () => start("debug");
 
     window.addEventListener("alight:curtain-passed",       onPassed);

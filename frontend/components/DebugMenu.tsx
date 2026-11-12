@@ -42,6 +42,7 @@ import {
   DBG_MOV, // Z34
   DBG_AMANECER, // Z38
   DBG_SECUENCIA, // Z39
+  DBG_CHECKPOINTS, // Z40
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -61,6 +62,7 @@ import { PAUSA } from "@/lib/pausaExperiencia"; // Z28
 import { AMANECER } from "@/lib/amanecer"; // Z38
 import { RELOJ, esperasPendientes } from "@/lib/relojExperiencia"; // Z39
 import { SECUENCIA } from "@/lib/secuenciaSillas"; // Z39
+import { CHECKPOINTS, CK_STATE, irACheckpoint } from "@/lib/checkpoints"; // Z40
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
 
 type Tab = "SILLAS" | "TARIMA";
@@ -316,6 +318,7 @@ export default function DebugMenu() {
   const [mov, setMov] = useState({ ...DBG_MOV });                          // Z34
   const [amn, setAmn] = useState({ ...DBG_AMANECER });                     // Z38
   const [sec, setSec] = useState({ ...DBG_SECUENCIA });                    // Z39
+  const [ckf, setCkf] = useState({ ...DBG_CHECKPOINTS });                  // Z40
   const [tab, setTab]         = useState<Tab>("SILLAS");
   const [spot,     setSpot]     = useState({ ...DBG_SPOTLIGHT });
   const [stars,    setStars]    = useState({ ...DBG_STARS });
@@ -1462,6 +1465,39 @@ export default function DebugMenu() {
             onChange={v => { DBG_PISO_ICONOS.FADE_MS = v; setPiso(o => ({ ...o, FADE_MS: v })); }} />
 
           <div style={DIVIDER} />
+          {/* Z40: checkpoints — un botón por punto; el actual (o el que se está aplicando) resaltado */}
+          <span style={LABEL}>Checkpoints Z40 <span style={NOTE}>(salto limpio desde cualquier estado)</span></span>
+          <div style={{ ...ROW, ...NOTE }}>
+            <span>{CK_STATE.fase === "aplicando" ? `aplicando ${CK_STATE.objetivo} · paso ${CK_STATE.paso + 1} (${CK_STATE.pasoNombre})`
+              : CK_STATE.fase === "error" ? `error en ${CK_STATE.objetivo}: ${CK_STATE.error}`
+              : `actual: ${CK_STATE.actual || "—"}`} · saltos={CK_STATE.saltos}</span>
+          </div>
+          <div style={ROW}>
+            <span>HABILITADOS</span>
+            <button style={INPUT} onClick={() => {
+              const v = !ckf.HABILITADOS;
+              DBG_CHECKPOINTS.HABILITADOS = v;
+              setCkf(o => ({ ...o, HABILITADOS: v }));
+            }}>{ckf.HABILITADOS ? "ON" : "off"}</button>
+          </div>
+          <div style={{ ...ROW, flexWrap: "wrap", gap: 4, justifyContent: "flex-start" }}>
+            {CHECKPOINTS.map(c => {
+              const marcado = CK_STATE.fase === "aplicando" ? CK_STATE.objetivo === c.id : CK_STATE.actual === c.id;
+              return (
+                <button key={c.id} title={c.descripcion} disabled={!ckf.HABILITADOS}
+                  style={{ ...INPUT, width: "auto", padding: "3px 7px", cursor: ckf.HABILITADOS ? "pointer" : "not-allowed",
+                    opacity: ckf.HABILITADOS ? 1 : 0.4,
+                    background: marcado ? "#FF9A1F" : (INPUT as React.CSSProperties).background,
+                    color: marcado ? "#2A1400" : (INPUT as React.CSSProperties).color }}
+                  onClick={e => { e.currentTarget.blur(); if (DBG_CHECKPOINTS.HABILITADOS) irACheckpoint(c.id); }}>
+                  {c.nombre}
+                </button>
+              );
+            })}
+          </div>
+          <NumField label="ADELANTO_S" value={ckf.ADELANTO_S} step={0.25} min={0.05} max={5} note="s de reloj por frame (sala_activa)"
+            onChange={v => { DBG_CHECKPOINTS.ADELANTO_S = v; setCkf(o => ({ ...o, ADELANTO_S: v })); }} />
+          <div style={DIVIDER} />
           <span style={LABEL}>Reloj de la experiencia Z39 <span style={NOTE}>(live)</span></span>
           <div style={{ ...ROW, ...NOTE }}>
             <span>tExp={RELOJ.tExp.toFixed(1)} s · esperas={esperasPendientes()} · revelado={SECUENCIA.activadoExpMs < 0 ? "—" : ((RELOJ.tExp * 1000 - SECUENCIA.activadoExpMs) / 1000).toFixed(1) + " s"} · dome-revealed={SECUENCIA.domeRevealedEmitido ? SECUENCIA.motivo : "no"}</span>
@@ -1514,6 +1550,7 @@ export default function DebugMenu() {
           <div style={{ ...ROW, flexWrap: "wrap", gap: 4 }}>
             <button style={INPUT} onClick={e => { e.currentTarget.blur(); probarEfecto("juego_alarma"); }}>Probar efecto: juego_alarma</button>
             <button style={INPUT} onClick={e => { e.currentTarget.blur(); probarEfecto("ir_tarima_sin_publico"); }}>Probar efecto: ir_tarima_sin_publico</button>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); probarEfecto("ir_checkpoint:sala_activa"); }}>Probar efecto: ir_checkpoint:sala_activa</button>
             <button style={INPUT} onClick={e => { e.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:debug-tocar-tarima")); }}>Probar efecto: premio (tocar tarima)</button>
             <button style={INPUT} onClick={e => { e.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:debug-detener-alarma")); }}>Detener alarma</button>
             <button style={INPUT} onClick={e => { e.currentTarget.blur(); borrarPremio(); }}>Borrar premio</button>

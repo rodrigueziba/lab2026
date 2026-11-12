@@ -34,6 +34,11 @@ const _enteredOnce:   boolean[] = [false, false, false, false];
 const _bandOn:        boolean[] = [false, false, false, false];
 const _lastToggleMs:  number[]  = [0, 0, 0, 0];
 
+/** Z40: estado inicial de los haces (checkpoints). No emite eventos: los componentes se remontan. */
+export function resetHaz(): void {
+  for (let i = 0; i < 4; i++) { _inBeam[i] = false; _enteredOnce[i] = false; _bandOn[i] = false; _lastToggleMs[i] = 0; }
+}
+
 export function getHazEnteredOnce(i: number): boolean {
   return _enteredOnce[i] ?? false;
 }

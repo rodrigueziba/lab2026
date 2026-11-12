@@ -768,6 +768,16 @@ function KnobTooltip() {
 
 // ── Canvas wrapper ─────────────────────────────────────────────────────────────
 export default function ThreeScene() {
+  // Z40: checkpoints — remonta <Scene/> (cada componente vuelve a su estado inicial y libera lo suyo)
+  const [epocaEscena, setEpocaEscena] = useState(0);
+  useEffect(() => {
+    const onRemontar = () => {
+      _D.path = "none"; _D.prismLanded = false; _D.vizActive = false; _D.d = 999; _D.minD = 999;
+      setEpocaEscena(n => n + 1);
+    };
+    window.addEventListener("alight:checkpoint-remontar", onRemontar);
+    return () => window.removeEventListener("alight:checkpoint-remontar", onRemontar);
+  }, []);
   // Pointer lock guards:
   // 1. Block canvas click in lectern mode (prevents drei re-locking on control clicks)
   // 2. Block click if within cooldown after lock exit (prevents early re-lock after Escape)
@@ -822,7 +832,7 @@ export default function ThreeScene() {
         onCreated={({ camera: cam }) => aplicarSpawn(cam)}
         gl={{ antialias: true }}
       >
-        <Scene />
+        <Scene key={epocaEscena} />
       </Canvas>
       <DebugMenu />
       <CurtainFlash />

@@ -65,12 +65,19 @@ for (const k of list) {
 }
 md += `\n## Pendientes por completar\n\n` + pendientes.map(k => `- [ ] **${k.tags.id}** (\`${k.name}\`)`).join('\n') + '\n';
 md += `\n## Efectos del juego (los ejecuta el código, no ink)\n\n` + efectos.map(k => `- **${k.tags.id}** → \`${k.tags.efecto}\``).join('\n') + '\n';
+// Z40: efectos con argumento ("nombre:arg"), por ejemplo saltos a checkpoints (ir_checkpoint:sala_activa)
+const conArg = efectos.filter(k => k.tags.efecto.includes(':'));
+md += `\n## Efectos con argumento (Z40)\n\n` + (conArg.length
+  ? conArg.map(k => { const [n, ...a] = k.tags.efecto.split(':'); return `- **${k.tags.id}** → \`${n}\` con \`${a.join(':')}\`${n === 'ir_checkpoint' ? ' (salto a checkpoint)' : ''}`; }).join('\n')
+  : '_Ninguno por ahora. Formato: `# efecto: ir_checkpoint:sala_activa`._') + '\n';
 
 // ---- diagrama Mermaid ----
 let m = `flowchart TD\n`;
 const nid = n => 'N_' + n;
 for (const k of list) {
-  const label = `${k.tags.id}<br/>${short(k.text.join(' ') || (k.tags.efecto ? '⚙ ' + k.tags.efecto : '(sin texto)'), 34)}`;
+  // Z40: con texto y efecto, el efecto (con su argumento) también se ve en el nodo
+  const base = short(k.text.join(' ') || (k.tags.efecto ? '⚙ ' + k.tags.efecto : '(sin texto)'), 34);
+  const label = `${k.tags.id}<br/>${base}${k.text.length && k.tags.efecto ? '<br/>⚙ ' + k.tags.efecto : ''}`;
   const cls = k.tags.efecto ? 'efecto' : estado(k) === 'pendiente' ? 'pendiente' : 'cerrado';
   m += `  ${nid(k.name)}["${label}"]:::${cls}\n`;
 }

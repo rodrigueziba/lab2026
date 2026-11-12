@@ -2230,11 +2230,16 @@ export default function LecternSystem() {
 
   // J1: people-visible → wait LECTERNS_AFTER_PEOPLE_MS → requestLecterns()
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;   // Z40: se cancela al desmontar
     const onPeople = () => {
-      setTimeout(() => requestLecterns(), LECTERNS_AFTER_PEOPLE_MS);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; requestLecterns(); }, LECTERNS_AFTER_PEOPLE_MS);
     };
     window.addEventListener("alight:people-visible", onPeople);
-    return () => window.removeEventListener("alight:people-visible", onPeople);
+    return () => {
+      window.removeEventListener("alight:people-visible", onPeople);
+      if (timer) clearTimeout(timer);   // Z40: un remontaje (checkpoint) no deja un request-lecterns colgado
+    };
   }, []);
 
   // J1: listen to request-lecterns (today fired by timer, future: ink.js dialog)

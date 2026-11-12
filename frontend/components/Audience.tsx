@@ -391,6 +391,7 @@ export default function Audience() {
   // with a minimum delay of PEOPLE_MIN_DELAY_MS from stars-visible.
   // Dispatches alight:people-visible when activating.
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;   // Z40: se cancela al desmontar
     const check = () => {
       if (!starsReady.current || !faceReady.current) return;
       if (activatedRef.current !== null || timerPending.current) return;
@@ -398,7 +399,8 @@ export default function Audience() {
       const elapsed = Date.now() - starsTime.current;
       const delay   = Math.max(0, PEOPLE_MIN_DELAY_MS - elapsed);
       timerPending.current = true;
-      setTimeout(() => {
+      timer = setTimeout(() => {
+        timer = null;
         if (activatedRef.current !== null || EFECTOS_STATE.sinPublico) { timerPending.current = false; return; }
         activatedRef.current = Date.now();
         window.dispatchEvent(new CustomEvent("alight:people-visible"));
@@ -411,6 +413,7 @@ export default function Audience() {
     return () => {
       window.removeEventListener("alight:stars-visible", onStars);
       window.removeEventListener("alight:face-captured", onFace);
+      if (timer) clearTimeout(timer);   // Z40: un remontaje (checkpoint) no deja un people-visible colgado
     };
   }, []);
 

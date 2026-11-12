@@ -26,6 +26,7 @@ import { INTERACT_STATE } from "@/lib/alightStore";
 import { abrirDialogo, cerrarDialogo, DIALOGO_STATE } from "@/lib/dialogo/dialogoEstado";
 import { EFECTOS_STATE, leerPremio, guardarPremio } from "@/lib/dialogo/efectosEstado";
 import { TARIMA_W, TARIMA_D, TARIMA_H } from "@/components/Tarima";
+import { irACheckpoint, parsearEfecto } from "@/lib/checkpoints"; // Z40
 
 export const RUTA_ALARMA = "/alight/audio/alarm.mp3";
 const SILLAS_MIRAR = { x: 0, z: -6 };   // = ZONA_SILLAS de ThreeScene (hacia donde mira tras el teleport)
@@ -181,6 +182,13 @@ function llevarATarima(c: Ctx): void {
   }, 400));
 }
 
+/** Z40: checkpoint tarima_vacia — mismo flujo que el efecto ir_tarima_sin_publico (sin diálogo abierto). */
+export function irTarimaSinPublicoAhora(): boolean {
+  if (!C) return false;
+  irTarimaSinPublico();
+  return true;
+}
+
 const ACCIONES: Record<string, Accion> = {
   juego_alarma: juegoAlarma,
   premio_otorgado: () => { /* el tag lo emite la terminal al entrar al knot: el juego ya premió */ },
@@ -215,7 +223,15 @@ export function instalarEfectos(scene: THREE.Scene, camera: THREE.Camera): () =>
   const onEfecto = (e: Event) => {
     if (!DBG_EFECTOS.EFECTOS_DIALOGO) return;
     const ef = (e as CustomEvent<{ efecto?: string }>).detail?.efecto ?? "";
-    const a = ACCIONES[ef];
+    // Z40: efectos con argumento "nombre:arg". ir_checkpoint:<id> → irACheckpoint (lo decide la narrativa:
+    // no depende de DBG_CHECKPOINTS.HABILITADOS). Se encola: se aplica en el próximo frame, fuera del handler
+    // de la terminal; la base del checkpoint cierra la terminal y libera los bloqueos (incluido el de la luz).
+    const { nombre, arg } = parsearEfecto(ef);
+    if (nombre === "ir_checkpoint") {
+      if (!irACheckpoint(arg)) console.warn("[efectosDialogo] checkpoint inexistente:", arg);
+      return;
+    }
+    const a = ACCIONES[nombre];
     if (a) a();
     else console.warn("[efectosDialogo] efecto sin acción:", ef);
   };

@@ -13,6 +13,7 @@
 export const RELOJ = {
   tExp: 0,    // s acumulados (sin pausas)
   dtExp: 0,   // dt del último tick (0 si estaba en pausa)
+  congelado: false,   // Z40: un checkpoint está remontando la escena: la escena vieja no avanza nada
 };
 
 export interface Espera {
@@ -52,9 +53,22 @@ function quitar(i: number): void {
 /** Una vez por frame. dt en s; con pausado el reloj no avanza ni se dispara ninguna espera. */
 export function tickReloj(dt: number, pausado: boolean): void {
   RELOJ.dtExp = 0;
-  if (pausado || !(dt > 0)) return;
+  if (pausado || RELOJ.congelado || !(dt > 0)) return;
   RELOJ.tExp += dt;
   RELOJ.dtExp = dt;
+  procesarEsperas();
+}
+
+/** Z40: adelanta el reloj (checkpoints): suma seg a tExp y a dtExp del frame y dispara lo vencido.
+ *  No crea nada; se llama a lo sumo una vez por frame. */
+export function adelantarReloj(seg: number): void {
+  if (!(seg > 0)) return;
+  RELOJ.tExp += seg;
+  RELOJ.dtExp += seg;
+  procesarEsperas();
+}
+
+function procesarEsperas(): void {
   const ahora = RELOJ.tExp * 1000;
   let i = 0;
   while (i < _esperas.length) {

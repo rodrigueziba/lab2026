@@ -135,5 +135,24 @@ check(sh.tipo === 'nada' && !sh.consumir, 'Shift: no se intercepta (menú debug)
 check(A(T('KeyW', 'w'), 'escribiendo', 0, 0).consumir && A(T('ArrowDown'), 'cargando', 0, 0).consumir, 'W/flechas se consumen aunque no haya opciones (no mueven ni scrollean)');
 check(!A(T('KeyA', 'a'), 'opciones', 4, 0).consumir && !A(T('KeyD', 'd'), 'opciones', 4, 0).consumir, 'A y D no se interceptan');
 
+// ── Z40: efectos con argumento (ir_checkpoint:<id>) ──
+console.log('\nZ40 efectos con argumento');
+{
+  const { parsearEfecto, buscarCheckpoint } = await import('../lib/checkpoints.ts');
+  const pe = parsearEfecto('ir_checkpoint:sala_activa');
+  check(pe.nombre === 'ir_checkpoint' && pe.arg === 'sala_activa', 'parsearEfecto("ir_checkpoint:sala_activa") → nombre + arg');
+  const ps = parsearEfecto('juego_alarma');
+  check(ps.nombre === 'juego_alarma' && ps.arg === '', 'efecto sin argumento: compatible (juego_alarma)');
+  check(!!buscarCheckpoint(pe.arg), 'el argumento es un checkpoint registrado');
+  // un knot de prueba compilado con el compilador de ink: el tag llega entero al runtime y al plan de la terminal
+  const { Compiler } = await import('inkjs/full');
+  const fuente = '-> salto\n=== salto ===\n# id: test.ck\n# estado: cerrado\n# efecto: ir_checkpoint:sala_activa\nVolvé a la sala.\n-> END\n';
+  const dj = new Compiler(fuente).Compile().ToJson();
+  const pj = crearDialogo(dj).iniciar();
+  check(pj.tags.efecto === 'ir_checkpoint:sala_activa' && pj.tags.id === 'test.ck', 'tag "# efecto: ir_checkpoint:sala_activa" llega entero al runtime');
+  const plan = planDePaso(pj, false);
+  check(plan.efecto === 'ir_checkpoint:sala_activa' && plan.fin, 'la terminal emite el efecto con argumento y termina');
+}
+
 console.log(`\n${ok} OK · ${fallas} fallas`);
 process.exit(fallas ? 1 : 0);

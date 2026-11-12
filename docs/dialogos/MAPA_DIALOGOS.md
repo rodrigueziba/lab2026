@@ -57,6 +57,10 @@
 - **1.a.premio** → `premio_otorgado`
 - **1.b.a** → `ir_tarima_sin_publico`
 
+## Efectos con argumento (Z40)
+
+_Ninguno por ahora. Formato: `# efecto: ir_checkpoint:sala_activa`._
+
 ## Diagrama
 
 Verde = cerrada · Amarillo = pendiente · Azul = dispara un efecto del juego.
@@ -64,8 +68,8 @@ Verde = cerrada · Amarillo = pendiente · Azul = dispara un efecto del juego.
 ```mermaid
 flowchart TD
   N_n_1["1<br/>¿No es suficiente?"]:::cerrado
-  N_n_1_a["1.a<br/>Quizás la luz no es para vos."]:::efecto
-  N_premio_otorgado["1.a.premio<br/>Quizás tenés otras habilidades o …"]:::efecto
+  N_n_1_a["1.a<br/>Quizás la luz no es para vos.<br/>⚙ juego_alarma"]:::efecto
+  N_premio_otorgado["1.a.premio<br/>Quizás tenés otras habilidades o …<br/>⚙ premio_otorgado"]:::efecto
   N_n_1_b["1.b<br/>¿Qué estás buscando?"]:::cerrado
   N_n_1_b_a["1.b.a<br/>⚙ ir_tarima_sin_publico"]:::efecto
   N_n_1_b_b["1.b.b<br/>¿Por qué crees que no te entiende…"]:::cerrado
