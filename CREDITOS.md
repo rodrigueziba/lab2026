@@ -50,6 +50,12 @@ Z45: cálculo en una textura compartida por las 3 caras; port a TypeScript del r
 
 ---
 
+### Tipografía del texto del telón (Z46)
+
+- **Anton**, por Vernon Adams — **SIL Open Font License 1.1**. Se carga con `next/font/google`
+  (`frontend/app/alight/fuentes.ts`), que la sirve desde el propio sitio. La usa
+  `frontend/components/TelonTexto.tsx` para el texto "A LIGHT FOR ATTRACTING ATTENTION" proyectado sobre el telón.
+
 ## Herramientas
 
 - Three.js / React Three Fiber — MIT

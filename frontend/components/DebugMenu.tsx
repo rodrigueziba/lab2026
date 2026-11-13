@@ -46,6 +46,7 @@ import {
   DBG_LAYOUT, // Z41
   DBG_LUCES, // Z42
   DBG_FRACTAL, // Z43
+  DBG_TELON_TEXTO, // Z46
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -324,6 +325,7 @@ export default function DebugMenu() {
   const [ckf, setCkf] = useState({ ...DBG_CHECKPOINTS });                  // Z40
   const [lay, setLay] = useState({ ...DBG_LAYOUT });                       // Z41
   const [frc, setFrc] = useState({ ...DBG_FRACTAL });                      // Z43
+  const [ttx, setTtx] = useState({ ...DBG_TELON_TEXTO });                  // Z46
   const [luc, setLuc] = useState({ ...DBG_LUCES, HALO_X: [...DBG_LUCES.HALO_X], RADIO_X: [...DBG_LUCES.RADIO_X], CONO_X: [...DBG_LUCES.CONO_X], POZO_X: [...DBG_LUCES.POZO_X] }); // Z42
   const [tab, setTab]         = useState<Tab>("SILLAS");
   const [spot,     setSpot]     = useState({ ...DBG_SPOTLIGHT });
@@ -1524,6 +1526,28 @@ export default function DebugMenu() {
             <input type="range" min={0} max={10} step={0.05} style={{ flex: 1 }} value={lay.MONOLITOS_OFFSET_M}
               onChange={e => { const v = parseFloat(e.target.value); DBG_LAYOUT.MONOLITOS_OFFSET_M = v; setLay(o => ({ ...o, MONOLITOS_OFFSET_M: v })); }} />
           </div>
+          <div style={DIVIDER} />
+          {/* Z46: texto proyectado sobre el telón — en vivo (ACTIVO se aplica al remontar el telón) */}
+          <span style={LABEL}>Texto del telón Z46 <span style={NOTE}>(recorte del reflector · live)</span></span>
+          {(["ACTIVO", "INVERTIDO"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{k === "ACTIVO" ? "off = no se crea (al remontar el telón)" : "off = gobo (letras en sombra)"}</span></span>
+              <button style={INPUT} onClick={() => { const v = !ttx[k]; DBG_TELON_TEXTO[k] = v; setTtx(o => ({ ...o, [k]: v })); }}>{ttx[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["TAMANO", 0.2, 1.2, 0.01, "× zona iluminada"], ["OFFSET_X_M", -4, 4, 0.05, "m"], ["OFFSET_Y_M", -3, 3, 0.05, "m"],
+            ["OPACIDAD", 0, 1, 0.01, ""], ["BLUR_PX", 0, 30, 0.5, "recrea la textura"], ["PLIEGUE", 0, 1, 0.01, "0 = plano"],
+            ["FADE_IN_S", 0, 8, 0.1, "s"], ["DURACION_S", 2, 120, 1, "s"], ["DIST_OCULTAR_M", 2, 40, 0.5, "m"],
+            ["OSCURO_INV", 0, 1, 0.01, "invertido"], ["BRILLO_INV", 0, 3, 0.05, "invertido"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{ttx[k].toFixed(2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={ttx[k]}
+                onChange={e => { const v = parseFloat(e.target.value); DBG_TELON_TEXTO[k] = v; setTtx(o => ({ ...o, [k]: v })); }} />
+            </div>
+          ))}
+          <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:telon-texto-reproducir"))}>Reproducir texto</button>
           <div style={DIVIDER} />
           {/* Z43: fractal de las caras del prisma (jungle fractal II) — todo en vivo */}
           <span style={LABEL}>Fractal del prisma Z43 <span style={NOTE}>(caras · live)</span></span>

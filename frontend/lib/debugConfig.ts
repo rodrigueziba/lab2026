@@ -1001,3 +1001,29 @@ export const DBG_FRACTAL = {
   ADAPT_BAJAR_S:    1.0,    // segundos seguidos por encima de MS_MAX para bajar un escalón
   ADAPT_SUBIR_S:    3.0,    // segundos seguidos con margen para subir un escalón
 };
+
+// ── Z46: texto proyectado sobre el telón ("A LIGHT FOR ATTRACTING ATTENTION", recorte del reflector) ──
+export const DBG_TELON_TEXTO = {
+  ACTIVO:          true,    // false = no se crea nada (ni textura ni plano)
+  INVERTIDO:       false,   // false = gobo (letras en sombra); true = letras iluminadas y el telón oscurecido alrededor
+  TAMANO:          0.6,     // ancho del bloque / ancho de la zona iluminada por el reflector (a media intensidad)
+  OFFSET_X_M:      0.0,     // corrimiento horizontal sobre el telón (m, + = derecha vista desde el público)
+  OFFSET_Y_M:      0.0,     // corrimiento vertical respecto del punto apuntado por el reflector (y = 4 m)
+  SEPARACION_M:    0.03,    // distancia del plano al frente de los pliegues (m)
+  OPACIDAD:        0.85,
+  TINTE_SOMBRA:    "#1A0606" as string,   // gobo: color de la sombra (casi negro rojizo), multiplica al telón
+  OSCURO_INV:      0.25,    // invertido: cuánto queda del telón alrededor del bloque (0 = negro)
+  BRILLO_INV:      0.8,     // invertido: brillo extra de las letras (× (1 + este valor))
+  BLUR_PX:         6,       // borde suave sobre 2048 px de ancho (recrea la textura solo al cambiarlo)
+  INTERLINEA:      0.16,    // separación entre las dos líneas / altura de mayúscula
+  COLUMNAS:        0.13,    // separación entre columnas / altura de mayúscula
+  INTENSIDAD_ENTION: 0.55,
+  PLIEGUE:         0.3,     // 0…1: el plano sigue los pliegues del telón (mismo patrón: 8 pliegues de 0,15 m); 0 = plano
+  FADE_IN_S:       2.5,
+  FADE_OUT_S:      2.0,
+  FLICKER_S:       0.6,     // parpadeo de reflector al encenderse
+  FLICKER_N:       4,       // destellos
+  FLICKER_PICO:    0.7,     // opacidad de cada destello
+  DURACION_S:      25,      // s de experiencia desde que aparece
+  DIST_OCULTAR_M:  12,      // se desvanece si el usuario se aleja más que esto del telón (el spawn está a 8 m)
+};

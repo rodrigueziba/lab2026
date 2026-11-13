@@ -13,6 +13,7 @@ import Tarima from "./Tarima";
 import FaceDome from "./FaceDome";
 import WatcherEye from "./WatcherEye";
 import Curtain from "./Curtain";
+import TelonTexto from "./TelonTexto"; // Z46: texto proyectado sobre el telón
 import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from "./LecternSystem";
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
@@ -25,7 +26,7 @@ import { moverConLimites } from "@/lib/caminoLuz"; // Z28: límites sala ∪ ext
 import { EFECTOS_STATE } from "@/lib/dialogo/efectosEstado"; // Z29: bloqueo de la zona TARIMA en juego_alarma
 import { posicionInicial, aplicarSpawn } from "@/lib/inicioEscena"; // Z24/Z25
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
-import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV, DBG_SECUENCIA, DBG_LAYOUT } from "@/lib/debugConfig";
+import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV, DBG_SECUENCIA, DBG_LAYOUT, DBG_TELON_TEXTO } from "@/lib/debugConfig";
 import { crearEspera, type Espera } from "@/lib/relojExperiencia"; // Z39
 import { cancelarSecuencia } from "@/lib/secuenciaSillas"; // Z39
 import { ZONA_TARIMA, ZONA_SILLAS_BASE, zonaSillasEn } from "@/lib/layoutSala"; // Z41
@@ -500,6 +501,8 @@ function Scene() {
       {RETRO_FLAGS.enabled && <RetroPostFX />}
       {/* N6: red velvet curtain — visible until player crosses the plane */}
       {curtainVisible && <Curtain />}
+      {/* Z46: "A LIGHT FOR ATTRACTING ATTENTION" sobre el telón (recorte del reflector); se va con el telón */}
+      {curtainVisible && DBG_TELON_TEXTO.ACTIVO && <TelonTexto />}
       {/* Z23: iconos de los dos caminos grabados en el piso, entre el inicio y el telón */}
       <PisoIconos />
       {/* Z28: luz lejana detrás del inicio (camino LUZ), estrellas y salida de la sala */}
