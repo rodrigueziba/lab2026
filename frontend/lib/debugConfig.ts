@@ -976,4 +976,13 @@ export const DBG_FRACTAL = {
   MUSICA_ENTRADA_S: 0.6,    // entrada/salida de la reacción al acercarse/alejarse (s)
   // caras
   CARAS_DISTINTAS:  false,  // true = uSemilla distinta por cara (hoy las tres iguales)
+  // Z44: aspecto del original (jungle fractal II tal cual)
+  PALETA_ORIGINAL:  true,   // colores exactos del original; false = versión dorada de Z43 (paleta de arriba)
+  TINTE_PRISMA:     0.0,    // 0…1: mezcla el resultado hacia el color de la cara del prisma
+  OPACIDAD_ORIGINAL: 1.0,   // opacidad máxima con la paleta original (1 = no se tiñe con el vidrio de atrás)
+  ASPECTO_ORIGINAL: 0.5625, // alto/ancho del cuadro del original (16:9): position = (uv.x, uv.y · ASPECTO) − offset
+  GRANO_RES:        1280,   // resolución virtual del rand (gl_FragCoord del original); 0 = continuo
+  ENCUADRE_Y_M:     0.0,    // corre el cuadro del original hacia la punta de la cara (m); 0 = apoyado en la base
+  COMPENSAR_SALIDA: 2,      // 2 = inversa de ACES + sRGB del OutputPass (valores de pantalla del original); 1 = solo sRGB; 0 = nada
+  COMP_TOPE_LINEAL: 1.5,    // tope del valor compensado: 1,5 → máx. 232/255 en pantalla (el original llega a 255); más alto = blancos más fieles pero con bloom
 };

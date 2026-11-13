@@ -10,7 +10,8 @@ import { DBG_PRISM, DBG_SECUENCIA, DBG_FRACTAL } from "@/lib/debugConfig";
 import { RELOJ, ahoraExp } from "@/lib/relojExperiencia"; // Z39
 // Z43: fractal nuevo de las caras ("jungle fractal II"), progresión por distancia y música
 import { FRACTAL_JUNGLA_VERT, FRACTAL_JUNGLA_FRAG } from "@/lib/prisma/fractalJungla.glsl";
-import { crearGeoCarasPrisma } from "@/lib/prisma/geoCarasPrisma";
+import { crearGeoCarasPrisma, dimCaraPrisma } from "@/lib/prisma/geoCarasPrisma";
+import { RETRO_FLAGS } from "@/lib/retro/retroFlags"; // Z44
 import { crearEstadoFractal, avanzarFractal } from "@/lib/prisma/fractalProgresion";
 import { PAUSA } from "@/lib/pausaExperiencia";
 import { isVizActivated } from "@/lib/alightStore";
@@ -126,6 +127,19 @@ const FRACTAL_UNIFORMS = {
   uMusZoom:        { value: 1 },
   uMusC:           { value: new THREE.Vector2(0, 0) },
   uMusBrillo:      { value: 1 },
+  // Z44: paleta y encuadre del original
+  uPaletaOriginal: { value: DBG_FRACTAL.PALETA_ORIGINAL ? 1 : 0 },
+  uTintePrisma:    { value: DBG_FRACTAL.TINTE_PRISMA },
+  uColCara:        { value: new THREE.Color(1, 1, 1) },   // color de la cara en sRGB (se copia del vidrio)
+  uOpacidadOrig:   { value: DBG_FRACTAL.OPACIDAD_ORIGINAL },
+  uAspecto:        { value: DBG_FRACTAL.ASPECTO_ORIGINAL },
+  uGranoRes:       { value: DBG_FRACTAL.GRANO_RES },
+  uCaraAncho:      { value: dimCaraPrisma(1.01, 1.81, 3).ancho },   // mismas medidas que geoFractal
+  uCaraYBase:      { value: dimCaraPrisma(1.01, 1.81, 3).yBase },
+  uEncuadreY:      { value: DBG_FRACTAL.ENCUADRE_Y_M },
+  uCompensar:      { value: DBG_FRACTAL.COMPENSAR_SALIDA },
+  uExposicion:     { value: 1 },
+  uCompTope:       { value: DBG_FRACTAL.COMP_TOPE_LINEAL },
 };
 const FRACTAL_DEFINES = { CELULAR: DBG_FRACTAL.CELULAR_ON ? 1 : 0 };
 
@@ -165,7 +179,7 @@ export default function Prism() {
     return () => window.removeEventListener("activar-prisma", handler);
   }, []);
 
-  useFrame(({ clock }, dt) => {
+  useFrame(({ clock, gl }, dt) => {
     if (!groupRef.current || !active.current) return;
 
     if (needStart.current) {
@@ -253,6 +267,19 @@ export default function Prism() {
       U.uMusZoom.value = fe.musZoom;
       U.uMusC.value.set(fe.musCx, fe.musCy);
       U.uMusBrillo.value = fe.musBrillo;
+      // Z44: paleta original. La compensación de salida solo tiene sentido si la escena pasa por el composer
+      // (OutputPass = ACES + sRGB); sin composer el shader escribe directo en pantalla (sin conversión).
+      U.uPaletaOriginal.value = DBG_FRACTAL.PALETA_ORIGINAL ? 1 : 0;
+      U.uTintePrisma.value = Math.max(0, Math.min(1, DBG_FRACTAL.TINTE_PRISMA));
+      U.uColCara.value.copy(GLASS_MAT.color).convertLinearToSRGB();
+      U.uOpacidadOrig.value = DBG_FRACTAL.OPACIDAD_ORIGINAL;
+      U.uAspecto.value = Math.max(0.05, DBG_FRACTAL.ASPECTO_ORIGINAL);
+      U.uGranoRes.value = Math.max(0, DBG_FRACTAL.GRANO_RES);
+      U.uEncuadreY.value = DBG_FRACTAL.ENCUADRE_Y_M;
+      const comp = RETRO_FLAGS.enabled ? Math.round(DBG_FRACTAL.COMPENSAR_SALIDA) : 0;
+      U.uCompensar.value = comp >= 2 && gl.toneMapping !== THREE.ACESFilmicToneMapping ? 1 : comp;
+      U.uExposicion.value = gl.toneMappingExposure;
+      U.uCompTope.value = Math.max(0.05, DBG_FRACTAL.COMP_TOPE_LINEAL);
       const cols = fracColores.current;
       if (cols[0] !== DBG_FRACTAL.COLOR_OSCURO) { cols[0] = DBG_FRACTAL.COLOR_OSCURO; U.uColOscuro.value.set(cols[0]); }
       if (cols[1] !== DBG_FRACTAL.COLOR_MEDIO)  { cols[1] = DBG_FRACTAL.COLOR_MEDIO;  U.uColMedio.value.set(cols[1]); }

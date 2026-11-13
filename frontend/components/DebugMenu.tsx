@@ -1527,9 +1527,9 @@ export default function DebugMenu() {
           <div style={DIVIDER} />
           {/* Z43: fractal de las caras del prisma (jungle fractal II) — todo en vivo */}
           <span style={LABEL}>Fractal del prisma Z43 <span style={NOTE}>(caras · live)</span></span>
-          {(["DISENO_NUEVO", "CELULAR_ON", "CARAS_DISTINTAS"] as const).map(k => (
+          {(["DISENO_NUEVO", "PALETA_ORIGINAL", "CELULAR_ON", "CARAS_DISTINTAS"] as const).map(k => (
             <div key={k} style={ROW}>
-              <span>{k} <span style={NOTE}>{k === "DISENO_NUEVO" ? "off = fractal anterior" : k === "CELULAR_ON" ? "recompila el material" : "uSemilla por cara"}</span></span>
+              <span>{k} <span style={NOTE}>{k === "DISENO_NUEVO" ? "off = fractal anterior" : k === "PALETA_ORIGINAL" ? "Z44 · off = dorado Z43" : k === "CELULAR_ON" ? "recompila el material" : "uSemilla por cara"}</span></span>
               <button style={INPUT} onClick={() => {
                 const v = !frc[k];
                 DBG_FRACTAL[k] = v;
@@ -1538,7 +1538,11 @@ export default function DebugMenu() {
             </div>
           ))}
           {([
-            ["PROX_FORZADA", -1, 1, 0.01, "−1 = off"], ["DIST_INICIO_M", 1, 15, 0.1, "m"], ["DIST_MAX_M", 0, 5, 0.05, "m"],
+            ["PROX_FORZADA", -1, 1, 0.01, "−1 = off"],
+            ["TINTE_PRISMA", 0, 1, 0.01, "Z44 → color de la cara"], ["OPACIDAD_ORIGINAL", 0, 1, 0.01, "Z44"],
+            ["ASPECTO_ORIGINAL", 0.2, 1.5, 0.0025, "Z44 alto/ancho"], ["GRANO_RES", 0, 2560, 10, "Z44 0 = continuo"],
+            ["ENCUADRE_Y_M", -1, 1.5, 0.01, "Z44 m"], ["COMPENSAR_SALIDA", 0, 2, 1, "Z44 2 ACES+sRGB · 1 sRGB · 0"], ["COMP_TOPE_LINEAL", 0.2, 10, 0.05, "Z44 bloom"],
+            ["DIST_INICIO_M", 1, 15, 0.1, "m"], ["DIST_MAX_M", 0, 5, 0.05, "m"],
             ["INERCIA_60", 0.005, 1, 0.005, "por frame a 60 fps"], ["VEL_MIN", 0, 3, 0.01, ""], ["VEL_MAX", 0, 5, 0.05, ""],
             ["OPACIDAD", 0, 1, 0.01, ""], ["ALFA_OSCURO", 0, 1, 0.01, ""], ["BRILLO", 0, 3, 0.05, ""], ["BRILLO_PROX", 0, 5, 0.05, ""],
             ["ITERACIONES", 1, 32, 1, ""], ["ZOOM", 0.2, 6, 0.05, ""], ["BAILOUT", 1, 40, 0.5, ""], ["X", -1.5, 1.5, 0.005, ""], ["Y", -1.5, 1.5, 0.005, ""],

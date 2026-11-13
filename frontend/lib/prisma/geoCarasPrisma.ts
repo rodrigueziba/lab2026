@@ -60,3 +60,12 @@ export function crearGeoCarasPrisma(radio: number, alto: number, lados = 3): THR
   geo.setAttribute("aCara", new THREE.BufferAttribute(cara, 1));
   return geo;
 }
+
+/** Z44: medidas de una cara lateral en el sistema de aCaraUv: ancho de la base (m) e y de la base
+ *  respecto del baricentro (m, negativa). Para encuadrar el cuadro del original sobre la cara. */
+export function dimCaraPrisma(radio: number, alto: number, lados = 3): { ancho: number; yBase: number } {
+  const ancho = 2 * radio * Math.sin(Math.PI / lados);
+  const apotema = radio * Math.cos(Math.PI / lados);
+  const inclinada = Math.hypot(alto, apotema);   // de la mitad de la base a la punta
+  return { ancho, yBase: -inclinada / 3 };
+}

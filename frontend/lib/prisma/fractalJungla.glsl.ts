@@ -27,6 +27,18 @@
 //   0,157) y se pinta con la paleta del prisma (uColOscuro → uColMedio → uColClaro). Las dos regiones del
 //   original se combinan con máscaras (sin if/else); la región "vacía" queda transparente.
 // - Ruido celular detrás de #define CELULAR (0/1): apagarlo saca las dos búsquedas por píxel.
+//
+// Z44 (uPaletaOriginal = 1, default): colores EXACTOS del original (mismas fórmulas de las dos ramas y el
+// mismo rand; la región v ≤ depthCull·0,1 es negra como en el original). Encuadre del original sobre la cara:
+// position = (uv.x, uv.y · ASPECTO) − offset, con uv.x = 0…1 a lo ancho de la base de la cara y uv.y en las
+// mismas unidades (isótropo: el cuadro 16:9 del original ocupa la parte baja de la cara y sigue hacia la
+// punta). rand sobre una grilla virtual de GRANO_RES × GRANO_RES·ASPECTO "píxeles", como gl_FragCoord.
+// Salida: el composer aplica ACES (exposición) + sRGB a toda la escena en el OutputPass (el material no tiene
+// tonemapping propio: toneMapped/fog del material no cambian nada acá). Para que se vea con los valores de
+// pantalla del original, el color se pasa por la inversa de ACES + sRGB (uCompensar 2; 1 = solo sRGB; 0 = nada).
+// El CRT (scanlines, tinte crema, lift, viñeta) y el bloom siguen actuando, como en todo el mundo; uCompTope
+// limita el valor compensado (los blancos del original, que en ACES serían ∞, no encienden el bloom).
+// Con uPaletaOriginal = 0 todo vuelve exactamente a la versión dorada de Z43.
 
 export const FRACTAL_JUNGLA_VERT = /* glsl */`
   attribute vec2  aCaraUv;
@@ -45,6 +57,7 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
   #define Ko 0.428571428571
   #define JITTER 1.0
   #define EPS 1e-3
+  #define EPS_ORIG 1e-6
   #define MAX_ITER 32
   #ifndef CELULAR
   #define CELULAR 1
@@ -73,6 +86,19 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
   uniform float uMusZoom;          // × zoom (graves)
   uniform vec2  uMusC;             // + (X, Y) (medios)
   uniform float uMusBrillo;        // × brillo (agudos)
+  // Z44
+  uniform float uPaletaOriginal;   // 1 = colores del original; 0 = dorado de Z43
+  uniform float uTintePrisma;      // 0…1 mezcla hacia el color de la cara
+  uniform vec3  uColCara;          // color de la cara (sRGB, valores de pantalla)
+  uniform float uOpacidadOrig;     // opacidad máxima con la paleta original
+  uniform float uAspecto;          // ASPECTO_ORIGINAL (16:9 → 0,5625)
+  uniform float uGranoRes;         // resolución virtual del grano (0 = continuo)
+  uniform float uCaraAncho;        // ancho de la base de la cara (m)
+  uniform float uCaraYBase;        // y de la base respecto del baricentro de la cara (m)
+  uniform float uEncuadreY;        // corrimiento vertical del cuadro sobre la cara (m)
+  uniform float uCompensar;        // 0 nada, 1 sRGB, 2 ACES + sRGB
+  uniform float uExposicion;       // renderer.toneMappingExposure
+  uniform float uCompTope;         // tope del valor lineal compensado (los blancos del original no disparan el bloom)
 
   varying vec2  vCaraUv;
   varying float vCara;
@@ -121,6 +147,26 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
 
   // signo sin cero y magnitud mínima EPS (evita dividir por 0 o por casi 0)
   float protegido(float s) { return (s < 0.0 ? -1.0 : 1.0) * max(abs(s), EPS); }
+  float protegidoE(float s, float e) { return (s < 0.0 ? -1.0 : 1.0) * max(abs(s), e); }
+
+  // Z44: inversa de la salida del composer (OutputPass: ACES filmic de three + sRGB).
+  vec3 srgbALineal(vec3 c) {
+    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+  }
+  vec3 rrtInversa(vec3 y) {
+    // y = (v² + a·v − b) / (c·v² + d·v + e)  →  (y·c − 1)·v² + (y·d − a)·v + (y·e + b) = 0, raíz positiva
+    vec3 A = y * 0.983729 - 1.0;
+    vec3 B = y * 0.4329510 - 0.0245786;
+    vec3 C = y * 0.238081 + 0.000090537;
+    return (-B - sqrt(max(B * B - 4.0 * A * C, 0.0))) / (2.0 * A);
+  }
+  vec3 acesInversa(vec3 lin, float expo) {
+    const mat3 OUT_INV = mat3(vec3(0.643038, 0.059269, 0.005962), vec3(0.311187, 0.931436, 0.063929), vec3(0.045775, 0.009295, 0.930118));
+    const mat3 IN_INV  = mat3(vec3(1.764741, -0.147028, -0.036337), vec3(-0.675778, 1.160252, -0.162436), vec3(-0.088963, -0.013224, 1.198773));
+    vec3 y = clamp(OUT_INV * lin, 0.0, 0.99);
+    vec3 x = IN_INV * rrtInversa(y);
+    return max(x, 0.0) / max(expo / 0.6, 1e-4);
+  }
 
   void main() {
     // semilla de la cara (hoy sin efecto: uCarasDistintas = 0)
@@ -129,7 +175,9 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
     float t = uT + semilla * 7.0;
 
     vec2 off = uOffset + vec2(sin(t * 0.1), cos(t * 0.1)) * 0.1 + semilla * vec2(0.37, 0.21);
-    vec2 coord = vCaraUv * uEscala + uCentro;
+    // Z44: encuadre del original (uv 0…1 a lo ancho; y isótropo) o mapeo de Z43
+    vec2 uvO = vec2(vCaraUv.x / uCaraAncho + 0.5, (vCaraUv.y - uCaraYBase - uEncuadreY) / (uCaraAncho * uAspecto));
+    vec2 coord = mix(vCaraUv * uEscala + uCentro, vec2(uvO.x, uvO.y * uAspecto), uPaletaOriginal);
     vec2 position = (coord - off) * (uZoom * uMusZoom + sin(t * 0.1) * 0.2);
     vec2 c0 = vec2(uC.x + sin(t) * 0.01, uC.y + cos(t) * 0.02) + uMusC;
 
@@ -146,10 +194,10 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
       if (float(i) >= uIter) break;
       d = cmult(c, c);
       c = d + c0;
-      v = abs(c.x) + (c.y * c.y) / protegido(sin(abs(c.x) * 4.0));
-      if (v > uBailout || dot(c, c) > 1e6) break;
+      v = abs(c.x) + (c.y * c.y) / protegidoE(sin(abs(c.x) * 4.0), mix(EPS, EPS_ORIG, uPaletaOriginal));
+      if (v > uBailout || dot(c, c) > mix(1e6, 1e30, uPaletaOriginal)) break;
     }
-    c = clamp(c, vec2(-1e3), vec2(1e3));
+    c = clamp(c, vec2(-mix(1e3, 1e15, uPaletaOriginal)), vec2(mix(1e3, 1e15, uPaletaOriginal)));
 
     float l = sin((c.y * 2.0) * 0.23);
   #if CELULAR
@@ -189,6 +237,21 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
     col *= uBrillo * uMusBrillo * (1.0 + uProx * uBrilloProx);
 
     float alfa = (mA + mB) * uProx * uOpacidad * mix(uAlfaOscuro, 1.0, clamp(inten, 0.0, 1.0));
+
+    // ── Z44: paleta original (fórmulas del original sin modificar) ──
+    vec2 resV = vec2(uGranoRes, uGranoRes * uAspecto);
+    vec2 fcV = mix(uvO, (floor(uvO * resV) + 0.5) / max(resV, vec2(1.0)), step(0.5, uGranoRes));   // gl_FragCoord/iResolution
+    float randO = mod(fract(sin(dot(2.5 * fcV, vec2(12.9898, 100.233))) * 43758.5453), 0.7) * uGrano;
+    vec3 colOA = colA;                                                              // rama de escape rápido (alfa .3 en Shadertoy: se ve opaca)
+    vec3 colOB = (randO + vec3(pow(max(vb + 0.46, EPS_ORIG), -0.75))) * vec3(0.1, 0.17, 0.2);   // rama principal
+    vec3 colO = clamp((mA * colOA + mB * colOB) * uMusBrillo, 0.0, 1.0);           // resto: negro, como el original
+    colO = mix(colO, uColCara, uTintePrisma);
+    vec3 linO = srgbALineal(colO);
+    colO = mix(colO, mix(linO, min(acesInversa(linO, uExposicion), vec3(uCompTope)), step(1.5, uCompensar)), step(0.5, uCompensar));
+    float alfaO = uProx * uOpacidadOrig;
+
+    col = mix(col, colO, uPaletaOriginal);
+    alfa = mix(alfa, alfaO, uPaletaOriginal);
     gl_FragColor = vec4(col, clamp(alfa, 0.0, 1.0));
   }
 `;
