@@ -45,6 +45,7 @@ import {
   DBG_CHECKPOINTS, // Z40
   DBG_LAYOUT, // Z41
   DBG_LUCES, // Z42
+  DBG_FRACTAL, // Z43
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -322,6 +323,7 @@ export default function DebugMenu() {
   const [sec, setSec] = useState({ ...DBG_SECUENCIA });                    // Z39
   const [ckf, setCkf] = useState({ ...DBG_CHECKPOINTS });                  // Z40
   const [lay, setLay] = useState({ ...DBG_LAYOUT });                       // Z41
+  const [frc, setFrc] = useState({ ...DBG_FRACTAL });                      // Z43
   const [luc, setLuc] = useState({ ...DBG_LUCES, HALO_X: [...DBG_LUCES.HALO_X], RADIO_X: [...DBG_LUCES.RADIO_X], CONO_X: [...DBG_LUCES.CONO_X], POZO_X: [...DBG_LUCES.POZO_X] }); // Z42
   const [tab, setTab]         = useState<Tab>("SILLAS");
   const [spot,     setSpot]     = useState({ ...DBG_SPOTLIGHT });
@@ -1522,6 +1524,38 @@ export default function DebugMenu() {
             <input type="range" min={0} max={10} step={0.05} style={{ flex: 1 }} value={lay.MONOLITOS_OFFSET_M}
               onChange={e => { const v = parseFloat(e.target.value); DBG_LAYOUT.MONOLITOS_OFFSET_M = v; setLay(o => ({ ...o, MONOLITOS_OFFSET_M: v })); }} />
           </div>
+          <div style={DIVIDER} />
+          {/* Z43: fractal de las caras del prisma (jungle fractal II) — todo en vivo */}
+          <span style={LABEL}>Fractal del prisma Z43 <span style={NOTE}>(caras · live)</span></span>
+          {(["DISENO_NUEVO", "CELULAR_ON", "CARAS_DISTINTAS"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{k === "DISENO_NUEVO" ? "off = fractal anterior" : k === "CELULAR_ON" ? "recompila el material" : "uSemilla por cara"}</span></span>
+              <button style={INPUT} onClick={() => {
+                const v = !frc[k];
+                DBG_FRACTAL[k] = v;
+                setFrc(o => ({ ...o, [k]: v }));
+              }}>{frc[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["PROX_FORZADA", -1, 1, 0.01, "−1 = off"], ["DIST_INICIO_M", 1, 15, 0.1, "m"], ["DIST_MAX_M", 0, 5, 0.05, "m"],
+            ["INERCIA_60", 0.005, 1, 0.005, "por frame a 60 fps"], ["VEL_MIN", 0, 3, 0.01, ""], ["VEL_MAX", 0, 5, 0.05, ""],
+            ["OPACIDAD", 0, 1, 0.01, ""], ["ALFA_OSCURO", 0, 1, 0.01, ""], ["BRILLO", 0, 3, 0.05, ""], ["BRILLO_PROX", 0, 5, 0.05, ""],
+            ["ITERACIONES", 1, 32, 1, ""], ["ZOOM", 0.2, 6, 0.05, ""], ["BAILOUT", 1, 40, 0.5, ""], ["X", -1.5, 1.5, 0.005, ""], ["Y", -1.5, 1.5, 0.005, ""],
+            ["OFFSET_X", -2, 2, 0.01, ""], ["OFFSET_Y", -2, 2, 0.01, ""], ["DEPTH_CULL", 0, 1, 0.005, ""], ["GRANO", 0, 2, 0.05, ""],
+            ["ESCALA", 0.1, 2, 0.01, "cara → coord."], ["CENTRO_X", -1, 2, 0.01, ""], ["CENTRO_Y", -1, 2, 0.01, ""],
+            ["PROX_MIN_MUSICA", 0, 1, 0.01, ""], ["MUSICA_GRAVES", 0, 2, 0.05, "zoom"], ["MUSICA_MEDIOS", 0, 2, 0.05, "X, Y"],
+            ["MUSICA_AGUDOS", 0, 2, 0.05, "brillo"], ["MUSICA_SUAVE_S", 0.01, 1, 0.01, "s"], ["MUSICA_ENTRADA_S", 0.05, 3, 0.05, "s"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{frc[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={frc[k]}
+                onChange={e => { const v = parseFloat(e.target.value); DBG_FRACTAL[k] = v; setFrc(o => ({ ...o, [k]: v })); }} />
+            </div>
+          ))}
+          {(["COLOR_OSCURO", "COLOR_MEDIO", "COLOR_CLARO"] as const).map(k => (
+            <ColorField key={k} label={k} value={frc[k]} onChange={v => { DBG_FRACTAL[k] = v; setFrc(o => ({ ...o, [k]: v })); }} />
+          ))}
           <div style={DIVIDER} />
           {/* Z42: diseño de las 4 luces del visualizador (LucesHaz, estilo luz de la narrativa) — todo en vivo */}
           <span style={LABEL}>Luces del visualizador Z42 <span style={NOTE}>(halo, cono y charco · live)</span></span>

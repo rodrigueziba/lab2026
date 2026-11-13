@@ -932,3 +932,48 @@ export const DBG_LUCES = {
   CONO_X:     [1, 1, 1, 1] as number[],
   POZO_X:     [1, 1, 1, 1] as number[],
 };
+
+// ── Z43: fractal de las caras del prisma ("jungle fractal II", George Toledo 2015; lib/prisma/fractalJungla.glsl.ts) ──
+// Progresión pura en lib/prisma/fractalProgresion.ts (prueba: scripts/fractal-test.mjs). Todo live.
+export const DBG_FRACTAL = {
+  DISENO_NUEVO:     true,   // false = exactamente el fractal anterior (S2, Julia con tono que gira)
+  // progresión por distancia (distancia 3D del ojo al centro del prisma, como el S2 anterior)
+  DIST_INICIO_M:    5.0,    // empieza a verse (= DBG_PRISM.nearM, donde hoy empieza a cambiar el material)
+  DIST_MAX_M:       1.2,    // máximo (pegado a la cara: radio 1 m + diferencia de altura ojo/centro ≈ 0,4 m)
+  INERCIA_60:       0.04,   // fracción por frame a 60 fps hacia el objetivo (= lerp 0,04 del S2), sin depender de los fps
+  PROX_FORZADA:     -1,     // -1 = desactivado; 0…1 fuerza prox (ver el efecto sin caminar; ignora el aterrizaje)
+  VEL_MIN:          0.15,   // velocidad de animación lejos (prox 0)
+  VEL_MAX:          1.5,    // velocidad pegado (prox 1)
+  OPACIDAD:         0.8,    // opacidad máxima (el S2 usaba 0,8)
+  ALFA_OSCURO:      0.6,    // opacidad de la parte oscura respecto de la clara (se lee como forma oscura sobre el vidrio)
+  BRILLO:           1.0,    // brillo base de la paleta
+  BRILLO_PROX:      2.5,    // × (1 + prox · BRILLO_PROX), como el S2 (alimenta el bloom de cerca)
+  // paleta (del S2: hsl(tono, 0,85, 0,55) en los tonos amarillo/naranja; oscuro = naranja × 0,12)
+  COLOR_OSCURO:     "#1C1005" as string,
+  COLOR_MEDIO:      "#EE882B" as string,   // hsl(0,08, 0,85, 0,55)
+  COLOR_CLARO:      "#EEB72B" as string,   // hsl(0,12, 0,85, 0,55)
+  // parámetros originales del shader
+  ITERACIONES:      16,     // 1…32 (probar 10–12 si el costo es alto)
+  CELULAR_ON:       true,   // ruido celular de Gustavson (2 búsquedas extra por píxel); cambiarlo recompila el material
+  ZOOM:             2.0,
+  BAILOUT:          12.0,
+  X:                -0.7,
+  Y:                0.3,
+  OFFSET_X:         0.0,
+  OFFSET_Y:         0.4,
+  DEPTH_CULL:       0.1,
+  GRANO:            1.0,    // el "rand" del original (grano fijo sobre la cara); 0 = sin grano
+  // mapeo cara → coordenada del original (metros de la cara × ESCALA + CENTRO; la cara mide 1,75 × 1,88 m)
+  ESCALA:           0.55,
+  CENTRO_X:         0.5,
+  CENTRO_Y:         0.28,
+  // música (solo con el visualizador activo y prox > PROX_MIN_MUSICA; 0 apaga cada una)
+  PROX_MIN_MUSICA:  0.15,
+  MUSICA_GRAVES:    0.5,    // graves (< 250 Hz) → zoom
+  MUSICA_MEDIOS:    0.5,    // medios (250 Hz – 4 kHz) → desplazamiento pequeño de X e Y
+  MUSICA_AGUDOS:    0.5,    // agudos (> 4 kHz) → brillo
+  MUSICA_SUAVE_S:   0.12,   // suavizado de cada banda (s)
+  MUSICA_ENTRADA_S: 0.6,    // entrada/salida de la reacción al acercarse/alejarse (s)
+  // caras
+  CARAS_DISTINTAS:  false,  // true = uSemilla distinta por cara (hoy las tres iguales)
+};

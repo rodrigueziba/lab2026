@@ -31,6 +31,19 @@ Cambios: sin texturas ni multipass; estrellas por celdas 3D sobre la dirección 
 manchones de densidad, titilar, velo azul del horizonte, rampa `uReveal` ligada a la
 distancia a la luz, calidad por capas (`uCapas`) y tope por canal (`uTope`).
 
+### Fractal de las caras del prisma (Z43)
+
+- Obra: *jungle fractal II*, por **George Toledo** (Shadertoy, 2015). El original no declara licencia:
+  rige la de Shadertoy por defecto, **CC BY-NC-SA 3.0** (uso académico / no comercial; atribución y
+  misma licencia en derivados).
+- Incluye *Cellular noise ("Worley noise") in 2D in GLSL*, © **Stefan Gustavson** 2011 — **MIT**
+  (texto de la licencia en el encabezado del archivo).
+- Archivo: `frontend/lib/prisma/fractalJungla.glsl.ts` (lo usa `frontend/components/Prism.tsx`).
+
+Cambios: coordenada por cara en metros (sin estirarse), tiempo propio acumulado según la cercanía,
+constantes como uniforms, divisiones protegidas, solo la intensidad del original pintada con la paleta
+amarilla/naranja del prisma, regiones combinadas con máscaras, ruido celular opcional y reacción a la música.
+
 ---
 
 ## Herramientas

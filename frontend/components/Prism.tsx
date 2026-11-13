@@ -6,8 +6,15 @@ import * as THREE from "three";
 import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
 import { TARIMA_H } from "./Tarima";
 import { INTERACT_STATE } from "@/lib/alightStore";
-import { DBG_PRISM, DBG_SECUENCIA } from "@/lib/debugConfig";
+import { DBG_PRISM, DBG_SECUENCIA, DBG_FRACTAL } from "@/lib/debugConfig";
 import { RELOJ, ahoraExp } from "@/lib/relojExperiencia"; // Z39
+// Z43: fractal nuevo de las caras ("jungle fractal II"), progresión por distancia y música
+import { FRACTAL_JUNGLA_VERT, FRACTAL_JUNGLA_FRAG } from "@/lib/prisma/fractalJungla.glsl";
+import { crearGeoCarasPrisma } from "@/lib/prisma/geoCarasPrisma";
+import { crearEstadoFractal, avanzarFractal } from "@/lib/prisma/fractalProgresion";
+import { PAUSA } from "@/lib/pausaExperiencia";
+import { isVizActivated } from "@/lib/alightStore";
+import { BAND_STATE } from "@/lib/vizAudio";
 
 const PRISM_Y_START   = 22;
 const PRISM_CONE_HALF = 0.9;
@@ -94,6 +101,34 @@ const PROX_FRAG = /* glsl */`
   }
 `;
 
+// ── Z43: uniforms del fractal nuevo (módulo, un solo set compartido por las 3 caras; patrón de LuzLejana) ──
+const FRACTAL_UNIFORMS = {
+  uT:              { value: 0 },
+  uProx:           { value: 0 },
+  uOpacidad:       { value: DBG_FRACTAL.OPACIDAD },
+  uAlfaOscuro:     { value: DBG_FRACTAL.ALFA_OSCURO },
+  uBrillo:         { value: DBG_FRACTAL.BRILLO },
+  uBrilloProx:     { value: DBG_FRACTAL.BRILLO_PROX },
+  uIter:           { value: DBG_FRACTAL.ITERACIONES },
+  uZoom:           { value: DBG_FRACTAL.ZOOM },
+  uBailout:        { value: DBG_FRACTAL.BAILOUT },
+  uC:              { value: new THREE.Vector2(DBG_FRACTAL.X, DBG_FRACTAL.Y) },
+  uOffset:         { value: new THREE.Vector2(DBG_FRACTAL.OFFSET_X, DBG_FRACTAL.OFFSET_Y) },
+  uDepthCull:      { value: DBG_FRACTAL.DEPTH_CULL },
+  uGrano:          { value: DBG_FRACTAL.GRANO },
+  uEscala:         { value: DBG_FRACTAL.ESCALA },
+  uCentro:         { value: new THREE.Vector2(DBG_FRACTAL.CENTRO_X, DBG_FRACTAL.CENTRO_Y) },
+  uColOscuro:      { value: new THREE.Color(DBG_FRACTAL.COLOR_OSCURO) },
+  uColMedio:       { value: new THREE.Color(DBG_FRACTAL.COLOR_MEDIO) },
+  uColClaro:       { value: new THREE.Color(DBG_FRACTAL.COLOR_CLARO) },
+  uSemilla:        { value: new THREE.Vector4(0, 1.3, 2.6, 3.9) },   // una por cara (0, 1, 2) y la base (3)
+  uCarasDistintas: { value: 0 },
+  uMusZoom:        { value: 1 },
+  uMusC:           { value: new THREE.Vector2(0, 0) },
+  uMusBrillo:      { value: 1 },
+};
+const FRACTAL_DEFINES = { CELULAR: DBG_FRACTAL.CELULAR_ON ? 1 : 0 };
+
 export default function Prism() {
   const groupRef    = useRef<THREE.Group>(null!);
   const proxRef     = useRef<THREE.ShaderMaterial>(null!);
@@ -104,6 +139,15 @@ export default function Prism() {
   const landedRef   = useRef(false);
   // S2: time-tracking for translucency ramp-up
   const nearSince   = useRef<number | null>(null);
+  // Z43: fractal nuevo
+  const oldOverlayRef = useRef<THREE.Mesh>(null!);
+  const fracMeshRef   = useRef<THREE.Mesh>(null!);
+  const fracMatRef    = useRef<THREE.ShaderMaterial>(null!);
+  const fracEstado    = useRef(crearEstadoFractal());
+  const fracColores   = useRef(["", "", ""]);
+  const geoFractal    = useMemo(() => crearGeoCarasPrisma(1.01, 1.81, 3), []);
+  useEffect(() => () => geoFractal.dispose(), [geoFractal]);
+  useEffect(() => { fracEstado.current = crearEstadoFractal(); FRACTAL_UNIFORMS.uProx.value = 0; }, []);
 
   const proxUniforms = useMemo(() => ({
     uProximity: { value: 0.0 },
@@ -121,7 +165,7 @@ export default function Prism() {
     return () => window.removeEventListener("activar-prisma", handler);
   }, []);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, dt) => {
     if (!groupRef.current || !active.current) return;
 
     if (needStart.current) {
@@ -182,6 +226,45 @@ export default function Prism() {
       proxRef.current.uniforms.uTime.value = clock.elapsedTime;
     }
 
+    // ── Z43: fractal nuevo (una vez por frame; sin allocations) ─────────────────
+    const nuevo = DBG_FRACTAL.DISENO_NUEVO;
+    if (oldOverlayRef.current) oldOverlayRef.current.visible = !nuevo;
+    if (nuevo) {
+      const ne = BAND_STATE.normEnergy;
+      const fe = avanzarFractal(fracEstado.current, DBG_FRACTAL, dt, dist, landedRef.current, PAUSA.activa,
+        isVizActivated(), Math.max(ne[0] ?? 0, ne[1] ?? 0), ne[2] ?? 0, ne[3] ?? 0);
+      const U = FRACTAL_UNIFORMS;
+      U.uT.value = fe.t;
+      U.uProx.value = fe.prox;
+      U.uOpacidad.value = DBG_FRACTAL.OPACIDAD;
+      U.uAlfaOscuro.value = DBG_FRACTAL.ALFA_OSCURO;
+      U.uBrillo.value = DBG_FRACTAL.BRILLO;
+      U.uBrilloProx.value = DBG_FRACTAL.BRILLO_PROX;
+      U.uIter.value = Math.max(1, Math.min(32, Math.round(DBG_FRACTAL.ITERACIONES)));
+      U.uZoom.value = DBG_FRACTAL.ZOOM;
+      U.uBailout.value = DBG_FRACTAL.BAILOUT;
+      U.uC.value.set(DBG_FRACTAL.X, DBG_FRACTAL.Y);
+      U.uOffset.value.set(DBG_FRACTAL.OFFSET_X, DBG_FRACTAL.OFFSET_Y);
+      U.uDepthCull.value = DBG_FRACTAL.DEPTH_CULL;
+      U.uGrano.value = DBG_FRACTAL.GRANO;
+      U.uEscala.value = DBG_FRACTAL.ESCALA;
+      U.uCentro.value.set(DBG_FRACTAL.CENTRO_X, DBG_FRACTAL.CENTRO_Y);
+      U.uCarasDistintas.value = DBG_FRACTAL.CARAS_DISTINTAS ? 1 : 0;
+      U.uMusZoom.value = fe.musZoom;
+      U.uMusC.value.set(fe.musCx, fe.musCy);
+      U.uMusBrillo.value = fe.musBrillo;
+      const cols = fracColores.current;
+      if (cols[0] !== DBG_FRACTAL.COLOR_OSCURO) { cols[0] = DBG_FRACTAL.COLOR_OSCURO; U.uColOscuro.value.set(cols[0]); }
+      if (cols[1] !== DBG_FRACTAL.COLOR_MEDIO)  { cols[1] = DBG_FRACTAL.COLOR_MEDIO;  U.uColMedio.value.set(cols[1]); }
+      if (cols[2] !== DBG_FRACTAL.COLOR_CLARO)  { cols[2] = DBG_FRACTAL.COLOR_CLARO;  U.uColClaro.value.set(cols[2]); }
+      // ruido celular: es un #define (sin rama en el fragment); cambiarlo recompila solo este material
+      const mat = fracMatRef.current;
+      const cel = DBG_FRACTAL.CELULAR_ON ? 1 : 0;
+      if (mat && mat.defines && mat.defines.CELULAR !== cel) { mat.defines.CELULAR = cel; mat.needsUpdate = true; }
+    }
+    // invisible (prox ≈ 0 o diseño anterior) → no se dibuja: costo 0 lejos del prisma
+    if (fracMeshRef.current) fracMeshRef.current.visible = nuevo && FRACTAL_UNIFORMS.uProx.value > 0.001;
+
     // Glass translucency ramp (PRISM_TRANSLUCENT_MS)
     if (dist < nearM && landedRef.current) {
       const ahoraP = DBG_SECUENCIA.RELOJ_UNIFICADO ? ahoraExp() : performance.now();   // Z39
@@ -208,14 +291,29 @@ export default function Prism() {
         <coneGeometry args={[1.0, 1.8, 3, 1]} />
         <primitive object={GLASS_MAT} attach="material" />
       </mesh>
-      {/* S2: fractal proximity overlay */}
-      <mesh>
+      {/* S2: fractal proximity overlay (Z43: oculto con DBG_FRACTAL.DISENO_NUEVO) */}
+      <mesh ref={oldOverlayRef}>
         <coneGeometry args={[1.01, 1.81, 3, 1]} />
         <shaderMaterial
           ref={proxRef}
           vertexShader={PROX_VERT}
           fragmentShader={PROX_FRAG}
           uniforms={proxUniforms}
+          transparent
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Z43: fractal nuevo — mismo tamaño que el S2; un material y un set de uniforms para las 3 caras.
+          renderOrder 0 y sin depthWrite, como el S2: se ordena por distancia con paneles y haces y no tapa nada
+          de lo que está delante; el cielo (−0,5 / −1) queda detrás y el halo de las luces (10) encima. */}
+      <mesh ref={fracMeshRef} geometry={geoFractal} visible={false}>
+        <shaderMaterial
+          ref={fracMatRef}
+          vertexShader={FRACTAL_JUNGLA_VERT}
+          fragmentShader={FRACTAL_JUNGLA_FRAG}
+          uniforms={FRACTAL_UNIFORMS}
+          defines={FRACTAL_DEFINES}
           transparent
           depthWrite={false}
           side={THREE.DoubleSide}
