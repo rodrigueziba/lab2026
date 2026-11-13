@@ -13,7 +13,8 @@ import { OutputPass }      from "three/addons/postprocessing/OutputPass.js";
 import { Pass }            from "three/addons/postprocessing/Pass.js";
 import { CAPA_UI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
 import { RetroCRTShader, CRT_UNIFORMS } from "@/lib/retro/retroCRT";
-import { DBG_RETRO_FX, DBG_FLASH } from "@/lib/debugConfig";
+import { DBG_RETRO_FX, DBG_FLASH, DBG_DIA } from "@/lib/debugConfig";
+import { DIA } from "@/lib/cicloDia"; // Z48
 import { flashBoost, FLASH_STATE, medicionFlashLista, medirPicoFlash } from "@/lib/curtainFlash";
 import { createFlashBlowoutMaterial } from "@/lib/retro/flashBlowout";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
@@ -235,7 +236,9 @@ export default function RetroPostFX() {
     }
     // G2: topes absolutos (finitos) para exposición y bloom
     // G3: multiplicador de pico = 1 + (MULT − 1) × I
-    const expo = DBG_RETRO_FX.toneExposure * (1 + (DBG_FLASH.FLASH_EXPOSICION_MULT - 1) * I * b);
+    // Z48: el ciclo de día varía levemente la exposición (DIA.expo, 1 = sin cambio) mientras sigue a la escena
+    const expoDia = DIA.escena && DBG_DIA.NUEVO ? DIA.expo : 1;
+    const expo = DBG_RETRO_FX.toneExposure * expoDia * (1 + (DBG_FLASH.FLASH_EXPOSICION_MULT - 1) * I * b);
     renderer.toneMappingExposure = Number.isFinite(expo) ? Math.min(expo, DBG_FLASH.FLASH_EXPOSICION_TOPE) : DBG_RETRO_FX.toneExposure;
     if (bloomRef.current) {
       bloomRef.current.threshold = DBG_RETRO_FX.bloomThreshold;

@@ -38,7 +38,8 @@ export function dispararAmanecer(): void {
   if (AMANECER.fase === "inactivo") AMANECER.pendiente = true;
 }
 
-function emitirFin(): void {
+/** Z48: también lo usa el ciclo de día al terminar la introducción (mismo evento, una vez). */
+export function emitirFin(): void {
   AMANECER.emitidos++;
   const w = (globalThis as { window?: { dispatchEvent(e: Event): boolean } }).window;
   if (!w || typeof CustomEvent === "undefined") return;

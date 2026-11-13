@@ -13,7 +13,8 @@ useTexture.preload([
   "/portal/portal-color.png",
 ]);
 import { domeVert, domeFrag } from "./domeShaders";
-import { DBG_DOME_LIVE, DBG_DOME_FORCE } from "@/lib/debugConfig";
+import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA } from "@/lib/debugConfig";
+import { DIA } from "@/lib/cicloDia"; // Z48
 
 export type Bands = { bass: number; lowMid: number; highMid: number; treble: number }; // 0..1
 // W4: parámetros de ajuste del shader (leídos cada frame vía callback — sin recrear material)
@@ -141,6 +142,25 @@ export default function DomeSky({
           uSoftEdge:    { value: 0 },
           // X2b: debug máscaras
           uDebugMasks:  { value: 0 },
+          // Z48: ciclo de día (lib/cicloDia.ts); con uDiaNuevo = 0 el shader hace lo de siempre
+          uDiaNuevo:    { value: 0 },
+          uDia:         { value: 0 },
+          uSolDir:      { value: new THREE.Vector3(0, -1, 0) },
+          uLuzDia:      { value: 0 },
+          uColHor:      { value: new THREE.Vector3() },
+          uColMed:      { value: new THREE.Vector3() },
+          uColCen:      { value: new THREE.Vector3() },
+          uColGlow:     { value: new THREE.Vector3() },
+          uBrilloSol:   { value: 0 },
+          uEstrellas:   { value: 1 },
+          uMontCrece:   { value: 0 },
+          uMontCentro:  { value: 0 },
+          uMontAncho:   { value: DBG_DIA.MONT_ANCHO },
+          uMontSilueta: { value: DBG_DIA.MONT_SILUETA },
+          uSolRadio:    { value: DBG_DIA.SOL_RADIO },
+          uSolPulso:    { value: 0 },
+          uNubesBrillo: { value: 0 },
+          uPortalNoche: { value: DBG_DIA.PORTAL_NOCHE },
         },
       }),
     // los uniformes sueltos se actualizan en useFrame; el material solo se recrea si cambia la calidad
@@ -219,6 +239,29 @@ export default function DomeSky({
     }
     // X2b: debug máscaras
     u.uDebugMasks.value = DBG_DOME_FORCE.masks ? 1.0 : 0.0;
+    // Z48: ciclo de día (los revelados de la introducción ya llegan por uDawn / uReveal desde DomeSkyAnchor)
+    u.uDiaNuevo.value = DBG_DIA.NUEVO ? 1 : 0;
+    if (DBG_DIA.NUEVO) {
+      u.uDia.value = DIA.dia;
+      u.uSolDir.value.set(DIA.solDir[0], DIA.solDir[1], DIA.solDir[2]);
+      u.uLuzDia.value = DIA.luz;
+      u.uColHor.value.set(DIA.hor[0], DIA.hor[1], DIA.hor[2]);
+      u.uColMed.value.set(DIA.med[0], DIA.med[1], DIA.med[2]);
+      u.uColCen.value.set(DIA.cen[0], DIA.cen[1], DIA.cen[2]);
+      u.uColGlow.value.set(DIA.glow[0], DIA.glow[1], DIA.glow[2]);
+      u.uBrilloSol.value = DIA.brilloSol;
+      u.uEstrellas.value = DIA.estrellas;
+      u.uMontCrece.value = DIA.montCrece;
+      // centro del crecimiento = azimut de la salida del sol, en vueltas (-0,5…0,5) como el shader
+      const azS = (DBG_DIA.SOL_AZ_SALIDA_DEG / 360) % 1;
+      u.uMontCentro.value = azS > 0.5 ? azS - 1 : azS < -0.5 ? azS + 1 : azS;
+      u.uMontAncho.value = DBG_DIA.MONT_ANCHO;
+      u.uMontSilueta.value = DBG_DIA.MONT_SILUETA;
+      u.uSolRadio.value = DBG_DIA.SOL_RADIO;
+      u.uSolPulso.value = DIA.solPulso;
+      u.uNubesBrillo.value = DIA.nubesBrillo;
+      u.uPortalNoche.value = DBG_DIA.PORTAL_NOCHE;
+    }
     // X2 PASO 1: escribir valores live (sin allocations — solo asignaciones de número)
     DBG_DOME_LIVE.uDawn     = u.uDawn.value;
     DBG_DOME_LIVE.revX      = u.uReveal.value.x;

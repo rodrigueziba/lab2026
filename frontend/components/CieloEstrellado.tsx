@@ -25,7 +25,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_LUZ } from "@/lib/debugConfig";
+import { DBG_LUZ, DBG_DIA } from "@/lib/debugConfig";
+import { DIA } from "@/lib/cicloDia"; // Z48
 import { LUZ_STATE, CIELO_STATE, revealPorDistancia } from "@/lib/caminoLuz";
 import { INTERACT_STATE, PANELES_SILLAS, isVizActivated } from "@/lib/alightStore";
 import { PAUSA } from "@/lib/pausaExperiencia";
@@ -149,7 +150,8 @@ export default function CieloEstrellado() {
     CIELO_STATE.aten   += (atenObj - CIELO_STATE.aten) * (1 - Math.exp(-dt / Math.max(0.01, DBG_LUZ.ESTRELLAS_ATEN_TRANS_S)));
     CIELO_STATE.reveal += (obj - CIELO_STATE.reveal) * (1 - Math.exp(-dt / Math.max(0.01, DBG_LUZ.ESTRELLAS_INERCIA_S)));
     if (obj === 0 && CIELO_STATE.reveal < 0.002) CIELO_STATE.reveal = 0;   // Z31: vuelve a 0 exacto
-    let r = CIELO_STATE.reveal * CIELO_STATE.aten;
+    // Z48: con el ciclo de día siguiendo a la escena, las estrellas de la sala se apagan con la luz del día
+    let r = CIELO_STATE.reveal * CIELO_STATE.aten * (DIA.escena && DBG_DIA.NUEVO ? DIA.estrellas : 1);
     if (DBG_LUZ.ESTRELLAS_FORZAR_REVEAL >= 0) r = Math.min(1, DBG_LUZ.ESTRELLAS_FORZAR_REVEAL);
 
     // ── uniforms en vivo ──

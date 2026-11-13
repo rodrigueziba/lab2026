@@ -16,7 +16,8 @@
 
 export type CheckpointId =
   | "inicio" | "exploracion" | "sillas_prisma" | "sala_activa" | "visualizador" | "amanecer_completo"
-  | "tarima" | "tarima_vacia" | "luz_dialogo" | "premio";
+  | "tarima" | "tarima_vacia" | "luz_dialogo" | "premio"
+  | "dia_mediodia" | "dia_atardecer" | "dia_noche";   // Z48
 
 /** ["accion", ...args] */
 export type Paso = readonly [string, ...(string | number)[]];
@@ -54,6 +55,13 @@ export const CHECKPOINTS: readonly Checkpoint[] = [
     descripcion: "Sala activa + visualizador (4 luces y 2 monolitos), sin amanecer." },
   { id: "amanecer_completo", nombre: "Amanecer completo", pasos: [...VIZ, ["amanecerFinal"], ["esperarFrames", 2]],
     descripcion: "Visualizador con el amanecer terminado (fase 1 y fase 2)." },
+  // Z48: ciclo de día (con DBG_DIA.NUEVO): después del amanecer completo, ubica el día en tDia
+  { id: "dia_mediodia", nombre: "Día: mediodía", pasos: [...VIZ, ["amanecerFinal"], ["diaEn", 0.5], ["esperarFrames", 2]],
+    descripcion: "Visualizador con la introducción terminada y el ciclo de día en tDia 0,50 (mediodía)." },
+  { id: "dia_atardecer", nombre: "Día: atardecer", pasos: [...VIZ, ["amanecerFinal"], ["diaEn", 0.8], ["esperarFrames", 2]],
+    descripcion: "Visualizador con el ciclo de día en tDia 0,80 (atardecer)." },
+  { id: "dia_noche", nombre: "Día: noche", pasos: [...VIZ, ["amanecerFinal"], ["diaEn", 0.97], ["esperarFrames", 2]],
+    descripcion: "Visualizador con el ciclo de día en tDia 0,97 (noche, poco antes de que termine el día)." },
   { id: "tarima", nombre: "Tarima", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5]],
     descripcion: "Camino TARIMA elegido (zona del Player). Público y atriles llegan con sus tiempos reales." },
   { id: "tarima_vacia", nombre: "Tarima vacía", pasos: [...EXPLORACION, ["tarimaVacia"], ["esperarEvento", "alight:lecterns-visible", 8]],

@@ -51,6 +51,26 @@ uniform float uSoftEdge;
 // X2b: debug — pintar canales R/G/B de la máscara como colores sólidos (0=off, 1=on)
 uniform float uDebugMasks;
 
+// Z48: ciclo de día (lib/cicloDia.ts). Con uDiaNuevo = 0 todo sigue como antes (uDawn / uReveal).
+uniform float uDiaNuevo;     // 0 = amanecer viejo (mezcla de 10 s), 1 = ciclo de día
+uniform float uDia;          // tDia 0..1 (informativo; los colores ya vienen interpolados)
+uniform vec3  uSolDir;       // dirección del sol (unitaria; y < 0 = bajo el horizonte)
+uniform float uLuzDia;       // luz del día 0..1
+uniform vec3  uColHor;       // cielo del mundo: horizonte, medio y cénit (sRGB)
+uniform vec3  uColMed;
+uniform vec3  uColCen;
+uniform vec3  uColGlow;      // resplandor alrededor del sol
+uniform float uBrilloSol;    // intensidad del resplandor (máximo al salir y al ponerse)
+uniform float uEstrellas;    // visibilidad de las estrellas (se apagan con la luz)
+uniform float uMontCrece;    // 0..1 crecimiento de la cordillera, por azimut desde uMontCentro
+uniform float uMontCentro;   // azimut del centro del crecimiento (vueltas, -0.5..0.5, = salida del sol)
+uniform float uMontAncho;    // ancho del frente de crecimiento (vueltas)
+uniform float uMontSilueta;  // altura antes de crecer (fracción): silueta oscura desde el principio
+uniform float uSolRadio;     // radio angular del disco (rad)
+uniform float uSolPulso;     // gancho de música: pulso del halo (0 = sin efecto)
+uniform float uNubesBrillo;  // gancho de música: brillo de las nubes (0 = sin efecto)
+uniform float uPortalNoche;  // brillo del portal de noche (× luz del día)
+
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
 const float PORTAL_R = 0.848;
@@ -178,6 +198,23 @@ vec3 worldSky(vec3 d, float t) {
   return c;
 }
 
+// Z48: cielo del mundo con dirección: degradado del ciclo + resplandor hacia el azimut del sol (más intenso
+// cerca del horizonte) + brillo alrededor del disco. Mismo fbm que worldSky (una sola llamada).
+vec3 cieloDia(vec3 d, float t) {
+  float h = d.y;
+  vec3 c = mix(uColHor, uColMed, smoothstep(0.0, 0.35, h));
+  c = mix(c, uColCen, smoothstep(0.25, 0.95, h));
+  c *= 0.85 + 0.15 * (0.5 + 0.5 * fbm4(d.xz * 3.0 + t * 0.03));
+  vec2 dh = normalize(d.xz + vec2(1e-5, 0.0));
+  vec2 sh = normalize(uSolDir.xz + vec2(1e-5, 0.0));
+  float haciaSol = 0.5 + 0.5 * dot(dh, sh);
+  float cercaHor = exp(-max(h, 0.0) * 5.0);
+  float cercaSol = pow(max(dot(d, uSolDir), 0.0), 8.0);
+  c += uColGlow * uBrilloSol * (pow(haciaSol, 6.0) * cercaHor * 0.7 + cercaSol * 0.3);
+  c = mix(uColHor * 0.15, c, smoothstep(-0.12, 0.02, h));
+  return c;
+}
+
 float tri(float x) { return abs(fract(x) * 2.0 - 1.0); }
 // altura (en seno de elevacion) de la cordillera para el azimut u en (-0.5, 0.5]
 float ridgeH(float u, float seed) {
@@ -206,10 +243,27 @@ void main() {
   // ---- mundo alrededor ----
   // W3: antes del amanecer (uDawn=0) el cielo es violeta oscuro; se abre al atardecer con uDawn
   vec3 nightSky = vec3(0.025, 0.018, 0.035);
-  vec3 col = mix(nightSky, worldSky(d, t), uDawn);
+  vec3 col;
+  if (uDiaNuevo > 0.5) col = cieloDia(d, t);                 // Z48: rama uniforme (un solo fbm en cada una)
+  else col = mix(nightSky, worldSky(d, t), uDawn);
   float worldStars = starLayer(d, 58.0, uStarCut - 0.02 * cielo, 0.20, t, 0.6 + 0.4 * cielo);
   // W3: estrellas del mundo solo después del amanecer + fase 2 CIELO
-  col += vec3(1.0, 0.92, 0.80) * worldStars * (0.7 + 0.9 * cielo + 0.5 * kick) * smoothstep(0.02, 0.45, d.y) * uReveal.w;
+  // Z48: con el ciclo, visibles de noche y apagadas con la luz del día (uEstrellas)
+  col += vec3(1.0, 0.92, 0.80) * worldStars * (0.7 + 0.9 * cielo + 0.5 * kick) * smoothstep(0.02, 0.45, d.y) * mix(uReveal.w, uEstrellas, uDiaNuevo);
+
+  // Z48: sol en el cielo del mundo (estética del sol del portal: anillo rojo, crema y núcleo amarillo, con
+  // halo). Se dibuja antes de la cordillera, así sale DETRÁS de las montañas; bajo el horizonte lo corta el alfa.
+  if (uDiaNuevo > 0.5) {
+    float ang = acos(clamp(dot(d, uSolDir), -1.0, 1.0));
+    float R = uSolRadio * (1.0 + 0.08 * uSolPulso);
+    float vis = smoothstep(-2.0 * R, 0.0, uSolDir.y);
+    col += vec3(0.9, 0.35, 0.1) * 0.35 * (0.6 + 0.4 * uLuzDia + uSolPulso) * exp(-5.0 * max(ang / R - 1.0, 0.0)) * vis;
+    vec3 rojoSol = mix(vec3(0.898, 0.361, 0.161), vec3(0.894, 0.196, 0.169), smoothstep(-0.1, 0.4, d.y));
+    col = mix(col, rojoSol, smoothstep(R + 0.002, R - 0.002, ang) * vis);
+    col = mix(col, vec3(0.973, 0.918, 0.847), smoothstep(R * 0.757 + 0.002, R * 0.757 - 0.002, ang) * vis);
+    col = mix(col, vec3(0.996, 0.741, 0.090), smoothstep(R * 0.464 + 0.002, R * 0.464 - 0.002, ang) * vis);
+    col = min(col, vec3(0.97));   // que el resplandor no sature a blanco con el bloom (el disco se lee)
+  }
 
   // ---- marco de anillos (tunel) ----
   float wob  = fbm4(q * 2.2 + vec2(0.0, t * 0.04));
@@ -234,12 +288,19 @@ void main() {
   // cordillera que rodea el domo: capa lejana azul oscuro + capa cercana negra
   // W3: la cordillera crece desde el horizonte durante la fase 1 (escala por uDawn)
   float az = atan(d.x, -d.z) / TAU;
-  float hFar = 1.25 * ridgeH(az, 0.31) * uDawn;
-  float hNear = 0.70 * ridgeH(az + 0.17, 0.77) * uDawn;
+  // Z48: con el ciclo, la cordillera es una silueta desde el principio y crece por azimut desde la salida del sol
+  float dAz = abs(fract(az - uMontCentro + 0.5) - 0.5);                       // 0..0.5 vueltas
+  float frente = clamp((uMontCrece * (0.5 + uMontAncho) - dAz) / max(uMontAncho, 1e-3), 0.0, 1.0);
+  float creceM = mix(uMontSilueta, 1.0, frente * frente * (3.0 - 2.0 * frente));
+  float escalaM = mix(uDawn, creceM, uDiaNuevo);
+  float opM = mix(uDawn, 1.0, uDiaNuevo);
+  float luzM = mix(1.0, mix(0.35, 1.0, uLuzDia), uDiaNuevo);                  // de noche más oscura (silueta)
+  float hFar = 1.25 * ridgeH(az, 0.31) * escalaM;
+  float hNear = 0.70 * ridgeH(az + 0.17, 0.77) * escalaM;
   // Z2: multiplicar por uDawn — con h=0 (uDawn=0), smoothstep(0.0015,-0.0015,d.y) vale 0.5 en el horizonte
   // → franja gris visible. El factor uDawn oculta las montañas por completo antes del amanecer.
-  col = mix(col, vec3(0.133, 0.188, 0.227), smoothstep(0.0015, -0.0015, d.y - hFar)  * (1.0 - inside) * uDawn);
-  col = mix(col, vec3(0.098, 0.102, 0.133), smoothstep(0.0015, -0.0015, d.y - hNear) * (1.0 - inside) * uDawn);
+  col = mix(col, vec3(0.133, 0.188, 0.227) * luzM, smoothstep(0.0015, -0.0015, d.y - hFar)  * (1.0 - inside) * opM);
+  col = mix(col, vec3(0.098, 0.102, 0.133) * luzM, smoothstep(0.0015, -0.0015, d.y - hNear) * (1.0 - inside) * opM);
 
   // ---- cielo del portal ----
   if (inside > 0.001) {
@@ -273,20 +334,21 @@ void main() {
     float c1 = cloudShape(p, vec2(-0.5585 + dr, 0.1579), 0.125 * sc, 0.70);
     float c2 = cloudShape(p, vec2( 0.6770 - dr, 0.1382), 0.208 * sc, 0.70);
     float c3 = cloudShape(p, vec2( 0.4596 + dr, 0.3487), 0.053 * sc, 0.70);
-    vec3 cloudCol = vec3(0.957, 0.914, 0.831);
+    vec3 cloudCol = vec3(0.957, 0.914, 0.831) * (1.0 + uNubesBrillo);   // Z48: gancho de música (0 = igual)
     sky = mix(sky, cloudCol, smoothstep(0.004, -0.004, c1));
     sky = mix(sky, cloudCol, smoothstep(0.004, -0.004, c2));
     sky = mix(sky, cloudCol, smoothstep(0.004, -0.004, c3));
 
     // estrellas y destellos fijos de la referencia — W3: solo en fase 2 CIELO
     float tw = 0.75 + 0.25 * sin(t * 3.0) + 0.6 * cielo + 0.4 * kick;
-    sky += vec3(1.0, 0.95, 0.85) * starLayer(d, 70.0, uStarCut - 0.03 * cielo, 0.22, t, 0.7) * smoothstep(-0.1, 0.5, p.y) * (0.7 + cielo + 0.5 * kick) * uReveal.w;
+    sky += vec3(1.0, 0.95, 0.85) * starLayer(d, 70.0, uStarCut - 0.03 * cielo, 0.22, t, 0.7) * smoothstep(-0.1, 0.5, p.y) * (0.7 + cielo + 0.5 * kick) * uReveal.w * mix(1.0, uEstrellas, uDiaNuevo);
     sky = mix(sky, vec3(0.30, 0.45, 0.83), sparkle4(p - vec2(-0.3740, 0.3651), 0.040 * tw) * uReveal.w);
     sky = mix(sky, vec3(0.91, 0.32, 0.18), sparkle4(p - vec2( 0.0214, 0.7105), 0.036 * tw) * uReveal.w);
     sky = mix(sky, vec3(0.96, 0.92, 0.82), disc(p - vec2( 0.3245, 0.4836), 0.022) * uReveal.w);
     sky = mix(sky, vec3(0.95, 0.60, 0.18), disc(p - vec2(-0.1500, 0.6974), 0.014) * uReveal.w);
     // W3: el portal se funde en con el progreso del amanecer (fase 1)
-    col = mix(col, sky, inside * uDawn);
+    // Z48: con el ciclo, uDawn = revelado del portal en la introducción, y de noche el portal se apaga un poco
+    col = mix(col, sky * mix(1.0, mix(uPortalNoche, 1.0, uLuzDia), uDiaNuevo), inside * uDawn);
   }
 
   // ---- montanas (mascaras + color posterizado) ----

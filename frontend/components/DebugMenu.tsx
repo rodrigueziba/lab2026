@@ -47,6 +47,7 @@ import {
   DBG_LUCES, // Z42
   DBG_FRACTAL, // Z43
   DBG_TELON_TEXTO, // Z46
+  DBG_DIA, // Z48
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -67,6 +68,7 @@ import { AMANECER } from "@/lib/amanecer"; // Z38
 import { RELOJ, esperasPendientes } from "@/lib/relojExperiencia"; // Z39
 import { SECUENCIA } from "@/lib/secuenciaSillas"; // Z39
 import { CHECKPOINTS, CK_STATE, irACheckpoint } from "@/lib/checkpoints"; // Z40
+import { DIA } from "@/lib/cicloDia"; // Z48
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
 
 type Tab = "SILLAS" | "TARIMA";
@@ -326,6 +328,17 @@ export default function DebugMenu() {
   const [lay, setLay] = useState({ ...DBG_LAYOUT });                       // Z41
   const [frc, setFrc] = useState({ ...DBG_FRACTAL });                      // Z43
   const [ttx, setTtx] = useState({ ...DBG_TELON_TEXTO });                  // Z46
+  // Z48: ciclo de día — los valores viven en DBG_DIA (anidados); diaV fuerza el re-render al cambiarlos
+  const [, setDiaV] = useState(0);
+  const tocarDia = () => setDiaV(n => n + 1);
+  const [diaLive, setDiaLive] = useState("");
+  useEffect(() => {
+    const id = setInterval(() => setDiaLive(
+      `tDia=${DIA.dia.toFixed(3)} · ${DIA.etapa} · sol ${(DIA.solAlt * 180 / Math.PI).toFixed(1)}° · fase=${DIA.fase}` +
+      ` · t=${DIA.t.toFixed(1)}/${(DIA.dur).toFixed(0)} s · intro=${(DIA.intro * 100).toFixed(0)}% · montañas=${DIA.montCrece.toFixed(2)}` +
+      ` · luz=${DIA.luz.toFixed(2)} · estrellas=${DIA.estrellas.toFixed(2)} · ciclos=${DIA.ciclos}`), 250);
+    return () => clearInterval(id);
+  }, []);
   const [luc, setLuc] = useState({ ...DBG_LUCES, HALO_X: [...DBG_LUCES.HALO_X], RADIO_X: [...DBG_LUCES.RADIO_X], CONO_X: [...DBG_LUCES.CONO_X], POZO_X: [...DBG_LUCES.POZO_X] }); // Z42
   const [tab, setTab]         = useState<Tab>("SILLAS");
   const [spot,     setSpot]     = useState({ ...DBG_SPOTLIGHT });
@@ -1526,6 +1539,45 @@ export default function DebugMenu() {
             <input type="range" min={0} max={10} step={0.05} style={{ flex: 1 }} value={lay.MONOLITOS_OFFSET_M}
               onChange={e => { const v = parseFloat(e.target.value); DBG_LAYOUT.MONOLITOS_OFFSET_M = v; setLay(o => ({ ...o, MONOLITOS_OFFSET_M: v })); }} />
           </div>
+          <div style={DIVIDER} />
+          {/* Z48: ciclo de día (lib/cicloDia.ts) — todo en vivo */}
+          <span style={LABEL}>Ciclo de día Z48 <span style={NOTE}>(cielo, sol, estrellas, escena · live)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{diaLive}</span></div>
+          {(["NUEVO", "SINCRONIZAR_CON_TEMA", "LOOP", "OCULTAR_INVISIBLES"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{k === "NUEVO" ? "off = amanecer de 10 s (Z38)" : k === "OCULTAR_INVISIBLES" ? "esfera de panorama y caparazón con alfa 0" : ""}</span></span>
+              <button style={INPUT} onClick={() => { DBG_DIA[k] = !DBG_DIA[k]; tocarDia(); }}>{DBG_DIA[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["T_MANUAL", -1, 1, 0.005, "−1 = reloj; 0…1 fija tDia"], ["VELOCIDAD", 0.25, 16, 0.25, "× tiempo"],
+            ["INTRO_S", 40, 90, 1, "s"], ["DURACION_FALLBACK_S", 30, 600, 5, "s"],
+            ["SOL_AZ_SALIDA_DEG", 0, 360, 1, "° (180 = portal)"], ["SOL_ALT_MAX_DEG", 10, 85, 1, "°"], ["SOL_RADIO", 0.01, 0.2, 0.005, "rad"],
+            ["MONT_SILUETA", 0, 1, 0.01, ""], ["MONT_ANCHO", 0.02, 0.5, 0.01, "vueltas"], ["PORTAL_NOCHE", 0, 1, 0.01, ""],
+            ["MUSICA_SOL", 0, 2, 0.05, "gancho"], ["MUSICA_NUBES", 0, 2, 0.05, "gancho"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{DBG_DIA[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_DIA[k]}
+                onChange={e => { DBG_DIA[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          {(["ALBA", "SALIDA", "MEDIODIA", "ATARDECER", "CREPUSCULO"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>KEYS.{k} <span style={NOTE}>{DBG_DIA.KEYS[k].toFixed(3)}</span></span>
+              <input type="range" min={0.01} max={0.99} step={0.005} style={{ flex: 1 }} value={DBG_DIA.KEYS[k]}
+                onChange={e => { DBG_DIA.KEYS[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          {(["noche", "alba", "salida", "mediodia", "atardecer", "crepusculo"] as const).map(et => (
+            <div key={et}>
+              <span style={NOTE}>{et}</span>
+              {(["hor", "med", "cen", "glow"] as const).map(c => (
+                <ColorField key={c} label={`${et}.${c}`} value={DBG_DIA.ETAPAS[et][c]}
+                  onChange={v => { DBG_DIA.ETAPAS[et][c] = v; tocarDia(); }} />
+              ))}
+            </div>
+          ))}
           <div style={DIVIDER} />
           {/* Z46: texto proyectado sobre el telón — en vivo (ACTIVO se aplica al remontar el telón) */}
           <span style={LABEL}>Texto del telón Z46 <span style={NOTE}>(recorte del reflector · live)</span></span>

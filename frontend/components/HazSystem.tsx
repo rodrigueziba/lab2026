@@ -7,7 +7,7 @@
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS, DBG_RETRO_FX, DBG_AMANECER, DBG_LUCES } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_RETRO_FX, DBG_AMANECER, DBG_LUCES, DBG_DIA } from "@/lib/debugConfig";
 import { getHazUnderUser, getHazPositionsXZ } from "@/lib/haz";
 import { startVizAudio, openGate, closeGate, isPlaying } from "@/lib/vizAudio";
 import { getDawnState, startDawnSequence } from "@/lib/alightStore";
@@ -104,7 +104,7 @@ export default function HazSystem() {
       flashPendingRef.current[index] = on; // U6B: signal flash to useFrame
       // U9: first haz ever triggers dawn sequence (pending flag consumed in useFrame for clock access)
       // Z38: con la máquina única, el mismo disparo (primer haz on) la arranca; si no, la U9 vieja
-      if (on && DBG_AMANECER.UNIFICADO) dispararAmanecer();
+      if (on && (DBG_AMANECER.UNIFICADO || DBG_DIA.NUEVO)) dispararAmanecer();   // Z48: el ciclo de día usa el mismo disparo
       else if (on && getDawnState().phase === 'inactivo') dawnPendingRef.current = true;
       if (on) {
         if (!isPlaying()) {

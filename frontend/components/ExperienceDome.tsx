@@ -11,9 +11,10 @@ import SectorAudioFX from "./SectorAudioFX";
 import HazSystem from "./HazSystem";
 import HazRings from "./HazRings";
 import LucesHaz from "./LucesHaz"; // Z42
+import CicloDiaEscena from "./CicloDiaEscena"; // Z48
 import SymbolSystem from "./SymbolSystem";
 import Monoliths from "./Monoliths";
-import { DBG_SILLAS, DBG_PANELES, DBG_ORBITAS, DBG_SECUENCIA } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_PANELES, DBG_ORBITAS, DBG_SECUENCIA, DBG_DIA } from "@/lib/debugConfig";
 import { RELOJ, ahoraExp } from "@/lib/relojExperiencia"; // Z39
 import { SECUENCIA, iniciarRevelado, revelarFinal } from "@/lib/secuenciaSillas"; // Z39
 import { PRISM_CENTER_Y } from "./Prism"; // Z7: altura del origen de los haces
@@ -877,7 +878,9 @@ export default function ExperienceDome() {
     // Z13: + selección habilitada recién con la liberación del movimiento
     if (Z2_FASE_POR_PANEL) tickLinterna(camera, dt, ahoraR, panelesSillasVisibles(), PANELES_SILLAS.fase !== "oculto", seleccionPanelesHabilitada());
     if (shellRef.current) {
-      shellRef.current.visible = !DBG_SILLAS.vizHideShell;
+      // Z48: con opacidad 0 (visualizador activo) el caparazón no se ve (alfa 0, también el arcoíris): no se dibuja
+      const invisible = DBG_DIA.OCULTAR_INVISIBLES && DOME_SHELL_UNIFORMS.uShellOpacity.value < 0.002;
+      shellRef.current.visible = !DBG_SILLAS.vizHideShell && !invisible;
     }
     const target = vizActiveRef.current ? DBG_SILLAS.domeShellOpacity : 1.0;
     const cur    = DOME_SHELL_UNIFORMS.uShellOpacity.value;
@@ -936,6 +939,7 @@ export default function ExperienceDome() {
       {vizActive && <HazSystem />}
       {vizActive && <HazRings />}
       {vizActive && <LucesHaz />}{/* Z42: diseño de las 4 luces (estilo luz de la narrativa) */}
+      {vizActive && <CicloDiaEscena />}{/* Z48: fondo, niebla y luces de la escena siguen el ciclo de día */}
       {vizActive && <SymbolSystem />}
       {/* N5: monoliths flanking tarima path */}
       {vizActive && <Monoliths />}

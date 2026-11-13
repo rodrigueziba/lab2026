@@ -7,7 +7,8 @@
 import { useRef, useEffect, useMemo, useState, Suspense } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS, DBG_AMANECER, DOME_METERS, DBG_DOME_LIVE } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_AMANECER, DOME_METERS, DBG_DOME_LIVE, DBG_DIA } from "@/lib/debugConfig";
+import { DIA, ganchosMusica } from "@/lib/cicloDia"; // Z48
 import { prepareVizAudio, stopVizAudio, getVizBands, BAND_STATE, N5_STATE } from "@/lib/vizAudio";
 import { getDawnState, getDomeDawnState, startDomeDawn, finishDomeDawnPhase1, resetDomeDawnState, skipDomeDawnState } from "@/lib/alightStore";
 import { estadoCompat, resetAmanecer, skipAmanecer, easeOut3, type EstadoCompat } from "@/lib/amanecer"; // Z38
@@ -423,6 +424,7 @@ function DomeSkyAnchor() {
   const _s = useRef({
     gp: [0, 0, 0, 0], kick: 0, kickSeen: false,
     dawn: 0, revMont: 0, revLin: 0, revSol: 0, revCielo: 0,
+    bajos: 0, medios: 0,   // Z48: energía suavizada para los ganchos de música del ciclo
   });
   // W3: flags de reset/skip desde DebugMenu (seteados en evento, leídos en useFrame con acceso al clock)
   const _dawnReset = useRef(false);
@@ -521,6 +523,17 @@ function DomeSkyAnchor() {
       s.revCielo = _revealProgress(elapsed, DBG_SILLAS.domeRevDelayCieloS, DBG_SILLAS.domeRevDurS);
     }
     // inactivo: dawn=0, reveal=0 (defaults)
+    // Z48: con el ciclo de día, el portal y la fase 2 se revelan dentro de la introducción (lib/cicloDia.ts):
+    // portal (y nubes) → olas y estratos → anillos → cielo (warp, confeti). Las montañas y el sol van por
+    // uniforms propios (uMontCrece, uSolDir) y las estrellas por uEstrellas.
+    if (DBG_DIA.NUEVO) {
+      s.dawn = DIA.revPortal;
+      s.revMont = DIA.revOlas; s.revLin = DIA.revOlas; s.revSol = DIA.revAnillos; s.revCielo = DIA.revCielo;
+      // ganchos del visualizador futuro (ganancia 0 por defecto = sin efecto): graves → sol, medios → nubes
+      s.bajos += (Math.max(norm[0] ?? 0, norm[1] ?? 0) - s.bajos) * (1 - Math.exp(-dt / 0.12));
+      s.medios += ((norm[2] ?? 0) - s.medios) * (1 - Math.exp(-dt / 0.25));
+      ganchosMusica(DIA, DBG_DIA, s.bajos, s.medios);
+    }
 
     // W4: escribir medidores para el panel de debug (sin allocations — mutación directa)
     DOME_METERS.sol = s.gp[0]; DOME_METERS.mont  = s.gp[1];
@@ -860,6 +873,8 @@ export default function DomeVisualizer() {
         matRef.current.needsUpdate = true;
       }
       meshRef.current.renderOrder = solid ? 10 : -1;
+      // Z48: con DomeSky activo la esfera queda con alfa 0 (uFade = 0): no se dibuja (una pasada menos)
+      meshRef.current.visible = solid || !(DBG_DIA.OCULTAR_INVISIBLES && DBG_SILLAS.usarDomoShader && !DBG_SILLAS.domoOriginal);
     }
 
     // G1: scale animation 1.0 → vizSphereScale over vizFadeMs (gives "dome expansion" effect)

@@ -13,7 +13,8 @@
 
 import * as THREE from "three";
 import type { Accion } from "@/lib/checkpoints";
-import { DBG_SECUENCIA, DBG_CHECKPOINTS, DBG_LAYOUT } from "@/lib/debugConfig";
+import { DBG_SECUENCIA, DBG_CHECKPOINTS, DBG_LAYOUT, DBG_DIA } from "@/lib/debugConfig";
+import { DIA, posicionarDia } from "@/lib/cicloDia"; // Z48
 import { aplicarSpawn, EJE_TELON } from "@/lib/inicioEscena";
 import { cerrarDialogo, DIALOGO_STATE } from "@/lib/dialogo/dialogoEstado";
 import { EFECTOS_STATE, guardarPremio } from "@/lib/dialogo/efectosEstado";
@@ -27,7 +28,7 @@ import {
   resetDawn, resetDomeDawnState,
 } from "@/lib/alightStore";
 import { resetHaz } from "@/lib/haz";
-import { stopVizAudio, prepareVizAudio } from "@/lib/vizAudio";
+import { stopVizAudio, prepareVizAudio, duracionTemaViz, idTemaViz } from "@/lib/vizAudio";
 import { togglePlayPause } from "@/lib/audioEngine";
 import { resetLinterna } from "@/lib/linternaPaneles";
 import { resetFoco } from "@/lib/focoSubpanel";
@@ -179,6 +180,12 @@ export const ACCIONES_CHECKPOINT: Record<string, Accion> = {
       window.dispatchEvent(new CustomEvent("alight:dawn-complete"));
       window.dispatchEvent(new CustomEvent("alight:dome-dawn-complete"));
     }
+    return true;
+  },
+
+  // Z48: ubica el ciclo de día en tDia = p[1] (introducción terminada). Sin el ciclo nuevo no hace nada.
+  diaEn: (p) => {
+    if (DBG_DIA.NUEVO) posicionarDia(DIA, DBG_DIA, Number(p[1]), AMANECER, duracionTemaViz(), idTemaViz());
     return true;
   },
 

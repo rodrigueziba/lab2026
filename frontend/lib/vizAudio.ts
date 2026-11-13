@@ -216,8 +216,18 @@ async function fetchVizPlaylist(): Promise<void> {
   } catch { /* playlist stays empty, loop plays same track */ }
 }
 
+// Z48: duración e identificador del tema que suena (el ciclo de día dura lo que dura el tema). El id cambia
+// cada vez que empieza un tema (también si se repite el mismo).
+let _temaId = 0;
+export function duracionTemaViz(): number {
+  const d = _vizAudioEl?.duration;
+  return d !== undefined && Number.isFinite(d) && d > 0 ? d : NaN;
+}
+export function idTemaViz(): number { return _temaId; }
+
 function onTrackEnded(): void {
   if (!_vizAudioEl) return;
+  _temaId++; // Z48
   _recentUrls.push(_currentUrl);
   if (_recentUrls.length > 2) _recentUrls.shift();
   const next = pickNextTrack();
@@ -365,6 +375,7 @@ export async function startVizAudio(): Promise<"ok" | "need-gesture"> {
     VIZ_AUDIO_DEBUG.ctxState = _vizCtx!.state;
     if (_vizCtx!.state === "suspended") await _vizCtx!.resume();
     _vizAudioEl!.currentTime = 0; // N4: start MUSIC_FIRST from the beginning
+    _temaId++; // Z48
     await _vizAudioEl!.play();
     _playStarted = true;
     VIZ_AUDIO_DEBUG.lastPlayResult = "ok";

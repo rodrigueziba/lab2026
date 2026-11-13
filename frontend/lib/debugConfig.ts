@@ -1027,3 +1027,46 @@ export const DBG_TELON_TEXTO = {
   DURACION_S:      25,      // s de experiencia desde que aparece
   DIST_OCULTAR_M:  12,      // se desvanece si el usuario se aleja más que esto del telón (el spawn está a 8 m)
 };
+
+// ── Z48: ciclo de día (lib/cicloDia.ts) atado a la duración del tema, con introducción lenta de amanecer ──
+// Colores en sRGB (el shader del domo escribe sRGB directo). La etapa "noche" usa los valores actuales de la
+// escena (fondo, niebla, hemisférica y ambiente), así antes de la primera luz no cambia nada fuera del domo.
+export const DBG_DIA = {
+  NUEVO:                true,   // false = amanecer de una sola mezcla de 10 s (Z38), como antes — live
+  INTRO_S:              60,     // introducción de amanecer (40…90 s): montañas → sol → resto — live
+  DURACION_FALLBACK_S:  180,    // duración del día si no se puede leer la del tema (o sin sincronizar) — live
+  SINCRONIZAR_CON_TEMA: true,   // el día dura lo que dura el tema que suena — live
+  LOOP:                 true,   // al terminar el día (o cambiar / repetirse el tema) empieza otro — live
+  T_MANUAL:             -1,     // 0…1 fija tDia (recorrer el día a mano; revela todo); −1 = el reloj sigue solo — live
+  VELOCIDAD:            1,      // multiplicador del tiempo del día (8 para probar) — live
+  DIA_MIN_S:            30,     // mínimo del tramo posterior a la introducción (temas muy cortos) — live
+  RESINCRO_MIN_S:       8,      // no reiniciar por cambio de tema si el día recién se reinició (s) — live
+  OCULTAR_INVISIBLES:   true,   // no dibujar la esfera de panorama ni el caparazón cuando son invisibles (alfa 0) — live
+  KEYS: { ALBA: 0.12, SALIDA: 0.20, MEDIODIA: 0.50, ATARDECER: 0.80, CREPUSCULO: 0.92 },
+  SOL_AZ_SALIDA_DEG:    120,    // azimut de la salida del sol (convención del domo: 180 = detrás de la tarima, centro del portal) — live
+  SOL_ALT_MAX_DEG:      60,     // altura del sol al mediodía — live
+  SOL_RADIO:            0.055,  // radio angular del disco del sol (rad) — live
+  MONT_SILUETA:         0.35,   // altura de la cordillera antes de crecer (fracción) — silueta oscura desde el principio — live
+  MONT_ANCHO:           0.12,   // ancho del frente de crecimiento (fracción de vuelta) — live
+  PORTAL_NOCHE:         0.45,   // brillo del portal de noche (× luz del día) — live
+  // tramos de la introducción (fracción de INTRO_S)
+  INTRO_U_ALBA:         0.35,   // fin del crecimiento de montañas = primeras luces (tDia = KEYS.ALBA)
+  INTRO_U_SOL:          0.70,   // el sol ya asomó sobre las montañas
+  INTRO_TDIA_SOL:       0.23,   // tDia en INTRO_U_SOL (el sol a ~8° sobre el horizonte)
+  INTRO_TDIA_FIN:       0.27,   // tDia al terminar la introducción
+  INTRO_MONT_FIN:       0.35,   // las montañas terminan de crecer
+  INTRO_RESTO_INI:      0.70,   // empieza el resto: portal y nubes
+  INTRO_RESTO_PASO:     0.05,   // escalón entre portal → olas/estratos → anillos → cielo (warp, confeti)
+  INTRO_RESTO_DUR:      0.15,   // duración de cada uno (el último termina en 1,0)
+  // ganchos del visualizador futuro (0 = sin efecto)
+  MUSICA_SOL:           0,      // pulso del halo del sol con los graves — live
+  MUSICA_NUBES:         0,      // brillo de las nubes con los medios — live
+  ETAPAS: {
+    noche:      { hor: "#141826", med: "#0A0D18", cen: "#04050B", glow: "#1A2238", fondo: "#0A0812", niebla: "#0B0A14", hemiCielo: "#1A2330", hemiSuelo: "#0D0A12", luz: 0.00, estrellas: 1.00, brilloSol: 0.00, hemiInt: 0.25, ambInt: 0.020, expo: 1.00 },
+    alba:       { hor: "#4A5A8C", med: "#26305A", cen: "#0C1028", glow: "#8A6A9A", fondo: "#0E0E1C", niebla: "#141A2C", hemiCielo: "#34406A", hemiSuelo: "#120E18", luz: 0.12, estrellas: 0.75, brilloSol: 0.25, hemiInt: 0.27, ambInt: 0.022, expo: 1.00 },
+    salida:     { hor: "#F2A04A", med: "#C8705A", cen: "#3A3E78", glow: "#FFB060", fondo: "#24161C", niebla: "#3A2628", hemiCielo: "#E8A070", hemiSuelo: "#2A1A16", luz: 0.45, estrellas: 0.10, brilloSol: 0.55, hemiInt: 0.34, ambInt: 0.028, expo: 1.05 },
+    mediodia:   { hor: "#F3D9A4", med: "#EBB46A", cen: "#6F8FB8", glow: "#FFE7B0", fondo: "#2E2A34", niebla: "#4A4450", hemiCielo: "#E8E2D4", hemiSuelo: "#3A2E26", luz: 1.00, estrellas: 0.00, brilloSol: 0.20, hemiInt: 0.50, ambInt: 0.045, expo: 1.19 },
+    atardecer:  { hor: "#F3B230", med: "#D55D2F", cen: "#7A3A35", glow: "#FF9A3A", fondo: "#26121A", niebla: "#3E2020", hemiCielo: "#F08850", hemiSuelo: "#2A1410", hemiInt: 0.36, ambInt: 0.028, luz: 0.50, estrellas: 0.05, brilloSol: 0.55, expo: 1.08 },
+    crepusculo: { hor: "#8A3A48", med: "#3A2048", cen: "#120C24", glow: "#C05060", fondo: "#0E0A16", niebla: "#161222", hemiCielo: "#4A3460", hemiSuelo: "#0E0A12", luz: 0.12, estrellas: 0.60, brilloSol: 0.30, hemiInt: 0.26, ambInt: 0.021, expo: 1.00 },
+  },
+};

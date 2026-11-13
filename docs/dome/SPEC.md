@@ -46,6 +46,17 @@ El shader no pinta sobre las UV de la esfera: trabaja con la **dirección de cad
 | `uKickAmt` | float | 1.0 | Multiplicador amplitud kick |
 | `uDawn` | float | 1.0 | W3: progreso amanecer fase 1 (0→1, ease-out cúbico) |
 | `uReveal` | vec4 | (1,1,1,1) | W3: x=MONTAÑAS, y=LÍNEAS, z=SOL, w=CIELO (0→1 fase 2) |
+| `uDiaNuevo` | float | 0 | Z48: 1 = ciclo de día (`lib/cicloDia.ts`); 0 = amanecer viejo con `uDawn` / `uReveal` |
+| `uDia` | float | 0 | Z48: tDia 0..1 (0 noche, 0,12 alba, 0,20 salida, 0,50 mediodía, 0,80 atardecer, 0,92 crepúsculo) |
+| `uSolDir` | vec3 | (0,−1,0) | Z48: dirección del sol en el mundo (convención `az = atan(d.x, −d.z)`) |
+| `uLuzDia` | float | 0 | Z48: luz del día 0..1 (brillo de la cordillera y del portal) |
+| `uColHor`, `uColMed`, `uColCen` | vec3 | — | Z48: cielo del mundo (horizonte, medio, cénit) en sRGB, interpolados por el ciclo |
+| `uColGlow`, `uBrilloSol` | vec3, float | — | Z48: resplandor hacia el azimut del sol (más intenso al salir y al ponerse) |
+| `uEstrellas` | float | 1 | Z48: visibilidad de las estrellas (se apagan con la luz del día) |
+| `uMontCrece`, `uMontCentro`, `uMontAncho`, `uMontSilueta` | float | 0, —, 0.12, 0.35 | Z48: la cordillera es una silueta desde el principio y crece por azimut desde la salida del sol |
+| `uSolRadio` | float | 0.055 | Z48: radio angular (rad) del disco del sol del mundo (anillo rojo, crema y núcleo amarillo, como el del portal) |
+| `uSolPulso`, `uNubesBrillo` | float | 0 | Z48: ganchos de música del visualizador futuro (0 = sin efecto) |
+| `uPortalNoche` | float | 0.45 | Z48: brillo del portal de noche (× luz del día) |
 
 No incluyas `colorspace_fragment`: los colores ya están en sRGB y las texturas no deben convertirse.
 
