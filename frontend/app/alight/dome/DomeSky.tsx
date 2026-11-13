@@ -13,8 +13,9 @@ useTexture.preload([
   "/portal/portal-color.png",
 ]);
 import { domeVert, domeFrag } from "./domeShaders";
-import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA } from "@/lib/debugConfig";
-import { DIA } from "@/lib/cicloDia"; // Z48
+import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL } from "@/lib/debugConfig";
+import { DIA, PORTAL_GEOM } from "@/lib/cicloDia"; // Z48 · Z49
+import { escalaPortal } from "@/lib/portalEscala"; // Z49
 
 export type Bands = { bass: number; lowMid: number; highMid: number; treble: number }; // 0..1
 // W4: parámetros de ajuste del shader (leídos cada frame vía callback — sin recrear material)
@@ -161,6 +162,13 @@ export default function DomeSky({
           uSolPulso:    { value: 0 },
           uNubesBrillo: { value: 0 },
           uPortalNoche: { value: DBG_DIA.PORTAL_NOCHE },
+          // Z49
+          uSolUnico:      { value: 0 },
+          uHaloTope:      { value: DBG_DIA.SOL_HALO_TOPE },
+          uTinteBorde:    { value: DBG_PORTAL.TINTE_BORDE },
+          uTinteAnillos:  { value: DBG_PORTAL.TINTE_ANILLOS },
+          uTinteInterior: { value: DBG_PORTAL.TINTE_INTERIOR },
+          uBordeSuave:    { value: DBG_PORTAL.BORDE_SUAVE },
         },
       }),
     // los uniformes sueltos se actualizan en useFrame; el material solo se recrea si cambia la calidad
@@ -168,7 +176,7 @@ export default function DomeSky({
     [masks, color, lowQuality]
   );
 
-  const tmp = useMemo(() => ({ F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), b: [0, 0, 0, 0], ge: new THREE.Vector4(), rv: new THREE.Vector4() }), []);
+  const tmp = useMemo(() => ({ F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), b: [0, 0, 0, 0], ge: new THREE.Vector4(), rv: new THREE.Vector4(), esc: { elev: 0, tan: 1 } }), []);
 
   // AA2: exponer el material para que ExperienceDome lo aplique al mesh del domo
   useEffect(() => {
@@ -189,14 +197,17 @@ export default function DomeSky({
     u.uCameraPos.value.copy(state.camera.position);
 
     const { F, R, U } = tmp;
-    const ce = Math.cos(portalElevation), se = Math.sin(portalElevation);
+    // Z49: composición escalada (DBG_PORTAL.ESCALA) apoyada en la misma línea del horizonte (lib/portalEscala.ts)
+    escalaPortal(portalElevation, portalHalfFovDeg, DBG_PORTAL.ESCALA, tmp.esc);
+    const ce = Math.cos(tmp.esc.elev), se = Math.sin(tmp.esc.elev);
+    PORTAL_GEOM.azRad = portalAzimuth;   // Z49: el sol del ciclo sale en este azimut (misma convención)
     F.set(Math.sin(portalAzimuth) * ce, se, -Math.cos(portalAzimuth) * ce);
     R.set(Math.cos(portalAzimuth), 0, Math.sin(portalAzimuth));
     U.crossVectors(R, F);
     u.uPortalF.value.copy(F);
     u.uPortalR.value.copy(R);
     u.uPortalU.value.copy(U);
-    u.uPortalTan.value = Math.tan((portalHalfFovDeg * Math.PI) / 180);
+    u.uPortalTan.value = tmp.esc.tan;   // Z49: tan(semi-FOV) × ESCALA
     u.uWarp.value = warp;
     u.uRingFlow.value = ringFlow;
     u.uRingScale.value = ringScale;
@@ -253,7 +264,8 @@ export default function DomeSky({
       u.uEstrellas.value = DIA.estrellas;
       u.uMontCrece.value = DIA.montCrece;
       // centro del crecimiento = azimut de la salida del sol, en vueltas (-0,5…0,5) como el shader
-      const azS = (DBG_DIA.SOL_AZ_SALIDA_DEG / 360) % 1;
+      // Z49: el que calcula el ciclo (alineado al portal o el de Z48)
+      const azS = (DIA.azSalida / (2 * Math.PI)) % 1;
       u.uMontCentro.value = azS > 0.5 ? azS - 1 : azS < -0.5 ? azS + 1 : azS;
       u.uMontAncho.value = DBG_DIA.MONT_ANCHO;
       u.uMontSilueta.value = DBG_DIA.MONT_SILUETA;
@@ -261,6 +273,13 @@ export default function DomeSky({
       u.uSolPulso.value = DIA.solPulso;
       u.uNubesBrillo.value = DIA.nubesBrillo;
       u.uPortalNoche.value = DBG_DIA.PORTAL_NOCHE;
+      // Z49
+      u.uSolUnico.value = DIA.solUnico;
+      u.uHaloTope.value = DBG_DIA.SOL_HALO_TOPE;
+      u.uTinteBorde.value = DBG_PORTAL.TINTE_BORDE;
+      u.uTinteAnillos.value = DBG_PORTAL.TINTE_ANILLOS;
+      u.uTinteInterior.value = DBG_PORTAL.TINTE_INTERIOR;
+      u.uBordeSuave.value = DBG_PORTAL.BORDE_SUAVE;
     }
     // X2 PASO 1: escribir valores live (sin allocations — solo asignaciones de número)
     DBG_DOME_LIVE.uDawn     = u.uDawn.value;

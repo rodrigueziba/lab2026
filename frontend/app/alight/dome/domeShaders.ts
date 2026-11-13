@@ -85,6 +85,13 @@ uniform float uSolRadio;     // radio angular del disco (rad)
 uniform float uSolPulso;     // gancho de música: pulso del halo (0 = sin efecto)
 uniform float uNubesBrillo;  // gancho de música: brillo de las nubes (0 = sin efecto)
 uniform float uPortalNoche;  // brillo del portal de noche (× luz del día)
+// Z49: sol sobre el eje del portal, composición escalada (en JS: uPortalTan / uPortalF) y tinte del cielo
+uniform float uSolUnico;     // 0..1 atenúa el sol ilustrado del portal (el disco del mundo lo reemplaza)
+uniform float uHaloTope;     // tope del resplandor y del halo del sol (bajo el umbral del bloom: no satura a blanco)
+uniform float uTinteBorde;   // 0..1 borde exterior del portal teñido con el cielo del mundo de ese píxel
+uniform float uTinteAnillos; // 0..1 anillos del marco teñidos con el cielo del mundo
+uniform float uTinteInterior;// 0..1 velo suave del interior con el color de la etapa
+uniform float uBordeSuave;   // 0..1 feather del borde del portal (misma forma)
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -213,6 +220,13 @@ vec3 worldSky(vec3 d, float t) {
   return c;
 }
 
+// Z49: suma sin pasar uHaloTope en el canal más alto (conserva el tono; si ya está arriba no suma nada).
+// Lo que pasa el umbral del bloom (0,92) se abre en un destello blanco: con el tope en 0,88 no ocurre.
+vec3 sumaConTope(vec3 base, vec3 extra) {
+  float mb = max(max(base.r, base.g), base.b), me = max(max(extra.r, extra.g), extra.b);
+  return extra * clamp((uHaloTope - mb) / max(me, 1e-4), 0.0, 1.0);
+}
+
 // Z48: cielo del mundo con dirección: degradado del ciclo + resplandor hacia el azimut del sol (más intenso
 // cerca del horizonte) + brillo alrededor del disco. Mismo fbm que worldSky (una sola llamada).
 vec3 cieloDia(vec3 d, float t) {
@@ -222,11 +236,28 @@ vec3 cieloDia(vec3 d, float t) {
   c *= 0.85 + 0.15 * (0.5 + 0.5 * fbm4(d.xz * 3.0 + t * 0.03));
   vec2 dh = normalize(d.xz + vec2(1e-5, 0.0));
   vec2 sh = normalize(uSolDir.xz + vec2(1e-5, 0.0));
-  float haciaSol = 0.5 + 0.5 * dot(dh, sh);
+  // Z49: solo el hemisferio que mira al sol (antes 0,5 + 0,5·cos llegaba, débil, a todo el domo)
+  float haciaSol = max(dot(dh, sh), 0.0);
   float cercaHor = exp(-max(h, 0.0) * 5.0);
   float cercaSol = pow(max(dot(d, uSolDir), 0.0), 8.0);
-  c += uColGlow * uBrilloSol * (pow(haciaSol, 6.0) * cercaHor * 0.7 + cercaSol * 0.3);
+  c += sumaConTope(c, uColGlow * uBrilloSol * (pow(haciaSol, 3.0) * cercaHor * 0.7 + cercaSol * 0.3));
   c = mix(uColHor * 0.15, c, smoothstep(-0.12, 0.02, h));
+  return c;
+}
+
+// Z48/Z49: disco del sol del mundo y su halo. peso = cobertura (1 en el cielo; inside·uDawn sobre el portal).
+// El halo mira solo al hemisferio del sol y no pasa uHaloTope (sin destello blanco del bloom fuera del disco).
+vec3 solMundo(vec3 col, vec3 d, float peso) {
+  float cosA = dot(d, uSolDir);
+  float ang = acos(clamp(cosA, -1.0, 1.0));
+  float R = uSolRadio * (1.0 + 0.08 * uSolPulso);
+  float vis = smoothstep(-2.0 * R, 0.0, uSolDir.y) * peso;
+  vec3 halo = vec3(0.9, 0.35, 0.1) * 0.35 * (0.6 + 0.4 * uLuzDia + uSolPulso) * exp(-5.0 * max(ang / R - 1.0, 0.0)) * max(cosA, 0.0);
+  vec3 c = col + sumaConTope(col, halo * vis);
+  vec3 rojoSol = mix(vec3(0.898, 0.361, 0.161), vec3(0.894, 0.196, 0.169), smoothstep(-0.1, 0.4, d.y));
+  c = mix(c, rojoSol, smoothstep(R + 0.002, R - 0.002, ang) * vis);
+  c = mix(c, vec3(0.973, 0.918, 0.847), smoothstep(R * 0.757 + 0.002, R * 0.757 - 0.002, ang) * vis);
+  c = mix(c, vec3(0.996, 0.741, 0.090), smoothstep(R * 0.464 + 0.002, R * 0.464 - 0.002, ang) * vis);
   return c;
 }
 
@@ -268,23 +299,17 @@ void main() {
 
   // Z48: sol en el cielo del mundo (estética del sol del portal: anillo rojo, crema y núcleo amarillo, con
   // halo). Se dibuja antes de la cordillera, así sale DETRÁS de las montañas; bajo el horizonte lo corta el alfa.
-  if (uDiaNuevo > 0.5) {
-    float ang = acos(clamp(dot(d, uSolDir), -1.0, 1.0));
-    float R = uSolRadio * (1.0 + 0.08 * uSolPulso);
-    float vis = smoothstep(-2.0 * R, 0.0, uSolDir.y);
-    col += vec3(0.9, 0.35, 0.1) * 0.35 * (0.6 + 0.4 * uLuzDia + uSolPulso) * exp(-5.0 * max(ang / R - 1.0, 0.0)) * vis;
-    vec3 rojoSol = mix(vec3(0.898, 0.361, 0.161), vec3(0.894, 0.196, 0.169), smoothstep(-0.1, 0.4, d.y));
-    col = mix(col, rojoSol, smoothstep(R + 0.002, R - 0.002, ang) * vis);
-    col = mix(col, vec3(0.973, 0.918, 0.847), smoothstep(R * 0.757 + 0.002, R * 0.757 - 0.002, ang) * vis);
-    col = mix(col, vec3(0.996, 0.741, 0.090), smoothstep(R * 0.464 + 0.002, R * 0.464 - 0.002, ang) * vis);
-    col = min(col, vec3(0.97));   // que el resplandor no sature a blanco con el bloom (el disco se lee)
-  }
+  // Z49: función (también se dibuja dentro del portal, detrás de las montañas ilustradas); halo con tope.
+  vec3 colCielo = col;   // Z49: cielo del mundo de este píxel, sin el sol (tiñe el borde y los anillos)
+  if (uDiaNuevo > 0.5) col = solMundo(col, d, 1.0);
 
   // ---- marco de anillos (tunel) ----
   float wob  = fbm4(q * 2.2 + vec2(0.0, t * 0.04));
   float wob2 = fbm4(q * 1.1 + vec2(5.0, t * 0.03));
   float sw = s + 0.040 * wob * (0.6 + 0.4 * sol);
-  float inside = 1.0 - smoothstep(PORTAL_R - 0.012, PORTAL_R + 0.012, sw);
+  // Z49: feather del borde con BORDE_SUAVE (misma forma, solo el ancho de la transición)
+  float bw = mix(0.012, mix(0.012, 0.05, uBordeSuave), uDiaNuevo);
+  float inside = 1.0 - smoothstep(PORTAL_R - bw, PORTAL_R + bw, sw);
   float sph = s + 0.050 * wob + 0.130 * wob2 * (0.7 + 0.5 * sol);
   float ph = sph / (RING_PERIOD * uRingScale) - uRingFlow * t * 12.0 - sol * 0.6;
   float thick = 0.12 * fbm4(q * 5.0 + vec2(2.0, 7.0));
@@ -294,7 +319,12 @@ void main() {
   vec3 gold = mix(vec3(0.64, 0.39, 0.18), vec3(0.90, 0.55, 0.18), hv);
   gold = mix(gold, vec3(0.84, 0.31, 0.19), redw);
   vec3 dark = mix(vec3(0.13, 0.07, 0.05), vec3(0.36, 0.18, 0.11), hv);
-  vec3 ringCol = mix(dark, gold, band) * (0.85 + 0.35 * sol * band + 0.20 * kick * band);
+  float pulsoAnillo = 0.85 + 0.35 * sol * band + 0.20 * kick * band;
+  vec3 ringCol = mix(dark, gold, band) * pulsoAnillo;
+  // Z49: anillos y borde teñidos con el cielo del mundo de ese píxel (mismo patrón de franjas; de noche oscuros)
+  float bordeZ = 1.0 - smoothstep(0.0, 0.10, sw - PORTAL_R);                 // franja junto al borde del portal
+  float tinteA = mix(uTinteAnillos, uTinteBorde, bordeZ) * uDiaNuevo;
+  ringCol = mix(ringCol, min(colCielo * (0.55 + 0.9 * band), vec3(1.0)) * pulsoAnillo, tinteA);
   float reach = 1.0 - smoothstep(uRingFade.x, uRingFade.y, s);
   float ringA = max(reach, 0.10);
   // W3: anillos (SOL) aparecen en fase 2
@@ -325,31 +355,36 @@ void main() {
     float yy = p.y + 0.10 * (f - 0.5) * amt;
     vec3 sky = skyRamp(yy);
     sky += (f - 0.5) * 0.14 * amt * vec3(1.0, 0.6, 0.25);
+    // Z49: velo suave con el color de la etapa (no toca el sol ilustrado ni las montañas, que van después)
+    vec3 tinteEtapa = min(uColHor / max(dot(uColHor, vec3(0.299, 0.587, 0.114)), 0.05), vec3(1.6));
+    vec3 velo = mix(vec3(1.0), tinteEtapa, uTinteInterior * uDiaNuevo);
+    sky *= velo;
+    float ilus = 1.0 - uSolUnico * uDiaNuevo;   // Z49: SOL_UNICO atenúa el sol ilustrado
 
     // sol en 3 discos
     // W3: el sol sube desde abajo durante fase 1 (sunRiseOfs = 0.8 cuando dawn=0, 0 cuando dawn=1)
     float sunRiseOfs = (1.0 - uDawn) * 0.8;
     float k = 1.0 + 0.05 * sol + 0.08 * kick;
     float rs = length(p - SUN_C + vec2(0.0, sunRiseOfs)) / k + 0.010 * cielo * fbm4(p * 6.0 + t * 0.2);
-    sky += vec3(0.9, 0.35, 0.1) * 0.22 * (0.5 + sol + 0.3 * kick) * exp(-5.0 * max(rs - RING_R, 0.0));
+    sky += vec3(0.9, 0.35, 0.1) * 0.22 * (0.5 + sol + 0.3 * kick) * exp(-5.0 * max(rs - RING_R, 0.0)) * ilus;
     vec3 ringRed = mix(vec3(0.898, 0.361, 0.161), vec3(0.894, 0.196, 0.169), smoothstep(-0.1, 0.4, p.y));
-    sky = mix(sky, ringRed, smoothstep(RING_R + 0.004, RING_R - 0.004, rs));
+    sky = mix(sky, ringRed, smoothstep(RING_R + 0.004, RING_R - 0.004, rs) * ilus);
     float ry = length(p - YEL_C) / k;
     vec3 cream = mix(vec3(0.973, 0.918, 0.847), vec3(0.898, 0.780, 0.639), smoothstep(YEL_R + 0.14, YEL_R, ry));
-    sky = mix(sky, cream, smoothstep(CREAM_R + 0.004, CREAM_R - 0.004, rs));
-    sky = mix(sky, vec3(0.996, 0.741, 0.090), smoothstep(YEL_R + 0.004, YEL_R - 0.004, ry));
+    sky = mix(sky, cream, smoothstep(CREAM_R + 0.004, CREAM_R - 0.004, rs) * ilus);
+    sky = mix(sky, vec3(0.996, 0.741, 0.090), smoothstep(YEL_R + 0.004, YEL_R - 0.004, ry) * ilus);
 
     // nubes (se desplazan con el tiempo y respiran con los medios altos)
     float dr = 0.03 * sin(t * 0.05);
     float sc = 1.0 + 0.08 * cielo;
     float ob1 = cloudShape(p, vec2(-0.52 - dr, 0.22), 0.22 * sc, 0.55);
     float ob2 = cloudShape(p, vec2( 0.66 + dr, 0.28), 0.24 * sc, 0.55);
-    sky = mix(sky, vec3(0.94, 0.62, 0.20), 0.85 * smoothstep(0.004, -0.004, ob1));
-    sky = mix(sky, vec3(0.94, 0.62, 0.20), 0.85 * smoothstep(0.004, -0.004, ob2));
+    sky = mix(sky, vec3(0.94, 0.62, 0.20) * velo, 0.85 * smoothstep(0.004, -0.004, ob1));
+    sky = mix(sky, vec3(0.94, 0.62, 0.20) * velo, 0.85 * smoothstep(0.004, -0.004, ob2));
     float c1 = cloudShape(p, vec2(-0.5585 + dr, 0.1579), 0.125 * sc, 0.70);
     float c2 = cloudShape(p, vec2( 0.6770 - dr, 0.1382), 0.208 * sc, 0.70);
     float c3 = cloudShape(p, vec2( 0.4596 + dr, 0.3487), 0.053 * sc, 0.70);
-    vec3 cloudCol = vec3(0.957, 0.914, 0.831) * (1.0 + uNubesBrillo);   // Z48: gancho de música (0 = igual)
+    vec3 cloudCol = vec3(0.957, 0.914, 0.831) * (1.0 + uNubesBrillo) * velo;   // Z48: gancho de música (0 = igual); Z49: velo
     sky = mix(sky, cloudCol, smoothstep(0.004, -0.004, c1));
     sky = mix(sky, cloudCol, smoothstep(0.004, -0.004, c2));
     sky = mix(sky, cloudCol, smoothstep(0.004, -0.004, c3));
@@ -364,6 +399,9 @@ void main() {
     // W3: el portal se funde en con el progreso del amanecer (fase 1)
     // Z48: con el ciclo, uDawn = revelado del portal en la introducción, y de noche el portal se apaga un poco
     col = mix(col, sky * mix(1.0, mix(uPortalNoche, 1.0, uLuzDia), uDiaNuevo), inside * uDawn);
+    // Z49: el sol del mundo también se ve dentro del portal, delante de su cielo y DETRÁS de las montañas
+    // ilustradas (que se dibujan después); con SOL_UNICO reemplaza al sol ilustrado.
+    if (uDiaNuevo > 0.5) col = solMundo(col, d, inside * uDawn);
   }
 
   // ---- montanas (mascaras + color posterizado) ----

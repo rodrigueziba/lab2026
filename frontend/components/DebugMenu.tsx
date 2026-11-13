@@ -48,6 +48,7 @@ import {
   DBG_FRACTAL, // Z43
   DBG_TELON_TEXTO, // Z46
   DBG_DIA, // Z48
+  DBG_PORTAL, // Z49
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -1543,9 +1544,9 @@ export default function DebugMenu() {
           {/* Z48: ciclo de día (lib/cicloDia.ts) — todo en vivo */}
           <span style={LABEL}>Ciclo de día Z48 <span style={NOTE}>(cielo, sol, estrellas, escena · live)</span></span>
           <div style={{ ...ROW, ...NOTE }}><span>{diaLive}</span></div>
-          {(["NUEVO", "SINCRONIZAR_CON_TEMA", "LOOP", "OCULTAR_INVISIBLES"] as const).map(k => (
+          {(["NUEVO", "SINCRONIZAR_CON_TEMA", "LOOP", "OCULTAR_INVISIBLES", "SOL_ALINEAR_PORTAL", "SOL_UNICO"] as const).map(k => (
             <div key={k} style={ROW}>
-              <span>{k} <span style={NOTE}>{k === "NUEVO" ? "off = amanecer de 10 s (Z38)" : k === "OCULTAR_INVISIBLES" ? "esfera de panorama y caparazón con alfa 0" : ""}</span></span>
+              <span>{k} <span style={NOTE}>{k === "NUEVO" ? "off = amanecer de 10 s (Z38)" : k === "OCULTAR_INVISIBLES" ? "esfera de panorama y caparazón con alfa 0" : k === "SOL_ALINEAR_PORTAL" ? "Z49 · off = azimut Z48" : k === "SOL_UNICO" ? "Z49 · atenúa el sol ilustrado" : ""}</span></span>
               <button style={INPUT} onClick={() => { DBG_DIA[k] = !DBG_DIA[k]; tocarDia(); }}>{DBG_DIA[k] ? "ON" : "off"}</button>
             </div>
           ))}
@@ -1555,11 +1556,23 @@ export default function DebugMenu() {
             ["SOL_AZ_SALIDA_DEG", 0, 360, 1, "° (180 = portal)"], ["SOL_ALT_MAX_DEG", 10, 85, 1, "°"], ["SOL_RADIO", 0.01, 0.2, 0.005, "rad"],
             ["MONT_SILUETA", 0, 1, 0.01, ""], ["MONT_ANCHO", 0.02, 0.5, 0.01, "vueltas"], ["PORTAL_NOCHE", 0, 1, 0.01, ""],
             ["MUSICA_SOL", 0, 2, 0.05, "gancho"], ["MUSICA_NUBES", 0, 2, 0.05, "gancho"],
+            ["SOL_AZ_OFFSET_DEG", -30, 30, 0.5, "Z49 °"], ["SOL_VERTICAL_FASE", 0.05, 1.5, 0.05, "Z49 rad"], ["SOL_HALO_TOPE", 0.5, 1.2, 0.01, "Z49 bloom 0,92"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{DBG_DIA[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_DIA[k]}
                 onChange={e => { DBG_DIA[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          <span style={LABEL}>Composición del domo Z49 <span style={NOTE}>(escala y tinte del cielo · live)</span></span>
+          {([
+            ["ESCALA", 0.6, 1.8, 0.01, "apoyada en el horizonte"], ["TINTE_BORDE", 0, 1, 0.01, "0 = color fijo"],
+            ["TINTE_ANILLOS", 0, 1, 0.01, ""], ["TINTE_INTERIOR", 0, 1, 0.01, "velo"], ["BORDE_SUAVE", 0, 1, 0.01, "feather"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{DBG_PORTAL[k].toFixed(2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_PORTAL[k]}
+                onChange={e => { DBG_PORTAL[k] = parseFloat(e.target.value); tocarDia(); }} />
             </div>
           ))}
           {(["ALBA", "SALIDA", "MEDIODIA", "ATARDECER", "CREPUSCULO"] as const).map(k => (

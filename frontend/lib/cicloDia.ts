@@ -28,6 +28,8 @@ export interface CfgDia {
   KEYS: { ALBA: number; SALIDA: number; MEDIODIA: number; ATARDECER: number; CREPUSCULO: number };
   ETAPAS: { noche: EtapaCfg; alba: EtapaCfg; salida: EtapaCfg; mediodia: EtapaCfg; atardecer: EtapaCfg; crepusculo: EtapaCfg };
   SOL_AZ_SALIDA_DEG: number; SOL_ALT_MAX_DEG: number;
+  // Z49: sol sobre el eje del portal
+  SOL_ALINEAR_PORTAL: boolean; SOL_AZ_OFFSET_DEG: number; SOL_VERTICAL_FASE: number; SOL_UNICO: boolean;
   INTRO_U_ALBA: number; INTRO_U_SOL: number; INTRO_TDIA_SOL: number; INTRO_TDIA_FIN: number;
   INTRO_MONT_FIN: number; INTRO_RESTO_INI: number; INTRO_RESTO_PASO: number; INTRO_RESTO_DUR: number;
   MUSICA_SOL: number; MUSICA_NUBES: number;
@@ -53,6 +55,8 @@ export interface EstadoDia {
   hor: Rgb; med: Rgb; cen: Rgb; glow: Rgb; fondo: Rgb; niebla: Rgb; hemiCielo: Rgb; hemiSuelo: Rgb;
   luz: number; estrellas: number; brilloSol: number; hemiInt: number; ambInt: number; expo: number;
   solDir: Rgb; solAlt: number; solAz: number; etapa: EtapaNombre;
+  azSalida: number;     // Z49: azimut de la salida del sol (rad, convención del domo) — centro del crecimiento de montañas
+  solUnico: number;     // Z49: 0…1 atenuación del sol ilustrado del portal (SOL_UNICO)
   // ganchos de música (0 con ganancia 0)
   solPulso: number; nubesBrillo: number;
   // eventos de este frame (los emite quien llama)
@@ -67,9 +71,20 @@ export function crearEstadoDia(): EstadoDia {
     montCrece: 0, revPortal: 0, revOlas: 0, revAnillos: 0, revCielo: 0,
     hor: rgb(), med: rgb(), cen: rgb(), glow: rgb(), fondo: rgb(), niebla: rgb(), hemiCielo: rgb(), hemiSuelo: rgb(),
     luz: 0, estrellas: 1, brilloSol: 0, hemiInt: 0, ambInt: 0, expo: 1,
-    solDir: [0, -1, 0], solAlt: 0, solAz: 0, etapa: "noche",
+    solDir: [0, -1, 0], solAlt: 0, solAz: 0, etapa: "noche", azSalida: 0, solUnico: 0,
     solPulso: 0, nubesBrillo: 0, evDawn: false, evFin: false, evReinicio: false, escena: false,
   };
+}
+
+/** Z49: geometría del portal que escribe DomeSky (de DBG_SILLAS.domePortalAzimuth, la misma que usa el shader).
+ *  NaN hasta que el domo se monta: entonces vale SOL_AZ_SALIDA_DEG. */
+export const PORTAL_GEOM = { azRad: NaN };
+
+/** Azimut de la salida del sol (rad): el del portal + SOL_AZ_OFFSET_DEG, o SOL_AZ_SALIDA_DEG (Z48). */
+export function azimutSalida(c: CfgDia): number {
+  const portal = PORTAL_GEOM.azRad;
+  if (c.SOL_ALINEAR_PORTAL && Number.isFinite(portal)) return portal + (fin(c.SOL_AZ_OFFSET_DEG) * Math.PI) / 180;
+  return (fin(c.SOL_AZ_SALIDA_DEG, 120) * Math.PI) / 180;
 }
 
 /** Estado compartido (lo escribe AmanecerReloj y lo leen los consumidores). */
@@ -166,10 +181,18 @@ export function estadoCielo(dia: number, c: CfgDia, out: EstadoDia): EstadoDia {
   const altMax = (Math.max(1, Math.min(89, c.SOL_ALT_MAX_DEG)) * Math.PI) / 180;
   const alt = Math.asin(Math.sin(altMax) * Math.sin(fase));
   // azimut: media vuelta durante el día y la otra media durante la noche (continuo al cerrar el ciclo 1 → 0)
-  const az0 = (c.SOL_AZ_SALIDA_DEG * Math.PI) / 180;
+  // Z49: alineado al portal, al salir sube casi en vertical por su eje: el avance en azimut se multiplica por
+  // w = smoothstep(0, SOL_VERTICAL_FASE, fase)² (0 al salir, 1 después; w' = 0 en los dos extremos → sin saltos
+  // ni quiebres) y recién después se abre hacia el arco del mediodía y el atardecer.
+  const az0 = azimutSalida(c);
   const enDia = d >= K.SALIDA && d <= K.ATARDECER;
   const noche = (((d - K.ATARDECER) % 1) + 1) % 1 / Math.max(1e-3, 1 - span);
-  const az = enDia ? az0 + fase : az0 + Math.PI + Math.PI * Math.min(1, noche);
+  const fv = Math.max(1e-3, fin(c.SOL_VERTICAL_FASE, 1.0));
+  const w = c.SOL_ALINEAR_PORTAL ? suave(fase / fv) ** 2 : 1;
+  const az = enDia ? az0 + fase * w : az0 + Math.PI + Math.PI * Math.min(1, noche);
+  out.azSalida = az0;
+  // Z49: SOL_UNICO — el sol ilustrado se funde a medida que sale el del mundo y queda atenuado hasta el crepúsculo
+  out.solUnico = c.SOL_UNICO ? suave((d - (K.SALIDA - 0.01)) / 0.03) * (1 - suave((d - K.CREPUSCULO) / Math.max(1e-3, (1 - K.CREPUSCULO) * 0.6))) : 0;
   const ce = Math.cos(alt);
   // convención del shader del domo: az = atan(d.x, −d.z)
   out.solDir[0] = Math.sin(az) * ce; out.solDir[1] = Math.sin(alt); out.solDir[2] = -Math.cos(az) * ce;

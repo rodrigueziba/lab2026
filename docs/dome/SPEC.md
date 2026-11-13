@@ -57,6 +57,13 @@ El shader no pinta sobre las UV de la esfera: trabaja con la **dirección de cad
 | `uSolRadio` | float | 0.055 | Z48: radio angular (rad) del disco del sol del mundo (anillo rojo, crema y núcleo amarillo, como el del portal) |
 | `uSolPulso`, `uNubesBrillo` | float | 0 | Z48: ganchos de música del visualizador futuro (0 = sin efecto) |
 | `uPortalNoche` | float | 0.45 | Z48: brillo del portal de noche (× luz del día) |
+| `uSolUnico` | float | 0 | Z49: 0..1 atenúa el sol ilustrado del portal (el disco del mundo lo reemplaza) |
+| `uHaloTope` | float | 0.88 | Z49: tope del resplandor y del halo del sol (bajo el umbral del bloom) |
+| `uTinteBorde`, `uTinteAnillos` | float | 0.8, 0.7 | Z49: borde del portal y anillos teñidos con el cielo del mundo de ese píxel |
+| `uTinteInterior` | float | 0.25 | Z49: velo del interior con el color de la etapa (no toca sol ilustrado ni montañas) |
+| `uBordeSuave` | float | 0.5 | Z49: feather del borde del portal (misma forma) |
+
+Z49: la escala de la composición (`DBG_PORTAL.ESCALA`) no es un uniform propio: `DomeSky.tsx` multiplica `uPortalTan` por la escala y sube la elevación de `uPortalF` a `atan(ESCALA · tan(e0))` (`lib/portalEscala.ts`) para que la base siga en el horizonte.
 
 No incluyas `colorspace_fragment`: los colores ya están en sRGB y las texturas no deben convertirse.
 

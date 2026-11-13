@@ -10,7 +10,7 @@
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_DIA, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { DBG_DIA, DBG_PORTAL, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { DIA } from "@/lib/cicloDia";
 
 interface Originales {
@@ -42,10 +42,10 @@ export default function CicloDiaEscena() {
     };
     orig.current = o;
     // diagnóstico solo en modo debug (pruebas en Chrome headless)
-    const w = window as unknown as { __dia?: object };
-    if (DEBUG_ENABLED) w.__dia = { DIA, DBG_DIA };
+    const w = window as unknown as { __dia?: object; __portal?: object };
+    if (DEBUG_ENABLED) { w.__dia = { DIA, DBG_DIA }; w.__portal = DBG_PORTAL; }   // Z49: + composición
     return () => {
-      if (DEBUG_ENABLED) delete w.__dia;
+      if (DEBUG_ENABLED) { delete w.__dia; delete w.__portal; }
       restaurar(o);
       DIA.escena = false;
       orig.current = null;

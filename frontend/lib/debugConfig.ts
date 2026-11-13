@@ -1046,6 +1046,12 @@ export const DBG_DIA = {
   SOL_AZ_SALIDA_DEG:    120,    // azimut de la salida del sol (convención del domo: 180 = detrás de la tarima, centro del portal) — live
   SOL_ALT_MAX_DEG:      60,     // altura del sol al mediodía — live
   SOL_RADIO:            0.055,  // radio angular del disco del sol (rad) — live
+  // Z49: sol sobre el eje del portal
+  SOL_ALINEAR_PORTAL:   true,   // la salida del sol en el azimut del portal (DBG_SILLAS.domePortalAzimuth); false = SOL_AZ_SALIDA_DEG (Z48) — live
+  SOL_AZ_OFFSET_DEG:    0,      // ajuste fino del azimut de salida respecto del portal (°) — live
+  SOL_VERTICAL_FASE:    1.0,    // tramo del arco (rad de fase) en que el sol sube casi vertical (< 1° de deriva hasta 15° de altura) antes de abrirse — live
+  SOL_UNICO:            false,  // true = el sol ilustrado del portal se atenúa y el del mundo lo reemplaza — live
+  SOL_HALO_TOPE:        0.88,   // tope del resplandor y del halo (bajo el umbral del bloom 0,92: sin destello blanco) — live
   MONT_SILUETA:         0.35,   // altura de la cordillera antes de crecer (fracción) — silueta oscura desde el principio — live
   MONT_ANCHO:           0.12,   // ancho del frente de crecimiento (fracción de vuelta) — live
   PORTAL_NOCHE:         0.45,   // brillo del portal de noche (× luz del día) — live
@@ -1069,4 +1075,13 @@ export const DBG_DIA = {
     atardecer:  { hor: "#F3B230", med: "#D55D2F", cen: "#7A3A35", glow: "#FF9A3A", fondo: "#26121A", niebla: "#3E2020", hemiCielo: "#F08850", hemiSuelo: "#2A1410", hemiInt: 0.36, ambInt: 0.028, luz: 0.50, estrellas: 0.05, brilloSol: 0.55, expo: 1.08 },
     crepusculo: { hor: "#8A3A48", med: "#3A2048", cen: "#120C24", glow: "#C05060", fondo: "#0E0A16", niebla: "#161222", hemiCielo: "#4A3460", hemiSuelo: "#0E0A12", luz: 0.12, estrellas: 0.60, brilloSol: 0.30, hemiInt: 0.26, ambInt: 0.021, expo: 1.00 },
   },
+};
+
+// ── Z49: composición central del domo (portal, montañas ilustradas, anillos, confeti) ──
+export const DBG_PORTAL = {
+  ESCALA:          1.3,   // escala lineal de toda la composición, apoyada en la misma línea del horizonte (1 = como antes) — live
+  TINTE_BORDE:     0.8,   // borde exterior del portal teñido con el cielo del mundo (0 = color fijo) — live
+  TINTE_ANILLOS:   0.7,   // anillos del marco teñidos con el cielo del mundo — live
+  TINTE_INTERIOR:  0.25,  // velo del interior con el color de la etapa (no toca sol ilustrado ni montañas) — live
+  BORDE_SUAVE:     0.5,   // feather del borde del portal (misma forma) — live
 };
