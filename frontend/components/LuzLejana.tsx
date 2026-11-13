@@ -22,6 +22,7 @@ import CieloEstrellado from "@/components/CieloEstrellado";   // Z30
 import EfectosDialogo from "@/components/EfectosDialogo";     // Z29
 import AmanecerReloj from "@/components/AmanecerReloj";       // Z38
 import CheckpointsHost from "@/components/CheckpointsHost";   // Z40
+import { CONO_VERT, CONO_FRAG, POZO_VERT, POZO_FRAG, crearHalo } from "@/lib/luz/luzVisual"; // Z42
 
 const ESTRELLAS_R = 400;   // radio de la esfera de estrellas (sigue a la cámara)
 const DOMO_EXT_R  = 30;    // caparazón del domo (DOME_R + 2 en ExperienceDome)
@@ -42,45 +43,7 @@ const ESTRELLAS_UNIFORMS = {
   uPixelRatio: { value: 1 },
 };
 
-const CONO_VERT = /* glsl */`
-  varying vec2 vUv;
-  varying float vBorde;
-  void main() {
-    vUv = uv;
-    vec4 wp = modelMatrix * vec4(position, 1.0);
-    vec3 n  = normalize(mat3(modelMatrix) * normal);
-    vec3 v  = normalize(cameraPosition - wp.xyz);
-    vBorde  = abs(dot(n, v));            // 1 de frente, 0 en el contorno → bordes suaves
-    gl_Position = projectionMatrix * viewMatrix * wp;
-  }
-`;
-const CONO_FRAG = /* glsl */`
-  uniform vec3  uColor;
-  uniform float uOpacidad;
-  varying vec2  vUv;
-  varying float vBorde;
-  void main() {
-    float alto  = mix(0.35, 1.0, vUv.y);           // más denso arriba, junto a la fuente
-    float borde = pow(vBorde, 1.6);
-    // bandas horizontales tenues (polvo en suspensión, guiño a las scanlines)
-    float banda = 0.85 + 0.15 * sin(vUv.y * 90.0);
-    gl_FragColor = vec4(uColor, uOpacidad * alto * borde * banda);
-  }
-`;
-const POZO_VERT = /* glsl */`
-  varying vec2 vUv;
-  void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
-`;
-const POZO_FRAG = /* glsl */`
-  uniform vec3  uColor;
-  uniform float uOpacidad;
-  varying vec2  vUv;
-  void main() {
-    float d = length(vUv - 0.5) * 2.0;
-    float a = 1.0 - smoothstep(0.0, 1.0, d);
-    gl_FragColor = vec4(uColor, uOpacidad * a * a);
-  }
-`;
+// Z42: CONO_VERT/FRAG, POZO_VERT/FRAG y crearHalo se movieron sin cambios a lib/luz/luzVisual.ts (compartidos con LucesHaz)
 const ESTRELLAS_VERT = /* glsl */`
   attribute float aTam;
   attribute float aBrillo;
@@ -107,28 +70,6 @@ const ESTRELLAS_FRAG = /* glsl */`
     gl_FragColor = vec4(vec3(0.95, 0.90, 0.80), a * vBrillo * uOpacidad);   // beige cálido, no blanco puro
   }
 `;
-
-/** Halo de la luz: núcleo cálido + halo + scanlines tenues (estilo CRT). Una sola textura. */
-function crearHalo(): THREE.CanvasTexture {
-  const S = 256;
-  const c = document.createElement("canvas");
-  c.width = c.height = S;
-  const g = c.getContext("2d")!;
-  const r = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-  r.addColorStop(0.00, "rgba(255,250,236,1)");
-  r.addColorStop(0.06, "rgba(255,238,200,0.95)");
-  r.addColorStop(0.18, "rgba(255,226,168,0.45)");
-  r.addColorStop(0.45, "rgba(255,200,130,0.12)");
-  r.addColorStop(1.00, "rgba(255,180,110,0)");
-  g.fillStyle = r;
-  g.fillRect(0, 0, S, S);
-  g.globalCompositeOperation = "destination-out";
-  g.fillStyle = "rgba(0,0,0,0.18)";
-  for (let y = 0; y < S; y += 4) g.fillRect(0, y, S, 1);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
 
 function crearEstrellas(n: number): THREE.BufferGeometry {
   const pos = new Float32Array(n * 3);

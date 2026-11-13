@@ -7,7 +7,7 @@
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS, DBG_RETRO_FX, DBG_AMANECER } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_RETRO_FX, DBG_AMANECER, DBG_LUCES } from "@/lib/debugConfig";
 import { getHazUnderUser, getHazPositionsXZ } from "@/lib/haz";
 import { startVizAudio, openGate, closeGate, isPlaying } from "@/lib/vizAudio";
 import { getDawnState, startDawnSequence } from "@/lib/alightStore";
@@ -255,6 +255,9 @@ export default function HazSystem() {
     const cables    = cablesRef.current;
     const leds      = ledsRef.current;
     if (!lights.length) return;
+    // Z42: con DISENO_NUEVO lo visual lo dibuja LucesHaz; acá se ocultan carcasa, cable, LED, franjas y cono
+    // (las SpotLights siguen igual: misma cantidad de luces, sin recompilar materiales)
+    const disenoViejo = !DBG_LUCES.DISENO_NUEVO;
 
     const originH = DBG_SILLAS.hazOriginHM;
     const scale   = DBG_SILLAS.globalLightScale;
@@ -311,6 +314,7 @@ export default function HazSystem() {
 
       // Cone: centre at half-height, vertex at top (origin), base at floor
       const { mesh: coneMesh, mat: coneMat } = cones[i];
+      coneMesh.visible = disenoViejo; // Z42
       coneMesh.position.set(bx, originH / 2, bz);
       coneMat.uniforms.uColor.value.copy(col);
       coneMat.uniforms.uOpacity.value     = DBG_SILLAS.hazConeOpacity *
@@ -322,9 +326,11 @@ export default function HazSystem() {
       coneMat.uniforms.uStripeBoost.value = DBG_RETRO_FX.hazStripeBoost;
 
       // Luminaria housing centred at origin height
+      boxes[i].visible = disenoViejo; // Z42
       boxes[i].position.set(bx, originH, bz);
 
       // Cable: rises from top of housing
+      cables[i].visible = disenoViejo; // Z42
       cables[i].position.set(bx, originH + 0.1 + CABLE_LEN / 2, bz);
 
       // LED indicator: face toward scene centre
@@ -333,6 +339,7 @@ export default function HazSystem() {
       const nx = dlen > 1e-4 ? dx / dlen : 0;
       const nz = dlen > 1e-4 ? dz / dlen : -1;
       const { mesh: led, mat: ledMat } = leds[i];
+      led.visible = disenoViejo; // Z42
       led.position.set(bx + nx * 0.141, originH, bz + nz * 0.141);
       ledLookTarget.current.set(bx + nx * 2, originH, bz + nz * 2);
       led.lookAt(ledLookTarget.current);
@@ -344,6 +351,7 @@ export default function HazSystem() {
       // R5: stripe decal — positioned on the front face of the box (facing scene centre)
       const sd = stripeDecalsRef.current[i];
       if (sd) {
+        sd.visible = disenoViejo; // Z42
         sd.position.set(bx + nx * 0.141, originH, bz + nz * 0.141);
         ledLookTarget.current.set(bx + nx * 2, originH, bz + nz * 2);
         sd.lookAt(ledLookTarget.current);

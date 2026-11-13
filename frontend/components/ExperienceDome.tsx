@@ -10,6 +10,7 @@ import FloorVisualizer from "./FloorVisualizer";
 import SectorAudioFX from "./SectorAudioFX";
 import HazSystem from "./HazSystem";
 import HazRings from "./HazRings";
+import LucesHaz from "./LucesHaz"; // Z42
 import SymbolSystem from "./SymbolSystem";
 import Monoliths from "./Monoliths";
 import { DBG_SILLAS, DBG_PANELES, DBG_ORBITAS, DBG_SECUENCIA } from "@/lib/debugConfig";
@@ -934,6 +935,7 @@ export default function ExperienceDome() {
       {/* N3: beams + floor symbols */}
       {vizActive && <HazSystem />}
       {vizActive && <HazRings />}
+      {vizActive && <LucesHaz />}{/* Z42: diseño de las 4 luces (estilo luz de la narrativa) */}
       {vizActive && <SymbolSystem />}
       {/* N5: monoliths flanking tarima path */}
       {vizActive && <Monoliths />}

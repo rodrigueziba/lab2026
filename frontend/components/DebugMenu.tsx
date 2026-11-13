@@ -44,6 +44,7 @@ import {
   DBG_SECUENCIA, // Z39
   DBG_CHECKPOINTS, // Z40
   DBG_LAYOUT, // Z41
+  DBG_LUCES, // Z42
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -321,6 +322,7 @@ export default function DebugMenu() {
   const [sec, setSec] = useState({ ...DBG_SECUENCIA });                    // Z39
   const [ckf, setCkf] = useState({ ...DBG_CHECKPOINTS });                  // Z40
   const [lay, setLay] = useState({ ...DBG_LAYOUT });                       // Z41
+  const [luc, setLuc] = useState({ ...DBG_LUCES, HALO_X: [...DBG_LUCES.HALO_X], RADIO_X: [...DBG_LUCES.RADIO_X], CONO_X: [...DBG_LUCES.CONO_X], POZO_X: [...DBG_LUCES.POZO_X] }); // Z42
   const [tab, setTab]         = useState<Tab>("SILLAS");
   const [spot,     setSpot]     = useState({ ...DBG_SPOTLIGHT });
   const [stars,    setStars]    = useState({ ...DBG_STARS });
@@ -1520,6 +1522,41 @@ export default function DebugMenu() {
             <input type="range" min={0} max={10} step={0.05} style={{ flex: 1 }} value={lay.MONOLITOS_OFFSET_M}
               onChange={e => { const v = parseFloat(e.target.value); DBG_LAYOUT.MONOLITOS_OFFSET_M = v; setLay(o => ({ ...o, MONOLITOS_OFFSET_M: v })); }} />
           </div>
+          <div style={DIVIDER} />
+          {/* Z42: diseño de las 4 luces del visualizador (LucesHaz, estilo luz de la narrativa) — todo en vivo */}
+          <span style={LABEL}>Luces del visualizador Z42 <span style={NOTE}>(halo, cono y charco · live)</span></span>
+          <div style={ROW}>
+            <span>DISENO_NUEVO <span style={NOTE}>off = lámpara colgada anterior</span></span>
+            <button style={INPUT} onClick={() => {
+              const v = !luc.DISENO_NUEVO;
+              DBG_LUCES.DISENO_NUEVO = v;
+              setLuc(o => ({ ...o, DISENO_NUEVO: v }));
+            }}>{luc.DISENO_NUEVO ? "ON" : "off"}</button>
+          </div>
+          {([
+            ["HALO_M", 0.2, 6, 0.05, "m"], ["CONO_RADIO_M", 0.2, 4, 0.05, "m"], ["CONO_OPACIDAD", 0, 1, 0.01, ""],
+            ["POZO_OPACIDAD", 0, 1.5, 0.01, ""], ["INT_ENCENDIDA", 0, 5, 0.05, ""], ["INT_APAGADA", 0, 2, 0.01, ""],
+            ["APAGADA_CONO", 0, 1, 0.01, "× apagada"], ["REACT_INT", 0, 4, 0.05, "música"], ["REACT_HALO", 0, 2, 0.05, "música"],
+            ["REACT_CONO", 0, 4, 0.05, "música"], ["REACT_RADIO", 0, 1, 0.01, "música"], ["ATAQUE_S", 0.01, 1, 0.01, "s"], ["CAIDA_S", 0.02, 2, 0.01, "s"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{luc[k].toFixed(2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={luc[k]}
+                onChange={e => { const v = parseFloat(e.target.value); DBG_LUCES[k] = v; setLuc(o => ({ ...o, [k]: v })); }} />
+            </div>
+          ))}
+          {[0, 1, 2, 3].map(i => (
+            <div key={i}>
+              <span style={NOTE}>luz {i} ({["SOL", "MONTAÑAS", "CIELO", "LÍNEAS"][i]}) · multiplicadores</span>
+              {(["HALO_X", "RADIO_X", "CONO_X", "POZO_X"] as const).map(k => (
+                <div key={k} style={ROW}>
+                  <span>{k}[{i}] <span style={NOTE}>{luc[k][i].toFixed(2)}</span></span>
+                  <input type="range" min={0} max={3} step={0.05} style={{ flex: 1 }} value={luc[k][i]}
+                    onChange={e => { const v = parseFloat(e.target.value); DBG_LUCES[k][i] = v; setLuc(o => ({ ...o, [k]: [...DBG_LUCES[k]] })); }} />
+                </div>
+              ))}
+            </div>
+          ))}
           <div style={DIVIDER} />
           <span style={LABEL}>Reloj de la experiencia Z39 <span style={NOTE}>(live)</span></span>
           <div style={{ ...ROW, ...NOTE }}>

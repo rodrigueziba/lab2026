@@ -906,3 +906,29 @@ export const DBG_LAYOUT = {
   SILLAS_OFFSET_M:    4,      // sillas + ZONA_SILLAS + público se alejan de la tarima (dirección tarima → sillas) — live
   MONOLITOS_OFFSET_M: 3,      // cada monolito se aleja de la tarima en dirección radial (sobre monolithDistM) — live
 };
+
+// ── Z42: diseño de las 4 luces del visualizador (components/LucesHaz.tsx), estilo luz de la narrativa ──
+// Halo (sprite) a la altura del origen del haz (DBG_SILLAS.hazOriginHM), cono hasta el piso y charco.
+// Color de cada una = DBG_SILLAS.hazColor0…3. Reacción a su banda (la misma que su grupo del domo).
+export const DBG_LUCES = {
+  DISENO_NUEVO:     true,   // false = lámpara colgada + cono a franjas (HazSystem, diseño anterior) — live
+  HALO_M:           1.8,    // diámetro del halo (m) — live
+  CONO_RADIO_M:     1.05,   // radio del cono / charco en el piso (= hazConeFloorRM; la zona que activa es 1 m) — live
+  CONO_OPACIDAD:    0.22,   // opacidad del cono encendido (la luz de la narrativa usa 0,22) — live
+  POZO_OPACIDAD:    0.35,   // opacidad del charco encendido (narrativa 0,35) — live
+  INT_ENCENDIDA:    1.6,    // brillo del halo encendido, sin música — live
+  INT_APAGADA:      0.35,   // brillo del halo apagado (tenue: se ve dónde está la luz) — live
+  APAGADA_CONO:     0.25,   // cono y charco apagados = este factor × encendidos — live
+  // reacción a la música (energía 0–1 de la banda de esa luz; solo encendida, como su grupo del domo)
+  REACT_INT:        1.2,    // brillo del halo: × (1 + REACT_INT · e) — live
+  REACT_HALO:       0.6,    // tamaño del halo: × (1 + REACT_HALO · e) — live
+  REACT_CONO:       1.3,    // opacidad del cono y del charco: × (1 + REACT_CONO · e) — live
+  REACT_RADIO:      0.25,   // radio del cono y del charco: × (1 + REACT_RADIO · e) — live
+  ATAQUE_S:         0.05,   // suavizado de subida de la energía (s) — live
+  CAIDA_S:          0.30,   // suavizado de bajada (s) — live
+  // ajuste por luz (multiplicadores sobre los globales; índice = haz 0…3)
+  HALO_X:     [1, 1, 1, 1] as number[],
+  RADIO_X:    [1, 1, 1, 1] as number[],
+  CONO_X:     [1, 1, 1, 1] as number[],
+  POZO_X:     [1, 1, 1, 1] as number[],
+};

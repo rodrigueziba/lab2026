@@ -27,6 +27,14 @@ export function getHazPositionsXZ(): readonly [number, number][] {
   });
 }
 
+/** Z42: centro XZ del haz i sin allocations (misma cuenta que getHazPositionsXZ). */
+export function hazPosXZEn(i: number, out: { x: number; z: number }): { x: number; z: number } {
+  const a = SECTOR_BASE_ANGLES[i] + (DBG_FLOOR.rotationDeg * Math.PI) / 180;
+  out.x = DBG_SILLAS.hazRadiusM * Math.cos(a);
+  out.z = DBG_SILLAS.hazRadiusM * Math.sin(a);
+  return out;
+}
+
 // Module-level state — no React, polled from useFrame
 const _inBeam:        boolean[] = [false, false, false, false];
 const _enteredOnce:   boolean[] = [false, false, false, false];
