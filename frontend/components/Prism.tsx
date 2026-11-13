@@ -6,10 +6,12 @@ import * as THREE from "three";
 import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
 import { TARIMA_H } from "./Tarima";
 import { INTERACT_STATE } from "@/lib/alightStore";
-import { DBG_PRISM, DBG_SECUENCIA, DBG_FRACTAL } from "@/lib/debugConfig";
+import { DBG_PRISM, DBG_SECUENCIA, DBG_FRACTAL, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { RELOJ, ahoraExp } from "@/lib/relojExperiencia"; // Z39
 // Z43: fractal nuevo de las caras ("jungle fractal II"), progresión por distancia y música
-import { FRACTAL_JUNGLA_VERT, FRACTAL_JUNGLA_FRAG } from "@/lib/prisma/fractalJungla.glsl";
+import { FRACTAL_JUNGLA_VERT, FRACTAL_JUNGLA_FRAG, FRACTAL_CARA_TEX_FRAG } from "@/lib/prisma/fractalJungla.glsl";
+import { crearEstadoFractalTex, avanzarFractalTex, tocaActualizar } from "@/lib/prisma/fractalTextura"; // Z45
+import { crearRecursosFractalTex, crearTexturaRuido, renderFractalTex, liberarRecursosFractalTex, type RecursosFractalTex } from "@/lib/prisma/fractalTexturaRender"; // Z45
 import { crearGeoCarasPrisma, dimCaraPrisma } from "@/lib/prisma/geoCarasPrisma";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags"; // Z44
 import { crearEstadoFractal, avanzarFractal } from "@/lib/prisma/fractalProgresion";
@@ -140,8 +142,19 @@ const FRACTAL_UNIFORMS = {
   uCompensar:      { value: DBG_FRACTAL.COMPENSAR_SALIDA },
   uExposicion:     { value: 1 },
   uCompTope:       { value: DBG_FRACTAL.COMP_TOPE_LINEAL },
+  // Z45: textura compartida y ruido precalculado
+  uTex:            { value: null as THREE.Texture | null },
+  uCaraAlto:       { value: -3 * dimCaraPrisma(1.01, 1.81, 3).yBase },   // alto inclinado de la cara (m)
+  uRuidoCel:       { value: null as THREE.Texture | null },
+  uRuidoCeldas:    { value: DBG_FRACTAL.RUIDO_CELDAS },
 };
-const FRACTAL_DEFINES = { CELULAR: DBG_FRACTAL.CELULAR_ON ? 1 : 0 };
+const FRACTAL_DEFINES = { CELULAR: DBG_FRACTAL.CELULAR_ON ? 1 : 0, RUIDO_TEX: DBG_FRACTAL.RUIDO_TEXTURA ? 1 : 0 };
+
+// Z45: los #define del fractal (por píxel y quad de la textura); cambiarlos recompila solo ese material
+function sincronizarDefines(m: THREE.ShaderMaterial | null | undefined, cel: number, rtex: number): void {
+  if (!m || !m.defines) return;
+  if (m.defines.CELULAR !== cel || m.defines.RUIDO_TEX !== rtex) { m.defines.CELULAR = cel; m.defines.RUIDO_TEX = rtex; m.needsUpdate = true; }
+}
 
 export default function Prism() {
   const groupRef    = useRef<THREE.Group>(null!);
@@ -162,6 +175,31 @@ export default function Prism() {
   const geoFractal    = useMemo(() => crearGeoCarasPrisma(1.01, 1.81, 3), []);
   useEffect(() => () => geoFractal.dispose(), [geoFractal]);
   useEffect(() => { fracEstado.current = crearEstadoFractal(); FRACTAL_UNIFORMS.uProx.value = 0; }, []);
+  // Z45: textura compartida (render target, quad y cámara se crean una vez; se liberan al desmontar)
+  const texMeshRef    = useRef<THREE.Mesh>(null!);
+  const texRecursos   = useRef<RecursosFractalTex | null>(null);
+  const texEstado     = useRef(crearEstadoFractalTex());
+  const texVisible    = useRef(false);
+  useEffect(() => {
+    const ruido = crearTexturaRuido(256, Math.max(1, Math.round(DBG_FRACTAL.RUIDO_CELDAS)));
+    FRACTAL_UNIFORMS.uRuidoCel.value = ruido;
+    FRACTAL_UNIFORMS.uRuidoCeldas.value = Math.max(1, Math.round(DBG_FRACTAL.RUIDO_CELDAS));
+    const R = crearRecursosFractalTex(FRACTAL_UNIFORMS as unknown as Record<string, THREE.IUniform>, FRACTAL_DEFINES, DBG_FRACTAL.TEX_RES);
+    texRecursos.current = R;
+    texEstado.current = crearEstadoFractalTex();
+    FRACTAL_UNIFORMS.uTex.value = R.rt.texture;
+    const malla = texMeshRef.current;
+    // se recalcula justo antes de dibujar las caras: solo si están visibles y en cuadro
+    if (malla) malla.onBeforeRender = (renderer) => renderFractalTex(R, renderer);
+    return () => {
+      if (malla) malla.onBeforeRender = () => {};
+      FRACTAL_UNIFORMS.uTex.value = null;
+      FRACTAL_UNIFORMS.uRuidoCel.value = null;
+      texRecursos.current = null;
+      liberarRecursosFractalTex(R);
+      ruido.dispose();
+    };
+  }, []);
 
   const proxUniforms = useMemo(() => ({
     uProximity: { value: 0.0 },
@@ -254,7 +292,18 @@ export default function Prism() {
       U.uAlfaOscuro.value = DBG_FRACTAL.ALFA_OSCURO;
       U.uBrillo.value = DBG_FRACTAL.BRILLO;
       U.uBrilloProx.value = DBG_FRACTAL.BRILLO_PROX;
-      U.uIter.value = Math.max(1, Math.min(32, Math.round(DBG_FRACTAL.ITERACIONES)));
+      // Z45: resolución (umbral con histéresis + adaptativo) e iteraciones; la textura se recalcula a TEX_FPS
+      const te = avanzarFractalTex(texEstado.current, DBG_FRACTAL, dt, fe.prox);
+      U.uIter.value = te.iter;
+      if (te.cambioNivel !== 0 && DEBUG_ENABLED) {
+        console.info(`[fractal Z45] calidad adaptativa ${te.cambioNivel < 0 ? "baja" : "sube"}: nivel ${te.nivel} · res ${te.res} · ${te.iter} it · ${te.msMedio.toFixed(1)} ms`);
+      }
+      const R = texRecursos.current;
+      if (R) {
+        R.frame++;
+        if (R.rt.width !== te.res) { R.rt.setSize(te.res, te.res); R.pendiente = true; }   // solo al cambiar
+        if (tocaActualizar(te, dt, DBG_FRACTAL.TEX_FPS, PAUSA.activa)) R.pendiente = true;
+      }
       U.uZoom.value = DBG_FRACTAL.ZOOM;
       U.uBailout.value = DBG_FRACTAL.BAILOUT;
       U.uC.value.set(DBG_FRACTAL.X, DBG_FRACTAL.Y);
@@ -287,10 +336,19 @@ export default function Prism() {
       // ruido celular: es un #define (sin rama en el fragment); cambiarlo recompila solo este material
       const mat = fracMatRef.current;
       const cel = DBG_FRACTAL.CELULAR_ON ? 1 : 0;
-      if (mat && mat.defines && mat.defines.CELULAR !== cel) { mat.defines.CELULAR = cel; mat.needsUpdate = true; }
+      const rtex = DBG_FRACTAL.RUIDO_TEXTURA ? 1 : 0;
+      sincronizarDefines(mat, cel, rtex);
+      sincronizarDefines(texRecursos.current?.mat, cel, rtex);
     }
     // invisible (prox ≈ 0 o diseño anterior) → no se dibuja: costo 0 lejos del prisma
-    if (fracMeshRef.current) fracMeshRef.current.visible = nuevo && FRACTAL_UNIFORMS.uProx.value > 0.001;
+    // Z45: con USAR_TEXTURA solo se dibuja la malla liviana (la textura se recalcula en su onBeforeRender);
+    // con prox 0 las dos mallas quedan invisibles y no se evalúa ningún shader del fractal.
+    const visFrac = nuevo && FRACTAL_UNIFORMS.uProx.value > 0.001;
+    const usarTex = DBG_FRACTAL.USAR_TEXTURA && !DBG_FRACTAL.CARAS_DISTINTAS && texRecursos.current !== null;
+    if (fracMeshRef.current) fracMeshRef.current.visible = visFrac && !usarTex;
+    if (texMeshRef.current) texMeshRef.current.visible = visFrac && usarTex;
+    if (visFrac && usarTex && !texVisible.current && texRecursos.current) texRecursos.current.pendiente = true;   // vuelve a verse: textura fresca
+    texVisible.current = visFrac && usarTex;
 
     // Glass translucency ramp (PRISM_TRANSLUCENT_MS)
     if (dist < nearM && landedRef.current) {
@@ -341,6 +399,17 @@ export default function Prism() {
           fragmentShader={FRACTAL_JUNGLA_FRAG}
           uniforms={FRACTAL_UNIFORMS}
           defines={FRACTAL_DEFINES}
+          transparent
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Z45: mismas caras con el material liviano que muestrea la textura compartida (mismo orden de dibujo) */}
+      <mesh ref={texMeshRef} geometry={geoFractal} visible={false}>
+        <shaderMaterial
+          vertexShader={FRACTAL_JUNGLA_VERT}
+          fragmentShader={FRACTAL_CARA_TEX_FRAG}
+          uniforms={FRACTAL_UNIFORMS}
           transparent
           depthWrite={false}
           side={THREE.DoubleSide}

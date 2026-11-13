@@ -40,6 +40,28 @@
 // limita el valor compensado (los blancos del original, que en ACES serían ∞, no encienden el bloom).
 // Con uPaletaOriginal = 0 todo vuelve exactamente a la versión dorada de Z43.
 
+// Z45: inversa de la salida del composer, compartida por el shader por píxel y el de la cara con textura.
+export const FRACTAL_SALIDA_GLSL = /* glsl */`
+  // Z44: inversa de la salida del composer (OutputPass: ACES filmic de three + sRGB).
+  vec3 srgbALineal(vec3 c) {
+    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+  }
+  vec3 rrtInversa(vec3 y) {
+    // y = (v² + a·v − b) / (c·v² + d·v + e)  →  (y·c − 1)·v² + (y·d − a)·v + (y·e + b) = 0, raíz positiva
+    vec3 A = y * 0.983729 - 1.0;
+    vec3 B = y * 0.4329510 - 0.0245786;
+    vec3 C = y * 0.238081 + 0.000090537;
+    return (-B - sqrt(max(B * B - 4.0 * A * C, 0.0))) / (2.0 * A);
+  }
+  vec3 acesInversa(vec3 lin, float expo) {
+    const mat3 OUT_INV = mat3(vec3(0.643038, 0.059269, 0.005962), vec3(0.311187, 0.931436, 0.063929), vec3(0.045775, 0.009295, 0.930118));
+    const mat3 IN_INV  = mat3(vec3(1.764741, -0.147028, -0.036337), vec3(-0.675778, 1.160252, -0.162436), vec3(-0.088963, -0.013224, 1.198773));
+    vec3 y = clamp(OUT_INV * lin, 0.0, 0.99);
+    vec3 x = IN_INV * rrtInversa(y);
+    return max(x, 0.0) / max(expo / 0.6, 1e-4);
+  }
+`;
+
 export const FRACTAL_JUNGLA_VERT = /* glsl */`
   attribute vec2  aCaraUv;
   attribute float aCara;
@@ -61,6 +83,12 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
   #define MAX_ITER 32
   #ifndef CELULAR
   #define CELULAR 1
+  #endif
+  #ifndef RUIDO_TEX
+  #define RUIDO_TEX 0
+  #endif
+  #ifndef MODO_TEXTURA
+  #define MODO_TEXTURA 0
   #endif
 
   uniform float uT;
@@ -98,7 +126,10 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
   uniform float uEncuadreY;        // corrimiento vertical del cuadro sobre la cara (m)
   uniform float uCompensar;        // 0 nada, 1 sRGB, 2 ACES + sRGB
   uniform float uExposicion;       // renderer.toneMappingExposure
-  uniform float uCompTope;         // tope del valor lineal compensado (los blancos del original no disparan el bloom)
+  uniform float uCompTope;
+  // Z45
+  uniform sampler2D uRuidoCel;     // ruido celular precalculado (F1, F2), RUIDO_TEX = 1
+  uniform float uRuidoCeldas;      // celdas por repetición de la textura de ruido         // tope del valor lineal compensado (los blancos del original no disparan el bloom)
 
   varying vec2  vCaraUv;
   varying float vCara;
@@ -143,30 +174,22 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
     return sqrt(d1.xy);
   }
 
+  // Z45: con RUIDO_TEX = 1 se lee de una textura precalculada (mismo algoritmo, período uRuidoCeldas celdas)
+  vec2 celular(vec2 P) {
+  #if RUIDO_TEX
+    return texture2D(uRuidoCel, P / uRuidoCeldas).xy;
+  #else
+    return cellular(P);
+  #endif
+  }
+
   vec2 cmult(vec2 a, vec2 b) { return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x); }
 
   // signo sin cero y magnitud mínima EPS (evita dividir por 0 o por casi 0)
   float protegido(float s) { return (s < 0.0 ? -1.0 : 1.0) * max(abs(s), EPS); }
   float protegidoE(float s, float e) { return (s < 0.0 ? -1.0 : 1.0) * max(abs(s), e); }
 
-  // Z44: inversa de la salida del composer (OutputPass: ACES filmic de three + sRGB).
-  vec3 srgbALineal(vec3 c) {
-    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
-  }
-  vec3 rrtInversa(vec3 y) {
-    // y = (v² + a·v − b) / (c·v² + d·v + e)  →  (y·c − 1)·v² + (y·d − a)·v + (y·e + b) = 0, raíz positiva
-    vec3 A = y * 0.983729 - 1.0;
-    vec3 B = y * 0.4329510 - 0.0245786;
-    vec3 C = y * 0.238081 + 0.000090537;
-    return (-B - sqrt(max(B * B - 4.0 * A * C, 0.0))) / (2.0 * A);
-  }
-  vec3 acesInversa(vec3 lin, float expo) {
-    const mat3 OUT_INV = mat3(vec3(0.643038, 0.059269, 0.005962), vec3(0.311187, 0.931436, 0.063929), vec3(0.045775, 0.009295, 0.930118));
-    const mat3 IN_INV  = mat3(vec3(1.764741, -0.147028, -0.036337), vec3(-0.675778, 1.160252, -0.162436), vec3(-0.088963, -0.013224, 1.198773));
-    vec3 y = clamp(OUT_INV * lin, 0.0, 0.99);
-    vec3 x = IN_INV * rrtInversa(y);
-    return max(x, 0.0) / max(expo / 0.6, 1e-4);
-  }
+  ${FRACTAL_SALIDA_GLSL}
 
   void main() {
     // semilla de la cara (hoy sin efecto: uCarasDistintas = 0)
@@ -183,7 +206,7 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
 
     vec2 c = position;
   #if CELULAR
-    c += sin(t + cellular(c) * 0.1) * 0.01;
+    c += sin(t + celular(c) * 0.1) * 0.01;
   #else
     c += sin(vec2(t)) * 0.01;
   #endif
@@ -201,7 +224,7 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
 
     float l = sin((c.y * 2.0) * 0.23);
   #if CELULAR
-    c += cellular(c * 23.0);
+    c += celular(c * 23.0);
   #endif
     c.x += sin(c.y * 2.0);
     c.y += sin(c.x * 20.0) * 0.1;
@@ -223,7 +246,7 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
       + (sin(cx * 1.1) + sin(c.y * 2.3) + sin(cx * 3.5) + sin(c.y * 4.0) + sin(c.y * 6.0) + sin(cx * 5.0) + sin(cx * 10.0)) * 0.1
       + sin(cx * 128.0) * 0.01;
   #if CELULAR
-    vb += cellular(vec2(cx, c.y)).x;
+    vb += celular(vec2(cx, c.y)).x;
   #endif
     vb = exp(min(max(0.0, vb), 30.0)) - 1.4;
     float iB = (rnd + pow(max(vb + 0.46, EPS), -0.75)) * 0.157;
@@ -232,11 +255,17 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
     float mB = (1.0 - mA) * step(uDepthCull * 0.1, v);
     float inten = mA * iA + mB * iB;
 
-    vec3 col = mix(uColOscuro, uColMedio, smoothstep(0.0, 0.45, inten));
-    col = mix(col, uColClaro, smoothstep(0.45, 1.0, inten));
-    col *= uBrillo * uMusBrillo * (1.0 + uProx * uBrilloProx);
-
-    float alfa = (mA + mB) * uProx * uOpacidad * mix(uAlfaOscuro, 1.0, clamp(inten, 0.0, 1.0));
+    vec3 colG = mix(uColOscuro, uColMedio, smoothstep(0.0, 0.45, inten));
+    colG = mix(colG, uColClaro, smoothstep(0.45, 1.0, inten));
+    float alfaG = (mA + mB) * uOpacidad * mix(uAlfaOscuro, 1.0, clamp(inten, 0.0, 1.0));
+  #if MODO_TEXTURA
+    // Z45: textura compartida. Original: rgb = color sin grano (el rand se suma en la cara, a resolución
+    // completa), a = máscara de la rama principal. Dorada: rgb = color de paleta sin brillo, a = alfa sin prox.
+    vec3 baseO = clamp(mA * colA + mB * pow(max(vb + 0.46, EPS_ORIG), -0.75) * vec3(0.1, 0.17, 0.2), 0.0, 1.0);
+    gl_FragColor = mix(vec4(colG, clamp(alfaG, 0.0, 1.0)), vec4(baseO, mB), uPaletaOriginal);
+  #else
+    vec3 col = colG * uBrillo * uMusBrillo * (1.0 + uProx * uBrilloProx);
+    float alfa = alfaG * uProx;
 
     // ── Z44: paleta original (fórmulas del original sin modificar) ──
     vec2 resV = vec2(uGranoRes, uGranoRes * uAspecto);
@@ -253,5 +282,74 @@ export const FRACTAL_JUNGLA_FRAG = /* glsl */`
     col = mix(col, colO, uPaletaOriginal);
     alfa = mix(alfa, alfaO, uPaletaOriginal);
     gl_FragColor = vec4(col, clamp(alfa, 0.0, 1.0));
+  #endif
+  }
+`;
+
+// ── Z45: render a textura compartida ──────────────────────────────────────────
+// El quad de pantalla completa recorre el rectángulo de la cara (ancho de la base × alto inclinado, en metros,
+// el mismo sistema que aCaraUv) y evalúa FRACTAL_JUNGLA_FRAG con MODO_TEXTURA = 1, una vez por actualización.
+export const FRACTAL_QUAD_VERT = /* glsl */`
+  uniform float uCaraAncho;
+  uniform float uCaraYBase;
+  uniform float uCaraAlto;
+  varying vec2  vCaraUv;
+  varying float vCara;
+  void main() {
+    vec2 st = position.xy * 0.5 + 0.5;
+    vCaraUv = vec2((st.x - 0.5) * uCaraAncho, uCaraYBase + st.y * uCaraAlto);
+    vCara = 0.0;
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+  }
+`;
+
+// Material liviano de las caras: muestrea la textura y aplica, a resolución completa, el grano (rand del
+// original), el brillo por música, el tinte del prisma, la compensación de salida y la opacidad por cercanía.
+export const FRACTAL_CARA_TEX_FRAG = /* glsl */`
+  uniform sampler2D uTex;
+  uniform float uCaraAncho;
+  uniform float uCaraYBase;
+  uniform float uCaraAlto;
+  uniform float uProx;
+  uniform float uPaletaOriginal;
+  uniform float uGrano;
+  uniform float uGranoRes;
+  uniform float uAspecto;
+  uniform float uEncuadreY;
+  uniform float uMusBrillo;
+  uniform float uBrillo;
+  uniform float uBrilloProx;
+  uniform float uTintePrisma;
+  uniform vec3  uColCara;
+  uniform float uOpacidadOrig;
+  uniform float uCompensar;
+  uniform float uExposicion;
+  uniform float uCompTope;
+
+  varying vec2  vCaraUv;
+  varying float vCara;
+
+  ${FRACTAL_SALIDA_GLSL}
+
+  void main() {
+    vec2 st = vec2(vCaraUv.x / uCaraAncho + 0.5, (vCaraUv.y - uCaraYBase) / uCaraAlto);
+    vec4 tx = texture2D(uTex, st);
+
+    // original: grano igual que en el shader por píxel (misma grilla virtual)
+    vec2 uvO = vec2(vCaraUv.x / uCaraAncho + 0.5, (vCaraUv.y - uCaraYBase - uEncuadreY) / (uCaraAncho * uAspecto));
+    vec2 resV = vec2(uGranoRes, uGranoRes * uAspecto);
+    vec2 fcV = mix(uvO, (floor(uvO * resV) + 0.5) / max(resV, vec2(1.0)), step(0.5, uGranoRes));
+    float randO = mod(fract(sin(dot(2.5 * fcV, vec2(12.9898, 100.233))) * 43758.5453), 0.7) * uGrano;
+    vec3 colO = clamp((tx.rgb + tx.a * randO * vec3(0.1, 0.17, 0.2)) * uMusBrillo, 0.0, 1.0);
+    colO = mix(colO, uColCara, uTintePrisma);
+    vec3 linO = srgbALineal(colO);
+    colO = mix(colO, mix(linO, min(acesInversa(linO, uExposicion), vec3(uCompTope)), step(1.5, uCompensar)), step(0.5, uCompensar));
+    float alfaO = uProx * uOpacidadOrig;
+
+    // dorada (Z43)
+    vec3 colG = tx.rgb * uBrillo * uMusBrillo * (1.0 + uProx * uBrilloProx);
+    float alfaG = tx.a * uProx;
+
+    gl_FragColor = vec4(mix(colG, colO, uPaletaOriginal), clamp(mix(alfaG, alfaO, uPaletaOriginal), 0.0, 1.0));
   }
 `;

@@ -1527,9 +1527,9 @@ export default function DebugMenu() {
           <div style={DIVIDER} />
           {/* Z43: fractal de las caras del prisma (jungle fractal II) — todo en vivo */}
           <span style={LABEL}>Fractal del prisma Z43 <span style={NOTE}>(caras · live)</span></span>
-          {(["DISENO_NUEVO", "PALETA_ORIGINAL", "CELULAR_ON", "CARAS_DISTINTAS"] as const).map(k => (
+          {(["DISENO_NUEVO", "PALETA_ORIGINAL", "CELULAR_ON", "CARAS_DISTINTAS", "USAR_TEXTURA", "TEX_RES_DINAMICA", "RUIDO_TEXTURA", "ADAPTATIVO"] as const).map(k => (
             <div key={k} style={ROW}>
-              <span>{k} <span style={NOTE}>{k === "DISENO_NUEVO" ? "off = fractal anterior" : k === "PALETA_ORIGINAL" ? "Z44 · off = dorado Z43" : k === "CELULAR_ON" ? "recompila el material" : "uSemilla por cara"}</span></span>
+              <span>{k} <span style={NOTE}>{k === "DISENO_NUEVO" ? "off = fractal anterior" : k === "PALETA_ORIGINAL" ? "Z44 · off = dorado Z43" : k === "CELULAR_ON" ? "recompila el material" : k === "CARAS_DISTINTAS" ? "uSemilla por cara (fuerza por píxel)" : k === "USAR_TEXTURA" ? "Z45 · off = por píxel" : k === "RUIDO_TEXTURA" ? "Z45 · recompila" : "Z45"}</span></span>
               <button style={INPUT} onClick={() => {
                 const v = !frc[k];
                 DBG_FRACTAL[k] = v;
@@ -1542,6 +1542,9 @@ export default function DebugMenu() {
             ["TINTE_PRISMA", 0, 1, 0.01, "Z44 → color de la cara"], ["OPACIDAD_ORIGINAL", 0, 1, 0.01, "Z44"],
             ["ASPECTO_ORIGINAL", 0.2, 1.5, 0.0025, "Z44 alto/ancho"], ["GRANO_RES", 0, 2560, 10, "Z44 0 = continuo"],
             ["ENCUADRE_Y_M", -1, 1.5, 0.01, "Z44 m"], ["COMPENSAR_SALIDA", 0, 2, 1, "Z44 2 ACES+sRGB · 1 sRGB · 0"], ["COMP_TOPE_LINEAL", 0.2, 10, 0.05, "Z44 bloom"],
+            ["TEX_RES", 128, 2048, 64, "Z45 px"], ["TEX_FPS", 0, 60, 1, "Z45 0 = cada frame"], ["TEX_RES_CERCA", 128, 2048, 64, "Z45 px"],
+            ["TEX_UMBRAL_CERCA", 0, 1, 0.01, "Z45 prox"], ["TEX_HISTERESIS", 0, 0.3, 0.01, "Z45"], ["MS_MAX", 8, 60, 1, "Z45 ms"],
+            ["ADAPT_MARGEN", 0.3, 1, 0.05, "Z45"], ["ADAPT_BAJAR_S", 0.2, 5, 0.1, "Z45 s"], ["ADAPT_SUBIR_S", 0.5, 10, 0.1, "Z45 s"],
             ["DIST_INICIO_M", 1, 15, 0.1, "m"], ["DIST_MAX_M", 0, 5, 0.05, "m"],
             ["INERCIA_60", 0.005, 1, 0.005, "por frame a 60 fps"], ["VEL_MIN", 0, 3, 0.01, ""], ["VEL_MAX", 0, 5, 0.05, ""],
             ["OPACIDAD", 0, 1, 0.01, ""], ["ALFA_OSCURO", 0, 1, 0.01, ""], ["BRILLO", 0, 3, 0.05, ""], ["BRILLO_PROX", 0, 5, 0.05, ""],

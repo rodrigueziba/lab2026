@@ -985,4 +985,19 @@ export const DBG_FRACTAL = {
   ENCUADRE_Y_M:     0.0,    // corre el cuadro del original hacia la punta de la cara (m); 0 = apoyado en la base
   COMPENSAR_SALIDA: 2,      // 2 = inversa de ACES + sRGB del OutputPass (valores de pantalla del original); 1 = solo sRGB; 0 = nada
   COMP_TOPE_LINEAL: 1.5,    // tope del valor compensado: 1,5 → máx. 232/255 en pantalla (el original llega a 255); más alto = blancos más fieles pero con bloom
+  // Z45: rendimiento. El fractal se calcula una vez por actualización en una textura que comparten las 3 caras
+  USAR_TEXTURA:     true,   // false = cálculo por píxel en cada cara (Z44). Con CARAS_DISTINTAS se usa siempre por píxel
+  TEX_RES:          512,    // resolución de la textura (cuadrada; cubre la cara de 1,75 × 1,88 m)
+  TEX_FPS:          30,     // actualizaciones por segundo de la textura; 0 = cada frame
+  TEX_RES_DINAMICA: true,   // usar TEX_RES_CERCA cuando prox supera TEX_UMBRAL_CERCA
+  TEX_RES_CERCA:    1024,
+  TEX_UMBRAL_CERCA: 0.7,
+  TEX_HISTERESIS:   0.05,   // sube a TEX_RES_CERCA con prox > umbral + h y vuelve con prox < umbral − h
+  RUIDO_TEXTURA:    false,  // ruido celular desde una textura precalculada (256 × 256) en vez de calcularlo
+  RUIDO_CELDAS:     32,     // celdas por repetición de la textura de ruido (se fija al montar)
+  ADAPTATIVO:       false,  // baja resolución/iteraciones si el frame tarda más de MS_MAX
+  MS_MAX:           20,     // ms
+  ADAPT_MARGEN:     0.7,    // vuelve a subir con el frame por debajo de MS_MAX × ADAPT_MARGEN
+  ADAPT_BAJAR_S:    1.0,    // segundos seguidos por encima de MS_MAX para bajar un escalón
+  ADAPT_SUBIR_S:    3.0,    // segundos seguidos con margen para subir un escalón
 };

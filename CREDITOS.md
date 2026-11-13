@@ -43,6 +43,10 @@ distancia a la luz, calidad por capas (`uCapas`) y tope por canal (`uTope`).
 Cambios: coordenada por cara en metros (sin estirarse), tiempo propio acumulado según la cercanía,
 constantes como uniforms, divisiones protegidas, solo la intensidad del original pintada con la paleta
 amarilla/naranja del prisma, regiones combinadas con máscaras, ruido celular opcional y reacción a la música.
+Z44: colores y encuadre del original restaurados (la paleta amarilla/naranja queda detrás de un flag).
+Z45: cálculo en una textura compartida por las 3 caras; port a TypeScript del ruido celular de Gustavson
+(mismo algoritmo, período ajustable) para precalcularlo en una textura opcional
+(`frontend/lib/prisma/ruidoCelular.ts`, misma licencia MIT).
 
 ---
 
