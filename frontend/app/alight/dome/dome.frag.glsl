@@ -98,6 +98,18 @@ uniform float uSolAlcance;   // hasta dónde llega el cuerpo del sol (rad); afue
 uniform float uSolPaleta;    // 0 = colores de la referencia, 1 = paleta del proyecto
 uniform float uSolTinteEt;   // tinte con el color de la etapa (uColGlow)
 uniform float uSolTope;      // tope del cuerpo del sol fuera del núcleo (mezcla tipo pantalla, nunca llega a 1)
+// Z52: ondas expansivas por kick (lib/ondasKick.ts). uOndas[i] = (edad s, fuerza, luz 0..3, activa)
+#define ONDAS_N 8
+uniform vec4  uOndas[ONDAS_N];
+uniform vec3  uOndaCol[4];    // color de la luz de cada banda (DBG_SILLAS.hazColor0..3), sRGB
+uniform float uOndaVel;       // rad/s
+uniform float uOndaAncho;     // rad
+uniform float uOndaDur;       // s
+uniform float uOndaAmp;       // períodos de franja
+uniform float uOndaBrillo;
+uniform float uOndaBrilloNoche;
+uniform float uOndaTinte;
+uniform float uOndaRevelar;
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -340,6 +352,25 @@ void main() {
   float inside = 1.0 - smoothstep(PORTAL_R - bw, PORTAL_R + bw, sw);
   float sph = s + 0.050 * wob + 0.130 * wob2 * (0.7 + 0.5 * sol);
   float ph = sph / (RING_PERIOD * uRingScale) - uRingFlow * t * 12.0 - sol * 0.6;
+  // Z52: ondas. La coordenada radial es la distancia angular al centro del portal (s · atan(tan), en rad); cada
+  // onda nace en el borde del portal y avanza a uOndaVel. Perfil de campana con seno adentro (cresta y valle):
+  // las franjas se empujan hacia afuera y vuelven. Se apaga con la edad y con la distancia recorrida.
+  float angP = s * atan(uPortalTan);
+  float r0 = PORTAL_R * atan(uPortalTan);
+  float desp = 0.0, cresta = 0.0;
+  vec3 tinteOnda = vec3(0.0);
+  for (int i = 0; i < ONDAS_N; i++) {
+    vec4 o = uOndas[i];
+    if (o.w < 0.5) continue;
+    float R = r0 + o.x * uOndaVel;
+    float x = (angP - R) / max(uOndaAncho, 1e-3);
+    float vida = (1.0 - smoothstep(0.6 * uOndaDur, uOndaDur, o.x)) / (1.0 + 1.5 * (R - r0));
+    float perfil = exp(-x * x) * o.y * vida;
+    desp += uOndaAmp * perfil * sin(-x * 2.2);
+    cresta += perfil;
+    tinteOnda += perfil * (o.z < 0.5 ? uOndaCol[0] : (o.z < 1.5 ? uOndaCol[1] : (o.z < 2.5 ? uOndaCol[2] : uOndaCol[3])));
+  }
+  ph -= desp * (1.0 - inside);   // el portal queda quieto
   float thick = 0.12 * fbm4(q * 5.0 + vec2(2.0, 7.0));
   float band = smoothstep(0.34 + thick, 0.60 + thick, 0.5 + 0.5 * sin(TAU * ph));
   float hv = 0.5 + 0.5 * fbm4(q * 1.4 + vec2(3.0, 1.0));
@@ -357,6 +388,11 @@ void main() {
   ringCol = mix(ringCol, min(colCielo * franja, vec3(1.0)) * mix(pulsoAnillo, 1.0, bordeZ * uDiaNuevo), tinteA);
   float reach = 1.0 - smoothstep(uRingFade.x, uRingFade.y, s);
   float ringA = max(reach, 0.10);
+  // Z52: bajo la cresta las franjas brillan, toman algo del color de su luz y se ven aunque estén fuera del alcance
+  float crestaC = clamp(cresta, 0.0, 1.0);
+  ringCol *= 1.0 + crestaC * uOndaBrillo * (1.0 + uOndaBrilloNoche * (1.0 - uLuzDia));
+  ringCol = mix(ringCol, tinteOnda / max(cresta, 1e-3) * (0.6 + 0.6 * band), crestaC * uOndaTinte);
+  ringA = max(ringA, crestaC * uOndaRevelar);
   // W3: anillos (SOL) aparecen en fase 2
   col = mix(col, ringCol, ringA * (1.0 - inside) * uReveal.z);
 

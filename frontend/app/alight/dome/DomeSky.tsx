@@ -13,7 +13,10 @@ useTexture.preload([
   "/portal/portal-color.png",
 ]);
 import { domeVert, domeFrag } from "./domeShaders";
-import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL, DBG_SOL } from "@/lib/debugConfig";
+import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL, DBG_SOL, DBG_ONDAS, DBG_SILLAS } from "@/lib/debugConfig";
+import { ONDAS, MAX_ONDAS, edad } from "@/lib/ondasKick"; // Z52
+import { RELOJ } from "@/lib/relojExperiencia"; // Z52
+import { hexARgb } from "@/lib/cicloDia"; // Z52
 import { DIA, PORTAL_GEOM } from "@/lib/cicloDia"; // Z48 · Z49
 import { escalaPortal, centroPortal } from "@/lib/portalEscala"; // Z49 · Z50
 
@@ -189,6 +192,17 @@ export default function DomeSky({
           uSolPaleta:     { value: DBG_SOL.PALETA_PROYECTO },
           uSolTinteEt:    { value: DBG_SOL.TINTE_ETAPA },
           uSolTope:       { value: DBG_SOL.TOPE },
+          // Z52: ondas por kick (edad, fuerza, luz, activa) y color de la luz de cada banda
+          uOndas:           { value: Array.from({ length: MAX_ONDAS }, () => new THREE.Vector4()) },
+          uOndaCol:         { value: Array.from({ length: 4 }, () => new THREE.Vector3(1, 1, 1)) },
+          uOndaVel:         { value: 0 },
+          uOndaAncho:       { value: 0.1 },
+          uOndaDur:         { value: 3.5 },
+          uOndaAmp:         { value: 0 },
+          uOndaBrillo:      { value: 0 },
+          uOndaBrilloNoche: { value: 0 },
+          uOndaTinte:       { value: 0 },
+          uOndaRevelar:     { value: 0 },
         },
       }),
     // los uniformes sueltos se actualizan en useFrame; el material solo se recrea si cambia la calidad
@@ -330,6 +344,28 @@ export default function DomeSky({
       u.uSolTope.value = DBG_SOL.TOPE;
     }
     u.uDebugCapas.value = DBG_PORTAL.DEBUG_CAPAS > 0.5 ? 1 : 0;   // Z50 (también con el ciclo apagado)
+    // Z52: ondas (lib/ondasKick.ts; las detecta DomeSkyAnchor). Edad con el reloj de la experiencia (pausa = quietas)
+    {
+      const tOnda = RELOJ.tExp, arr = u.uOndas.value as THREE.Vector4[];
+      for (let i = 0; i < MAX_ONDAS; i++) {
+        const w = ONDAS.lista[i];
+        arr[i].set(w.activa ? edad(w, tOnda) : 0, w.fuerza, w.luz, w.activa && DBG_ONDAS.ACTIVO ? 1 : 0);
+      }
+      const cols = u.uOndaCol.value as THREE.Vector3[];
+      // sin arrays por frame: hexARgb tiene caché por texto
+      let c = hexARgb(DBG_SILLAS.hazColor0); cols[0].set(c[0], c[1], c[2]);
+      c = hexARgb(DBG_SILLAS.hazColor1); cols[1].set(c[0], c[1], c[2]);
+      c = hexARgb(DBG_SILLAS.hazColor2); cols[2].set(c[0], c[1], c[2]);
+      c = hexARgb(DBG_SILLAS.hazColor3); cols[3].set(c[0], c[1], c[2]);
+      u.uOndaVel.value = (DBG_ONDAS.VELOCIDAD_DEG_S * Math.PI) / 180;
+      u.uOndaAncho.value = (Math.max(0.5, DBG_ONDAS.ANCHO_DEG) * Math.PI) / 180;
+      u.uOndaDur.value = Math.max(0.05, DBG_ONDAS.DURACION_S);
+      u.uOndaAmp.value = DBG_ONDAS.AMPLITUD;
+      u.uOndaBrillo.value = DBG_ONDAS.BRILLO;
+      u.uOndaBrilloNoche.value = DBG_ONDAS.BRILLO_NOCHE;
+      u.uOndaTinte.value = DBG_ONDAS.TINTE_BANDA;
+      u.uOndaRevelar.value = DBG_ONDAS.REVELAR;
+    }
     // X2 PASO 1: escribir valores live (sin allocations — solo asignaciones de número)
     DBG_DOME_LIVE.uDawn     = u.uDawn.value;
     DBG_DOME_LIVE.revX      = u.uReveal.value.x;

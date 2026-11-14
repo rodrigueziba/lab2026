@@ -7,8 +7,10 @@
 import { useRef, useEffect, useMemo, useState, Suspense } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS, DBG_AMANECER, DOME_METERS, DBG_DOME_LIVE, DBG_DIA } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_AMANECER, DOME_METERS, DBG_DOME_LIVE, DBG_DIA, DBG_ONDAS } from "@/lib/debugConfig";
 import { DIA, ganchosMusica } from "@/lib/cicloDia"; // Z48
+import { ONDAS, detectar, envejecer, lanzarOnda, limpiarOndas } from "@/lib/ondasKick"; // Z52
+import { RELOJ } from "@/lib/relojExperiencia"; // Z52
 import { prepareVizAudio, stopVizAudio, getVizBands, BAND_STATE, N5_STATE } from "@/lib/vizAudio";
 import { getDawnState, getDomeDawnState, startDomeDawn, finishDomeDawnPhase1, resetDomeDawnState, skipDomeDawnState } from "@/lib/alightStore";
 import { estadoCompat, resetAmanecer, skipAmanecer, easeOut3, type EstadoCompat } from "@/lib/amanecer"; // Z38
@@ -461,7 +463,15 @@ function DomeSkyAnchor() {
     window.addEventListener('alight:dawn-reset', onReset);
     window.addEventListener('alight:dawn-skip',  onSkip);
     window.addEventListener('alight:dome-lq-change',  onLQ);
+    // Z52: botón de debug "Lanzar onda de prueba" (por luz)
+    const onOnda = (e: Event) => {
+      const luz = Math.max(0, Math.min(3, Number((e as CustomEvent).detail?.luz ?? 0)));
+      lanzarOnda(ONDAS, DBG_ONDAS, luz, BAND_STATE.assignment[luz] ?? luz, 1, RELOJ.tExp);
+    };
+    window.addEventListener('alight:onda-prueba', onOnda);
     return () => {
+      window.removeEventListener('alight:onda-prueba', onOnda);
+      limpiarOndas(ONDAS);   // Z52: el visualizador se desmonta → sin ondas
       window.removeEventListener('alight:dome-dawn-reset', onReset);
       window.removeEventListener('alight:dome-dawn-skip',  onSkip);
       window.removeEventListener('alight:dawn-reset', onReset);
@@ -550,6 +560,16 @@ function DomeSkyAnchor() {
       const af = 1 - Math.exp(-dt / _GRP_ATK[i]);
       const rf = 1 - Math.exp(-dt / _GRP_REL[i]);
       s.gp[i] = gated > prev ? prev + (gated - prev) * af : prev + (gated - prev) * rf;
+    }
+
+    // Z52: detector de kick por luz/banda (energía normalizada, media móvil, flanco y enfriamiento) → ondas
+    {
+      const tExp = RELOJ.tExp, dtExp = RELOJ.dtExp;
+      if (dtExp > 0) for (let i = 0; i < 4; i++) {
+        const b = assign[i] ?? i;
+        detectar(ONDAS, DBG_ONDAS, i, b, norm[b] ?? 0, getHazBandOn(i) && !!BAND_STATE.gateOpen[b], tExp, dtExp);
+      }
+      envejecer(ONDAS, DBG_ONDAS, tExp);
     }
 
     // W2: kick — detecta flanco de subida (BAND_STATE.kick verdadero 1 frame)

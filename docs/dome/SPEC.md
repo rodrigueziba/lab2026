@@ -64,6 +64,9 @@ El shader no pinta sobre las UV de la esfera: trabaja con la **dirección de cad
 | `uBordeSuave` | float | 0.5 | Z49: feather del borde del portal (misma forma) |
 | `uBordeAncho` | float | 0.22 | Z50: banda del contorno hacia adentro del disco (fracción del radio) que converge al color del cielo |
 | `uSolNuevo` … `uSolTinteEt` | varios | ver `DomeSky.tsx` | Z51: sol nuevo (núcleo, halo y rayos al estilo de la referencia aportada por el usuario): base tangente `uSolTR`/`uSolTU`, escala `uSolTam`, `uSolIntens`, `uSolNucleo`, `uSolHalo`, `uSolRayos` (3, 9), `uSolRayosAncho`, `uSolRayosInt`, `uSolBrillo` (animado), `uSolRot`, `uSolAlcance`, `uSolPaleta`, `uSolTinteEt`. El destello de lente no está en este shader (`components/SolFlare.tsx`). |
+| `uOndas[8]` | vec4[] | (0,0,0,0) | Z52: ondas por kick (`lib/ondasKick.ts`): x = edad (s, reloj de la experiencia), y = fuerza, z = luz 0..3, w = activa. Desplazan la fase de los anillos del marco (`ph`) fuera del portal |
+| `uOndaCol[4]` | vec3[] | — | Z52: color de la luz de cada banda (`DBG_SILLAS.hazColor0..3`), sRGB |
+| `uOndaVel`, `uOndaAncho`, `uOndaDur`, `uOndaAmp`, `uOndaBrillo`, `uOndaBrilloNoche`, `uOndaTinte`, `uOndaRevelar` | float | ver `DBG_ONDAS` | Z52: velocidad (rad/s), ancho (rad), vida (s), amplitud (períodos de franja), brillo, brillo de noche, tinte de la banda y visibilidad bajo la cresta |
 | `uDebugCapas` | float | 0 | Z50: 1 = capas de la composición en colores planos (disco azul, banda del contorno cian, contorno magenta, anillos verde, franja de Z49 amarilla, sol ilustrado naranja, nubes blanco, montañas rojo) |
 
 Z49: la escala de la composición (`DBG_PORTAL.ESCALA`) no es un uniform propio: `DomeSky.tsx` multiplica `uPortalTan` por la escala y sube la elevación de `uPortalF` a `atan(ESCALA · tan(e0))` (`lib/portalEscala.ts`) para que la base siga en el horizonte.

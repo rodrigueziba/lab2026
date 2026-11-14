@@ -1117,3 +1117,22 @@ export const DBG_SOL = {
   FLARE_ALT_MIN_DEG:    8,      // por debajo no se ve (montañas); aparece entre esta altura y +4° — live
   FLARE_CENTRO:         0.2,    // se desvanece con el sol cerca del centro de la pantalla (los fantasmas se apilan sobre él) — live
 };
+
+// ── Z52: ondas expansivas por kick de cada luz/banda (lib/ondasKick.ts + shader del domo) ──
+export const DBG_ONDAS = {
+  ACTIVO:          true,   // — live
+  MAX:             8,      // ondas simultáneas (1…8) — live
+  VELOCIDAD_DEG_S: 28,     // avance del anillo (°/s), desde el borde del portal hacia afuera — live
+  ANCHO_DEG:       9,      // ancho del perfil de campana (°) — live
+  DURACION_S:      3.5,    // vida de cada onda (se apaga con la edad y con la distancia) — live
+  AMPLITUD:        0.6,    // desplazamiento de las franjas (en períodos de franja), cresta y valle — live
+  BRILLO:          0.25,   // brillo de las franjas bajo la cresta — live
+  BRILLO_NOCHE:    0.5,    // brillo extra de la cresta de noche (× (1 − luz del día)) — live
+  TINTE_BANDA:     0.35,   // huella del color de la luz de la banda bajo la cresta (0 = sin color propio) — live
+  REVELAR:         0.5,    // bajo la cresta las franjas se ven aunque estén fuera del alcance del marco (que queda al 10 %) — live
+  GANANCIA_BANDA:  [1, 1, 1, 1] as number[],   // por banda de frecuencia: 0 < 80 Hz · 1 80–250 Hz (bombo) · 2 250 Hz–4 kHz · 3 > 4 kHz — live
+  UMBRAL:          1.35,   // dispara cuando la energía supera UMBRAL × su media móvil (flanco de subida) — live
+  COOLDOWN_MS:     180,    // enfriamiento por luz — live
+  MEDIA_S:         0.6,    // constante de la media móvil (s) — live
+  MIN_ENERGIA:     0.1,    // energía normalizada mínima para disparar — live
+};

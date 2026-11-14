@@ -50,6 +50,7 @@ import {
   DBG_DIA, // Z48
   DBG_PORTAL, // Z49
   DBG_SOL, // Z51
+  DBG_ONDAS, // Z52
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -1582,6 +1583,37 @@ export default function DebugMenu() {
             {(["eje", "meridiano", "arco"] as const).map(m => (
               <button key={m} style={{ ...INPUT, opacity: DBG_DIA.SOL_RECORRIDO === m ? 1 : 0.45 }}
                 onClick={() => { DBG_DIA.SOL_RECORRIDO = m; tocarDia(); }}>{m}</button>
+            ))}
+          </div>
+          {/* Z52: ondas expansivas por kick de cada luz/banda */}
+          <span style={LABEL}>Ondas por kick Z52 <span style={NOTE}>(desde el portal hacia el domo · live)</span></span>
+          <div style={ROW}>
+            <span>ACTIVO</span>
+            <button style={INPUT} onClick={() => { DBG_ONDAS.ACTIVO = !DBG_ONDAS.ACTIVO; tocarDia(); }}>{DBG_ONDAS.ACTIVO ? "ON" : "off"}</button>
+          </div>
+          {([
+            ["MAX", 1, 8, 1, ""], ["VELOCIDAD_DEG_S", 5, 90, 1, "°/s"], ["ANCHO_DEG", 1, 30, 0.5, "°"], ["DURACION_S", 0.5, 8, 0.1, "s"],
+            ["AMPLITUD", 0, 2, 0.05, "períodos"], ["BRILLO", 0, 1.5, 0.05, ""], ["BRILLO_NOCHE", 0, 2, 0.05, ""], ["TINTE_BANDA", 0, 1, 0.01, ""],
+            ["REVELAR", 0, 1, 0.01, ""], ["UMBRAL", 1, 3, 0.05, "× media"], ["COOLDOWN_MS", 50, 1000, 10, "ms"], ["MEDIA_S", 0.1, 3, 0.05, "s"],
+            ["MIN_ENERGIA", 0, 0.6, 0.01, ""],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{DBG_ONDAS[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_ONDAS[k]}
+                onChange={e => { DBG_ONDAS[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          {[0, 1, 2, 3].map(b => (
+            <div key={b} style={ROW}>
+              <span>GANANCIA_BANDA[{b}] <span style={NOTE}>{DBG_ONDAS.GANANCIA_BANDA[b].toFixed(2)} {["< 80 Hz", "80–250 Hz", "250 Hz–4 kHz", "> 4 kHz"][b]}</span></span>
+              <input type="range" min={0} max={3} step={0.05} style={{ flex: 1 }} value={DBG_ONDAS.GANANCIA_BANDA[b]}
+                onChange={e => { DBG_ONDAS.GANANCIA_BANDA[b] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <span>Lanzar onda de prueba</span>
+            {[0, 1, 2, 3].map(l => (
+              <button key={l} style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:onda-prueba", { detail: { luz: l } }))}>luz {l}</button>
             ))}
           </div>
           <span style={LABEL}>Sol nuevo Z51 <span style={NOTE}>(núcleo, rayos y destello de lente · live)</span></span>
