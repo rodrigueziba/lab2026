@@ -13,7 +13,7 @@ useTexture.preload([
   "/portal/portal-color.png",
 ]);
 import { domeVert, domeFrag } from "./domeShaders";
-import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL } from "@/lib/debugConfig";
+import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL, DBG_SOL } from "@/lib/debugConfig";
 import { DIA, PORTAL_GEOM } from "@/lib/cicloDia"; // Z48 · Z49
 import { escalaPortal, centroPortal } from "@/lib/portalEscala"; // Z49 · Z50
 
@@ -172,6 +172,23 @@ export default function DomeSky({
           // Z50
           uBordeAncho:    { value: DBG_PORTAL.BORDE_ANCHO },
           uDebugCapas:    { value: 0 },
+          // Z51: sol nuevo
+          uSolNuevo:      { value: 0 },
+          uSolTR:         { value: new THREE.Vector3(1, 0, 0) },
+          uSolTU:         { value: new THREE.Vector3(0, 1, 0) },
+          uSolTam:        { value: DBG_SOL.TAMANO },
+          uSolIntens:     { value: DBG_SOL.INTENSIDAD },
+          uSolNucleo:     { value: DBG_SOL.NUCLEO },
+          uSolHalo:       { value: DBG_SOL.HALO },
+          uSolRayos:      { value: new THREE.Vector2(DBG_SOL.RAYOS_N1, DBG_SOL.RAYOS_N2) },
+          uSolRayosAncho: { value: DBG_SOL.RAYOS_ANCHO },
+          uSolRayosInt:   { value: DBG_SOL.RAYOS_INT },
+          uSolBrillo:     { value: 0.2 },
+          uSolRot:        { value: 0 },
+          uSolAlcance:    { value: DBG_SOL.ALCANCE },
+          uSolPaleta:     { value: DBG_SOL.PALETA_PROYECTO },
+          uSolTinteEt:    { value: DBG_SOL.TINTE_ETAPA },
+          uSolTope:       { value: DBG_SOL.TOPE },
         },
       }),
     // los uniformes sueltos se actualizan en useFrame; el material solo se recrea si cambia la calidad
@@ -179,7 +196,7 @@ export default function DomeSky({
     [masks, color, lowQuality]
   );
 
-  const tmp = useMemo(() => ({ F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), b: [0, 0, 0, 0], ge: new THREE.Vector4(), rv: new THREE.Vector4(), esc: { elev: 0, tan: 1 }, cen: { az: 0, elev: 0 } }), []);
+  const tmp = useMemo(() => ({ F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), b: [0, 0, 0, 0], ge: new THREE.Vector4(), rv: new THREE.Vector4(), esc: { elev: 0, tan: 1 }, cen: { az: 0, elev: 0 }, rot: 0 }), []);
 
   // AA2: exponer el material para que ExperienceDome lo aplique al mesh del domo
   useEffect(() => {
@@ -287,6 +304,30 @@ export default function DomeSky({
       u.uTinteInterior.value = DBG_PORTAL.TINTE_INTERIOR;
       u.uBordeSuave.value = DBG_PORTAL.BORDE_SUAVE;
       u.uBordeAncho.value = DBG_PORTAL.BORDE_ANCHO;   // Z50
+      // Z51: sol nuevo. Base tangente al sol (derecha = sol × arriba, arriba = derecha × sol) para el ángulo de
+      // los rayos; si el sol está en el cénit (modo meridiano) se conserva la anterior.
+      u.uSolNuevo.value = DBG_SOL.DISENO_NUEVO ? 1 : 0;
+      const sx = DIA.solDir[0], sy = DIA.solDir[1], sz = DIA.solDir[2];
+      const lr = Math.hypot(sz, sx);
+      if (lr > 1e-4) {
+        u.uSolTR.value.set(-sz / lr, 0, sx / lr);
+        const tr = u.uSolTR.value;
+        u.uSolTU.value.set(tr.y * sz - tr.z * sy, tr.z * sx - tr.x * sz, tr.x * sy - tr.y * sx);
+      }
+      tmp.rot = (tmp.rot + dt * (DBG_SOL.ROTACION_RAYOS_DEG_S * Math.PI / 180)) % (Math.PI * 2);
+      u.uSolRot.value = tmp.rot;
+      u.uSolBrillo.value = 0.2 + Math.sin(state.clock.elapsedTime) * 0.05 * DBG_SOL.PARPADEO + 0.1 * DIA.solPulso;   // + graves (MUSICA_SOL)
+      u.uSolTam.value = DBG_SOL.TAMANO;
+      u.uSolIntens.value = DBG_SOL.INTENSIDAD;
+      u.uSolNucleo.value = DBG_SOL.NUCLEO;
+      u.uSolHalo.value = DBG_SOL.HALO;
+      u.uSolRayos.value.set(DBG_SOL.RAYOS_N1, DBG_SOL.RAYOS_N2);
+      u.uSolRayosAncho.value = Math.max(0.05, DBG_SOL.RAYOS_ANCHO);
+      u.uSolRayosInt.value = DBG_SOL.RAYOS_INT;
+      u.uSolAlcance.value = Math.max(0.01, DBG_SOL.ALCANCE);
+      u.uSolPaleta.value = DBG_SOL.PALETA_PROYECTO;
+      u.uSolTinteEt.value = DBG_SOL.TINTE_ETAPA;
+      u.uSolTope.value = DBG_SOL.TOPE;
     }
     u.uDebugCapas.value = DBG_PORTAL.DEBUG_CAPAS > 0.5 ? 1 : 0;   // Z50 (también con el ciclo apagado)
     // X2 PASO 1: escribir valores live (sin allocations — solo asignaciones de número)

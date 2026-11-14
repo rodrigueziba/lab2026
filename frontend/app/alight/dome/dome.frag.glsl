@@ -80,6 +80,24 @@ uniform float uBordeSuave;   // 0..1 feather del borde del portal (misma forma)
 // Z50
 uniform float uBordeAncho;   // banda del contorno hacia ADENTRO del disco (fracción del radio) que converge al cielo
 uniform float uDebugCapas;   // 1 = capas de la composición en colores planos (diagnóstico)
+// Z51: sol nuevo (núcleo, halo y rayos). Estilo adaptado de un shader de Shadertoy aportado por el usuario
+// (autor y URL por confirmar; mientras tanto, licencia por defecto de Shadertoy CC BY-NC-SA 3.0; ver CREDITOS.md).
+uniform float uSolNuevo;     // 1 = sol nuevo; 0 = disco anterior (Z48)
+uniform vec3  uSolTR;        // base tangente al sol (derecha) para el ángulo de los rayos
+uniform vec3  uSolTU;        // base tangente al sol (arriba)
+uniform float uSolTam;       // rad por "unidad" de la referencia (escala del sol en el cielo)
+uniform float uSolIntens;    // intensidad del cuerpo del sol
+uniform float uSolNucleo;    // radio del núcleo (unidades de la referencia)
+uniform float uSolHalo;      // escala del punto brillante (halo)
+uniform vec2  uSolRayos;     // (3, 9) de la referencia: sin(a·x + cos(a·y)) · sin(a·y)
+uniform float uSolRayosAncho;// exponente de los rayos (1 = referencia; más alto = más finos)
+uniform float uSolRayosInt;  // intensidad de los rayos
+uniform float uSolBrillo;    // brillo animado (0,2 + sin(t)·0,05 en la referencia; + graves)
+uniform float uSolRot;       // giro de los rayos (rad)
+uniform float uSolAlcance;   // hasta dónde llega el cuerpo del sol (rad); afuera no se calcula
+uniform float uSolPaleta;    // 0 = colores de la referencia, 1 = paleta del proyecto
+uniform float uSolTinteEt;   // tinte con el color de la etapa (uColGlow)
+uniform float uSolTope;      // tope del cuerpo del sol fuera del núcleo (mezcla tipo pantalla, nunca llega a 1)
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -240,6 +258,27 @@ vec3 solMundo(vec3 col, vec3 d, float peso) {
   float ang = acos(clamp(cosA, -1.0, 1.0));
   float R = uSolRadio * (1.0 + 0.08 * uSolPulso);
   float vis = smoothstep(-2.0 * R, 0.0, uSolDir.y) * peso;
+  // Z51: sol nuevo — la referencia en espacio angular: L = ángulo / uSolTam, a = ángulo alrededor del sol
+  if (uSolNuevo > 0.5) {
+    if (ang > uSolAlcance || vis <= 0.0) return col;   // lejos del sol: nada que calcular
+    float L = max(ang / max(uSolTam, 1e-4), 1e-3);
+    float a = atan(dot(d, uSolTU), dot(d, uSolTR)) + uSolRot;
+    float rayo = pow(abs(sin(a * uSolRayos.x + cos(a * uSolRayos.y))) * abs(sin(a * uSolRayos.y)), uSolRayosAncho) / 8.0;
+    float frills = 0.1 / pow(L * 10.0, 0.05) + rayo * uSolRayosInt * (1.0 + uSolPulso);
+    float spot = uSolBrillo / sqrt(L * 4.0) * 4.0 * uSolHalo;
+    vec3 tinteEt = mix(vec3(1.0), uColGlow / max(max(uColGlow.r, max(uColGlow.g, uColGlow.b)), 1e-3), uSolTinteEt);
+    vec3 colRayos = mix(vec3(1.0), vec3(0.941, 0.455, 0.165), uSolPaleta) * tinteEt;            // referencia blanco · #F0742A
+    vec3 colSpot = mix(vec3(0.2, 0.21, 0.3) * 4.0, vec3(0.996, 0.741, 0.090) * 1.6, uSolPaleta) * tinteEt;   // azulado · #FEBD17
+    vec3 sol = (frills * colRayos + spot * colSpot) * exp(0.8 - L) * 0.2;
+    sol *= (1.0 - smoothstep(uSolAlcance * 0.55, uSolAlcance, ang)) * uSolIntens * (0.5 + 0.5 * max(uBrilloSol, uLuzDia)) * vis;
+    float nucleo = smoothstep(uSolNucleo * 1.15, uSolNucleo * 0.85, L) * vis;
+    // mezcla tipo pantalla (aclara también sobre un cielo de día ya brillante, nunca pasa de 1) con tope propio:
+    // fuera del núcleo no supera uSolTope (o el cielo, si ya estaba más alto) → sin blanco puro del bloom
+    vec3 c = col + (1.0 - col) * clamp(sol * (1.0 - nucleo), 0.0, 1.0);
+    c = min(c, vec3(max(uSolTope, max(col.r, max(col.g, col.b)))));
+    vec3 colNucleo = mix(vec3(0.92, 0.95, 1.0), vec3(0.973, 0.918, 0.847), uSolPaleta) * tinteEt;   // blanco azulado · #F8EAD8
+    return mix(c, colNucleo, nucleo);
+  }
   vec3 halo = vec3(0.9, 0.35, 0.1) * 0.35 * (0.6 + 0.4 * uLuzDia + uSolPulso) * exp(-5.0 * max(ang / R - 1.0, 0.0)) * max(cosA, 0.0);
   vec3 c = col + sumaConTope(col, halo * vis);
   vec3 rojoSol = mix(vec3(0.898, 0.361, 0.161), vec3(0.894, 0.196, 0.169), smoothstep(-0.1, 0.4, d.y));

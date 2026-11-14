@@ -56,6 +56,14 @@ Z45: cálculo en una textura compartida por las 3 caras; port a TypeScript del r
   (`frontend/app/alight/fuentes.ts`), que la sirve desde el propio sitio. La usa
   `frontend/components/TelonTexto.tsx` para el texto "A LIGHT FOR ATTRACTING ATTENTION" proyectado sobre el telón.
 
+### Sol del cielo y destello de lente (Z51)
+
+- Estilo adaptado de un shader de **Shadertoy aportado por el usuario** (sol con núcleo brillante, rayos y destello
+  de lente: hash `rnd`, `regShape`, `shapes`). **Autor y URL por confirmar** (los agrega el usuario). Mientras no se
+  confirme otra, rige la licencia por defecto de Shadertoy, **CC BY-NC-SA 3.0** (uso académico / no comercial).
+- Archivos: `frontend/app/alight/dome/dome.frag.glsl` (cuerpo del sol, función `solMundo`) y
+  `frontend/components/SolFlare.tsx` (destello de lente con sprites en pantalla).
+
 ## Herramientas
 
 - Three.js / React Three Fiber — MIT

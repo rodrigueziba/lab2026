@@ -10,7 +10,7 @@
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_DIA, DBG_PORTAL, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { DBG_DIA, DBG_PORTAL, DBG_SOL, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { DIA } from "@/lib/cicloDia";
 
 interface Originales {
@@ -21,7 +21,7 @@ interface Originales {
 }
 
 export default function CicloDiaEscena() {
-  const { scene } = useThree();
+  const { scene, camera } = useThree();
   const orig = useRef<Originales | null>(null);
   const aplicado = useRef(false);
 
@@ -42,15 +42,15 @@ export default function CicloDiaEscena() {
     };
     orig.current = o;
     // diagnóstico solo en modo debug (pruebas en Chrome headless)
-    const w = window as unknown as { __dia?: object; __portal?: object };
-    if (DEBUG_ENABLED) { w.__dia = { DIA, DBG_DIA }; w.__portal = DBG_PORTAL; }   // Z49: + composición
+    const w = window as unknown as { __dia?: object; __portal?: object; __sol?: object };
+    if (DEBUG_ENABLED) { w.__dia = { DIA, DBG_DIA, camera }; w.__portal = DBG_PORTAL; w.__sol = DBG_SOL; }   // Z49: + composición · Z51: + sol
     return () => {
-      if (DEBUG_ENABLED) { delete w.__dia; delete w.__portal; }
+      if (DEBUG_ENABLED) { delete w.__dia; delete w.__portal; delete w.__sol; }
       restaurar(o);
       DIA.escena = false;
       orig.current = null;
     };
-  }, [scene]);
+  }, [scene, camera]);
 
   useFrame(() => {
     const o = orig.current;

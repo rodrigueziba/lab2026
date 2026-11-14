@@ -26,7 +26,7 @@ console.log(`\nportal (DBG_SILLAS): azimut ${f(deg(AZ), 1)}° (convención atan(
 PORTAL_GEOM.azRad = AZ;   // lo escribe DomeSky en el juego
 
 console.log('\nsol sobre el eje del portal');
-const C = cfg(), E = crearEstadoDia(), K = C.KEYS;
+const C = cfg({ SOL_RECORRIDO: 'arco', SOL_EJE_HASTA_ELEV_DEG: -1 }), E = crearEstadoDia(), K = C.KEYS;   // Z51: estas pruebas son del arco de Z49
 estadoCielo(K.SALIDA, C, E);
 check(Math.abs(azTurn(E.solAz - AZ)) < 1e-9 && Math.abs(E.solAlt) < 1e-9, `sale en el azimut del portal (${f(deg(E.solAz), 1)}°) sobre el horizonte`);
 let maxDeriva = 0, altDeriva1 = 0;
@@ -39,8 +39,8 @@ check(Math.abs(altMed - C.SOL_ALT_MAX_DEG) < 1e-6 && Math.abs(azTurn(E.solAz - A
   for (let x = 0; x < 1; x += 1e-4) { estadoCielo(x, C, a); estadoCielo(x + 1e-4, C, b); for (let i = 0; i < 3; i++) maxS = Math.max(maxS, Math.abs(a.solDir[i] - b.solDir[i])); maxU = Math.max(maxU, Math.abs(a.solUnico - b.solUnico)); }
   check(maxS < 0.003, `continuidad 0…1 con el sol alineado: el paso de 1e-4 mueve el sol ≤ ${f(maxS, 4)} (Z50: el máximo es el giro de noche, bajo el horizonte)`);
   estadoCielo(0, C, a); estadoCielo(1, C, b); check([0, 1, 2].every(i => Math.abs(a.solDir[i] - b.solDir[i]) < 1e-9), 'el ciclo cierra (1 = 0)'); }
-estadoCielo(K.SALIDA, cfg({ SOL_AZ_OFFSET_DEG: 5 }), E); check(Math.abs(deg(azTurn(E.solAz - AZ) * 2 * Math.PI) - 5) < 1e-6, 'SOL_AZ_OFFSET_DEG 5 corre la salida 5°');
-estadoCielo(K.SALIDA, cfg({ SOL_ALINEAR_PORTAL: false }), E); check(Math.abs(deg(E.solAz) - 120) < 1e-6, 'SOL_ALINEAR_PORTAL false: azimut de Z48 (120°)');
+estadoCielo(K.SALIDA, cfg({ SOL_AZ_OFFSET_DEG: 5, SOL_RECORRIDO: 'arco' }), E); check(Math.abs(deg(azTurn(E.solAz - AZ) * 2 * Math.PI) - 5) < 1e-6, 'SOL_AZ_OFFSET_DEG 5 corre la salida 5°');
+estadoCielo(K.SALIDA, cfg({ SOL_ALINEAR_PORTAL: false, SOL_RECORRIDO: 'arco' }), E); check(Math.abs(deg(E.solAz) - 120) < 1e-6, 'SOL_ALINEAR_PORTAL false: azimut de Z48 (120°)');
 PORTAL_GEOM.azRad = NaN; estadoCielo(K.SALIDA, C, E); check(Math.abs(deg(E.solAz) - 120) < 1e-6, 'sin domo montado (geometría desconocida): azimut de respaldo SOL_AZ_SALIDA_DEG');
 PORTAL_GEOM.azRad = AZ;
 

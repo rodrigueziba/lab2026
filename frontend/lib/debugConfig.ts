@@ -1052,6 +1052,7 @@ export const DBG_DIA = {
   SOL_VERTICAL_FASE:    1.0,    // tramo del arco (rad de fase) en que el sol sube casi vertical (< 1° de deriva hasta 15° de altura) antes de abrirse — live
   SOL_UNICO:            false,  // true = el sol ilustrado del portal se atenúa y el del mundo lo reemplaza — live
   SOL_EJE_HASTA_ELEV_DEG: 35,   // Z50: azimut EXACTO del centro del portal hasta esta altura (toda la intro); < 0 = modo Z49 — live
+  SOL_RECORRIDO:        "eje" as string,   // Z51: "eje" (azimut del portal siempre, solo cambia la altura) · "meridiano" (pasa por el cénit) · "arco" (Z48–Z50) — live
   SOL_HALO_TOPE:        0.88,   // tope del resplandor y del halo (bajo el umbral del bloom 0,92: sin destello blanco) — live
   MONT_SILUETA:         0.35,   // altura de la cordillera antes de crecer (fracción) — silueta oscura desde el principio — live
   MONT_ANCHO:           0.12,   // ancho del frente de crecimiento (fracción de vuelta) — live
@@ -1088,4 +1089,31 @@ export const DBG_PORTAL = {
   BORDE_ANCHO:     0.22,  // Z50: banda del contorno hacia ADENTRO del disco (fracción del radio) que converge al cielo — live
   DEBUG_CAPAS:     0,     // Z50: 1 = cada capa de la composición en un color plano (diagnóstico) — live
   OVERLAY_EJE:     false, // Z50: con el menú abierto (Shift), muestra azimut del portal, del sol, diferencia, altura y tDia — live
+};
+
+// ── Z51: sol nuevo (núcleo, halo, rayos y destello de lente). Estilo adaptado de un shader de Shadertoy aportado
+// por el usuario (autor y URL por confirmar; licencia por defecto de Shadertoy CC BY-NC-SA 3.0, ver CREDITOS.md) ──
+export const DBG_SOL = {
+  DISENO_NUEVO:         true,   // false = disco anterior (anillo rojo, crema y núcleo amarillo, Z48) — live
+  TAMANO:               0.22,   // rad del cielo por "unidad" de la referencia (escala del sol) — live
+  INTENSIDAD:           1.0,    // cuerpo del sol (× 0,5 + 0,5 · máx(brilloSol, luz) de la etapa) — live
+  NUCLEO:               0.15,   // radio del núcleo (unidades de la referencia; 0,15 × 0,22 rad ≈ 1,9°) — live
+  HALO:                 1.0,    // punto brillante / halo (× bright/√(4L) de la referencia) — live
+  RAYOS_N1:             3,      // el 3 de sin(a·3 + cos(a·9)) — live
+  RAYOS_N2:             9,      // el 9 — live
+  RAYOS_ANCHO:          1.0,    // exponente de los rayos (1 = referencia; más alto = más finos) — live
+  RAYOS_INT:            1.0,    // intensidad de los rayos — live
+  PARPADEO:             1.0,    // brillo animado 0,2 + sin(t)·0,05·PARPADEO (referencia) — live
+  ROTACION_RAYOS_DEG_S: 4,      // giro lento de los rayos — live
+  ALCANCE:              0.9,    // hasta dónde llega el cuerpo del sol (rad); afuera el shader no lo calcula — live
+  PALETA_PROYECTO:      0,      // 0 = colores de la referencia; 1 = crema #F8EAD8, amarillo #FEBD17, naranja #F0742A, rojo #E5322B — live
+  TINTE_ETAPA:          0.3,    // tinte con el color de la etapa (cálido al salir y al ponerse, neutro de día) — live
+  TOPE:                 0.97,   // tope del cuerpo del sol fuera del núcleo (mezcla tipo pantalla) — live
+  // destello de lente (sprites en pantalla, components/SolFlare.tsx)
+  FLARE:                true,   // — live
+  FLARE_INTENSIDAD:     0.6,    // — live
+  FLARE_CANTIDAD:       8,      // elementos (1…10; círculo, punto y hexágono alternados) — live
+  FLARE_TAMANO:         1.0,    // escala de los elementos — live
+  FLARE_ALT_MIN_DEG:    8,      // por debajo no se ve (montañas); aparece entre esta altura y +4° — live
+  FLARE_CENTRO:         0.2,    // se desvanece con el sol cerca del centro de la pantalla (los fantasmas se apilan sobre él) — live
 };

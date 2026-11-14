@@ -140,7 +140,7 @@ console.log('\nZ50: sol sobre el eje del centro del portal');
   const cen = centroPortal(num('domePortalAzimuth'), esc.elev, esc.tan, { az: 0, elev: 0 });
   PORTAL_GEOM.azRad = cen.az; PORTAL_GEOM.elevRad = cen.elev;
   const wrap = x => ((x + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-  const c = cfg(), e = crearEstadoDia(); let maxIntro = 0, maxEje = 0, hastaElev = 0;
+  const c = cfg({ SOL_RECORRIDO: 'arco' }), e = crearEstadoDia(); let maxIntro = 0, maxEje = 0, hastaElev = 0;   // Z51: el modo de Z50
   for (let x = 0; x <= 0.30 + 1e-9; x += 1e-4) { estadoCielo(x, c, e); maxIntro = Math.max(maxIntro, Math.abs(wrap(e.solAz - cen.az))); }
   for (let x = 0.2; x < 0.5; x += 1e-4) { estadoCielo(x, c, e); if (deg(e.solAlt) <= c.SOL_EJE_HASTA_ELEV_DEG) { maxEje = Math.max(maxEje, Math.abs(wrap(e.solAz - cen.az))); hastaElev = deg(e.solAlt); } }
   console.log(`    centro del círculo: az ${f(deg(cen.az) < 0 ? deg(cen.az) + 360 : deg(cen.az), 2)}° el ${f(deg(cen.elev), 2)}° (ESCALA ${POR.ESCALA})`);
@@ -151,6 +151,22 @@ console.log('\nZ50: sol sobre el eje del centro del portal');
   estadoCielo(0, c, a); estadoCielo(1, c, b);
   check(maxS < 0.003 && [0, 1, 2].every(i => Math.abs(a.solDir[i] - b.solDir[i]) < 1e-9), `después se abre sin saltos (paso ≤ ${f(maxS, 4)} por 1e-4 de tDia; el máximo es el giro de noche, bajo el horizonte) y el ciclo cierra`);
   estadoCielo(c.KEYS.ATARDECER, c, e); check(Math.abs(wrap(e.solAz - cen.az - Math.PI)) < 1e-9 && Math.abs(e.solAlt) < 1e-9, 'se pone en el azimut opuesto al portal');
+
+  console.log('\nZ51: SOL_RECORRIDO');
+  const eje = cfg({ SOL_RECORRIDO: 'eje' }); let maxD = 0, maxPaso = 0, maxAlt = -9, minAlt = 9; const a1 = crearEstadoDia(), b1 = crearEstadoDia();
+  for (let x = 0; x <= 1 + 1e-12; x += 1e-4) { estadoCielo(x, eje, a1); estadoCielo(Math.min(1, x + 1e-4), eje, b1);
+    maxD = Math.max(maxD, Math.abs(wrap(Math.atan2(a1.solDir[0], -a1.solDir[2]) - cen.az)), Math.abs(wrap(a1.solAz - cen.az)));
+    for (let i = 0; i < 3; i++) maxPaso = Math.max(maxPaso, Math.abs(a1.solDir[i] - b1.solDir[i])); maxAlt = Math.max(maxAlt, a1.solAlt); minAlt = Math.min(minAlt, a1.solAlt); }
+  check(maxD < 1e-9, `"eje": Δaz = 0 en TODO el ciclo, tDia 0…1 (máx. ${maxD.toExponential(1)} rad; también la dirección que llega al shader)`);
+  check(maxPaso < 0.003 && Math.abs(deg(maxAlt) - eje.SOL_ALT_MAX_DEG) < 1e-3 && deg(minAlt) < -40, `"eje": altura continua (paso ≤ ${f(maxPaso, 4)}), máximo ${f(deg(maxAlt), 1)}° al mediodía, ${f(deg(minAlt), 1)}° a medianoche`);
+  for (const [x, nombre] of [[eje.KEYS.SALIDA, 'sale'], [eje.KEYS.ATARDECER, 'se pone']]) { estadoCielo(x, eje, a1); check(Math.abs(a1.solAlt) < 1e-9 && Math.abs(wrap(a1.solAz - cen.az)) < 1e-12, `"eje": ${nombre} en el horizonte detrás de la composición (az del portal)`); }
+  estadoCielo(0, eje, a1); estadoCielo(1, eje, b1); check([0, 1, 2].every(i => Math.abs(a1.solDir[i] - b1.solDir[i]) < 1e-12), '"eje": el ciclo cierra sin saltos');
+  const mer = cfg({ SOL_RECORRIDO: 'meridiano' }); let maxPM = 0;
+  for (let x = 0; x < 1; x += 1e-4) { estadoCielo(x, mer, a1); estadoCielo(x + 1e-4, mer, b1); for (let i = 0; i < 3; i++) maxPM = Math.max(maxPM, Math.abs(a1.solDir[i] - b1.solDir[i])); }
+  estadoCielo(0.5, mer, a1); const cen90 = Math.abs(deg(a1.solAlt) - 90) < 1e-6;
+  estadoCielo(mer.KEYS.SALIDA, mer, a1); const sale = Math.abs(wrap(a1.solAz - cen.az)) < 1e-12 && Math.abs(a1.solAlt) < 1e-9;
+  estadoCielo(mer.KEYS.ATARDECER, mer, a1); const pone = Math.abs(wrap(Math.atan2(a1.solDir[0], -a1.solDir[2]) - cen.az - Math.PI)) < 1e-6;
+  check(cen90 && sale && pone && maxPM < 0.006, `"meridiano": sale por el portal, cénit al mediodía, se pone en el lado opuesto, continuo (paso ≤ ${f(maxPM, 4)})`);
   PORTAL_GEOM.azRad = NaN; PORTAL_GEOM.elevRad = NaN; }
 
 console.log(`\n${ok} OK · ${fallas} fallas`);

@@ -49,6 +49,7 @@ import {
   DBG_TELON_TEXTO, // Z46
   DBG_DIA, // Z48
   DBG_PORTAL, // Z49
+  DBG_SOL, // Z51
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -1573,6 +1574,34 @@ export default function DebugMenu() {
               <span>{k} <span style={NOTE}>{DBG_DIA[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_DIA[k]}
                 onChange={e => { DBG_DIA[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          {/* Z51: recorrido del sol y sol nuevo */}
+          <div style={ROW}>
+            <span>SOL_RECORRIDO <span style={NOTE}>Z51</span></span>
+            {(["eje", "meridiano", "arco"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, opacity: DBG_DIA.SOL_RECORRIDO === m ? 1 : 0.45 }}
+                onClick={() => { DBG_DIA.SOL_RECORRIDO = m; tocarDia(); }}>{m}</button>
+            ))}
+          </div>
+          <span style={LABEL}>Sol nuevo Z51 <span style={NOTE}>(núcleo, rayos y destello de lente · live)</span></span>
+          {(["DISENO_NUEVO", "FLARE"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{k === "DISENO_NUEVO" ? "off = disco anterior" : "destello de lente"}</span></span>
+              <button style={INPUT} onClick={() => { DBG_SOL[k] = !DBG_SOL[k]; tocarDia(); }}>{DBG_SOL[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["TAMANO", 0.05, 0.6, 0.01, "rad/unidad"], ["INTENSIDAD", 0, 3, 0.05, ""], ["NUCLEO", 0.01, 0.3, 0.005, "unidades"],
+            ["HALO", 0, 3, 0.05, ""], ["RAYOS_N1", 1, 12, 1, "3 ref."], ["RAYOS_N2", 1, 24, 1, "9 ref."], ["RAYOS_ANCHO", 0.2, 6, 0.1, "exponente"],
+            ["RAYOS_INT", 0, 3, 0.05, ""], ["PARPADEO", 0, 3, 0.05, ""], ["ROTACION_RAYOS_DEG_S", -30, 30, 0.5, "°/s"], ["ALCANCE", 0.1, 2, 0.05, "rad"],
+            ["PALETA_PROYECTO", 0, 1, 0.01, "0 = referencia"], ["TINTE_ETAPA", 0, 1, 0.01, ""], ["TOPE", 0.5, 1, 0.01, "bloom 0,92"], ["FLARE_CENTRO", 0, 0.6, 0.01, "fundido al centro"],
+            ["FLARE_INTENSIDAD", 0, 2, 0.05, ""], ["FLARE_CANTIDAD", 1, 10, 1, ""], ["FLARE_TAMANO", 0.2, 3, 0.05, ""], ["FLARE_ALT_MIN_DEG", -5, 40, 1, "°"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{DBG_SOL[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_SOL[k]}
+                onChange={e => { DBG_SOL[k] = parseFloat(e.target.value); tocarDia(); }} />
             </div>
           ))}
           <span style={LABEL}>Composición del domo Z49 <span style={NOTE}>(escala y tinte del cielo · live)</span></span>

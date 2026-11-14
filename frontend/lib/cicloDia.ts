@@ -31,6 +31,7 @@ export interface CfgDia {
   // Z49: sol sobre el eje del portal
   SOL_ALINEAR_PORTAL: boolean; SOL_AZ_OFFSET_DEG: number; SOL_VERTICAL_FASE: number; SOL_UNICO: boolean;
   SOL_EJE_HASTA_ELEV_DEG: number;   // Z50: azimut EXACTO del centro del portal hasta esta altura (< 0 = modo Z49)
+  SOL_RECORRIDO: string;            // Z51: "eje" (default) · "meridiano" · "arco" (Z48–Z50)
   INTRO_U_ALBA: number; INTRO_U_SOL: number; INTRO_TDIA_SOL: number; INTRO_TDIA_FIN: number;
   INTRO_MONT_FIN: number; INTRO_RESTO_INI: number; INTRO_RESTO_PASO: number; INTRO_RESTO_DUR: number;
   MUSICA_SOL: number; MUSICA_NUBES: number;
@@ -208,13 +209,37 @@ export function estadoCielo(dia: number, c: CfgDia, out: EstadoDia): EstadoDia {
     const w = c.SOL_ALINEAR_PORTAL ? suave(fase / fv) ** 2 : 1;
     az = enDia ? az0 + fase * w : az0 + Math.PI + Math.PI * Math.min(1, noche);
   }
-  out.azSalida = az0;
+  // Z51: SOL_RECORRIDO. "eje": el azimut es SIEMPRE el del centro del portal (+ SOL_AZ_OFFSET_DEG) y solo cambia
+  // la altura (misma curva asin(sin(ALT_MAX)·sin(fase)) del arco: 0 en SALIDA y ATARDECER, máximo al mediodía,
+  // bajo el horizonte de noche y continua al cerrar el ciclo); sale y se pone detrás de la composición.
+  // "meridiano": gran círculo vertical por el azimut del portal: sale por el portal, pasa por el cénit al mediodía
+  // y se pone del lado opuesto (de noche completa la vuelta por debajo del horizonte). "arco": Z48–Z50.
+  const modo = c.SOL_RECORRIDO === "meridiano" ? 1 : c.SOL_RECORRIDO === "arco" ? 2 : 0;
+  if (modo !== 2) {
+    const portal = PORTAL_GEOM.azRad;
+    const azEje = Number.isFinite(portal) ? portal + (fin(c.SOL_AZ_OFFSET_DEG) * Math.PI) / 180 : az0;
+    out.azSalida = azEje;
+    if (modo === 0) {
+      const ceE = Math.cos(alt);
+      out.solDir[0] = Math.sin(azEje) * ceE; out.solDir[1] = Math.sin(alt); out.solDir[2] = -Math.cos(azEje) * ceE;
+      out.solAlt = alt; out.solAz = azEje;
+    } else {
+      const th = enDia ? fase : Math.PI + Math.PI * Math.min(1, noche);   // ángulo sobre el gran círculo
+      const hx = Math.sin(azEje), hz = -Math.cos(azEje), ct = Math.cos(th), st = Math.sin(th);
+      out.solDir[0] = hx * ct; out.solDir[1] = st; out.solDir[2] = hz * ct;
+      out.solAlt = Math.asin(Math.max(-1, Math.min(1, st)));
+      out.solAz = ct >= 0 ? azEje : azEje + Math.PI;
+    }
+  }
+  if (modo === 2) out.azSalida = az0;
   // Z49: SOL_UNICO — el sol ilustrado se funde a medida que sale el del mundo y queda atenuado hasta el crepúsculo
   out.solUnico = c.SOL_UNICO ? suave((d - (K.SALIDA - 0.01)) / 0.03) * (1 - suave((d - K.CREPUSCULO) / Math.max(1e-3, (1 - K.CREPUSCULO) * 0.6))) : 0;
-  const ce = Math.cos(alt);
-  // convención del shader del domo: az = atan(d.x, −d.z)
-  out.solDir[0] = Math.sin(az) * ce; out.solDir[1] = Math.sin(alt); out.solDir[2] = -Math.cos(az) * ce;
-  out.solAlt = alt; out.solAz = az;
+  if (modo === 2) {
+    const ce = Math.cos(alt);
+    // convención del shader del domo: az = atan(d.x, −d.z)
+    out.solDir[0] = Math.sin(az) * ce; out.solDir[1] = Math.sin(alt); out.solDir[2] = -Math.cos(az) * ce;
+    out.solAlt = alt; out.solAz = az;
+  }
   out.etapa = nombreEtapa(d, c);
   out.dia = d;
   return out;
