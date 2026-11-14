@@ -15,7 +15,7 @@ useTexture.preload([
 import { domeVert, domeFrag } from "./domeShaders";
 import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL } from "@/lib/debugConfig";
 import { DIA, PORTAL_GEOM } from "@/lib/cicloDia"; // Z48 · Z49
-import { escalaPortal } from "@/lib/portalEscala"; // Z49
+import { escalaPortal, centroPortal } from "@/lib/portalEscala"; // Z49 · Z50
 
 export type Bands = { bass: number; lowMid: number; highMid: number; treble: number }; // 0..1
 // W4: parámetros de ajuste del shader (leídos cada frame vía callback — sin recrear material)
@@ -169,6 +169,9 @@ export default function DomeSky({
           uTinteAnillos:  { value: DBG_PORTAL.TINTE_ANILLOS },
           uTinteInterior: { value: DBG_PORTAL.TINTE_INTERIOR },
           uBordeSuave:    { value: DBG_PORTAL.BORDE_SUAVE },
+          // Z50
+          uBordeAncho:    { value: DBG_PORTAL.BORDE_ANCHO },
+          uDebugCapas:    { value: 0 },
         },
       }),
     // los uniformes sueltos se actualizan en useFrame; el material solo se recrea si cambia la calidad
@@ -176,7 +179,7 @@ export default function DomeSky({
     [masks, color, lowQuality]
   );
 
-  const tmp = useMemo(() => ({ F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), b: [0, 0, 0, 0], ge: new THREE.Vector4(), rv: new THREE.Vector4(), esc: { elev: 0, tan: 1 } }), []);
+  const tmp = useMemo(() => ({ F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), b: [0, 0, 0, 0], ge: new THREE.Vector4(), rv: new THREE.Vector4(), esc: { elev: 0, tan: 1 }, cen: { az: 0, elev: 0 } }), []);
 
   // AA2: exponer el material para que ExperienceDome lo aplique al mesh del domo
   useEffect(() => {
@@ -200,7 +203,10 @@ export default function DomeSky({
     // Z49: composición escalada (DBG_PORTAL.ESCALA) apoyada en la misma línea del horizonte (lib/portalEscala.ts)
     escalaPortal(portalElevation, portalHalfFovDeg, DBG_PORTAL.ESCALA, tmp.esc);
     const ce = Math.cos(tmp.esc.elev), se = Math.sin(tmp.esc.elev);
-    PORTAL_GEOM.azRad = portalAzimuth;   // Z49: el sol del ciclo sale en este azimut (misma convención)
+    // Z50: el sol del ciclo sale en el azimut del CENTRO DEL CÍRCULO (cDir del shader, con PORTAL_C), no en F
+    centroPortal(portalAzimuth, tmp.esc.elev, tmp.esc.tan, tmp.cen);
+    PORTAL_GEOM.azRad = tmp.cen.az;
+    PORTAL_GEOM.elevRad = tmp.cen.elev;
     F.set(Math.sin(portalAzimuth) * ce, se, -Math.cos(portalAzimuth) * ce);
     R.set(Math.cos(portalAzimuth), 0, Math.sin(portalAzimuth));
     U.crossVectors(R, F);
@@ -280,7 +286,9 @@ export default function DomeSky({
       u.uTinteAnillos.value = DBG_PORTAL.TINTE_ANILLOS;
       u.uTinteInterior.value = DBG_PORTAL.TINTE_INTERIOR;
       u.uBordeSuave.value = DBG_PORTAL.BORDE_SUAVE;
+      u.uBordeAncho.value = DBG_PORTAL.BORDE_ANCHO;   // Z50
     }
+    u.uDebugCapas.value = DBG_PORTAL.DEBUG_CAPAS > 0.5 ? 1 : 0;   // Z50 (también con el ciclo apagado)
     // X2 PASO 1: escribir valores live (sin allocations — solo asignaciones de número)
     DBG_DOME_LIVE.uDawn     = u.uDawn.value;
     DBG_DOME_LIVE.revX      = u.uReveal.value.x;

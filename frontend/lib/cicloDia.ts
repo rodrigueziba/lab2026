@@ -30,6 +30,7 @@ export interface CfgDia {
   SOL_AZ_SALIDA_DEG: number; SOL_ALT_MAX_DEG: number;
   // Z49: sol sobre el eje del portal
   SOL_ALINEAR_PORTAL: boolean; SOL_AZ_OFFSET_DEG: number; SOL_VERTICAL_FASE: number; SOL_UNICO: boolean;
+  SOL_EJE_HASTA_ELEV_DEG: number;   // Z50: azimut EXACTO del centro del portal hasta esta altura (< 0 = modo Z49)
   INTRO_U_ALBA: number; INTRO_U_SOL: number; INTRO_TDIA_SOL: number; INTRO_TDIA_FIN: number;
   INTRO_MONT_FIN: number; INTRO_RESTO_INI: number; INTRO_RESTO_PASO: number; INTRO_RESTO_DUR: number;
   MUSICA_SOL: number; MUSICA_NUBES: number;
@@ -76,9 +77,10 @@ export function crearEstadoDia(): EstadoDia {
   };
 }
 
-/** Z49: geometría del portal que escribe DomeSky (de DBG_SILLAS.domePortalAzimuth, la misma que usa el shader).
+/** Z49: geometría del portal que escribe DomeSky. Z50: azRad = azimut del CENTRO DEL CÍRCULO (cDir del shader,
+ *  lib/portalEscala.ts → centroPortal), no la dirección F (PORTAL_C lo corre ~2°); elevRad = su altura.
  *  NaN hasta que el domo se monta: entonces vale SOL_AZ_SALIDA_DEG. */
-export const PORTAL_GEOM = { azRad: NaN };
+export const PORTAL_GEOM = { azRad: NaN, elevRad: NaN };
 
 /** Azimut de la salida del sol (rad): el del portal + SOL_AZ_OFFSET_DEG, o SOL_AZ_SALIDA_DEG (Z48). */
 export function azimutSalida(c: CfgDia): number {
@@ -181,15 +183,31 @@ export function estadoCielo(dia: number, c: CfgDia, out: EstadoDia): EstadoDia {
   const altMax = (Math.max(1, Math.min(89, c.SOL_ALT_MAX_DEG)) * Math.PI) / 180;
   const alt = Math.asin(Math.sin(altMax) * Math.sin(fase));
   // azimut: media vuelta durante el día y la otra media durante la noche (continuo al cerrar el ciclo 1 → 0)
-  // Z49: alineado al portal, al salir sube casi en vertical por su eje: el avance en azimut se multiplica por
-  // w = smoothstep(0, SOL_VERTICAL_FASE, fase)² (0 al salir, 1 después; w' = 0 en los dos extremos → sin saltos
-  // ni quiebres) y recién después se abre hacia el arco del mediodía y el atardecer.
   const az0 = azimutSalida(c);
   const enDia = d >= K.SALIDA && d <= K.ATARDECER;
   const noche = (((d - K.ATARDECER) % 1) + 1) % 1 / Math.max(1e-3, 1 - span);
-  const fv = Math.max(1e-3, fin(c.SOL_VERTICAL_FASE, 1.0));
-  const w = c.SOL_ALINEAR_PORTAL ? suave(fase / fv) ** 2 : 1;
-  const az = enDia ? az0 + fase * w : az0 + Math.PI + Math.PI * Math.min(1, noche);
+  let az: number;
+  const ejeElev = fin(c.SOL_EJE_HASTA_ELEV_DEG, 35);
+  if (c.SOL_ALINEAR_PORTAL && ejeElev >= 0) {
+    // Z50: azimut EXACTO del centro del portal desde la medianoche (tDia 0) hasta que el sol pasa
+    // SOL_EJE_HASTA_ELEV_DEG: sube en vertical por el eje, detrás de las montañas y cruzando la composición.
+    // Después se abre con g(u) = u²(3 − 2u) (derivada 0 al empezar: sin quiebre) hasta la puesta (az0 + 180°).
+    // De noche completa la otra media vuelta en la primera mitad de la noche (hasta tDia 0) y queda en az0.
+    const sinE = Math.sin((Math.min(89, ejeElev) * Math.PI) / 180) / Math.max(1e-6, Math.sin(altMax));
+    const faseEje = sinE >= 1 ? Math.PI / 2 : Math.asin(Math.max(0, sinE));
+    if (enDia) {
+      const u = fase <= faseEje ? 0 : (fase - faseEje) / Math.max(1e-6, Math.PI - faseEje);
+      az = u <= 0 ? az0 : az0 + Math.PI * suave(u);
+    } else {
+      const giro = suave(Math.min(1, noche) / 0.5);   // 0 al ponerse → 1 en la mitad de la noche (tDia 0)
+      az = giro >= 1 ? az0 : az0 + Math.PI + Math.PI * giro;
+    }
+  } else {
+    // Z49 (SOL_EJE_HASTA_ELEV_DEG < 0): casi vertical con w = smoothstep(0, SOL_VERTICAL_FASE, fase)²; o Z48 sin alinear
+    const fv = Math.max(1e-3, fin(c.SOL_VERTICAL_FASE, 1.0));
+    const w = c.SOL_ALINEAR_PORTAL ? suave(fase / fv) ** 2 : 1;
+    az = enDia ? az0 + fase * w : az0 + Math.PI + Math.PI * Math.min(1, noche);
+  }
   out.azSalida = az0;
   // Z49: SOL_UNICO — el sol ilustrado se funde a medida que sale el del mundo y queda atenuado hasta el crepúsculo
   out.solUnico = c.SOL_UNICO ? suave((d - (K.SALIDA - 0.01)) / 0.03) * (1 - suave((d - K.CREPUSCULO) / Math.max(1e-3, (1 - K.CREPUSCULO) * 0.6))) : 0;

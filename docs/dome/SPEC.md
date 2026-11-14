@@ -62,6 +62,8 @@ El shader no pinta sobre las UV de la esfera: trabaja con la **dirección de cad
 | `uTinteBorde`, `uTinteAnillos` | float | 0.8, 0.7 | Z49: borde del portal y anillos teñidos con el cielo del mundo de ese píxel |
 | `uTinteInterior` | float | 0.25 | Z49: velo del interior con el color de la etapa (no toca sol ilustrado ni montañas) |
 | `uBordeSuave` | float | 0.5 | Z49: feather del borde del portal (misma forma) |
+| `uBordeAncho` | float | 0.22 | Z50: banda del contorno hacia adentro del disco (fracción del radio) que converge al color del cielo |
+| `uDebugCapas` | float | 0 | Z50: 1 = capas de la composición en colores planos (disco azul, banda del contorno cian, contorno magenta, anillos verde, franja de Z49 amarilla, sol ilustrado naranja, nubes blanco, montañas rojo) |
 
 Z49: la escala de la composición (`DBG_PORTAL.ESCALA`) no es un uniform propio: `DomeSky.tsx` multiplica `uPortalTan` por la escala y sube la elevación de `uPortalF` a `atan(ESCALA · tan(e0))` (`lib/portalEscala.ts`) para que la base siga en el horizonte.
 

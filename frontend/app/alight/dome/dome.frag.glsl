@@ -77,6 +77,9 @@ uniform float uTinteBorde;   // 0..1 borde exterior del portal teñido con el ci
 uniform float uTinteAnillos; // 0..1 anillos del marco teñidos con el cielo del mundo
 uniform float uTinteInterior;// 0..1 velo suave del interior con el color de la etapa
 uniform float uBordeSuave;   // 0..1 feather del borde del portal (misma forma)
+// Z50
+uniform float uBordeAncho;   // banda del contorno hacia ADENTRO del disco (fracción del radio) que converge al cielo
+uniform float uDebugCapas;   // 1 = capas de la composición en colores planos (diagnóstico)
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -262,6 +265,7 @@ void main() {
   float cielo = uGroupEnergy.z * uCieloAmt;
   float lin   = uGroupEnergy.w * uLinAmt;
   float kick  = uKick * uKickAmt;
+  float capaSolIl = 0.0, capaNubes = 0.0, capaMont = 0.0, bordeInD = 0.0;   // Z50: capas (DEBUG_CAPAS)
 
   // ---- coordenadas del portal ----
   float fz = dot(d, uPortalF);
@@ -309,7 +313,9 @@ void main() {
   // Z49: anillos y borde teñidos con el cielo del mundo de ese píxel (mismo patrón de franjas; de noche oscuros)
   float bordeZ = 1.0 - smoothstep(0.0, 0.10, sw - PORTAL_R);                 // franja junto al borde del portal
   float tinteA = mix(uTinteAnillos, uTinteBorde, bordeZ) * uDiaNuevo;
-  ringCol = mix(ringCol, min(colCielo * (0.55 + 0.9 * band), vec3(1.0)) * pulsoAnillo, tinteA);
+  // Z50: junto al contorno las franjas pierden contraste y convergen al color del cielo (continuo con la banda de adentro)
+  float franja = mix(0.55 + 0.9 * band, 1.0, bordeZ * uTinteBorde * uDiaNuevo);
+  ringCol = mix(ringCol, min(colCielo * franja, vec3(1.0)) * mix(pulsoAnillo, 1.0, bordeZ * uDiaNuevo), tinteA);
   float reach = 1.0 - smoothstep(uRingFade.x, uRingFade.y, s);
   float ringA = max(reach, 0.10);
   // W3: anillos (SOL) aparecen en fase 2
@@ -351,6 +357,7 @@ void main() {
     float sunRiseOfs = (1.0 - uDawn) * 0.8;
     float k = 1.0 + 0.05 * sol + 0.08 * kick;
     float rs = length(p - SUN_C + vec2(0.0, sunRiseOfs)) / k + 0.010 * cielo * fbm4(p * 6.0 + t * 0.2);
+    capaSolIl = smoothstep(RING_R + 0.004, RING_R - 0.004, rs) * ilus;   // Z50 (DEBUG_CAPAS)
     sky += vec3(0.9, 0.35, 0.1) * 0.22 * (0.5 + sol + 0.3 * kick) * exp(-5.0 * max(rs - RING_R, 0.0)) * ilus;
     vec3 ringRed = mix(vec3(0.898, 0.361, 0.161), vec3(0.894, 0.196, 0.169), smoothstep(-0.1, 0.4, p.y));
     sky = mix(sky, ringRed, smoothstep(RING_R + 0.004, RING_R - 0.004, rs) * ilus);
@@ -369,6 +376,7 @@ void main() {
     float c1 = cloudShape(p, vec2(-0.5585 + dr, 0.1579), 0.125 * sc, 0.70);
     float c2 = cloudShape(p, vec2( 0.6770 - dr, 0.1382), 0.208 * sc, 0.70);
     float c3 = cloudShape(p, vec2( 0.4596 + dr, 0.3487), 0.053 * sc, 0.70);
+    capaNubes = smoothstep(0.004, -0.004, min(min(ob1, ob2), min(min(c1, c2), c3)));   // Z50 (DEBUG_CAPAS)
     vec3 cloudCol = vec3(0.957, 0.914, 0.831) * (1.0 + uNubesBrillo) * velo;   // Z48: gancho de música (0 = igual); Z49: velo
     sky = mix(sky, cloudCol, smoothstep(0.004, -0.004, c1));
     sky = mix(sky, cloudCol, smoothstep(0.004, -0.004, c2));
@@ -383,7 +391,13 @@ void main() {
     sky = mix(sky, vec3(0.95, 0.60, 0.18), disc(p - vec2(-0.1500, 0.6974), 0.014) * uReveal.w);
     // W3: el portal se funde en con el progreso del amanecer (fase 1)
     // Z48: con el ciclo, uDawn = revelado del portal en la introducción, y de noche el portal se apaga un poco
-    col = mix(col, sky * mix(1.0, mix(uPortalNoche, 1.0, uLuzDia), uDiaNuevo), inside * uDawn);
+    // Z50: BORDE EXTERIOR real = la banda del disco junto al contorno (cielo ilustrado en naranja). Hacia el
+    // contorno converge al color del cielo del mundo de ese píxel (peso 1 en el contorno, 0 a BORDE_ANCHO·R hacia
+    // adentro); el sol ilustrado y las montañas (más adentro / dibujadas después) conservan su color.
+    bordeInD = 1.0 - smoothstep(0.0, max(uBordeAncho, 1e-3) * PORTAL_R, PORTAL_R - sw);
+    vec3 skyN = sky * mix(1.0, mix(uPortalNoche, 1.0, uLuzDia), uDiaNuevo);
+    skyN = mix(skyN, colCielo, bordeInD * uTinteBorde * uDiaNuevo);
+    col = mix(col, skyN, inside * uDawn);
     // Z49: el sol del mundo también se ve dentro del portal, delante de su cielo y DETRÁS de las montañas
     // ilustradas (que se dibujan después); con SOL_UNICO reemplaza al sol ilustrado.
     if (uDiaNuevo > 0.5) col = solMundo(col, d, inside * uDawn);
@@ -403,6 +417,7 @@ void main() {
     // W2: montañas negras respiran con despl. vertical (~2%) + rebote de kick
     float blackDispY = 0.020 * mont * sin(uv.x * 9.0 + t * 0.6) + 0.008 * kick;
     vec3 m = texture2D(uMasks, uv + vec2(0.0, blackDispY)).rgb;
+    capaMont = max(m.r, max(m.g, m.b));   // Z50 (DEBUG_CAPAS)
     // W5: bordes suaves — smoothstep activo con máscara 2k borrosa (uSoftEdge > 0)
     if (uSoftEdge > 0.001) {
       float e = uSoftEdge * 0.48;
@@ -440,5 +455,18 @@ void main() {
 
   // AA2: alpha=0 bajo el horizonte — el piso real del escenario es visible a traves del domo
   float a = smoothstep(-0.015, 0.015, d.y);
+  // Z50: DEBUG_CAPAS — cada capa de la composición en un color plano (cielo del mundo gris oscuro)
+  if (uDebugCapas > 0.5) {
+    vec3 dc = vec3(0.06);
+    dc = mix(dc, vec3(0.0, 0.75, 0.2), clamp(ringA * (1.0 - inside) * uReveal.z, 0.0, 1.0));   // anillos: verde
+    dc = mix(dc, vec3(1.0, 1.0, 0.0), clamp(bordeZ * (1.0 - inside) * uReveal.z, 0.0, 1.0));  // franja de Z49 (TINTE_BORDE fuera del contorno): amarillo
+    dc = mix(dc, vec3(0.1, 0.3, 1.0), step(0.5, inside));                                    // disco del portal: azul
+    dc = mix(dc, vec3(0.0, 1.0, 1.0), bordeInD * step(0.5, inside));                          // banda del contorno hacia adentro (Z50): cian
+    dc = mix(dc, vec3(1.0, 0.0, 1.0), clamp(4.0 * inside * (1.0 - inside), 0.0, 1.0));        // contorno + feather: magenta
+    dc = mix(dc, vec3(1.0, 0.5, 0.0), capaSolIl * step(0.5, inside));                         // sol ilustrado: naranja
+    dc = mix(dc, vec3(1.0), capaNubes * step(0.5, inside));                                   // nubes: blanco
+    dc = mix(dc, vec3(1.0, 0.0, 0.0), capaMont);                                              // montañas ilustradas: rojo
+    col = dc;
+  }
   gl_FragColor = vec4(col, a);
 }

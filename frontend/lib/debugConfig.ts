@@ -1051,6 +1051,7 @@ export const DBG_DIA = {
   SOL_AZ_OFFSET_DEG:    0,      // ajuste fino del azimut de salida respecto del portal (°) — live
   SOL_VERTICAL_FASE:    1.0,    // tramo del arco (rad de fase) en que el sol sube casi vertical (< 1° de deriva hasta 15° de altura) antes de abrirse — live
   SOL_UNICO:            false,  // true = el sol ilustrado del portal se atenúa y el del mundo lo reemplaza — live
+  SOL_EJE_HASTA_ELEV_DEG: 35,   // Z50: azimut EXACTO del centro del portal hasta esta altura (toda la intro); < 0 = modo Z49 — live
   SOL_HALO_TOPE:        0.88,   // tope del resplandor y del halo (bajo el umbral del bloom 0,92: sin destello blanco) — live
   MONT_SILUETA:         0.35,   // altura de la cordillera antes de crecer (fracción) — silueta oscura desde el principio — live
   MONT_ANCHO:           0.12,   // ancho del frente de crecimiento (fracción de vuelta) — live
@@ -1079,9 +1080,12 @@ export const DBG_DIA = {
 
 // ── Z49: composición central del domo (portal, montañas ilustradas, anillos, confeti) ──
 export const DBG_PORTAL = {
-  ESCALA:          1.3,   // escala lineal de toda la composición, apoyada en la misma línea del horizonte (1 = como antes) — live
-  TINTE_BORDE:     0.8,   // borde exterior del portal teñido con el cielo del mundo (0 = color fijo) — live
-  TINTE_ANILLOS:   0.7,   // anillos del marco teñidos con el cielo del mundo — live
+  ESCALA:          1.625, // Z50: 1,3 × 1,25 (Z49 1,3). Escala lineal de toda la composición, apoyada en el horizonte (1 = original) — live
+  TINTE_BORDE:     1.0,   // Z50 (Z49 0,8): contorno del disco del portal → color del cielo del mundo en ese píxel (0 = color fijo) — live
+  TINTE_ANILLOS:   0.85,  // Z50 (Z49 0,7): anillos del marco teñidos con el cielo del mundo — live
   TINTE_INTERIOR:  0.25,  // velo del interior con el color de la etapa (no toca sol ilustrado ni montañas) — live
   BORDE_SUAVE:     0.5,   // feather del borde del portal (misma forma) — live
+  BORDE_ANCHO:     0.22,  // Z50: banda del contorno hacia ADENTRO del disco (fracción del radio) que converge al cielo — live
+  DEBUG_CAPAS:     0,     // Z50: 1 = cada capa de la composición en un color plano (diagnóstico) — live
+  OVERLAY_EJE:     false, // Z50: con el menú abierto (Shift), muestra azimut del portal, del sol, diferencia, altura y tDia — live
 };

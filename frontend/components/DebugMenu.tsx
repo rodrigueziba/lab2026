@@ -69,7 +69,7 @@ import { AMANECER } from "@/lib/amanecer"; // Z38
 import { RELOJ, esperasPendientes } from "@/lib/relojExperiencia"; // Z39
 import { SECUENCIA } from "@/lib/secuenciaSillas"; // Z39
 import { CHECKPOINTS, CK_STATE, irACheckpoint } from "@/lib/checkpoints"; // Z40
-import { DIA } from "@/lib/cicloDia"; // Z48
+import { DIA, PORTAL_GEOM } from "@/lib/cicloDia"; // Z48 · Z50
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
 
 type Tab = "SILLAS" | "TARIMA";
@@ -333,6 +333,17 @@ export default function DebugMenu() {
   const [, setDiaV] = useState(0);
   const tocarDia = () => setDiaV(n => n + 1);
   const [diaLive, setDiaLive] = useState("");
+  const [ejeLive, setEjeLive] = useState("");   // Z50: indicador del eje del sol (OVERLAY_EJE)
+  useEffect(() => {
+    const id = setInterval(() => {
+      const g = (r: number) => ((r * 180 / Math.PI) % 360 + 360) % 360;
+      const dAz = ((DIA.solAz - PORTAL_GEOM.azRad) * 180 / Math.PI % 360 + 540) % 360 - 180;
+      setEjeLive(Number.isFinite(PORTAL_GEOM.azRad)
+        ? `portal az ${g(PORTAL_GEOM.azRad).toFixed(2)}° · sol az ${g(DIA.solAz).toFixed(2)}° · Δaz ${dAz.toFixed(3)}° · sol elev ${(DIA.solAlt * 180 / Math.PI).toFixed(1)}° · tDia ${DIA.dia.toFixed(3)}`
+        : "portal sin montar");
+    }, 250);
+    return () => clearInterval(id);
+  }, []);
   useEffect(() => {
     const id = setInterval(() => setDiaLive(
       `tDia=${DIA.dia.toFixed(3)} · ${DIA.etapa} · sol ${(DIA.solAlt * 180 / Math.PI).toFixed(1)}° · fase=${DIA.fase}` +
@@ -1556,7 +1567,7 @@ export default function DebugMenu() {
             ["SOL_AZ_SALIDA_DEG", 0, 360, 1, "° (180 = portal)"], ["SOL_ALT_MAX_DEG", 10, 85, 1, "°"], ["SOL_RADIO", 0.01, 0.2, 0.005, "rad"],
             ["MONT_SILUETA", 0, 1, 0.01, ""], ["MONT_ANCHO", 0.02, 0.5, 0.01, "vueltas"], ["PORTAL_NOCHE", 0, 1, 0.01, ""],
             ["MUSICA_SOL", 0, 2, 0.05, "gancho"], ["MUSICA_NUBES", 0, 2, 0.05, "gancho"],
-            ["SOL_AZ_OFFSET_DEG", -30, 30, 0.5, "Z49 °"], ["SOL_VERTICAL_FASE", 0.05, 1.5, 0.05, "Z49 rad"], ["SOL_HALO_TOPE", 0.5, 1.2, 0.01, "Z49 bloom 0,92"],
+            ["SOL_AZ_OFFSET_DEG", -30, 30, 0.5, "Z49 °"], ["SOL_EJE_HASTA_ELEV_DEG", -1, 60, 1, "Z50 ° (−1 = Z49)"], ["SOL_VERTICAL_FASE", 0.05, 1.5, 0.05, "Z49 rad"], ["SOL_HALO_TOPE", 0.5, 1.2, 0.01, "Z49 bloom 0,92"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{DBG_DIA[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
@@ -1565,9 +1576,20 @@ export default function DebugMenu() {
             </div>
           ))}
           <span style={LABEL}>Composición del domo Z49 <span style={NOTE}>(escala y tinte del cielo · live)</span></span>
+          <div style={ROW}>
+            <span>OVERLAY_EJE <span style={NOTE}>Z50 · eje del sol en pantalla (con el menú abierto)</span></span>
+            <button style={INPUT} onClick={() => { DBG_PORTAL.OVERLAY_EJE = !DBG_PORTAL.OVERLAY_EJE; tocarDia(); }}>{DBG_PORTAL.OVERLAY_EJE ? "ON" : "off"}</button>
+          </div>
+          {DBG_PORTAL.OVERLAY_EJE && (
+            <div style={{ position: "fixed", left: "50%", bottom: 12, transform: "translateX(-50%)", zIndex: 9998, pointerEvents: "none",
+              background: "rgba(0,0,0,0.72)", color: "#FF9A1F", font: "13px monospace", padding: "4px 10px", borderRadius: 4 }}>
+              {ejeLive}
+            </div>
+          )}
           {([
             ["ESCALA", 0.6, 1.8, 0.01, "apoyada en el horizonte"], ["TINTE_BORDE", 0, 1, 0.01, "0 = color fijo"],
             ["TINTE_ANILLOS", 0, 1, 0.01, ""], ["TINTE_INTERIOR", 0, 1, 0.01, "velo"], ["BORDE_SUAVE", 0, 1, 0.01, "feather"],
+            ["BORDE_ANCHO", 0.02, 0.6, 0.01, "Z50 × radio"], ["DEBUG_CAPAS", 0, 1, 1, "Z50 color falso"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{DBG_PORTAL[k].toFixed(2)} {nota}</span></span>

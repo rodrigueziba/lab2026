@@ -40,7 +40,8 @@ console.log('\ncontinuidad (sin saltos)');
   for (let x = 0; x < 1; x += 1e-4) { estadoCielo(x, C, a); estadoCielo(x + 1e-4, C, b);
     for (let i = 0; i < 3; i++) { maxC = Math.max(maxC, Math.abs(a.hor[i] - b.hor[i]), Math.abs(a.cen[i] - b.cen[i]), Math.abs(a.fondo[i] - b.fondo[i])); maxS = Math.max(maxS, Math.abs(a.solDir[i] - b.solDir[i])); }
     maxL = Math.max(maxL, Math.abs(a.luz - b.luz), Math.abs(a.estrellas - b.estrellas)); }
-  check(maxC < 0.01 && maxS < 0.002 && maxL < 0.005, `paso de 1e-4: color ≤ ${f(maxC, 4)}, sol ≤ ${f(maxS, 4)}, luz/estrellas ≤ ${f(maxL, 4)}`); }
+  check(maxC < 0.01 && maxS < 0.003 && maxL < 0.005,   // Z50: 0,003 (giro de noche del sol, bajo el horizonte)
+   `paso de 1e-4: color ≤ ${f(maxC, 4)}, sol ≤ ${f(maxS, 4)}, luz/estrellas ≤ ${f(maxL, 4)}`); }
 { let prev = -1, mono = true, maxSalto = 0; for (let t = 0; t <= largoDia(180, C); t += 0.05) { const x = tDiaDesdeT(t, 180, C); if (x < prev - 1e-12) mono = false; if (prev >= 0) maxSalto = Math.max(maxSalto, x - prev); prev = x; }
   check(mono && maxSalto < 0.003, `tDia crece sin saltos con el tiempo (máx. ${f(maxSalto, 4)} cada 0,05 s)`); }
 check(Math.abs(tDiaDesdeT(60, 180, C) - C.INTRO_TDIA_FIN) < 1e-9 && Math.abs(tDiaDesdeT(largoDia(180, C), 180, C) - 1) < 1e-9, 'la introducción termina en tDia 0,27 y el día en 1');
@@ -126,6 +127,31 @@ for (const x of [0.5, 0.8, 0.97]) { const e = crearEstadoDia(), am = amNuevo(); 
   check(e.dia === 0.5 && e.revCielo === 1 && e.montCrece === 1 && e.fase === 'espera', 'T_MANUAL 0,5: mediodía con todo revelado, sin tocar el reloj'); }
 { const e = crearEstadoDia(), am = amNuevo(); am.pendiente = true; avanzarDia(e, cfg(), NaN, false, am, Infinity, 1);
   check([e.dia, e.t, e.solDir[0], e.hor[0]].every(Number.isFinite), 'dt NaN y duración infinita no rompen'); }
+
+console.log('\nZ50: sol sobre el eje del centro del portal');
+{ const { PORTAL_GEOM } = await import('../lib/cicloDia.ts');
+  const { escalaPortal, centroPortal, PORTAL_C_SHADER } = await import('../lib/portalEscala.ts');
+  const frag = fs.readFileSync(new URL('../app/alight/dome/dome.frag.glsl', import.meta.url), 'utf8');
+  const pc = /PORTAL_C\s*=\s*vec2\(([-\d.]+),\s*([-\d.]+)\)/.exec(frag).slice(1).map(Number);
+  check(pc[0] === PORTAL_C_SHADER[0] && pc[1] === PORTAL_C_SHADER[1], `PORTAL_C de JS = PORTAL_C del shader (${pc})`);
+  const num = k => Number(new RegExp(`${k}:\\s*([^,]+),`).exec(fuente)[1].replace('Math.PI', String(Math.PI)));
+  const POR = Function(`return (${/export const DBG_PORTAL = (\{[\s\S]*?\n\});/.exec(fuente)[1]});`)();
+  const esc = escalaPortal(num('domePortalElevation'), num('domePortalHalfFovDeg'), POR.ESCALA, { elev: 0, tan: 1 });
+  const cen = centroPortal(num('domePortalAzimuth'), esc.elev, esc.tan, { az: 0, elev: 0 });
+  PORTAL_GEOM.azRad = cen.az; PORTAL_GEOM.elevRad = cen.elev;
+  const wrap = x => ((x + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  const c = cfg(), e = crearEstadoDia(); let maxIntro = 0, maxEje = 0, hastaElev = 0;
+  for (let x = 0; x <= 0.30 + 1e-9; x += 1e-4) { estadoCielo(x, c, e); maxIntro = Math.max(maxIntro, Math.abs(wrap(e.solAz - cen.az))); }
+  for (let x = 0.2; x < 0.5; x += 1e-4) { estadoCielo(x, c, e); if (deg(e.solAlt) <= c.SOL_EJE_HASTA_ELEV_DEG) { maxEje = Math.max(maxEje, Math.abs(wrap(e.solAz - cen.az))); hastaElev = deg(e.solAlt); } }
+  console.log(`    centro del círculo: az ${f(deg(cen.az) < 0 ? deg(cen.az) + 360 : deg(cen.az), 2)}° el ${f(deg(cen.elev), 2)}° (ESCALA ${POR.ESCALA})`);
+  check(maxIntro < 1e-9, `Δaz = 0 de tDia 0 a 0,30 (toda la introducción y el alba; máx. ${maxIntro.toExponential(1)} rad)`);
+  check(maxEje < 1e-9 && hastaElev > c.SOL_EJE_HASTA_ELEV_DEG - 0.5, `Δaz = 0 mientras sube hasta ${c.SOL_EJE_HASTA_ELEV_DEG}° (máx. ${maxEje.toExponential(1)} rad)`);
+  const a = crearEstadoDia(), b = crearEstadoDia(); let maxS = 0;
+  for (let x = 0; x < 1; x += 1e-4) { estadoCielo(x, c, a); estadoCielo(x + 1e-4, c, b); for (let i = 0; i < 3; i++) maxS = Math.max(maxS, Math.abs(a.solDir[i] - b.solDir[i])); }
+  estadoCielo(0, c, a); estadoCielo(1, c, b);
+  check(maxS < 0.003 && [0, 1, 2].every(i => Math.abs(a.solDir[i] - b.solDir[i]) < 1e-9), `después se abre sin saltos (paso ≤ ${f(maxS, 4)} por 1e-4 de tDia; el máximo es el giro de noche, bajo el horizonte) y el ciclo cierra`);
+  estadoCielo(c.KEYS.ATARDECER, c, e); check(Math.abs(wrap(e.solAz - cen.az - Math.PI)) < 1e-9 && Math.abs(e.solAlt) < 1e-9, 'se pone en el azimut opuesto al portal');
+  PORTAL_GEOM.azRad = NaN; PORTAL_GEOM.elevRad = NaN; }
 
 console.log(`\n${ok} OK · ${fallas} fallas`);
 process.exit(fallas ? 1 : 0);
