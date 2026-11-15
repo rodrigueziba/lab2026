@@ -18,6 +18,8 @@ import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from ".
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import CurtainFlash from "./CurtainFlash"; // F1: destello al atravesar el telón
+import EntradaTelon from "./EntradaTelon"; // Z59: pose de entrada fija tras el telón
+import { movimientoBloqueado } from "@/lib/entradaTelon"; // Z59
 import FlashAviso from "./FlashAviso"; // G2: aviso de fotosensibilidad (flag, off por defecto)
 import VideoModal from "./VideoModal"; // video etapa 1: reproductor aparte (modal)
 import PisoIconos from "./PisoIconos"; // Z23: iconos grabados en el piso (silla / luz)
@@ -379,6 +381,8 @@ function Player() {
 
     // N1: block WASD + prism interaction during sillas_secuencia
     if (INTERACT_STATE.movementLocked) return;
+    // Z59: bloqueo propio por razones (entrada tras el telón); no toca movementLocked
+    if (movimientoBloqueado()) return;
     // Z5: con PANEL_BLOQUEA_MOVIMIENTO, un panel SILLAS abierto también bloquea WASD
     if (INTERACT_STATE.panelBloqueo) return;
 
@@ -501,6 +505,8 @@ function Scene() {
       {RETRO_FLAGS.enabled && <RetroPostFX />}
       {/* N6: red velvet curtain — visible until player crosses the plane */}
       {curtainVisible && <Curtain />}
+      {/* Z59: pose de entrada fija tras el telón (siempre montado: el telón se desmonta después del cruce) */}
+      <EntradaTelon />
       {/* Z46: "A LIGHT FOR ATTRACTING ATTENTION" sobre el telón (recorte del reflector); se va con el telón */}
       {curtainVisible && DBG_TELON_TEXTO.ACTIVO && <TelonTexto />}
       {/* Z23: iconos de los dos caminos grabados en el piso, entre el inicio y el telón */}

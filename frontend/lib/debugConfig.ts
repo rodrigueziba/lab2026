@@ -901,6 +901,18 @@ export const DBG_CHECKPOINTS = {
 };
 
 // ── Z41: layout de sillas, zona SILLAS, público y monolitos (lib/layoutSala.ts) ──
+// ── Z59: entrada fija después de cruzar el telón (lib/entradaTelon.ts, components/EntradaTelon.tsx) ──
+export const DBG_ENTRADA = {
+  ACTIVO:                 true,   // false = como antes de Z59 (el usuario queda donde cruzó el telón) — live
+  POS_X:                  -7.4,   // pose de entrada (m); la altura de ojos es la de siempre (1,6) — live
+  POS_Z:                  0.5,
+  YAW_DEG:                -86.1,  // mirando al centro de la tarima (0, 0) desde (−7,4, 0,5): de frente a su lado −X, sillas (z = −7) a la izquierda — live
+  PITCH_DEG:              0,      // — live
+  BLOQUEO_EXTRA_S:        0.3,    // WASD sigue bloqueado esto después del fin del destello — live
+  TOPE_S:                 12,     // seguridad: pase lo que pase, libera el movimiento a los TOPE_S del cruce — live
+  DESTELLO_EN_REPETICION: true,   // si se cruza otra vez (telón repuesto desde debug), un destello de debug tapa el salto — live
+};
+
 export const DBG_LAYOUT = {
   POSICIONES_NUEVAS:  true,   // false = exactamente las posiciones anteriores (offsets ignorados) — live
   SILLAS_OFFSET_M:    4,      // sillas + ZONA_SILLAS + público se alejan de la tarima (dirección tarima → sillas) — live

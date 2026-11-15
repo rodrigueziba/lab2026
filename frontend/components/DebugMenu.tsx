@@ -52,6 +52,7 @@ import {
   DBG_SOL, // Z51
   DBG_ONDAS, // Z52
   DBG_FLOR, // Z54
+  DBG_ENTRADA, // Z59
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -74,6 +75,8 @@ import { SECUENCIA } from "@/lib/secuenciaSillas"; // Z39
 import { CHECKPOINTS, CK_STATE, irACheckpoint } from "@/lib/checkpoints"; // Z40
 import { DIA, PORTAL_GEOM, posicionarDia } from "@/lib/cicloDia"; // Z48 · Z50 · Z54
 import { EJE_PANT } from "@/components/EjeOverlay"; // Z55
+import { ENTRADA_POSE } from "@/components/EntradaTelon"; // Z59
+import { ENTRADA } from "@/lib/entradaTelon"; // Z59
 import { FLOR } from "@/lib/prismaFlor"; // Z54
 import { duracionTemaViz, idTemaViz } from "@/lib/vizAudio"; // Z54
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
@@ -2513,6 +2516,28 @@ export default function DebugMenu() {
               Disparar destello de cortina
             </button>
           </div>
+          {/* Z59: pose de entrada fija tras el telón */}
+          <span style={LABEL}>Entrada tras el telón Z59 <span style={NOTE}>(teletransporte en el pico del destello · live)</span></span>
+          <div style={ROW}>
+            <span>ACTIVO <span style={NOTE}>off = queda donde cruzó</span></span>
+            <button style={INPUT} onClick={() => { DBG_ENTRADA.ACTIVO = !DBG_ENTRADA.ACTIVO; tocarDia(); }}>{DBG_ENTRADA.ACTIVO ? "ON" : "off"}</button>
+          </div>
+          {([
+            ["POS_X", -39, 39, 0.1, "m"], ["POS_Z", -39, 39, 0.1, "m"], ["YAW_DEG", -180, 180, 0.5, "°"], ["PITCH_DEG", -45, 45, 0.5, "°"],
+            ["BLOQUEO_EXTRA_S", 0, 3, 0.05, "s tras el destello"], ["TOPE_S", 2, 30, 0.5, "s seguridad"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{DBG_ENTRADA[k].toFixed(st < 0.1 ? 2 : 1)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_ENTRADA[k]}
+                onChange={e => { DBG_ENTRADA[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <button style={INPUT} onClick={() => { window.dispatchEvent(new CustomEvent("alight:entrada-guardar")); tocarDia(); }}>Guardar pose actual como entrada</button>
+            <button style={INPUT} onClick={() => { window.dispatchEvent(new CustomEvent("alight:entrada-probar")); tocarDia(); }}>Probar entrada</button>
+          </div>
+          {ENTRADA_POSE.texto && <div style={ROW}><span style={NOTE}>{ENTRADA_POSE.texto}</span></div>}
+          <div style={ROW}><span style={NOTE}>entrada: {ENTRADA.fase} · saltos {ENTRADA.teletransportes}</span></div>
 
           <div style={DIVIDER} />
           <span style={LABEL}>Panorama T2 — crecimiento de grupos <span style={NOTE}>(live)</span></span>
