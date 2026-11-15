@@ -1052,6 +1052,8 @@ export const DBG_DIA = {
   SOL_VERTICAL_FASE:    1.0,    // tramo del arco (rad de fase) en que el sol sube casi vertical (< 1° de deriva hasta 15° de altura) antes de abrirse — live
   SOL_UNICO:            false,  // true = el sol ilustrado del portal se atenúa y el del mundo lo reemplaza — live
   SOL_EJE_HASTA_ELEV_DEG: 35,   // Z50: azimut EXACTO del centro del portal hasta esta altura (toda la intro); < 0 = modo Z49 — live
+  SOL_EJE_CENTRO:       "composicion" as string,   // Z55: vertical del eje: "composicion" (SUN_C: pico de la montaña central, sol ilustrado, discos crema y rojo) · "portal" (PORTAL_C: círculo exterior y anillos, 1,9° a la derecha; el de Z50) — live
+  SOL_EJE_IMAGEN:       true,   // Z55: en "eje", el sol va sobre la recta vertical de la composición (pico y centro de los anillos); false = azimut constante del centro del círculo (Z51) — live
   SOL_RECORRIDO:        "eje" as string,   // Z51: "eje" (azimut del portal siempre, solo cambia la altura) · "meridiano" (pasa por el cénit) · "arco" (Z48–Z50) — live
   SOL_HALO_TOPE:        0.88,   // tope del resplandor y del halo (bajo el umbral del bloom 0,92: sin destello blanco) — live
   MONT_SILUETA:         0.35,   // altura de la cordillera antes de crecer (fracción) — silueta oscura desde el principio — live
@@ -1088,7 +1090,7 @@ export const DBG_PORTAL = {
   BORDE_SUAVE:     0.5,   // feather del borde del portal (misma forma) — live
   BORDE_ANCHO:     0.22,  // Z50: banda del contorno hacia ADENTRO del disco (fracción del radio) que converge al cielo — live
   DEBUG_CAPAS:     0,     // Z50: 1 = cada capa de la composición en un color plano (diagnóstico) — live
-  OVERLAY_EJE:     false, // Z50: con el menú abierto (Shift), muestra azimut del portal, del sol, diferencia, altura y tDia — live
+  OVERLAY_EJE:     false, // Z50: con el menú abierto (Shift), muestra azimut del portal, del sol, diferencia, altura y tDia. Z55: además, cruz en el centro del círculo, recta del eje y marca del sol en pantalla (components/EjeOverlay.tsx) — live
 };
 
 // ── Z51: sol nuevo (núcleo, halo, rayos y destello de lente). Estilo adaptado de un shader de Shadertoy aportado

@@ -167,6 +167,47 @@ console.log('\nZ50: sol sobre el eje del centro del portal');
   estadoCielo(mer.KEYS.SALIDA, mer, a1); const sale = Math.abs(wrap(a1.solAz - cen.az)) < 1e-12 && Math.abs(a1.solAlt) < 1e-9;
   estadoCielo(mer.KEYS.ATARDECER, mer, a1); const pone = Math.abs(wrap(Math.atan2(a1.solDir[0], -a1.solDir[2]) - cen.az - Math.PI)) < 1e-6;
   check(cen90 && sale && pone && maxPM < 0.006, `"meridiano": sale por el portal, cénit al mediodía, se pone en el lado opuesto, continuo (paso ≤ ${f(maxPM, 4)})`);
+
+  console.log('\nZ55: sol sobre la RECTA vertical de la composición (SOL_EJE_IMAGEN)');
+  { // geometría como la escribe DomeSky
+    const { SUN_C_SHADER } = await import('../lib/portalEscala.ts');
+    const sc = /SUN_C\s*=\s*vec2\(([-\d.]+),\s*([-\d.]+)\)/.exec(frag).slice(1).map(Number);
+    check(sc[0] === SUN_C_SHADER[0] && sc[1] === SUN_C_SHADER[1], `SUN_C de JS = SUN_C del shader (${sc}); PORTAL_C.x − SUN_C.x = ${f(PORTAL_C_SHADER[0] - SUN_C_SHADER[0], 4)}`);
+    const EX = SUN_C_SHADER[0];   // SOL_EJE_CENTRO "composicion" (default)
+    const az = num('domePortalAzimuth'), ce = Math.cos(esc.elev), se = Math.sin(esc.elev);
+    const F = [Math.sin(az) * ce, se, -Math.cos(az) * ce], R = [Math.cos(az), 0, Math.sin(az)];
+    const U = [R[1] * F[2] - R[2] * F[1], R[2] * F[0] - R[0] * F[2], R[0] * F[1] - R[1] * F[0]];
+    const k = EX * esc.tan, Pq = [0, 1, 2].map(i => F[i] + R[i] * k), L = Math.hypot(...Pq);
+    const dot = (x, y) => x[0] * y[0] + x[1] * y[1] + x[2] * y[2];
+    const pImg = d => { const t = dot(d, F); const q = [0, 1, 2].map(i => d[i] / t - F[i]); return [dot(q, R) / esc.tan, dot(q, U) / esc.tan]; };
+    const ejeOn = cfg({ SOL_RECORRIDO: 'eje', SOL_EJE_IMAGEN: true }), ejeOff = cfg({ SOL_RECORRIDO: 'eje', SOL_EJE_IMAGEN: false });
+    const sOn = crearEstadoDia(), sOff = crearEstadoDia();
+    // antes (Z51, sin la geometría del eje): azimut constante del centro del círculo
+    console.log('    tDia · altura · p.x antes (Z51) → ahora (eje SUN_C.x = ' + EX + ', pico y discos) · Δaz del sol de antes respecto del eje');
+    let maxPx = 0, maxAlt = 0;
+    for (const x of [0.2, 0.22, 0.25, 0.3, 0.4, 0.5, 0.65, 0.8]) {
+      PORTAL_GEOM.ejeP[0] = NaN; estadoCielo(x, ejeOff, sOff);
+      PORTAL_GEOM.ejeP[0] = Pq[0] / L; PORTAL_GEOM.ejeP[1] = Pq[1] / L; PORTAL_GEOM.ejeP[2] = Pq[2] / L;
+      PORTAL_GEOM.ejeU[0] = U[0]; PORTAL_GEOM.ejeU[1] = U[1]; PORTAL_GEOM.ejeU[2] = U[2];
+      estadoCielo(x, ejeOn, sOn);
+      const pa = pImg(sOff.solDir), pn = pImg(sOn.solDir);
+      const dAz = deg(wrap(sOff.solAz - sOn.solAz));
+      console.log(`    ${f(x, 2)} · ${f(deg(sOn.solAlt), 1)}° · ${f(pa[0], 4)} → ${f(pn[0], 4)} · ${f(dAz, 3)}° `);
+      maxPx = Math.max(maxPx, Math.abs(pn[0] - EX)); maxAlt = Math.max(maxAlt, Math.abs(sOn.solAlt - sOff.solAlt));
+    }
+    check(maxPx < 1e-9, `el sol queda sobre la recta p.x = SUN_C.x en todos esos tDia (máx. ${maxPx.toExponential(1)})`);
+    check(maxAlt < 1e-9, `misma altura que antes (solo cambia el azimut; máx. ${maxAlt.toExponential(1)} rad)`);
+    let maxPaso = 0, maxRecta = 0;
+    for (let x = 0; x < 1; x += 1e-4) { estadoCielo(x, ejeOn, sOn); estadoCielo(x + 1e-4, ejeOn, sOff);
+      for (let i = 0; i < 3; i++) maxPaso = Math.max(maxPaso, Math.abs(sOn.solDir[i] - sOff.solDir[i]));
+      if (sOn.solDir[1] > -0.2 && dot(sOn.solDir, F) > 0.1) maxRecta = Math.max(maxRecta, Math.abs(pImg(sOn.solDir)[0] - EX)); }
+    estadoCielo(0, ejeOn, sOn); estadoCielo(1, ejeOn, sOff);
+    check(maxPaso < 0.003 && [0, 1, 2].every(i => Math.abs(sOn.solDir[i] - sOff.solDir[i]) < 1e-12) && maxRecta < 1e-9, `todo el ciclo sobre la recta (máx. ${maxRecta.toExponential(1)}), continuo (paso ≤ ${f(maxPaso, 4)}) y cierra`);
+    estadoCielo(0.4, cfg({ SOL_RECORRIDO: 'eje', SOL_EJE_IMAGEN: true, SOL_AZ_OFFSET_DEG: 5 }), sOff); estadoCielo(0.4, ejeOn, sOn);
+    check(Math.abs(deg(wrap(sOff.solAz - sOn.solAz)) - 5) < 1e-9 && Math.abs(sOff.solAlt - sOn.solAlt) < 1e-12, 'SOL_AZ_OFFSET_DEG 5 gira el sol 5° (misma altura)');
+    estadoCielo(0.4, ejeOff, sOff); check(Math.abs(wrap(sOff.solAz - cen.az)) < 1e-12, 'SOL_EJE_IMAGEN false: azimut constante del centro del círculo (Z51)');
+    PORTAL_GEOM.ejeP[0] = NaN; PORTAL_GEOM.ejeP[1] = 0; PORTAL_GEOM.ejeP[2] = 0; PORTAL_GEOM.ejeU[0] = 0; PORTAL_GEOM.ejeU[1] = 1; PORTAL_GEOM.ejeU[2] = 0;
+  }
   PORTAL_GEOM.azRad = NaN; PORTAL_GEOM.elevRad = NaN; }
 
 console.log(`\n${ok} OK · ${fallas} fallas`);

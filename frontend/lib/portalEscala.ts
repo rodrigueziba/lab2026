@@ -23,6 +23,10 @@ export function elevacionDeP(py: number, elev: number, tan: number): number {
 /** Z50: PORTAL_C del shader (app/alight/dome/dome.frag.glsl, `const vec2 PORTAL_C`): centro del círculo del portal
  *  en coordenadas de la imagen. Copiado acá para JS; scripts/ciclo-dia-test.mjs verifica que coincida con el GLSL. */
 export const PORTAL_C_SHADER: readonly [number, number] = [0.0461, -0.0609];
+/** Z55: SUN_C del shader (`const vec2 SUN_C`): centro del sol ilustrado y de los discos crema y rojo; el pico de la
+ *  montaña central cae sobre la misma vertical (medido en pantalla). NO coincide con PORTAL_C (círculo exterior y
+ *  anillos): está 0,0379 más a la izquierda (≈ 1,9° con ESCALA 1,625). scripts/ciclo-dia-test.mjs lo verifica. */
+export const SUN_C_SHADER: readonly [number, number] = [0.0082, -0.0822];
 
 export interface CentroPortal { az: number; elev: number }
 

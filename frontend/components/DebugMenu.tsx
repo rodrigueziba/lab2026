@@ -73,6 +73,7 @@ import { RELOJ, esperasPendientes } from "@/lib/relojExperiencia"; // Z39
 import { SECUENCIA } from "@/lib/secuenciaSillas"; // Z39
 import { CHECKPOINTS, CK_STATE, irACheckpoint } from "@/lib/checkpoints"; // Z40
 import { DIA, PORTAL_GEOM, posicionarDia } from "@/lib/cicloDia"; // Z48 · Z50 · Z54
+import { EJE_PANT } from "@/components/EjeOverlay"; // Z55
 import { FLOR } from "@/lib/prismaFlor"; // Z54
 import { duracionTemaViz, idTemaViz } from "@/lib/vizAudio"; // Z54
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
@@ -344,7 +345,8 @@ export default function DebugMenu() {
       const g = (r: number) => ((r * 180 / Math.PI) % 360 + 360) % 360;
       const dAz = ((DIA.solAz - PORTAL_GEOM.azRad) * 180 / Math.PI % 360 + 540) % 360 - 180;
       setEjeLive(Number.isFinite(PORTAL_GEOM.azRad)
-        ? `portal az ${g(PORTAL_GEOM.azRad).toFixed(2)}° · sol az ${g(DIA.solAz).toFixed(2)}° · Δaz ${dAz.toFixed(3)}° · sol elev ${(DIA.solAlt * 180 / Math.PI).toFixed(1)}° · tDia ${DIA.dia.toFixed(3)}`
+        ? `portal az ${g(PORTAL_GEOM.azRad).toFixed(2)}° · sol az ${g(DIA.solAz).toFixed(2)}° · Δaz centro ${dAz.toFixed(3)}° · sol elev ${(DIA.solAlt * 180 / Math.PI).toFixed(1)}° · tDia ${DIA.dia.toFixed(3)}`
+          + (Number.isFinite(EJE_PANT.difPx) ? ` · Z55 sol − eje: ${EJE_PANT.difPx.toFixed(1)} px, ${EJE_PANT.difDeg.toFixed(3)}° az` : "")
         : "portal sin montar");
     }, 250);
     return () => clearInterval(id);
@@ -1587,6 +1589,17 @@ export default function DebugMenu() {
             {(["eje", "meridiano", "arco"] as const).map(m => (
               <button key={m} style={{ ...INPUT, opacity: DBG_DIA.SOL_RECORRIDO === m ? 1 : 0.45 }}
                 onClick={() => { DBG_DIA.SOL_RECORRIDO = m; tocarDia(); }}>{m}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <span>SOL_EJE_IMAGEN <span style={NOTE}>Z55 · en modo eje, sobre la recta de la composición (off = azimut constante, Z51)</span></span>
+            <button style={INPUT} onClick={() => { DBG_DIA.SOL_EJE_IMAGEN = !DBG_DIA.SOL_EJE_IMAGEN; tocarDia(); }}>{DBG_DIA.SOL_EJE_IMAGEN ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>SOL_EJE_CENTRO <span style={NOTE}>Z55 · composicion = pico y discos (SUN_C) · portal = círculo exterior y anillos (PORTAL_C)</span></span>
+            {(["composicion", "portal"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, opacity: DBG_DIA.SOL_EJE_CENTRO === m ? 1 : 0.45 }}
+                onClick={() => { DBG_DIA.SOL_EJE_CENTRO = m; tocarDia(); }}>{m}</button>
             ))}
           </div>
           {/* Z54: prisma y flor dentro del ciclo de día */}

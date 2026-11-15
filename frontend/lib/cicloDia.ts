@@ -32,6 +32,7 @@ export interface CfgDia {
   SOL_ALINEAR_PORTAL: boolean; SOL_AZ_OFFSET_DEG: number; SOL_VERTICAL_FASE: number; SOL_UNICO: boolean;
   SOL_EJE_HASTA_ELEV_DEG: number;   // Z50: azimut EXACTO del centro del portal hasta esta altura (< 0 = modo Z49)
   SOL_RECORRIDO: string;            // Z51: "eje" (default) · "meridiano" · "arco" (Z48–Z50)
+  SOL_EJE_IMAGEN?: boolean;         // Z55: "eje" sobre la RECTA vertical de la composición (no a azimut constante)
   INTRO_U_ALBA: number; INTRO_U_SOL: number; INTRO_TDIA_SOL: number; INTRO_TDIA_FIN: number;
   INTRO_MONT_FIN: number; INTRO_RESTO_INI: number; INTRO_RESTO_PASO: number; INTRO_RESTO_DUR: number;
   MUSICA_SOL: number; MUSICA_NUBES: number;
@@ -81,7 +82,21 @@ export function crearEstadoDia(): EstadoDia {
 /** Z49: geometría del portal que escribe DomeSky. Z50: azRad = azimut del CENTRO DEL CÍRCULO (cDir del shader,
  *  lib/portalEscala.ts → centroPortal), no la dirección F (PORTAL_C lo corre ~2°); elevRad = su altura.
  *  NaN hasta que el domo se monta: entonces vale SOL_AZ_SALIDA_DEG. */
-export const PORTAL_GEOM = { azRad: NaN, elevRad: NaN };
+export const PORTAL_GEOM = { azRad: NaN, elevRad: NaN, ejeP: [NaN, 0, 0], ejeU: [0, 1, 0], ejeElevCentro: NaN };
+// Z55: ejeP / ejeU (unitarios, ortogonales) generan el gran círculo de la RECTA VERTICAL de la composición que pasa
+// por el centro elegido (DBG_DIA.SOL_EJE_CENTRO: "composicion" = SUN_C.x, pico y discos; "portal" = PORTAL_C.x,
+// círculo exterior y anillos): ejeP = normalize(F + R·x·tan), ejeU = U; ejeElevCentro = altura de ese centro. Como el plano del portal está inclinado (elevación ≈ 34°), esa recta NO es un meridiano: su azimut cambia
+// con la altura (≈ −0,8° en el horizonte, +1,4° a 60° respecto del centro del círculo). Los escribe DomeSky.
+
+/** Z55: dirección sobre el gran círculo cosθ·P + sinθ·U con altura alt (rad). Escribe en out[0..2]. Puro. */
+export function solSobreEje(P: ArrayLike<number>, U: ArrayLike<number>, alt: number, out: number[]): number[] {
+  const A = P[1], B = U[1], R0 = Math.hypot(A, B) || 1;
+  const k = Math.max(-1, Math.min(1, Math.sin(alt) / R0));
+  const th = Math.atan2(B, A) - Math.acos(k);   // rama que sube desde abajo del horizonte hasta el tope del círculo
+  const c = Math.cos(th), sn = Math.sin(th);
+  out[0] = P[0] * c + U[0] * sn; out[1] = P[1] * c + U[1] * sn; out[2] = P[2] * c + U[2] * sn;
+  return out;
+}
 
 /** Azimut de la salida del sol (rad): el del portal + SOL_AZ_OFFSET_DEG, o SOL_AZ_SALIDA_DEG (Z48). */
 export function azimutSalida(c: CfgDia): number {
@@ -219,7 +234,15 @@ export function estadoCielo(dia: number, c: CfgDia, out: EstadoDia): EstadoDia {
     const portal = PORTAL_GEOM.azRad;
     const azEje = Number.isFinite(portal) ? portal + (fin(c.SOL_AZ_OFFSET_DEG) * Math.PI) / 180 : az0;
     out.azSalida = azEje;
-    if (modo === 0) {
+    if (modo === 0 && c.SOL_EJE_IMAGEN && Number.isFinite(PORTAL_GEOM.ejeP[0])) {
+      // Z55: sobre la recta vertical de la composición (pico de la montaña central y centro de los anillos) a la
+      // altura alt; SOL_AZ_OFFSET_DEG gira el resultado alrededor de la vertical
+      const s = solSobreEje(PORTAL_GEOM.ejeP, PORTAL_GEOM.ejeU, alt, out.solDir);
+      const off = (fin(c.SOL_AZ_OFFSET_DEG) * Math.PI) / 180;
+      if (off !== 0) { const co = Math.cos(off), so = Math.sin(off), x = s[0], z = s[2]; s[0] = x * co - z * so; s[2] = x * so + z * co; }
+      out.solAlt = Math.asin(Math.max(-1, Math.min(1, s[1])));
+      out.solAz = Math.atan2(s[0], -s[2]);
+    } else if (modo === 0) {
       const ceE = Math.cos(alt);
       out.solDir[0] = Math.sin(azEje) * ceE; out.solDir[1] = Math.sin(alt); out.solDir[2] = -Math.cos(azEje) * ceE;
       out.solAlt = alt; out.solAz = azEje;

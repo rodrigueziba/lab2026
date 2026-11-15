@@ -18,7 +18,7 @@ import { ONDAS, MAX_ONDAS, edad } from "@/lib/ondasKick"; // Z52
 import { RELOJ } from "@/lib/relojExperiencia"; // Z52
 import { hexARgb } from "@/lib/cicloDia"; // Z52
 import { DIA, PORTAL_GEOM } from "@/lib/cicloDia"; // Z48 · Z49
-import { escalaPortal, centroPortal } from "@/lib/portalEscala"; // Z49 · Z50
+import { escalaPortal, centroPortal, PORTAL_C_SHADER, SUN_C_SHADER } from "@/lib/portalEscala"; // Z49 · Z50 · Z55
 
 export type Bands = { bass: number; lowMid: number; highMid: number; treble: number }; // 0..1
 // W4: parámetros de ajuste del shader (leídos cada frame vía callback — sin recrear material)
@@ -241,6 +241,17 @@ export default function DomeSky({
     F.set(Math.sin(portalAzimuth) * ce, se, -Math.cos(portalAzimuth) * ce);
     R.set(Math.cos(portalAzimuth), 0, Math.sin(portalAzimuth));
     U.crossVectors(R, F);
+    // Z55: recta vertical de la composición por el centro elegido (SOL_EJE_CENTRO): el sol "eje" va sobre ella
+    {
+      const C = DBG_DIA.SOL_EJE_CENTRO === "portal" ? PORTAL_C_SHADER : SUN_C_SHADER;
+      const k = C[0] * tmp.esc.tan, m = C[1] * tmp.esc.tan;
+      const cy = F.y + R.y * k + U.y * m;
+      PORTAL_GEOM.ejeElevCentro = Math.asin(cy / (Math.hypot(F.x + R.x * k + U.x * m, cy, F.z + R.z * k + U.z * m) || 1));
+      const px = F.x + R.x * k, py = F.y + R.y * k, pz = F.z + R.z * k, L = Math.hypot(px, py, pz) || 1;
+      const P = PORTAL_GEOM.ejeP, Ue = PORTAL_GEOM.ejeU;
+      P[0] = px / L; P[1] = py / L; P[2] = pz / L;
+      Ue[0] = U.x; Ue[1] = U.y; Ue[2] = U.z;
+    }
     u.uPortalF.value.copy(F);
     u.uPortalR.value.copy(R);
     u.uPortalU.value.copy(U);
