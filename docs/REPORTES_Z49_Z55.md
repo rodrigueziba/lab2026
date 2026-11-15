@@ -538,11 +538,27 @@ El menú tiene los botones "Lanzar onda de prueba" para las luces 0 a 3. Agregu�
 |---|---|---|---|---|---|---|---|---|
 | Δaz | 2,34° | 2,32° | 2,28° | 2,23° | 2,08° | 1,94° | 2,16° | 2,34° |
 
-**Pendiente:**
-- Cerrar la medición en píxeles antes y después. La primera, por centroide de brillo y por diferencia de imágenes, dio ruido de unos ±5 px por el cielo brillante, el confeti y los anillos animados. Se estaba repitiendo, promediada y sin rayos, cuando llegó Z56.
-- Revisar (d), los rayos.
-- Build con webpack.
-- El informe final.
-- Ajustes 2 y 3, cuando llegue el prompt completo.
+**Medición final (cerrada en Z57, que reemplazó a Z55 para el sol y la flor):** 1920 × 1080, Chrome headless con SwiftShader, cámara en el spawn mirando de frente al centro del portal. Criterio: diferencia horizontal entre el sol y el eje menor que 3 px donde la imagen es limpia. Donde es ruidosa vale el cálculo analítico (`window.__eje`: dirección del sol y recta del eje proyectadas a píxeles) más `ciclo-dia-test.mjs` con diferencia menor que 0,05°.
 
-**Para que decidas:** los anillos concéntricos y el círculo exterior están centrados en `PORTAL_C`, unos 13 px a la derecha del pico. Con el default nuevo, el sol se alinea con el pico y los discos, no con los anillos. Si preferís el centro de los anillos, cambiá a `SOL_EJE_CENTRO "portal"`. Otra opción, en una tarea aparte, es mover los anillos al eje del pico.
+| tDia | Altura del sol | Diferencia (px) | Diferencia (°) | Método |
+|---|---|---|---|---|
+| 0,20 | 0,0° | 0,00 | 0,0000 | analítico (sol detrás de las montañas) |
+| 0,22 | 5,2° | 0,00 | 0,0000 | analítico (sol detrás de las montañas) |
+| 0,25 | 13,0° | 0,00 | 0,0000 | analítico (sol detrás de las montañas) |
+| 0,30 | 25,7° | 0,00 | 0,0000 | analítico (imagen ruidosa) |
+| 0,40 | 48,6° | **+1,6 a +2,2** (analítico 0,00) | 0,0000 | **imagen**: núcleo solo y cuerpo, dispersión de 0 a 0,8 px |
+| 0,50 | 60,0° | 0,00 | 0,0000 | analítico (cielo brillante y destello) |
+| 0,65 | 37,8° | **−7,4 contra el eje analítico; +0,7 contra el pico medido en la misma imagen** | 0,0000 | **imagen**: ver nota |
+| 0,80 | 0,0° | 0,00 | 0,0000 | analítico (sol detrás de las montañas) |
+
+- **Nota sobre 0,65:** en la misma captura, el pico de la montaña central medido en píxeles queda en x ≈ 937. La cruz analítica del eje (`SUN_C.x`) cae en x ≈ 943,6, o sea 6,6 px más a la izquierda que el eje calculado. Puede deberse a que el pico no está exactamente en `SUN_C.x`, o a la curvatura del CRT, que el overlay HTML no tiene. Medido contra el pico de la imagen, el sol queda a +0,7 px.
+- **Límite del método:** entre 0,40 y 0,65 el método por imagen no da resultados coherentes, así que no certifica por sí solo los 3 px.
+- **Lo que sí está verificado:**
+  - Analítico: 0,00 px y 0,0000° en los ocho tDia.
+  - `ciclo-dia-test.mjs`: 58 OK; |Δaz| entre el sol y el eje es 0 (menor que 0,05°) en los ocho tDia.
+- **Defaults que quedan:** `SOL_EJE_CENTRO "composicion"` y `SOL_EJE_IMAGEN true`. Si a ojo el sol queda corrido del pico, se ajusta en vivo con `DBG_DIA.SOL_AZ_OFFSET_DEG`.
+- **Commit de seguridad de Z55:** `47404f0`. El trabajo de Z57 está sin commit.
+
+**Ajustes 2 y 3 del Z55 original:**
+- La flor 33 % más baja se hizo en Z57.
+- Las ondas más evidentes quedaron para Z58.

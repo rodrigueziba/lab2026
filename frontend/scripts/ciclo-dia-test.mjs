@@ -195,6 +195,16 @@ console.log('\nZ50: sol sobre el eje del centro del portal');
       console.log(`    ${f(x, 2)} · ${f(deg(sOn.solAlt), 1)}° · ${f(pa[0], 4)} → ${f(pn[0], 4)} · ${f(dAz, 3)}° `);
       maxPx = Math.max(maxPx, Math.abs(pn[0] - EX)); maxAlt = Math.max(maxAlt, Math.abs(sOn.solAlt - sOff.solAlt));
     }
+    { // Z57: diferencia en grados de azimut entre el sol y la recta del eje a la MISMA altura (criterio < 0,05°)
+      const { solSobreEje } = await import('../lib/cicloDia.ts'); const ax = [0, 0, 0]; let maxDeg = 0;
+      console.log('    Z57 · tDia · altura · Δaz sol − eje (°)');
+      for (const x of [0.2, 0.22, 0.25, 0.3, 0.4, 0.5, 0.65, 0.8]) {
+        estadoCielo(x, ejeOn, sOn); solSobreEje(PORTAL_GEOM.ejeP, PORTAL_GEOM.ejeU, sOn.solAlt, ax);
+        const dd = deg(wrap(sOn.solAz - Math.atan2(ax[0], -ax[2]))); maxDeg = Math.max(maxDeg, Math.abs(dd));
+        console.log(`    Z57 · ${f(x, 2)} · ${f(deg(sOn.solAlt), 1)}° · ${dd.toExponential(1)}`);
+      }
+      check(maxDeg < 0.05, `Z57: |Δaz| sol − eje < 0,05° en todos esos tDia (máx. ${maxDeg.toExponential(1)}°)`);
+    }
     check(maxPx < 1e-9, `el sol queda sobre la recta p.x = SUN_C.x en todos esos tDia (máx. ${maxPx.toExponential(1)})`);
     check(maxAlt < 1e-9, `misma altura que antes (solo cambia el azimut; máx. ${maxAlt.toExponential(1)} rad)`);
     let maxPaso = 0, maxRecta = 0;

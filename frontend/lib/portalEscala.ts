@@ -34,12 +34,12 @@ export interface CentroPortal { az: number; elev: number }
  *  cDir = normalize(F + (R·PORTAL_C.x + U·PORTAL_C.y)·tan), con F, R, U como los arma DomeSky.tsx
  *  (F = (sin az·cos e, sin e, −cos az·cos e), R = (cos az, 0, sin az), U = R × F). Azimut en la convención del
  *  domo: az = atan(d.x, −d.z). Escribe en out (sin allocations). */
-export function centroPortal(azF: number, elevF: number, tan: number, out: CentroPortal): CentroPortal {
+export function centroPortal(azF: number, elevF: number, tan: number, out: CentroPortal, centroX: number = PORTAL_C_SHADER[0]): CentroPortal {
   const ce = Math.cos(elevF), se = Math.sin(elevF);
   const fx = Math.sin(azF) * ce, fy = se, fz = -Math.cos(azF) * ce;
   const rx = Math.cos(azF), rz = Math.sin(azF);
   const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy;   // R × F con R.y = 0
-  const px = PORTAL_C_SHADER[0] * tan, py = PORTAL_C_SHADER[1] * tan;
+  const px = centroX * tan, py = PORTAL_C_SHADER[1] * tan;   // Z57: centroX = uPortalCx (PORTAL_C.x o SUN_C.x)
   const cx = fx + rx * px + ux * py, cy = fy + uy * py, cz = fz + rz * px + uz * py;
   const L = Math.hypot(cx, cy, cz) || 1;
   out.az = Math.atan2(cx / L, -cz / L);

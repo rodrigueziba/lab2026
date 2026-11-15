@@ -21,6 +21,8 @@ import { TARIMA_H } from "./Tarima";
 
 const N_AFUERA = 16, N_ADENTRO = 12, N_ESTAMBRES = 10;
 const ALTO_TALLO = 0.8;            // fracción de ALTURA_M que es tallo (el resto, la cabeza)
+const ANCHO_REF_M = 2.7;           // Z57: alto de Z54. El ancho de la S y el grosor del tallo se miden con este alto fijo:
+                                   // al bajar ALTURA_M la S se comprime solo en vertical (no se angosta ni adelgaza)
 const PUNTA_X = 0.03;              // x de la punta de la curva normalizada (ver CURVA)
 // pétalo: elipsoide (ancho, grosor, largo) en metros para una cabeza de radio 0,9 (ESCALA 1)
 const PET_W = 0.27, PET_T = 0.22, PET_L = 0.52;   // bulbosos, como el video
@@ -174,7 +176,8 @@ export default function FlorCiclo() {
     if (!vis) return;
     const D = DBG_FLOR;
     const t = RELOJ.tExp;   // reloj de la experiencia: con la pausa la flor queda quieta
-    const H = Math.max(0.2, D.ALTURA_M) * FLOR.escala;
+    const H = Math.max(0.2, D.ALTURA_M * D.ALTURA_FACTOR) * FLOR.escala;   // Z57: alto efectivo = ALTURA_M × ALTURA_FACTOR
+    const HA = ANCHO_REF_M * FLOR.escala;                                     // Z57: ancho de la S y grosor del tallo
     const altoTallo = H * ALTO_TALLO * Math.max(0.001, FLOR.tallo);
     const U = UNIFORMS;
     U.uT.value = t;
@@ -189,14 +192,15 @@ export default function FlorCiclo() {
     const resp = 1 - D.RESPIRACION_AMP * (0.5 + 0.5 * Math.sin((t * Math.PI * 2) / Math.max(0.5, D.RESPIRACION_S)));
     const graves = Math.max(BAND_STATE.normEnergy[0] ?? 0, BAND_STATE.normEnergy[1] ?? 0);
     U.uAp.value = Math.min(1, FLOR.apertura * resp + D.MUSICA_APERTURA * graves * FLOR.apertura);
-    // tallo: escala (sin recrear geometría); x/z con el alto completo para que la S no se aplaste al crecer
+    // tallo: escala (sin recrear geometría); x/z con el ancho de referencia (no con el alto: Z57) para que la S no se
+    // aplaste al crecer ni se angoste al bajar la altura
     T.position.set(0, TARIMA_H, 0);
-    T.scale.set(H * ALTO_TALLO, altoTallo, H * ALTO_TALLO);
+    T.scale.set(HA * ALTO_TALLO, altoTallo, HA * ALTO_TALLO);
     // cabeza en la punta del tallo, con el mismo balanceo que el shader (yN = 1)
     const w = U.uBalW.value;
-    C.position.set(PUNTA_X * H * ALTO_TALLO + U.uBal.value * Math.sin(t * w), TARIMA_H + altoTallo, U.uBal.value * 0.6 * Math.cos(t * w * 0.7));
+    C.position.set(PUNTA_X * HA * ALTO_TALLO + U.uBal.value * Math.sin(t * w), TARIMA_H + altoTallo, U.uBal.value * 0.6 * Math.cos(t * w * 0.7));
     // diámetro de la cabeza abierta (copa) ≈ 1,2 m × 1,45 ≈ 1,75 m (ancho de la base del prisma) con ESCALA 1
-    C.scale.setScalar(Math.max(1e-4, 1.45 * Math.max(0.1, D.ESCALA) * FLOR.escala * Math.max(0.001, FLOR.cabeza)));
+    C.scale.setScalar(Math.max(1e-4, 1.45 * Math.max(0.1, D.ESCALA) * Math.max(0.1, D.ESCALA_CABEZA) * FLOR.escala * Math.max(0.001, FLOR.cabeza)));
     giro.current += RELOJ.dtExp * (D.GIRO_DEG_S * Math.PI) / 180;   // reloj de la experiencia: quieto en pausa
     C.rotation.set(Math.sin(t * 0.3) * (D.INCLINACION_DEG * Math.PI) / 180, giro.current, Math.cos(t * 0.23) * (D.INCLINACION_DEG * Math.PI) / 360);
   });

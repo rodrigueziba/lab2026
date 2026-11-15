@@ -52,5 +52,10 @@ check(en(0.5, { ...C, ACTIVO: false }).altura === 0 && en(0.5, { ...C, ACTIVO: f
   const b = { ...estadoPrismaFlor(d.dia, C, true, E) };
   check(a.altura === b.altura && a.escala === b.escala && a.apertura === b.apertura, `con la pausa queda congelado (tDia ${f(d.dia)}: prisma ${f(a.altura)}, flor ${f(a.escala)})`);
 }
+console.log('\nZ57: altura de la flor');
+{ const H = C.ALTURA_M * C.ALTURA_FACTOR, alto15 = C.ALTURA_M * 1.5;
+  console.log(`    ALTURA_M ${C.ALTURA_M} × ALTURA_FACTOR ${C.ALTURA_FACTOR} = ${f(H, 2)} m (Z54: 2,7 m; con ALTURA_FACTOR 1,5: ${f(alto15, 2)} m) · ESCALA_CABEZA ${C.ESCALA_CABEZA}`);
+  check(Math.abs(H / 2.7 - 0.6667) < 0.001, `33 % más baja: ${f(H, 2)} / 2,7 = ${f(H / 2.7, 3)}`);
+  check(Math.abs(alto15 - 2.7) < 1e-9 && C.ESCALA_CABEZA === 1, 'ALTURA_FACTOR 1,5 = la altura de Z54; la cabeza conserva su tamaño (ESCALA_CABEZA 1)'); }
 console.log(`\n${ok} OK · ${fallas} fallas`);
 process.exit(fallas ? 1 : 0);

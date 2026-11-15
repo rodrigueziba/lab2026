@@ -1090,6 +1090,7 @@ export const DBG_PORTAL = {
   BORDE_SUAVE:     0.5,   // feather del borde del portal (misma forma) — live
   BORDE_ANCHO:     0.22,  // Z50: banda del contorno hacia ADENTRO del disco (fracción del radio) que converge al cielo — live
   DEBUG_CAPAS:     0,     // Z50: 1 = cada capa de la composición en un color plano (diagnóstico) — live
+  ANILLOS_EN_EJE:  false, // Z57: el círculo exterior del portal y los anillos se centran en el eje de la composición (SUN_C.x, pico de la montaña central) en vez de PORTAL_C.x (≈ 13 px a la derecha). Lo siguen el tinte del borde (Z50) y las ondas (Z52) — live
   OVERLAY_EJE:     false, // Z50: con el menú abierto (Shift), muestra azimut del portal, del sol, diferencia, altura y tDia. Z55: además, cruz en el centro del círculo, recta del eje y marca del sol en pantalla (components/EjeOverlay.tsx) — live
 };
 
@@ -1110,6 +1111,7 @@ export const DBG_SOL = {
   ALCANCE:              0.9,    // hasta dónde llega el cuerpo del sol (rad); afuera el shader no lo calcula — live
   PALETA_PROYECTO:      0,      // 0 = colores de la referencia; 1 = crema #F8EAD8, amarillo #FEBD17, naranja #F0742A, rojo #E5322B — live
   TINTE_ETAPA:          0.3,    // tinte con el color de la etapa (cálido al salir y al ponerse, neutro de día) — live
+  TOPE_BRILLO:          1.0,    // Z57: tope de TODO el sol (núcleo incluido) por canal; nunca oscurece el cielo que ya era más brillante. 1 = sin cambio (como hasta Z56) — live
   TOPE:                 0.97,   // tope del cuerpo del sol fuera del núcleo (mezcla tipo pantalla) — live
   // destello de lente (sprites en pantalla, components/SolFlare.tsx)
   FLARE:                true,   // — live
@@ -1153,7 +1155,9 @@ export const DBG_FLOR = {
   BAJA_FIN:        1.0,    // lento: todo el último cuarto
   // flor
   ESCALA:          1.0,    // tamaño de la cabeza (1 = diámetro ≈ ancho de la base del prisma, 1,75 m) — live
-  ALTURA_M:        2.7,    // altura total (≈ 1,5 × alto del prisma) — live
+  ALTURA_M:        1.8,    // Z57 (Z54 2,7): altura total, 33 % más baja; el valor efectivo es ALTURA_M × ALTURA_FACTOR — live
+  ALTURA_FACTOR:   1.0,    // Z57: multiplica ALTURA_M en vivo (0,3…1,5; 1,5 = la altura de Z54) — live
+  ESCALA_CABEZA:   1.0,    // Z57: diámetro de la cabeza (× ESCALA); no depende de la altura — live
   RESPIRACION_S:   7,      // período del abrir y cerrar de los pétalos — live
   RESPIRACION_AMP: 0.18,   // cuánto respira la apertura — live
   BALANCEO_M:      0.12,   // balanceo del tallo (m en la punta) — live

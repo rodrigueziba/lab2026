@@ -113,6 +113,8 @@ uniform float uSolAlcance;   // hasta dónde llega el cuerpo del sol (rad); afue
 uniform float uSolPaleta;    // 0 = colores de la referencia, 1 = paleta del proyecto
 uniform float uSolTinteEt;   // tinte con el color de la etapa (uColGlow)
 uniform float uSolTope;      // tope del cuerpo del sol fuera del núcleo (mezcla tipo pantalla, nunca llega a 1)
+uniform float uSolTopeBrillo; // Z57: tope de TODO el sol (núcleo incluido); nunca oscurece el cielo ya más brillante (1 = sin tope)
+uniform float uPortalCx;     // Z57: x del centro del círculo del portal y de los anillos (PORTAL_C.x, o SUN_C.x con ANILLOS_EN_EJE)
 // Z52: ondas expansivas por kick (lib/ondasKick.ts). uOndas[i] = (edad s, fuerza, luz 0..3, activa)
 #define ONDAS_N 8
 uniform vec4  uOndas[ONDAS_N];
@@ -304,7 +306,8 @@ vec3 solMundo(vec3 col, vec3 d, float peso) {
     vec3 c = col + (1.0 - col) * clamp(sol * (1.0 - nucleo), 0.0, 1.0);
     c = min(c, vec3(max(uSolTope, max(col.r, max(col.g, col.b)))));
     vec3 colNucleo = mix(vec3(0.92, 0.95, 1.0), vec3(0.973, 0.918, 0.847), uSolPaleta) * tinteEt;   // blanco azulado · #F8EAD8
-    return mix(c, colNucleo, nucleo);
+    // Z57: tope de todo el sol (DBG_SOL.TOPE_BRILLO); con 1 no cambia nada (todo ya está en 0…1)
+    return min(mix(c, colNucleo, nucleo), vec3(max(uSolTopeBrillo, max(col.r, max(col.g, col.b)))));
   }
   vec3 halo = vec3(0.9, 0.35, 0.1) * 0.35 * (0.6 + 0.4 * uLuzDia + uSolPulso) * exp(-5.0 * max(ang / R - 1.0, 0.0)) * max(cosA, 0.0);
   vec3 c = col + sumaConTope(col, halo * vis);
@@ -337,9 +340,12 @@ void main() {
   float fz = dot(d, uPortalF);
   vec2 tp = vec2(dot(d, uPortalR), dot(d, uPortalU)) / uPortalTan;     // continuo en todo el domo
   vec2 p  = tp / max(fz, 0.02);                                         // imagen del portal (proyeccion gnomonica)
-  vec3 cDir = normalize(uPortalF + (uPortalR * PORTAL_C.x + uPortalU * PORTAL_C.y) * uPortalTan);
+  // Z57: el centro del círculo y de los anillos puede correrse en x al eje de la composición (uPortalCx); el
+  // contorno, el tinte del borde (Z50) y las ondas (Z52) usan s y q, así que lo siguen sin más cambios
+  vec2 pc = vec2(uPortalCx, PORTAL_C.y);
+  vec3 cDir = normalize(uPortalF + (uPortalR * pc.x + uPortalU * pc.y) * uPortalTan);
   float s = acos(clamp(dot(d, cDir), -1.0, 1.0)) / atan(uPortalTan);    // radio angular ~ unidades p
-  vec2 q = tp - PORTAL_C;
+  vec2 q = tp - pc;
 
   // ---- mundo alrededor ----
   // W3: antes del amanecer (uDawn=0) el cielo es violeta oscuro; se abre al atardecer con uDawn

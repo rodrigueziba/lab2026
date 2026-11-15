@@ -1613,7 +1613,7 @@ export default function DebugMenu() {
           {([
             ["SUBE_INICIO", 0, 1, 0.005, "tDia"], ["SUBE_FIN", 0, 1, 0.005, ""], ["NACE_INICIO", 0, 1, 0.005, ""], ["NACE_FIN", 0, 1, 0.005, ""],
             ["ACHICA_INICIO", 0, 1, 0.005, ""], ["ACHICA_FIN", 0, 1, 0.005, ""], ["BAJA_INICIO", 0, 1, 0.005, ""], ["BAJA_FIN", 0, 1, 0.005, ""],
-            ["ESCALA", 0.2, 3, 0.05, "cabeza"], ["ALTURA_M", 0.5, 8, 0.1, "m"], ["RESPIRACION_S", 1, 20, 0.5, "s"], ["RESPIRACION_AMP", 0, 0.6, 0.01, ""],
+            ["ESCALA", 0.2, 3, 0.05, "cabeza"], ["ALTURA_M", 0.5, 8, 0.1, "m (Z57: 1,8)"], ["ALTURA_FACTOR", 0.3, 1.5, 0.01, "Z57 × ALTURA_M"], ["ESCALA_CABEZA", 0.5, 1.5, 0.01, "Z57 diámetro"], ["RESPIRACION_S", 1, 20, 0.5, "s"], ["RESPIRACION_AMP", 0, 0.6, 0.01, ""],
             ["BALANCEO_M", 0, 0.6, 0.01, "m"], ["BALANCEO_S", 1, 20, 0.5, "s"], ["GIRO_DEG_S", -40, 40, 1, "°/s"], ["INCLINACION_DEG", 0, 40, 1, "°"],
             ["COLOR_VEL", 0, 0.5, 0.01, ""], ["PALETA_PROYECTO", 0, 1, 0.01, "0 = video"], ["BRILLO", 0.2, 2, 0.05, ""], ["MUSICA_APERTURA", 0, 1, 0.01, "graves"],
           ] as const).map(([k, mn, mx, st, nota]) => (
@@ -1674,7 +1674,7 @@ export default function DebugMenu() {
             ["TAMANO", 0.05, 0.6, 0.01, "rad/unidad"], ["INTENSIDAD", 0, 3, 0.05, ""], ["NUCLEO", 0.01, 0.3, 0.005, "unidades"],
             ["HALO", 0, 3, 0.05, ""], ["RAYOS_N1", 1, 12, 1, "3 ref."], ["RAYOS_N2", 1, 24, 1, "9 ref."], ["RAYOS_ANCHO", 0.2, 6, 0.1, "exponente"],
             ["RAYOS_INT", 0, 3, 0.05, ""], ["PARPADEO", 0, 3, 0.05, ""], ["ROTACION_RAYOS_DEG_S", -30, 30, 0.5, "°/s"], ["ALCANCE", 0.1, 2, 0.05, "rad"],
-            ["PALETA_PROYECTO", 0, 1, 0.01, "0 = referencia"], ["TINTE_ETAPA", 0, 1, 0.01, ""], ["TOPE", 0.5, 1, 0.01, "bloom 0,92"], ["FLARE_CENTRO", 0, 0.6, 0.01, "fundido al centro"],
+            ["PALETA_PROYECTO", 0, 1, 0.01, "0 = referencia"], ["TINTE_ETAPA", 0, 1, 0.01, ""], ["TOPE", 0.5, 1, 0.01, "bloom 0,92"], ["TOPE_BRILLO", 0.3, 1, 0.01, "Z57 todo el sol (1 = sin tope)"], ["FLARE_CENTRO", 0, 0.6, 0.01, "fundido al centro"],
             ["FLARE_INTENSIDAD", 0, 2, 0.05, ""], ["FLARE_CANTIDAD", 1, 10, 1, ""], ["FLARE_TAMANO", 0.2, 3, 0.05, ""], ["FLARE_ALT_MIN_DEG", -5, 40, 1, "°"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
@@ -1684,6 +1684,10 @@ export default function DebugMenu() {
             </div>
           ))}
           <span style={LABEL}>Composición del domo Z49 <span style={NOTE}>(escala y tinte del cielo · live)</span></span>
+          <div style={ROW}>
+            <span>ANILLOS_EN_EJE <span style={NOTE}>Z57 · círculo y anillos centrados en el pico (SUN_C.x)</span></span>
+            <button style={INPUT} onClick={() => { DBG_PORTAL.ANILLOS_EN_EJE = !DBG_PORTAL.ANILLOS_EN_EJE; tocarDia(); }}>{DBG_PORTAL.ANILLOS_EN_EJE ? "ON" : "off"}</button>
+          </div>
           <div style={ROW}>
             <span>OVERLAY_EJE <span style={NOTE}>Z50 · eje del sol en pantalla (con el menú abierto)</span></span>
             <button style={INPUT} onClick={() => { DBG_PORTAL.OVERLAY_EJE = !DBG_PORTAL.OVERLAY_EJE; tocarDia(); }}>{DBG_PORTAL.OVERLAY_EJE ? "ON" : "off"}</button>

@@ -192,6 +192,8 @@ export default function DomeSky({
           uSolPaleta:     { value: DBG_SOL.PALETA_PROYECTO },
           uSolTinteEt:    { value: DBG_SOL.TINTE_ETAPA },
           uSolTope:       { value: DBG_SOL.TOPE },
+          uSolTopeBrillo: { value: DBG_SOL.TOPE_BRILLO },   // Z57
+          uPortalCx:      { value: PORTAL_C_SHADER[0] },    // Z57
           // Z52: ondas por kick (edad, fuerza, luz, activa) y color de la luz de cada banda
           uOndas:           { value: Array.from({ length: MAX_ONDAS }, () => new THREE.Vector4()) },
           uOndaCol:         { value: Array.from({ length: 4 }, () => new THREE.Vector3(1, 1, 1)) },
@@ -235,7 +237,10 @@ export default function DomeSky({
     escalaPortal(portalElevation, portalHalfFovDeg, DBG_PORTAL.ESCALA, tmp.esc);
     const ce = Math.cos(tmp.esc.elev), se = Math.sin(tmp.esc.elev);
     // Z50: el sol del ciclo sale en el azimut del CENTRO DEL CÍRCULO (cDir del shader, con PORTAL_C), no en F
-    centroPortal(portalAzimuth, tmp.esc.elev, tmp.esc.tan, tmp.cen);
+    // Z57: centro del círculo y de los anillos (PORTAL_C.x, o SUN_C.x con ANILLOS_EN_EJE)
+    const cxAnillos = DBG_PORTAL.ANILLOS_EN_EJE ? SUN_C_SHADER[0] : PORTAL_C_SHADER[0];
+    u.uPortalCx.value = cxAnillos;
+    centroPortal(portalAzimuth, tmp.esc.elev, tmp.esc.tan, tmp.cen, cxAnillos);
     PORTAL_GEOM.azRad = tmp.cen.az;
     PORTAL_GEOM.elevRad = tmp.cen.elev;
     F.set(Math.sin(portalAzimuth) * ce, se, -Math.cos(portalAzimuth) * ce);
@@ -244,7 +249,7 @@ export default function DomeSky({
     // Z55: recta vertical de la composición por el centro elegido (SOL_EJE_CENTRO): el sol "eje" va sobre ella
     {
       const C = DBG_DIA.SOL_EJE_CENTRO === "portal" ? PORTAL_C_SHADER : SUN_C_SHADER;
-      const k = C[0] * tmp.esc.tan, m = C[1] * tmp.esc.tan;
+      const k = (DBG_DIA.SOL_EJE_CENTRO === "portal" ? cxAnillos : C[0]) * tmp.esc.tan, m = C[1] * tmp.esc.tan;   // Z57: "portal" sigue a los anillos
       const cy = F.y + R.y * k + U.y * m;
       PORTAL_GEOM.ejeElevCentro = Math.asin(cy / (Math.hypot(F.x + R.x * k + U.x * m, cy, F.z + R.z * k + U.z * m) || 1));
       const px = F.x + R.x * k, py = F.y + R.y * k, pz = F.z + R.z * k, L = Math.hypot(px, py, pz) || 1;
@@ -353,6 +358,7 @@ export default function DomeSky({
       u.uSolPaleta.value = DBG_SOL.PALETA_PROYECTO;
       u.uSolTinteEt.value = DBG_SOL.TINTE_ETAPA;
       u.uSolTope.value = DBG_SOL.TOPE;
+      u.uSolTopeBrillo.value = DBG_SOL.TOPE_BRILLO;   // Z57
     }
     u.uDebugCapas.value = DBG_PORTAL.DEBUG_CAPAS > 0.5 ? 1 : 0;   // Z50 (también con el ciclo apagado)
     // Z52: ondas (lib/ondasKick.ts; las detecta DomeSkyAnchor). Edad con el reloj de la experiencia (pausa = quietas)
