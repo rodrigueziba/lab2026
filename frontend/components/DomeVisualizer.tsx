@@ -466,7 +466,8 @@ function DomeSkyAnchor() {
     // Z52: botón de debug "Lanzar onda de prueba" (por luz)
     const onOnda = (e: Event) => {
       const luz = Math.max(0, Math.min(3, Number((e as CustomEvent).detail?.luz ?? 0)));
-      lanzarOnda(ONDAS, DBG_ONDAS, luz, BAND_STATE.assignment[luz] ?? luz, 1, RELOJ.tExp);
+      const fuerza = Math.max(0, Number((e as CustomEvent).detail?.fuerza ?? 1)) || 1;   // Z58: "onda fuerte"
+      lanzarOnda(ONDAS, DBG_ONDAS, luz, BAND_STATE.assignment[luz] ?? luz, fuerza, RELOJ.tExp);
     };
     window.addEventListener('alight:onda-prueba', onOnda);
     return () => {

@@ -76,6 +76,26 @@ export function envejecer(o: typeof ONDAS, c: CfgOndas, t: number): void {
 /** Edad (s) de una onda activa, o −1. (edadFija ≥ 0: edad fijada para diagnóstico) */
 export function edad(w: Onda, t: number): number { return w.activa ? (w.edadFija >= 0 ? w.edadFija : t - w.t0) : -1; }
 
+// ── Z58: EVIDENCIA. Mezcla, para los cinco valores de aspecto, el valor de Z52 (V) con el del menú (N):
+//   e = clamp(EVIDENCIA, 0, 2);  e ≤ 1: V + (N − V)·e   (0 = Z52 exacto, 1 = el valor del menú)
+//                                e > 1: N·e             (2 = el doble del valor del menú)
+// Es continua en e = 1. CONTRASTE y ENGROSAR no existían en Z52 (V = 0), así que valen N·e en todo el rango.
+// Velocidad, ancho y duración no se escalan (son la geometría y el tiempo de la onda).
+export const ONDAS_Z52 = { AMPLITUD: 0.6, BRILLO: 0.25, TINTE_BANDA: 0.35, CONTRASTE: 0, ENGROSAR: 0 } as const;
+export interface CfgEvidencia { EVIDENCIA: number; AMPLITUD: number; BRILLO: number; TINTE_BANDA: number; CONTRASTE: number; ENGROSAR: number }
+export interface Evidencia { amp: number; brillo: number; tinte: number; contraste: number; engrosar: number }
+export const mezclaEvidencia = (v: number, n: number, e: number): number => (e <= 1 ? v + (n - v) * e : n * e);
+/** Escribe en out los valores efectivos (sin allocations). */
+export function evidenciaOndas(c: CfgEvidencia, out: Evidencia): Evidencia {
+  const e = Math.max(0, Math.min(2, fin(c.EVIDENCIA, 1)));
+  out.amp = mezclaEvidencia(ONDAS_Z52.AMPLITUD, fin(c.AMPLITUD), e);
+  out.brillo = mezclaEvidencia(ONDAS_Z52.BRILLO, fin(c.BRILLO), e);
+  out.tinte = mezclaEvidencia(ONDAS_Z52.TINTE_BANDA, fin(c.TINTE_BANDA), e);
+  out.contraste = mezclaEvidencia(ONDAS_Z52.CONTRASTE, fin(c.CONTRASTE), e);
+  out.engrosar = mezclaEvidencia(ONDAS_Z52.ENGROSAR, fin(c.ENGROSAR), e);
+  return out;
+}
+
 /** Limpia todo (al desmontar el visualizador o al reiniciar). */
 export function limpiarOndas(o: typeof ONDAS): void {
   for (const w of o.lista) { w.activa = false; w.edadFija = -1; }

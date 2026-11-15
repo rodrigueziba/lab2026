@@ -69,7 +69,7 @@ import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado"; // Z2
 import { LUZ_STATE, CIELO_STATE } from "@/lib/caminoLuz"; // Z28 · Z30
 import { PAUSA } from "@/lib/pausaExperiencia"; // Z28
 import { AMANECER } from "@/lib/amanecer"; // Z38
-import { RELOJ, esperasPendientes } from "@/lib/relojExperiencia"; // Z39
+import { RELOJ, esperasPendientes, crearEspera } from "@/lib/relojExperiencia"; // Z39 · Z58
 import { SECUENCIA } from "@/lib/secuenciaSillas"; // Z39
 import { CHECKPOINTS, CK_STATE, irACheckpoint } from "@/lib/checkpoints"; // Z40
 import { DIA, PORTAL_GEOM, posicionarDia } from "@/lib/cicloDia"; // Z48 · Z50 · Z54
@@ -1642,7 +1642,7 @@ export default function DebugMenu() {
             ["MAX", 1, 8, 1, ""], ["VELOCIDAD_DEG_S", 5, 90, 1, "°/s"], ["ANCHO_DEG", 1, 30, 0.5, "°"], ["DURACION_S", 0.5, 8, 0.1, "s"],
             ["AMPLITUD", 0, 2, 0.05, "períodos"], ["BRILLO", 0, 1.5, 0.05, ""], ["BRILLO_NOCHE", 0, 2, 0.05, ""], ["TINTE_BANDA", 0, 1, 0.01, ""],
             ["REVELAR", 0, 1, 0.01, ""], ["UMBRAL", 1, 3, 0.05, "× media"], ["COOLDOWN_MS", 50, 1000, 10, "ms"], ["MEDIA_S", 0.1, 3, 0.05, "s"],
-            ["MIN_ENERGIA", 0, 0.6, 0.01, ""],
+            ["MIN_ENERGIA", 0, 0.6, 0.01, ""], ["CONTRASTE", 0, 1, 0.01, "Z58"], ["ENGROSAR", 0, 1, 0.01, "Z58"], ["EVIDENCIA", 0, 2, 0.01, "Z58 0 = Z52 · 2 = doble"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{DBG_ONDAS[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
@@ -1662,6 +1662,13 @@ export default function DebugMenu() {
             {[0, 1, 2, 3].map(l => (
               <button key={l} style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:onda-prueba", { detail: { luz: l } }))}>luz {l}</button>
             ))}
+          </div>
+          <div style={ROW}>
+            <span>Prueba Z58 <span style={NOTE}>sin música</span></span>
+            {/* una por banda, 0,4 s de diferencia (reloj de la experiencia: se congela con la pausa) */}
+            <button style={INPUT} onClick={() => { for (let l = 0; l < 4; l++) crearEspera(400 * l, () => window.dispatchEvent(new CustomEvent("alight:onda-prueba", { detail: { luz: l } }))); }}>Lanzar 4 ondas escalonadas</button>
+            {/* fuerza 3 = el máximo que puede dar el detector (energía normalizada 1 × GANANCIA_BANDA máx. 3) */}
+            <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:onda-prueba", { detail: { luz: 0, fuerza: 3 } }))}>Lanzar onda fuerte</button>
           </div>
           <span style={LABEL}>Sol nuevo Z51 <span style={NOTE}>(núcleo, rayos y destello de lente · live)</span></span>
           {(["DISENO_NUEVO", "FLARE"] as const).map(k => (

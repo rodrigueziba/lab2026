@@ -14,7 +14,9 @@ useTexture.preload([
 ]);
 import { domeVert, domeFrag } from "./domeShaders";
 import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL, DBG_SOL, DBG_ONDAS, DBG_SILLAS } from "@/lib/debugConfig";
-import { ONDAS, MAX_ONDAS, edad } from "@/lib/ondasKick"; // Z52
+import { ONDAS, MAX_ONDAS, edad, evidenciaOndas } from "@/lib/ondasKick"; // Z52 · Z58
+
+const EVID = { amp: 0, brillo: 0, tinte: 0, contraste: 0, engrosar: 0 };   // Z58: valores efectivos (se reescriben, sin allocations)
 import { RELOJ } from "@/lib/relojExperiencia"; // Z52
 import { hexARgb } from "@/lib/cicloDia"; // Z52
 import { DIA, PORTAL_GEOM } from "@/lib/cicloDia"; // Z48 · Z49
@@ -205,6 +207,8 @@ export default function DomeSky({
           uOndaBrilloNoche: { value: 0 },
           uOndaTinte:       { value: 0 },
           uOndaRevelar:     { value: 0 },
+          uOndaContraste:   { value: 0 },   // Z58
+          uOndaEngrosar:    { value: 0 },   // Z58
         },
       }),
     // los uniformes sueltos se actualizan en useFrame; el material solo se recrea si cambia la calidad
@@ -377,10 +381,14 @@ export default function DomeSky({
       u.uOndaVel.value = (DBG_ONDAS.VELOCIDAD_DEG_S * Math.PI) / 180;
       u.uOndaAncho.value = (Math.max(0.5, DBG_ONDAS.ANCHO_DEG) * Math.PI) / 180;
       u.uOndaDur.value = Math.max(0.05, DBG_ONDAS.DURACION_S);
-      u.uOndaAmp.value = DBG_ONDAS.AMPLITUD;
-      u.uOndaBrillo.value = DBG_ONDAS.BRILLO;
+      // Z58: amplitud, brillo, tinte, contraste y engrosamiento pasan por EVIDENCIA (lib/ondasKick.ts)
+      const ev = evidenciaOndas(DBG_ONDAS, EVID);
+      u.uOndaAmp.value = ev.amp;
+      u.uOndaBrillo.value = ev.brillo;
       u.uOndaBrilloNoche.value = DBG_ONDAS.BRILLO_NOCHE;
-      u.uOndaTinte.value = DBG_ONDAS.TINTE_BANDA;
+      u.uOndaTinte.value = ev.tinte;
+      u.uOndaContraste.value = ev.contraste;
+      u.uOndaEngrosar.value = ev.engrosar;
       u.uOndaRevelar.value = DBG_ONDAS.REVELAR;
     }
     // X2 PASO 1: escribir valores live (sin allocations — solo asignaciones de número)

@@ -1126,13 +1126,16 @@ export const DBG_SOL = {
 export const DBG_ONDAS = {
   ACTIVO:          true,   // — live
   MAX:             8,      // ondas simultáneas (1…8) — live
-  VELOCIDAD_DEG_S: 28,     // avance del anillo (°/s), desde el borde del portal hacia afuera — live
-  ANCHO_DEG:       9,      // ancho del perfil de campana (°) — live
-  DURACION_S:      3.5,    // vida de cada onda (se apaga con la edad y con la distancia) — live
-  AMPLITUD:        0.6,    // desplazamiento de las franjas (en períodos de franja), cresta y valle — live
-  BRILLO:          0.25,   // brillo de las franjas bajo la cresta — live
+  VELOCIDAD_DEG_S: 22,     // Z58 (Z52 28): avance del anillo (°/s), desde el borde del portal hacia afuera; más lenta y legible — live
+  ANCHO_DEG:       14,     // Z58 (Z52 9): ancho del perfil de campana (°) — live
+  DURACION_S:      5,      // Z58 (Z52 3,5): vida de cada onda (se apaga con la edad y con la distancia); llega más lejos — live
+  AMPLITUD:        1.5,    // Z58 (Z52 0,6, × 2,5): desplazamiento de las franjas (en períodos de franja), cresta y valle — live
+  BRILLO:          0.7,    // Z58 (Z52 0,25): brillo bajo la cresta; sobre fondo claro oscurece en vez de sumar luz (sin blanco) — live
   BRILLO_NOCHE:    0.5,    // brillo extra de la cresta de noche (× (1 − luz del día)) — live
-  TINTE_BANDA:     0.35,   // huella del color de la luz de la banda bajo la cresta (0 = sin color propio) — live
+  TINTE_BANDA:     0.6,    // Z58 (Z52 0,35): huella del color de la luz de la banda bajo la cresta (0 = sin color propio) — live
+  CONTRASTE:       0.5,    // Z58: bajo la cresta las franjas se aclaran (fondo oscuro) u oscurecen (fondo claro) — live
+  ENGROSAR:        0.35,   // Z58: engrosamiento de las franjas bajo la cresta — live
+  EVIDENCIA:       1.0,    // Z58: 0 = aspecto de Z52 · 1 = estos valores · 2 = el doble (escala amplitud, brillo, contraste, tinte y engrosamiento; ver lib/ondasKick.ts) — live
   REVELAR:         0.5,    // bajo la cresta las franjas se ven aunque estén fuera del alcance del marco (que queda al 10 %) — live
   GANANCIA_BANDA:  [1, 1, 1, 1] as number[],   // por banda de frecuencia: 0 < 80 Hz · 1 80–250 Hz (bombo) · 2 250 Hz–4 kHz · 3 > 4 kHz — live
   UMBRAL:          1.35,   // dispara cuando la energía supera UMBRAL × su media móvil (flanco de subida) — live

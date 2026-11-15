@@ -127,6 +127,8 @@ uniform float uOndaBrillo;
 uniform float uOndaBrilloNoche;
 uniform float uOndaTinte;
 uniform float uOndaRevelar;
+uniform float uOndaContraste;   // Z58: franjas al revés del fondo bajo la cresta
+uniform float uOndaEngrosar;    // Z58: franjas más gruesas bajo la cresta
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -393,7 +395,11 @@ void main() {
   }
   ph -= desp * (1.0 - inside);   // el portal queda quieto
   float thick = 0.12 * fbm4(q * 5.0 + vec2(2.0, 7.0));
-  float band = smoothstep(0.34 + thick, 0.60 + thick, 0.5 + 0.5 * sin(TAU * ph));
+  // Z58: bajo la cresta se engrosan las líneas que se leen contra el fondo (fuera del portal): de noche las claras
+  // (umbral más bajo), de día las oscuras (umbral más alto). Fondo = cielo del mundo de este píxel.
+  float claroCielo = smoothstep(0.45, 0.75, dot(colCielo, vec3(0.2126, 0.7152, 0.0722)));
+  float eng = clamp(cresta, 0.0, 1.0) * uOndaEngrosar * 0.25 * (1.0 - inside) * (1.0 - 2.0 * claroCielo);
+  float band = smoothstep(0.34 + thick - eng, 0.60 + thick - eng, 0.5 + 0.5 * sin(TAU * ph));
   float hv = 0.5 + 0.5 * fbm4(q * 1.4 + vec2(3.0, 1.0));
   float redw = smoothstep(0.55, 0.85, 0.5 + 0.5 * fbm4(q * 1.1 + vec2(-4.0, 2.0)) - 0.25 * q.x + 0.15 * q.y);
   vec3 gold = mix(vec3(0.64, 0.39, 0.18), vec3(0.90, 0.55, 0.18), hv);
@@ -411,8 +417,23 @@ void main() {
   float ringA = max(reach, 0.10);
   // Z52: bajo la cresta las franjas brillan, toman algo del color de su luz y se ven aunque estén fuera del alcance
   float crestaC = clamp(cresta, 0.0, 1.0);
-  ringCol *= 1.0 + crestaC * uOndaBrillo * (1.0 + uOndaBrilloNoche * (1.0 - uLuzDia));
-  ringCol = mix(ringCol, tinteOnda / max(cresta, 1e-3) * (0.6 + 0.6 * band), crestaC * uOndaTinte);
+  // Z58: la onda se aplica DESPUÉS del tinte del cielo (Z49/Z50), así TINTE_ANILLOS no le apaga el color.
+  // Sin saturar: sobre fondo oscuro aclara tipo pantalla (no pasa de 1); sobre fondo claro (de día) oscurece
+  // (inversión parcial) en vez de sumar luz. Y nunca empuja por encima de 0,9 (umbral del bloom 0,92).
+  vec3 antesOnda = ringCol;
+  // primero el color de la luz: tono de la luz con la luminancia de cada franja (el patrón se conserva), así el
+  // contraste de después sigue marcando las líneas sobre ese color
+  vec3 tcOnda = tinteOnda / max(cresta, 1e-3);
+  float lumR = dot(ringCol, vec3(0.2126, 0.7152, 0.0722)), lumT = max(dot(tcOnda, vec3(0.2126, 0.7152, 0.0722)), 1e-3);
+  ringCol = mix(ringCol, min(tcOnda * (lumR / lumT), vec3(1.0)), clamp(crestaC * uOndaTinte, 0.0, 1.0));
+  float claro = smoothstep(0.45, 0.75, dot(ringCol, vec3(0.2126, 0.7152, 0.0722)));
+  float kB = clamp(crestaC * uOndaBrillo * (1.0 + uOndaBrilloNoche * (1.0 - uLuzDia)), 0.0, 1.0);
+  ringCol = mix(ringCol + (1.0 - ringCol) * kB * 0.6, ringCol * (1.0 - 0.45 * kB), claro);
+  // contraste: las líneas que se leen contra el fondo van al revés de él. De noche (fondo oscuro) se aclaran las
+  // franjas claras (band); de día (fondo claro) se oscurecen las franjas oscuras (1 − band). Sube el contraste.
+  float kC = clamp(crestaC * uOndaContraste, 0.0, 1.0);
+  ringCol = mix(ringCol, mix(ringCol + (1.0 - ringCol) * kC, ringCol * (1.0 - 0.7 * kC), claro), mix(band, 1.0 - band, claro));
+  ringCol = min(ringCol, max(antesOnda, vec3(0.9)));
   ringA = max(ringA, crestaC * uOndaRevelar);
   // W3: anillos (SOL) aparecen en fase 2
   col = mix(col, ringCol, ringA * (1.0 - inside) * uReveal.z);

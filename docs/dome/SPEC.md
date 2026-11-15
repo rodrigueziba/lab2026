@@ -68,6 +68,7 @@ El shader no pinta sobre las UV de la esfera: trabaja con la **dirección de cad
 | `uOndaCol[4]` | vec3[] | — | Z52: color de la luz de cada banda (`DBG_SILLAS.hazColor0..3`), sRGB |
 | `uPortalCx` | float | 0.0461 | Z57: x del centro del círculo del portal y de los anillos (`PORTAL_C.x`; con `DBG_PORTAL.ANILLOS_EN_EJE` = `SUN_C.x` 0.0082, el eje del pico). Lo siguen el contorno, el tinte del borde y las ondas |
 | `uSolTope`, `uSolTopeBrillo` | float | 0.97, 1.0 | Z51 / Z57: tope del cuerpo del sol fuera del núcleo; tope de todo el sol, núcleo incluido (1 = sin tope). Ninguno oscurece el cielo ya más brillante |
+| `uOndaContraste`, `uOndaEngrosar` | float | 0 | Z58: bajo la cresta las franjas van al revés del fondo (contraste) y se engrosan. Amplitud, brillo, tinte, contraste y engrosamiento llegan ya mezclados por `DBG_ONDAS.EVIDENCIA` (`evidenciaOndas`, `lib/ondasKick.ts`) |
 | `uOndaVel`, `uOndaAncho`, `uOndaDur`, `uOndaAmp`, `uOndaBrillo`, `uOndaBrilloNoche`, `uOndaTinte`, `uOndaRevelar` | float | ver `DBG_ONDAS` | Z52: velocidad (rad/s), ancho (rad), vida (s), amplitud (períodos de franja), brillo, brillo de noche, tinte de la banda y visibilidad bajo la cresta |
 | `uDebugCapas` | float | 0 | Z50: 1 = capas de la composición en colores planos (disco azul, banda del contorno cian, contorno magenta, anillos verde, franja de Z49 amarilla, sol ilustrado naranja, nubes blanco, montañas rojo) |
 
