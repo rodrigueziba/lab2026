@@ -53,7 +53,7 @@ function frame(dt = 1 / 60) {
 const hasta = (cond, max = 2000) => { let n = 0; while (!cond() && n++ < max) frame(); return n; };
 
 console.log('\nregistro');
-check(CHECKPOINTS.length === 13, `13 checkpoints (Z48: + dia_mediodia, dia_atardecer, dia_noche): ${CHECKPOINTS.map(c => c.id).join(', ')}`);
+check(CHECKPOINTS.length === 16, `16 checkpoints (Z48: + dia_mediodia, dia_atardecer, dia_noche · Z54: + dia_prisma_sube, dia_flor, dia_prisma_baja): ${CHECKPOINTS.map(c => c.id).join(', ')}`);
 check(CHECKPOINTS.every(c => c.pasos[0][0] === 'base' && c.pasos[1][0] === 'remontar' && c.pasos[2][0] === 'base' && c.pasos[3][0] === 'spawn'), 'todos empiezan por base → remontar → base → spawn');
 check(!irACheckpoint('no_existe') && CK_STATE.fase === 'inactivo', 'id inexistente: false y no hace nada');
 

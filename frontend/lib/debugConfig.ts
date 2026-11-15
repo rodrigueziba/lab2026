@@ -1136,3 +1136,31 @@ export const DBG_ONDAS = {
   MEDIA_S:         0.6,    // constante de la media móvil (s) — live
   MIN_ENERGIA:     0.1,    // energía normalizada mínima para disparar — live
 };
+
+// ── Z54: prisma y flor dentro del ciclo de día (lib/prismaFlor.ts, components/FlorCiclo.tsx) ──
+export const DBG_FLOR = {
+  ACTIVO:          true,   // false = el prisma queda como hoy (apoyado) y no hay flor — live
+  // puntos clave (fracciones del ciclo, tDia)
+  SUBE_INICIO:     0.25,
+  SUBE_FIN:        0.37,
+  NACE_INICIO:     0.29,   // el prisma ya se despegó del suelo
+  NACE_FIN:        0.42,   // flor completa y abierta
+  ACHICA_INICIO:   0.66,
+  ACHICA_FIN:      0.75,   // desaparece justo al terminar el tercer cuarto
+  BAJA_INICIO:     0.75,
+  BAJA_FIN:        1.0,    // lento: todo el último cuarto
+  // flor
+  ESCALA:          1.0,    // tamaño de la cabeza (1 = diámetro ≈ ancho de la base del prisma, 1,75 m) — live
+  ALTURA_M:        2.7,    // altura total (≈ 1,5 × alto del prisma) — live
+  RESPIRACION_S:   7,      // período del abrir y cerrar de los pétalos — live
+  RESPIRACION_AMP: 0.18,   // cuánto respira la apertura — live
+  BALANCEO_M:      0.12,   // balanceo del tallo (m en la punta) — live
+  BALANCEO_S:      5.5,    // período del balanceo — live
+  GIRO_DEG_S:      6,      // giro lento de la cabeza — live
+  INCLINACION_DEG: 9,      // inclinación de la cabeza — live
+  COLOR_VEL:       0.08,   // velocidad del degradado térmico — live
+  PALETA_PROYECTO: 0,      // 0 = colores del video (azul marino, rojo, naranja, lima); 1 = paleta retro del proyecto — live
+  BRILLO:          1.0,    // limita el brillo (bloom 0,92) — live
+  MUSICA_APERTURA: 0.0,    // graves → apertura (0 = sin efecto) — live
+  PROX_USA_BASE:   false,  // true = el fractal del prisma calcula su cercanía con la posición apoyada (aunque esté arriba) — live
+};

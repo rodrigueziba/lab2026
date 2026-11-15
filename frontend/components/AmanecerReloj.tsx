@@ -6,7 +6,8 @@
 
 import { useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
-import { DBG_AMANECER, DBG_DIA } from "@/lib/debugConfig";
+import { DBG_AMANECER, DBG_DIA, DBG_FLOR } from "@/lib/debugConfig";
+import { FLOR, estadoPrismaFlor } from "@/lib/prismaFlor"; // Z54
 import { tickAmanecer, emitirFin, AMANECER } from "@/lib/amanecer";
 import { DIA, avanzarDia } from "@/lib/cicloDia"; // Z48
 import { duracionTemaViz, idTemaViz } from "@/lib/vizAudio"; // Z48
@@ -25,6 +26,8 @@ export default function AmanecerReloj() {
       if (DIA.evFin) window.dispatchEvent(new CustomEvent("alight:dia-fin"));
       if (DIA.evReinicio) window.dispatchEvent(new CustomEvent("alight:dia-reinicio"));
     } else if (DBG_AMANECER.UNIFICADO) tickAmanecer(dt, PAUSA.activa, DBG_AMANECER.AMANECER_DUR_S);
+    // Z54: coreografía del prisma y la flor (solo con el ciclo nuevo en marcha, o T_MANUAL fijado)
+    estadoPrismaFlor(DIA.dia, DBG_FLOR, DBG_DIA.NUEVO && DIA.escena && (DIA.fase !== "espera" || DBG_DIA.T_MANUAL >= 0), FLOR);
   });
   return null;
 }

@@ -51,6 +51,7 @@ import {
   DBG_PORTAL, // Z49
   DBG_SOL, // Z51
   DBG_ONDAS, // Z52
+  DBG_FLOR, // Z54
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -71,7 +72,9 @@ import { AMANECER } from "@/lib/amanecer"; // Z38
 import { RELOJ, esperasPendientes } from "@/lib/relojExperiencia"; // Z39
 import { SECUENCIA } from "@/lib/secuenciaSillas"; // Z39
 import { CHECKPOINTS, CK_STATE, irACheckpoint } from "@/lib/checkpoints"; // Z40
-import { DIA, PORTAL_GEOM } from "@/lib/cicloDia"; // Z48 · Z50
+import { DIA, PORTAL_GEOM, posicionarDia } from "@/lib/cicloDia"; // Z48 · Z50 · Z54
+import { FLOR } from "@/lib/prismaFlor"; // Z54
+import { duracionTemaViz, idTemaViz } from "@/lib/vizAudio"; // Z54
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
 
 type Tab = "SILLAS" | "TARIMA";
@@ -350,7 +353,8 @@ export default function DebugMenu() {
     const id = setInterval(() => setDiaLive(
       `tDia=${DIA.dia.toFixed(3)} · ${DIA.etapa} · sol ${(DIA.solAlt * 180 / Math.PI).toFixed(1)}° · fase=${DIA.fase}` +
       ` · t=${DIA.t.toFixed(1)}/${(DIA.dur).toFixed(0)} s · intro=${(DIA.intro * 100).toFixed(0)}% · montañas=${DIA.montCrece.toFixed(2)}` +
-      ` · luz=${DIA.luz.toFixed(2)} · estrellas=${DIA.estrellas.toFixed(2)} · ciclos=${DIA.ciclos}`), 250);
+      ` · luz=${DIA.luz.toFixed(2)} · estrellas=${DIA.estrellas.toFixed(2)} · ciclos=${DIA.ciclos}` +
+      ` · prisma ${FLOR.altura.toFixed(2)} · flor ${FLOR.escala.toFixed(2)} / apertura ${FLOR.apertura.toFixed(2)}`), 250);   // Z54
     return () => clearInterval(id);
   }, []);
   const [luc, setLuc] = useState({ ...DBG_LUCES, HALO_X: [...DBG_LUCES.HALO_X], RADIO_X: [...DBG_LUCES.RADIO_X], CONO_X: [...DBG_LUCES.CONO_X], POZO_X: [...DBG_LUCES.POZO_X] }); // Z42
@@ -1584,6 +1588,36 @@ export default function DebugMenu() {
               <button key={m} style={{ ...INPUT, opacity: DBG_DIA.SOL_RECORRIDO === m ? 1 : 0.45 }}
                 onClick={() => { DBG_DIA.SOL_RECORRIDO = m; tocarDia(); }}>{m}</button>
             ))}
+          </div>
+          {/* Z54: prisma y flor dentro del ciclo de día */}
+          <span style={LABEL}>Prisma y flor Z54 <span style={NOTE}>(ciclo de día · live)</span></span>
+          {(["ACTIVO", "PROX_USA_BASE"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{k === "ACTIVO" ? "off = prisma apoyado, sin flor" : "fractal con la posición apoyada"}</span></span>
+              <button style={INPUT} onClick={() => { DBG_FLOR[k] = !DBG_FLOR[k]; tocarDia(); }}>{DBG_FLOR[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["SUBE_INICIO", 0, 1, 0.005, "tDia"], ["SUBE_FIN", 0, 1, 0.005, ""], ["NACE_INICIO", 0, 1, 0.005, ""], ["NACE_FIN", 0, 1, 0.005, ""],
+            ["ACHICA_INICIO", 0, 1, 0.005, ""], ["ACHICA_FIN", 0, 1, 0.005, ""], ["BAJA_INICIO", 0, 1, 0.005, ""], ["BAJA_FIN", 0, 1, 0.005, ""],
+            ["ESCALA", 0.2, 3, 0.05, "cabeza"], ["ALTURA_M", 0.5, 8, 0.1, "m"], ["RESPIRACION_S", 1, 20, 0.5, "s"], ["RESPIRACION_AMP", 0, 0.6, 0.01, ""],
+            ["BALANCEO_M", 0, 0.6, 0.01, "m"], ["BALANCEO_S", 1, 20, 0.5, "s"], ["GIRO_DEG_S", -40, 40, 1, "°/s"], ["INCLINACION_DEG", 0, 40, 1, "°"],
+            ["COLOR_VEL", 0, 0.5, 0.01, ""], ["PALETA_PROYECTO", 0, 1, 0.01, "0 = video"], ["BRILLO", 0.2, 2, 0.05, ""], ["MUSICA_APERTURA", 0, 1, 0.01, "graves"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{DBG_FLOR[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_FLOR[k]}
+                onChange={e => { DBG_FLOR[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <span>Probar flor <span style={NOTE}>recorre el ciclo a VELOCIDAD 24 (con el visualizador activo)</span></span>
+            <button style={INPUT} onClick={() => {
+              DBG_DIA.T_MANUAL = -1; DBG_DIA.VELOCIDAD = 24;
+              if (DIA.fase === "espera") posicionarDia(DIA, DBG_DIA, 0.2, AMANECER, duracionTemaViz(), idTemaViz());
+              tocarDia();
+            }}>Probar flor</button>
+            <button style={INPUT} onClick={() => { DBG_DIA.VELOCIDAD = 1; tocarDia(); }}>velocidad 1</button>
           </div>
           {/* Z52: ondas expansivas por kick de cada luz/banda */}
           <span style={LABEL}>Ondas por kick Z52 <span style={NOTE}>(desde el portal hacia el domo · live)</span></span>

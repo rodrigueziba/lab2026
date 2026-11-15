@@ -6,7 +6,8 @@ import * as THREE from "three";
 import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
 import { TARIMA_H } from "./Tarima";
 import { INTERACT_STATE } from "@/lib/alightStore";
-import { DBG_PRISM, DBG_SECUENCIA, DBG_FRACTAL, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { DBG_PRISM, DBG_SECUENCIA, DBG_FRACTAL, DEBUG_ENABLED, DBG_FLOR } from "@/lib/debugConfig";
+import { FLOR } from "@/lib/prismaFlor"; // Z54
 import { RELOJ, ahoraExp } from "@/lib/relojExperiencia"; // Z39
 // Z43: fractal nuevo de las caras ("jungle fractal II"), progresión por distancia y música
 import { FRACTAL_JUNGLA_VERT, FRACTAL_JUNGLA_FRAG, FRACTAL_CARA_TEX_FRAG } from "@/lib/prisma/fractalJungla.glsl";
@@ -231,14 +232,18 @@ export default function Prism() {
     const prog    = Math.min(1, elapsed / DESCEND_DUR);
     const ease    = 1 - Math.pow(1 - prog, 3);
 
-    const y = THREE.MathUtils.lerp(PRISM_Y_START, PRISM_Y_END, ease);
+    let y = THREE.MathUtils.lerp(PRISM_Y_START, PRISM_Y_END, ease);
+    // Z54: ya apoyado, dentro del ciclo de día el prisma sube y baja por el mismo recorrido vertical de la bajada
+    // (x = z = 0, entre PRISM_Y_END y PRISM_Y_START); la altura sale de lib/prismaFlor.ts (FLOR.altura, 0…1).
+    if (landedRef.current && FLOR.activo) y = THREE.MathUtils.lerp(PRISM_Y_END, PRISM_Y_START, FLOR.altura);
     groupRef.current.position.y = y;
 
     // ── S1: inverted spin ────────────────────────────────────────────────────
     const pp       = INTERACT_STATE.playerPos;
     const px       = pp.x - groupRef.current.position.x;
     const pz       = pp.z - groupRef.current.position.z;
-    const py       = pp.y - groupRef.current.position.y;
+    // Z54: con PROX_USA_BASE la cercanía (fractal, giro, vidrio) se mide como si estuviera apoyado
+    const py       = pp.y - (DBG_FLOR.PROX_USA_BASE ? PRISM_Y_END : groupRef.current.position.y);
     const dist     = Math.sqrt(px*px + py*py + pz*pz);
 
     // S2: proximity (0=far, 1=at maxEffectM)

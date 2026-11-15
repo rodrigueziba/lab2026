@@ -17,7 +17,8 @@
 export type CheckpointId =
   | "inicio" | "exploracion" | "sillas_prisma" | "sala_activa" | "visualizador" | "amanecer_completo"
   | "tarima" | "tarima_vacia" | "luz_dialogo" | "premio"
-  | "dia_mediodia" | "dia_atardecer" | "dia_noche";   // Z48
+  | "dia_mediodia" | "dia_atardecer" | "dia_noche"   // Z48
+  | "dia_prisma_sube" | "dia_flor" | "dia_prisma_baja";   // Z54
 
 /** ["accion", ...args] */
 export type Paso = readonly [string, ...(string | number)[]];
@@ -62,6 +63,13 @@ export const CHECKPOINTS: readonly Checkpoint[] = [
     descripcion: "Visualizador con el ciclo de día en tDia 0,80 (atardecer)." },
   { id: "dia_noche", nombre: "Día: noche", pasos: [...VIZ, ["amanecerFinal"], ["diaEn", 0.97], ["esperarFrames", 2]],
     descripcion: "Visualizador con el ciclo de día en tDia 0,97 (noche, poco antes de que termine el día)." },
+  // Z54: prisma y flor dentro del ciclo de día
+  { id: "dia_prisma_sube", nombre: "Día: prisma sube", pasos: [...VIZ, ["amanecerFinal"], ["diaEn", 0.31], ["esperarFrames", 2]],
+    descripcion: "Ciclo de día en tDia 0,31: el prisma subiendo y la flor naciendo." },
+  { id: "dia_flor", nombre: "Día: flor", pasos: [...VIZ, ["amanecerFinal"], ["diaEn", 0.5], ["esperarFrames", 2]],
+    descripcion: "Ciclo de día en tDia 0,50: flor completa y abierta, prisma arriba." },
+  { id: "dia_prisma_baja", nombre: "Día: prisma baja", pasos: [...VIZ, ["amanecerFinal"], ["diaEn", 0.88], ["esperarFrames", 2]],
+    descripcion: "Ciclo de día en tDia 0,88: sin flor, el prisma bajando despacio." },
   { id: "tarima", nombre: "Tarima", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5]],
     descripcion: "Camino TARIMA elegido (zona del Player). Público y atriles llegan con sus tiempos reales." },
   { id: "tarima_vacia", nombre: "Tarima vacía", pasos: [...EXPLORACION, ["tarimaVacia"], ["esperarEvento", "alight:lecterns-visible", 8]],
