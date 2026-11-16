@@ -53,6 +53,7 @@ import {
   DBG_ONDAS, // Z52
   DBG_FLOR, // Z54
   DBG_ENTRADA, // Z59
+  DBG_FLUIDO, // Z61
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -1638,6 +1639,34 @@ export default function DebugMenu() {
             }}>Probar flor</button>
             <button style={INPUT} onClick={() => { DBG_DIA.VELOCIDAD = 1; tocarDia(); }}>velocidad 1</button>
           </div>
+          {/* Z61: fluir de color de los bloques de la composición */}
+          <span style={LABEL}>Fluir de color Z61 <span style={NOTE}>(azul = cordilleras / MONTAÑAS · naranja = olas cálidas / LÍNEAS · live)</span></span>
+          {(["ACTIVO", "SIMULAR_AZUL", "SIMULAR_NARANJA"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{k === "ACTIVO" ? "off = como antes" : "música simulada"}</span></span>
+              <button style={INPUT} onClick={() => { DBG_FLUIDO[k] = !DBG_FLUIDO[k]; tocarDia(); }}>{DBG_FLUIDO[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["MEZCLA_AZUL", 0, 1, 0.01, ""], ["MEZCLA_NARANJA", 0, 1, 0.01, ""], ["ESCALA", 0.5, 10, 0.1, "manchas"], ["VEL_BASE", 0, 0.5, 0.005, "deriva"],
+            ["ACELERA", 0, 8, 0.1, "× energía"], ["WARP", 0, 4, 0.05, ""], ["LUZ_FLUJO", 0, 1, 0.01, ""], ["PULSO_LUZ", 0, 1.5, 0.01, "música"],
+            ["MUSICA_AZUL", 0, 3, 0.05, "ganancia"], ["MUSICA_NARANJA", 0, 3, 0.05, "ganancia"], ["SUAVIZADO_S", 0.02, 2, 0.02, "s"], ["CALIDAD", 2, 4, 1, "octavas"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{DBG_FLUIDO[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_FLUIDO[k]}
+                onChange={e => { DBG_FLUIDO[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          {(["PALETA_AZUL", "PALETA_NARANJA"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k}</span>
+              {DBG_FLUIDO[k].map((c, i) => (
+                <input key={i} type="color" value={c} style={{ width: 28, height: 20, padding: 0, border: "none" }}
+                  onChange={e => { DBG_FLUIDO[k][i] = e.target.value.toUpperCase(); tocarDia(); }} />
+              ))}
+            </div>
+          ))}
           {/* Z52: ondas expansivas por kick de cada luz/banda */}
           <span style={LABEL}>Ondas por kick Z52 <span style={NOTE}>(desde el portal hacia el domo · live)</span></span>
           <div style={ROW}>

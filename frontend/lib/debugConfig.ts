@@ -901,6 +901,29 @@ export const DBG_CHECKPOINTS = {
 };
 
 // ── Z41: layout de sillas, zona SILLAS, público y monolitos (lib/layoutSala.ts) ──
+// ── Z61: fluir de color dentro de los dos bloques de la composición central del domo (lib/fluidoBloques.ts y
+// dome.frag.glsl, implementación propia de la técnica general de domain warping). AZUL = cordilleras del centro
+// (grupo MONTAÑAS); NARANJA = olas/estratos cálidos de abajo (grupo LÍNEAS). Las siluetas y líneas no cambian. ──
+export const DBG_FLUIDO = {
+  ACTIVO:          true,   // false = exactamente como antes de Z61 — live
+  MEZCLA_AZUL:     0.6,    // cuánto del color fluido se aplica al bloque azul — live
+  MEZCLA_NARANJA:  0.6,    // ídem bloque naranja — live
+  ESCALA:          3.0,    // tamaño de las manchas (más alto = manchas más chicas) — live
+  VEL_BASE:        0.05,   // deriva sin música — live
+  ACELERA:         2.5,    // la energía multiplica la velocidad por (1 + ACELERA·e) — live
+  WARP:            1.2,    // cuánto distorsiona el campo (con música sube hasta × 2,5) — live
+  LUZ_FLUJO:       0.25,   // variación de luminosidad del fluido (sin música) — live
+  PULSO_LUZ:       0.35,   // cuánto sube la luminosidad con la música — live
+  MUSICA_AZUL:     1.0,    // ganancia de la energía del grupo MONTAÑAS — live
+  MUSICA_NARANJA:  1.0,    // ganancia de la energía del grupo LÍNEAS — live
+  SUAVIZADO_S:     0.3,    // lerp temporal de la energía — live
+  CALIDAD:         3,      // octavas del ruido (2…4) — live
+  SIMULAR_AZUL:    false,  // música simulada (pulsos tipo bombo) para el bloque azul — live
+  SIMULAR_NARANJA: false,  // ídem bloque naranja — live
+  PALETA_AZUL:     ["#16294A", "#1F4E8C", "#2A9D9A", "#7CC6E0", "#D2E8F0"] as string[],   // marino, azul profundo, turquesa, celeste, azul pálido — live
+  PALETA_NARANJA:  ["#C8402A", "#F0742A", "#F4A23A", "#F4CE4A", "#F3E6C8"] as string[],   // naranja rojizo, naranja, ámbar, amarillo, crema — live
+};
+
 // ── Z59: entrada fija después de cruzar el telón (lib/entradaTelon.ts, components/EntradaTelon.tsx) ──
 export const DBG_ENTRADA = {
   ACTIVO:                 true,   // false = como antes de Z59 (el usuario queda donde cruzó el telón) — live

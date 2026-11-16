@@ -13,7 +13,8 @@ useTexture.preload([
   "/portal/portal-color.png",
 ]);
 import { domeVert, domeFrag } from "./domeShaders";
-import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL, DBG_SOL, DBG_ONDAS, DBG_SILLAS } from "@/lib/debugConfig";
+import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL, DBG_SOL, DBG_ONDAS, DBG_SILLAS, DBG_FLUIDO } from "@/lib/debugConfig";
+import { FLUIDO, avanzarFluido } from "@/lib/fluidoBloques"; // Z61
 import { ONDAS, MAX_ONDAS, edad, evidenciaOndas } from "@/lib/ondasKick"; // Z52 · Z58
 
 const EVID = { amp: 0, brillo: 0, tinte: 0, contraste: 0, engrosar: 0 };   // Z58: valores efectivos (se reescriben, sin allocations)
@@ -208,6 +209,18 @@ export default function DomeSky({
           uOndaTinte:       { value: 0 },
           uOndaRevelar:     { value: 0 },
           uOndaContraste:   { value: 0 },   // Z58
+          // Z61: fluir de color de los bloques azul (MONTAÑAS) y naranja (LÍNEAS)
+          uFluido:  { value: 0 },
+          uFlT:     { value: new THREE.Vector2(0, 0) },
+          uFlE:     { value: new THREE.Vector2(0, 0) },
+          uFlMez:   { value: new THREE.Vector2(0.6, 0.6) },
+          uFlEsc:   { value: 3 },
+          uFlWarp:  { value: 1.2 },
+          uFlLuz:   { value: 0.25 },
+          uFlPulso: { value: 0.35 },
+          uFlOct:   { value: 3 },
+          uFlPalA:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
+          uFlPalN:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
           uOndaEngrosar:    { value: 0 },   // Z58
         },
       }),
@@ -280,6 +293,25 @@ export default function DomeSky({
       u.uDawn.value = ge.dawn;
       tmp.rv.set(ge.revMont, ge.revLin, ge.revSol, ge.revCielo);
       u.uReveal.value.copy(tmp.rv);
+      // Z61: energía del grupo de cada bloque (MONTAÑAS → azul, LÍNEAS → naranja; ya con su luz encendida o no)
+      avanzarFluido(FLUIDO, DBG_FLUIDO, RELOJ.dtExp, ge.mont, ge.lin);
+    }
+    // Z61: fluir de color (tiempo acumulado propio por bloque: sin saltos al cambiar la velocidad; quieto en pausa)
+    u.uFluido.value = DBG_FLUIDO.ACTIVO ? 1 : 0;
+    if (DBG_FLUIDO.ACTIVO) {
+      u.uFlT.value.set(FLUIDO.tA, FLUIDO.tN);
+      u.uFlE.value.set(FLUIDO.eA, FLUIDO.eN);
+      u.uFlMez.value.set(DBG_FLUIDO.MEZCLA_AZUL, DBG_FLUIDO.MEZCLA_NARANJA);
+      u.uFlEsc.value = Math.max(0.2, DBG_FLUIDO.ESCALA);
+      u.uFlWarp.value = Math.max(0, DBG_FLUIDO.WARP);
+      u.uFlLuz.value = DBG_FLUIDO.LUZ_FLUJO;
+      u.uFlPulso.value = DBG_FLUIDO.PULSO_LUZ;
+      u.uFlOct.value = Math.max(2, Math.min(4, Math.round(DBG_FLUIDO.CALIDAD)));
+      const pa = u.uFlPalA.value as THREE.Vector3[], pn = u.uFlPalN.value as THREE.Vector3[];
+      for (let i = 0; i < 5; i++) {   // hexARgb tiene caché por texto: sin allocations por frame
+        let c = hexARgb(DBG_FLUIDO.PALETA_AZUL[i] ?? "#FFFFFF"); pa[i].set(c[0], c[1], c[2]);
+        c = hexARgb(DBG_FLUIDO.PALETA_NARANJA[i] ?? "#FFFFFF"); pn[i].set(c[0], c[1], c[2]);
+      }
     }
     u.uSolAmt.value   = solAmt;
     u.uMontAmt.value  = montAmt;

@@ -10,7 +10,7 @@
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_DIA, DBG_PORTAL, DBG_SOL, DBG_FLOR, DBG_RETRO_FX, DBG_ONDAS, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { DBG_DIA, DBG_PORTAL, DBG_SOL, DBG_FLOR, DBG_RETRO_FX, DBG_ONDAS, DBG_FLUIDO, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { DIA } from "@/lib/cicloDia";
 import { ONDAS } from "@/lib/ondasKick"; // Z52 (diagnóstico)
 import { RELOJ } from "@/lib/relojExperiencia"; // Z52 (diagnóstico)
@@ -44,10 +44,10 @@ export default function CicloDiaEscena() {
     };
     orig.current = o;
     // diagnóstico solo en modo debug (pruebas en Chrome headless)
-    const w = window as unknown as { __dia?: object; __portal?: object; __sol?: object; __ondas?: object; __fx?: object; __flor?: object };
-    if (DEBUG_ENABLED) { w.__dia = { DIA, DBG_DIA, camera }; w.__portal = DBG_PORTAL; w.__sol = DBG_SOL; w.__ondas = { ONDAS, RELOJ, DBG_ONDAS }; w.__fx = DBG_RETRO_FX; w.__flor = DBG_FLOR; }   // Z49: + composición · Z51: + sol · Z57: + post-proceso y flor
+    const w = window as unknown as { __dia?: object; __portal?: object; __sol?: object; __ondas?: object; __fx?: object; __flor?: object; __fluido?: object };
+    if (DEBUG_ENABLED) { w.__dia = { DIA, DBG_DIA, camera }; w.__portal = DBG_PORTAL; w.__sol = DBG_SOL; w.__ondas = { ONDAS, RELOJ, DBG_ONDAS }; w.__fx = DBG_RETRO_FX; w.__flor = DBG_FLOR; w.__fluido = DBG_FLUIDO; }   // Z49: + composición · Z51: + sol · Z57: + post-proceso y flor
     return () => {
-      if (DEBUG_ENABLED) { delete w.__dia; delete w.__portal; delete w.__sol; delete w.__ondas; delete w.__fx; delete w.__flor; }
+      if (DEBUG_ENABLED) { delete w.__dia; delete w.__portal; delete w.__sol; delete w.__ondas; delete w.__fx; delete w.__flor; delete w.__fluido; }
       restaurar(o);
       DIA.escena = false;
       orig.current = null;

@@ -129,6 +129,18 @@ uniform float uOndaTinte;
 uniform float uOndaRevelar;
 uniform float uOndaContraste;   // Z58: franjas al revés del fondo bajo la cresta
 uniform float uOndaEngrosar;    // Z58: franjas más gruesas bajo la cresta
+// Z61: fluir de color en los bloques AZUL (cordilleras, MONTAÑAS) y NARANJA (olas cálidas, LÍNEAS)
+uniform float uFluido;         // 0 = como antes de Z61
+uniform vec2  uFlT;            // tiempo acumulado propio de cada bloque (azul, naranja)
+uniform vec2  uFlE;            // energía suavizada de cada bloque (0..1)
+uniform vec2  uFlMez;          // mezcla del color fluido (azul, naranja)
+uniform float uFlEsc;          // tamaño de las manchas
+uniform float uFlWarp;         // distorsión del campo
+uniform float uFlLuz;          // variación de luminosidad del fluido
+uniform float uFlPulso;        // luminosidad extra con la música
+uniform float uFlOct;          // octavas (2..4)
+uniform vec3  uFlPalA[5];      // paleta del bloque azul (sRGB)
+uniform vec3  uFlPalN[5];      // paleta del bloque naranja (sRGB)
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -185,6 +197,54 @@ float warpField(vec2 q, float t, float amt) {
 
 // ------------------------------------------------------------------ hash
 float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+
+// ------------------------------------------------------------------ Z61: fluir de color
+// Implementación PROPIA de la técnica general de "domain warping" (distorsionar las coordenadas de un ruido fractal
+// con otro ruido, en dos capas). Hash, ruido de valor, suma de octavas, constantes, estructura y paletas son propios
+// de este proyecto; no deriva de ningún shader de terceros.
+float fluHash(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * vec3(0.1149, 0.1371, 0.0973));
+  q += dot(q, q.yzx + 27.31);
+  return fract((q.x + q.y) * q.z);
+}
+float fluRuido(vec2 p) {   // ruido de valor con interpolación quíntica
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  float a = fluHash(i), b = fluHash(i + vec2(1.0, 0.0)), c = fluHash(i + vec2(0.0, 1.0)), d = fluHash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+float fluFbm(vec2 p) {     // 2..4 octavas (uFlOct), girando y corriendo cada una
+  float s = 0.0, amp = 0.55, norm = 0.0;
+  mat2 giro = mat2(0.80, 0.60, -0.60, 0.80);
+  for (int i = 0; i < 4; i++) {
+    if (float(i) >= uFlOct) break;
+    s += amp * fluRuido(p); norm += amp;
+    p = giro * p * 2.07 + vec2(3.1, 1.7);
+    amp *= 0.48;
+  }
+  return s / max(norm, 1e-3);
+}
+// dos capas de distorsión: q desplaza a r, r desplaza al campo final; tt = tiempo propio del bloque
+float fluCampo(vec2 x, float tt, float w) {
+  vec2 q = vec2(fluFbm(x + vec2(0.0, 0.31 * tt)), fluFbm(x + vec2(4.7, 1.9) - 0.27 * tt));
+  vec2 r = vec2(fluFbm(x + w * q + vec2(2.3, 7.1) + 0.19 * tt), fluFbm(x + w * q + vec2(6.1, 3.4) - 0.23 * tt));
+  return smoothstep(0.22, 0.78, fluFbm(x + w * r));
+}
+vec3 fluPal5(float f, vec3 a, vec3 b, vec3 c, vec3 d, vec3 e) {
+  float x = clamp(f, 0.0, 1.0) * 4.0;
+  vec3 col = mix(a, b, clamp(x, 0.0, 1.0));
+  col = mix(col, c, clamp(x - 1.0, 0.0, 1.0));
+  col = mix(col, d, clamp(x - 2.0, 0.0, 1.0));
+  return mix(col, e, clamp(x - 3.0, 0.0, 1.0));
+}
+// el dibujo se conserva: el color de la paleta toma la luminancia de la textura (líneas y contornos intactos);
+// encima, un corrimiento de luminosidad del propio campo y un pulso con la música
+vec3 fluTenir(vec3 base, vec3 pal, float f, float e, float mezcla) {
+  float lb = dot(base, vec3(0.2126, 0.7152, 0.0722));
+  float lp = max(dot(pal, vec3(0.2126, 0.7152, 0.0722)), 0.02);
+  float luz = lb * (1.0 + uFlLuz * (f - 0.5) * 2.0) * (1.0 + uFlPulso * e);
+  return mix(base, min(pal * (luz / lp), vec3(0.95)), clamp(mezcla, 0.0, 1.0));
+}
 float h31(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123); }
 vec3  h33(vec3 p) {
   return fract(sin(vec3(dot(p, vec3(127.1, 311.7, 74.7)),
@@ -535,6 +595,26 @@ void main() {
     float blackDispY = 0.020 * mont * sin(uv.x * 9.0 + t * 0.6) + 0.008 * kick;
     vec3 m = texture2D(uMasks, uv + vec2(0.0, blackDispY)).rgb;
     capaMont = max(m.r, max(m.g, m.b));   // Z50 (DEBUG_CAPAS)
+    // Z61: fluir de color dentro de cada bloque (salida temprana fuera de sus máscaras). AZUL = estratos (m.g) y las
+    // olas frías (m.b con tono frío); NARANJA = olas cálidas (m.b con rojo > azul en la textura).
+    if (uFluido > 0.5 && (m.g > 0.01 || m.b > 0.01)) {
+      float calido = smoothstep(0.02, 0.10, waveCol.r - waveCol.b) * step(0.01, m.b);
+      vec2 xl = uv * uFlEsc;
+      vec3 olaFria = waveCol;
+      if (m.g > 0.01 || (m.b > 0.01 && calido < 0.99)) {
+        float fA = fluCampo(xl, uFlT.x, uFlWarp * (1.0 + 1.5 * uFlE.x));
+        vec3 pA = fluPal5(fA, uFlPalA[0], uFlPalA[1], uFlPalA[2], uFlPalA[3], uFlPalA[4]);
+        strataCol = fluTenir(strataCol, pA, fA, uFlE.x, uFlMez.x);
+        olaFria = fluTenir(waveCol, pA, fA, uFlE.x, uFlMez.x);
+      }
+      vec3 olaCalida = waveCol;
+      if (calido > 0.01) {
+        float fN = fluCampo(xl + vec2(11.3, 5.7), uFlT.y, uFlWarp * (1.0 + 1.5 * uFlE.y));
+        vec3 pN = fluPal5(fN, uFlPalN[0], uFlPalN[1], uFlPalN[2], uFlPalN[3], uFlPalN[4]);
+        olaCalida = fluTenir(waveCol, pN, fN, uFlE.y, uFlMez.y);
+      }
+      waveCol = mix(olaFria, olaCalida, calido);
+    }
     // W5: bordes suaves — smoothstep activo con máscara 2k borrosa (uSoftEdge > 0)
     if (uSoftEdge > 0.001) {
       float e = uSoftEdge * 0.48;
