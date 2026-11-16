@@ -45,6 +45,7 @@ Dónde se muestra: principalmente en PCs o notebooks con webcam y rendimiento po
 ## Post-proceso y debug
 - Orden de pases en `RetroPostFX.tsx`: escena → bloom → CRT → salida. Los efectos que deban sentirse parte del mundo (por ejemplo el destello) se inyectan antes del CRT, no como overlay HTML.
 - Menú de debug: se abre con Shift. Los clics dentro del menú y de cualquier panel de debug (`data-debug-panel`) no deben capturar el mouse de la cámara. Los overlays de debug van ocultos por defecto.
+- Menú de debug por pestañas (Z70): contenedor `components/DebugMenu.tsx`, estado en `components/debug/estado.tsx`, secciones en `components/debug/pestanas/*.tsx` (marca `// sección: <id>`), registro en `lib/debugSecciones.ts`. Al agregar o modificar controles del menú de debug, actualizar su entrada en `lib/debugSecciones.ts` con `ultimoZ` igual al número de la tarea actual, para que se ordene y se marque como NUEVO sola. Después: `node scripts/debug-menu-indice.mjs` (buscador) y `node scripts/debug-menu-test.mjs`.
 
 ## Convenciones
 - Todo componente que use three.js lleva `"use client"` y se importa con `dynamic` + `ssr: false`.
