@@ -47,3 +47,51 @@ export function estadoPrismaFlor(dia: number, c: CfgFlor, activo: boolean, out: 
   out.cabeza = vivo ? tramo(nace, 0.35, 0.85) * (1 - tramo(achica, 0.3, 1)) : 0;
   return out;
 }
+
+// ── Z60: giro de la cabeza (rueda hacia adelante), ola de pétalos y fases de color. Puro, sin allocations. ──
+// Fases acumuladas (rad o vueltas) con dt del reloj de la experiencia (0 en pausa → todo quieto). Como se acumula la
+// FASE y no se calcula fase = t · velocidad, cambiar la velocidad (menú, música) nunca produce saltos.
+// Todo se atenúa con la escala de la flor (al nacer y al desaparecer gira y ondula más lento y con menos amplitud).
+export interface CfgRoll {
+  ROLL_CABEZA_ACTIVO: boolean; ROLL_CABEZA_PERIODO_S: number; ROLL_CABEZA_AMP_DEG: number; ROLL_CABEZA_SENTIDO: number;
+  PETALO_OLA_ACTIVO: boolean; PETALO_OLA_PERIODO_S: number;
+  COLOR_VEL: number; COLOR_TALLO_VEL: number; COLOR_TALLO_ACTIVO: boolean; MUSICA_ROLL: number;
+}
+export interface EstadoRoll { fase: number; ola: number; color: number; tallo: number; graves: number }
+export function crearEstadoRoll(): EstadoRoll { return { fase: 0, ola: 0, color: 0, tallo: 0, graves: 0 }; }
+const TAU = Math.PI * 2;
+const envolver = (x: number): number => { const r = x % TAU; return r < 0 ? r + TAU : r; };
+
+/** Avanza las fases. dt (s, reloj de la experiencia), escala de la flor (0…1), graves 0…1 (música). */
+export function avanzarRoll(s: EstadoRoll, c: CfgRoll, dt: number, escala: number, graves: number): EstadoRoll {
+  const d = Math.max(0, fin(dt));
+  const e = sat(fin(escala));
+  // graves suavizados (lerp temporal, ~0,25 s): la música acelera sin tirones
+  s.graves += (sat(fin(graves)) - s.graves) * (1 - Math.exp(-d / 0.25));
+  const vRoll = c.ROLL_CABEZA_ACTIVO ? (TAU / Math.max(0.5, fin(c.ROLL_CABEZA_PERIODO_S, 4.2))) * (1 + Math.max(0, fin(c.MUSICA_ROLL)) * s.graves) : 0;
+  s.fase = envolver(s.fase + vRoll * e * d);
+  const vOla = c.PETALO_OLA_ACTIVO ? TAU / Math.max(0.5, fin(c.PETALO_OLA_PERIODO_S, 4.2)) : 0;
+  s.ola = envolver(s.ola + vOla * e * d);
+  s.color = (s.color + fin(c.COLOR_VEL) * d) % 1000;                                  // vueltas del degradado
+  s.tallo = (s.tallo + (c.COLOR_TALLO_ACTIVO ? fin(c.COLOR_TALLO_VEL) : 0) * e * d) % 1000;
+  return s;
+}
+
+/** Ángulo de giro de la cabeza (rad, con signo). AMP ≥ 360: vuelta completa; menos: se mece ±AMP/2. */
+export function anguloRoll(s: EstadoRoll, c: CfgRoll): number {
+  const amp = Math.max(0, fin(c.ROLL_CABEZA_AMP_DEG, 360));
+  const sg = fin(c.ROLL_CABEZA_SENTIDO, 1) < 0 ? -1 : 1;
+  return sg * (amp >= 359.9 ? s.fase : ((amp * Math.PI) / 360) * Math.sin(s.fase));
+}
+
+/** Retraso (rad) de la ola de un pétalo: DESFASE por cada pétalo de distancia al frente del giro (az = π), por los
+ *  dos lados del anillo (sin costura). azK = azimut del pétalo en el marco del giro (rad), n = pétalos del anillo.
+ *  Réplica exacta de las cuentas del vertex shader de FlorCiclo. */
+export function retrasoPetalo(azK: number, n: number, desfase: number): number {
+  const d = Math.abs((((fin(azK) % TAU) + TAU) % TAU) - Math.PI);
+  return Math.max(0, fin(desfase)) * d * Math.max(1, fin(n, 1)) / TAU;
+}
+/** Apertura extra (−1…1) de un pétalo: cos(ángulo de giro − retraso). 1 = abierto (cara arriba), −1 = copa. */
+export function olaPetalo(anguloGiro: number, azK: number, n: number, desfase: number, capaInterior = false, contrafase = true): number {
+  return Math.cos(fin(anguloGiro) - retrasoPetalo(azK, n, desfase) + (capaInterior && contrafase ? Math.PI : 0));
+}

@@ -1607,9 +1607,9 @@ export default function DebugMenu() {
           </div>
           {/* Z54: prisma y flor dentro del ciclo de día */}
           <span style={LABEL}>Prisma y flor Z54 <span style={NOTE}>(ciclo de día · live)</span></span>
-          {(["ACTIVO", "PROX_USA_BASE"] as const).map(k => (
+          {(["ACTIVO", "PROX_USA_BASE", "ROLL_CABEZA_ACTIVO", "PETALO_OLA_ACTIVO", "PETALO_OLA_CAPAS", "COLOR_TALLO_ACTIVO"] as const).map(k => (
             <div key={k} style={ROW}>
-              <span>{k} <span style={NOTE}>{k === "ACTIVO" ? "off = prisma apoyado, sin flor" : "fractal con la posición apoyada"}</span></span>
+              <span>{k} <span style={NOTE}>{k === "ACTIVO" ? "off = prisma apoyado, sin flor" : k === "PROX_USA_BASE" ? "fractal con la posición apoyada" : "Z60"}</span></span>
               <button style={INPUT} onClick={() => { DBG_FLOR[k] = !DBG_FLOR[k]; tocarDia(); }}>{DBG_FLOR[k] ? "ON" : "off"}</button>
             </div>
           ))}
@@ -1619,6 +1619,9 @@ export default function DebugMenu() {
             ["ESCALA", 0.2, 3, 0.05, "cabeza"], ["ALTURA_M", 0.5, 8, 0.1, "m (Z57: 1,8)"], ["ALTURA_FACTOR", 0.3, 1.5, 0.01, "Z57 × ALTURA_M"], ["ESCALA_CABEZA", 0.5, 1.5, 0.01, "Z57 diámetro"], ["RESPIRACION_S", 1, 20, 0.5, "s"], ["RESPIRACION_AMP", 0, 0.6, 0.01, ""],
             ["BALANCEO_M", 0, 0.6, 0.01, "m"], ["BALANCEO_S", 1, 20, 0.5, "s"], ["GIRO_DEG_S", -40, 40, 1, "°/s"], ["INCLINACION_DEG", 0, 40, 1, "°"],
             ["COLOR_VEL", 0, 0.5, 0.01, ""], ["PALETA_PROYECTO", 0, 1, 0.01, "0 = video"], ["BRILLO", 0.2, 2, 0.05, ""], ["MUSICA_APERTURA", 0, 1, 0.01, "graves"],
+            ["GROSOR_TALLO", 0.3, 1.5, 0.01, "Z60"], ["ROLL_CABEZA_PERIODO_S", 1, 20, 0.1, "Z60 s/vuelta"], ["ROLL_CABEZA_AMP_DEG", 0, 360, 5, "Z60 (360 = vuelta)"], ["ROLL_CABEZA_SENTIDO", -1, 1, 2, "Z60"],
+            ["ROLL_CABEZA_EJE_DEG", -180, 180, 5, "Z60 0 = hacia las sillas"], ["PETALO_OLA_AMP_DEG", 0, 80, 1, "Z60 °"], ["PETALO_OLA_DESFASE", 0, 2, 0.01, "Z60 rad"], ["PETALO_OLA_PERIODO_S", 1, 20, 0.1, "Z60 s"],
+            ["COLOR_ACOPLE", 0, 2, 0.01, "Z60"], ["DORSO_AZUL", 0, 1, 0.01, "Z60"], ["COLOR_TALLO_VEL", 0, 1, 0.01, "Z60"], ["MUSICA_ROLL", 0, 3, 0.05, "Z60 graves"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{DBG_FLOR[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>

@@ -1172,7 +1172,26 @@ export const DBG_FLOR = {
   ESCALA:          1.0,    // tamaño de la cabeza (1 = diámetro ≈ ancho de la base del prisma, 1,75 m) — live
   ALTURA_M:        1.8,    // Z57 (Z54 2,7): altura total, 33 % más baja; el valor efectivo es ALTURA_M × ALTURA_FACTOR — live
   ALTURA_FACTOR:   1.0,    // Z57: multiplica ALTURA_M en vivo (0,3…1,5; 1,5 = la altura de Z54) — live
-  ESCALA_CABEZA:   1.0,    // Z57: diámetro de la cabeza (× ESCALA); no depende de la altura — live
+  ESCALA_CABEZA:   0.67,   // Z60 (Z57 1,0): diámetro de la cabeza (× ESCALA), un tercio menos para equilibrar con la altura de Z57 — live
+  GROSOR_TALLO:    1.0,    // Z60: grosor del tallo (× el de Z54/Z57); ver el reporte de Z60 sobre las proporciones — live
+  // Z60: la cabeza rueda hacia adelante (eje horizontal por su centro, en la punta del tallo)
+  ROLL_CABEZA_ACTIVO:    true,  // — live
+  ROLL_CABEZA_PERIODO_S: 4.2,   // una vuelta completa (360°) — live
+  ROLL_CABEZA_AMP_DEG:   360,   // 360 = vuelta completa; menos = se mece ±AMP/2 — live
+  ROLL_CABEZA_SENTIDO:   -1,    // −1 (como el video, ver Z60) = la cara sube y se aleja del observador y vuelve por abajo; 1 = al revés (la parte de arriba viene hacia el observador) — live
+  ROLL_CABEZA_EJE_DEG:   0,     // orientación del eje (°, alrededor de la vertical): 0 = rueda hacia las sillas (−Z); 90 = hacia la entrada (−X) — live
+  // Z60: ola de apertura que recorre el anillo de pétalos
+  PETALO_OLA_ACTIVO:     true,  // — live
+  PETALO_OLA_AMP_DEG:    35,    // apertura extra ± (°) — live
+  PETALO_OLA_DESFASE:    0.35,  // retraso por pétalo de distancia al frente del giro (rad); la ola va del frente hacia atrás — live
+  PETALO_OLA_CAPAS:      true,  // la capa interior en contrafase — live
+  PETALO_OLA_PERIODO_S:  4.2,   // período de la ola SOLO sin giro (con giro, la ola sigue al ángulo de la cabeza) — live
+  // Z60: color
+  COLOR_ACOPLE:          0.7,   // cuánto sigue el degradado al giro de la cabeza y a la ola — live
+  DORSO_AZUL:            0.8,   // el dorso de los pétalos tira a azul marino (como el video) — live
+  COLOR_TALLO_ACTIVO:    true,  // bandas de color que suben por el tallo — live
+  COLOR_TALLO_VEL:       0.15,  // vueltas del degradado por segundo en el tallo — live
+  MUSICA_ROLL:           0,     // graves → giro más rápido (0 = sin efecto) — live
   RESPIRACION_S:   7,      // período del abrir y cerrar de los pétalos — live
   RESPIRACION_AMP: 0.18,   // cuánto respira la apertura — live
   BALANCEO_M:      0.12,   // balanceo del tallo (m en la punta) — live

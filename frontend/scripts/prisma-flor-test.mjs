@@ -1,7 +1,7 @@
 // Z54: prueba de la coreografía del prisma y la flor (lib/prismaFlor.ts) dentro del ciclo de día.
 // Uso: node scripts/prisma-flor-test.mjs. DBG_FLOR se lee de lib/debugConfig.ts.
 import fs from 'node:fs';
-import { estadoPrismaFlor, crearEstadoFlor } from '../lib/prismaFlor.ts';
+import { estadoPrismaFlor, crearEstadoFlor, crearEstadoRoll, avanzarRoll, anguloRoll, retrasoPetalo, olaPetalo } from '../lib/prismaFlor.ts';
 import { crearEstadoDia, avanzarDia } from '../lib/cicloDia.ts';
 
 const src = fs.readFileSync(new URL('../lib/debugConfig.ts', import.meta.url), 'utf8');
@@ -56,6 +56,41 @@ console.log('\nZ57: altura de la flor');
 { const H = C.ALTURA_M * C.ALTURA_FACTOR, alto15 = C.ALTURA_M * 1.5;
   console.log(`    ALTURA_M ${C.ALTURA_M} × ALTURA_FACTOR ${C.ALTURA_FACTOR} = ${f(H, 2)} m (Z54: 2,7 m; con ALTURA_FACTOR 1,5: ${f(alto15, 2)} m) · ESCALA_CABEZA ${C.ESCALA_CABEZA}`);
   check(Math.abs(H / 2.7 - 0.6667) < 0.001, `33 % más baja: ${f(H, 2)} / 2,7 = ${f(H / 2.7, 3)}`);
-  check(Math.abs(alto15 - 2.7) < 1e-9 && C.ESCALA_CABEZA === 1, 'ALTURA_FACTOR 1,5 = la altura de Z54; la cabeza conserva su tamaño (ESCALA_CABEZA 1)'); }
+  check(Math.abs(alto15 - 2.7) < 1e-9 && Math.abs(C.ESCALA_CABEZA - 0.67) < 1e-9, 'ALTURA_FACTOR 1,5 = la altura de Z54; la cabeza un tercio menor desde Z60 (ESCALA_CABEZA 0,67)'); }
+console.log('\nZ60: giro de la cabeza, ola y color');
+{ const TAU = 2 * Math.PI, P = C.ROLL_CABEZA_PERIODO_S, dt = 1 / 60;
+  const correr = (seg, cfg = C, esc = 1, gr = 0, s = crearEstadoRoll()) => { for (let i = 0; i < Math.round(seg / dt); i++) avanzarRoll(s, cfg, dt, esc, gr); return s; };
+  const a0 = anguloRoll(crearEstadoRoll(), C), sP = correr(P), aP = anguloRoll(sP, C);   // (signo según SENTIDO)
+  const dif = x => Math.abs(((x % TAU) + TAU + Math.PI) % TAU - Math.PI);
+  console.log(`    período ${P} s: ángulo tras un período ${f(aP, 4)} rad (≡ ${f(dif(aP - a0), 5)} de la vuelta) · a P/4: ${f(anguloRoll(correr(P / 4), C) * 180 / Math.PI, 1)}°`);
+  check(dif(aP - a0) < 0.01 && Math.abs(Math.abs(anguloRoll(correr(P / 2), C)) - Math.PI) < 0.01, `vuelta completa en ROLL_CABEZA_PERIODO_S (${P} s); media vuelta a ${f(P / 2, 1)} s`);
+  // sin saltos al cambiar la velocidad a mitad de camino (fase acumulada)
+  { const s = correr(1.3); const antes = anguloRoll(s, C); avanzarRoll(s, { ...C, ROLL_CABEZA_PERIODO_S: 1.5 }, dt, 1, 0); const despues = anguloRoll(s, C);
+    check(dif(despues - antes) < (TAU / 1.5) * dt * 1.01, `cambiar el período de ${P} a 1,5 s no salta: avanza ${f(dif(despues - antes) * 180 / Math.PI, 2)}° en un frame`); }
+  // música: acelera suave (graves suavizados), sin saltos
+  { const s = correr(1); let maxPaso = 0, prev = anguloRoll(s, C); const cm = { ...C, MUSICA_ROLL: 2 };
+    for (let i = 0; i < 120; i++) { avanzarRoll(s, cm, dt, 1, i < 60 ? 1 : 0); const a = anguloRoll(s, cm); maxPaso = Math.max(maxPaso, dif(a - prev)); prev = a; }
+    check(maxPaso < (TAU / P) * 3 * dt * 1.01 && s.graves < 0.2, `MUSICA_ROLL 2 con graves de golpe: acelera suave (paso máx. ${f(maxPaso * 180 / Math.PI, 2)}°/frame ≤ 3× la velocidad base) y vuelve`); }
+  // atenuación con la escala y pausa
+  { const a1 = correr(1, C, 1).fase, a05 = correr(1, C, 0.5).fase, a0e = correr(1, C, 0).fase;
+    check(Math.abs(a05 - a1 / 2) < 1e-9 && a0e === 0, 'se atenúa con la escala de la flor (escala 0,5 → mitad de velocidad; 0 → quieta)'); }
+  { const s = correr(1); const f0 = { ...s }; for (let i = 0; i < 60; i++) avanzarRoll(s, C, 0, 1, 1); check(s.fase === f0.fase && s.ola === f0.ola && s.color === f0.color && s.tallo === f0.tallo, 'con dt 0 (pausa del reloj de la experiencia) todo queda quieto'); }
+  // mecerse con AMP < 360, sentido, y sin NaN
+  { const cm = { ...C, ROLL_CABEZA_AMP_DEG: 90 }; let mx = 0; const s = crearEstadoRoll(); for (let i = 0; i < 600; i++) { avanzarRoll(s, cm, dt, 1, 0); mx = Math.max(mx, Math.abs(anguloRoll(s, cm))); }
+    check(Math.abs(mx * 180 / Math.PI - 45) < 0.5, `AMP 90: se mece ±45° (máx. ${f(mx * 180 / Math.PI, 1)}°)`); }
+  { const s = correr(1); check(anguloRoll(s, { ...C, ROLL_CABEZA_SENTIDO: -1 }) === -anguloRoll(s, { ...C, ROLL_CABEZA_SENTIDO: 1 }), `SENTIDO −1 invierte el giro (default ${C.ROLL_CABEZA_SENTIDO})`); }
+  { const s = crearEstadoRoll(); const raro = { ...C, ROLL_CABEZA_PERIODO_S: NaN, COLOR_VEL: NaN, MUSICA_ROLL: NaN }; for (let i = 0; i < 100; i++) avanzarRoll(s, raro, NaN, NaN, NaN);
+    check(Object.values(s).every(Number.isFinite) && Number.isFinite(anguloRoll(s, { ...raro, ROLL_CABEZA_AMP_DEG: NaN })), 'sin NaN con valores inválidos'); }
+  // ola atada al giro: abierta con la cara arriba, copa con la cara abajo; retraso por distancia al frente, sin costura
+  { const D = C.PETALO_OLA_DESFASE, az = k => (k / 16) * TAU, prom = a => { let m = 0; for (let k = 0; k < 16; k++) m += olaPetalo(a, az(k), 16, D); return m / 16; };
+    const arriba = prom(0), abajo = prom(Math.PI);
+    console.log(`    apertura media del anillo: cara arriba ${f(arriba, 2)} · cara abajo ${f(abajo, 2)} · retraso del pétalo de atrás ${f(retrasoPetalo(0, 16, D), 2)} rad`);
+    for (const d of [0.1, 0.15, 0.2, 0.35]) { const pm = a => { let m = 0; for (let k = 0; k < 16; k++) m += olaPetalo(a, az(k), 16, d); return m / 16; }; console.log(`      DESFASE ${d}: apertura media cara arriba ${f(pm(0), 2)} / cara abajo ${f(pm(Math.PI), 2)}`); }
+    check(arriba > abajo && olaPetalo(0, Math.PI, 16, D) === 1 && olaPetalo(Math.PI, Math.PI, 16, D) === -1, 'el pétalo del frente: abierto con la cara arriba, en copa con la cara abajo (la ola sigue al giro)');
+    let maxSalto = 0; for (let k = 0; k < 16; k++) maxSalto = Math.max(maxSalto, Math.abs(retrasoPetalo(az(k + 1), 16, D) - retrasoPetalo(az(k), 16, D)));
+    check(Math.abs(maxSalto - D) < 1e-9 && retrasoPetalo(Math.PI, 16, D) === 0, `cada pétalo se retrasa ${D} rad respecto del vecino más cercano al frente, sin costura (salto máx. ${f(maxSalto, 3)})`);
+    check(Math.abs(olaPetalo(0.3, az(3), 12, D, true) + olaPetalo(0.3, az(3), 12, D, false)) < 1e-9, 'la capa interior en contrafase'); }
+  { const s = correr(10); check(Math.abs(s.tallo - 10 * C.COLOR_TALLO_VEL) < 1e-6 && s.tallo > 0, `el color sube por el tallo a COLOR_TALLO_VEL (${C.COLOR_TALLO_VEL} vueltas/s)`); }
+}
 console.log(`\n${ok} OK · ${fallas} fallas`);
 process.exit(fallas ? 1 : 0);
