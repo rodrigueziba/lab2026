@@ -53,6 +53,7 @@ import {
   DBG_ONDAS, // Z52
   DBG_FLOR, // Z54
   DBG_ENTRADA, // Z59
+  DBG_BASE_FLOR, // Z67
   DBG_FLUIDO, // Z61
   DBG_PASTO, // Z64
   DEBUG_MENU_ESTADO,
@@ -85,6 +86,7 @@ const FLUIDO_DEFAULTS = { MEZCLA_AZUL: DBG_FLUIDO.MEZCLA_AZUL, MEZCLA_NARANJA: D
 import { FLOR } from "@/lib/prismaFlor"; // Z54
 import { MONO_PASTO } from "@/lib/monolitosPasto"; // Z65
 import RendimientoPanel from "@/components/RendimientoPanel"; // Z66
+import { BASE } from "@/lib/baseFlor"; // Z67
 import { duracionTemaViz, idTemaViz } from "@/lib/vizAudio"; // Z54
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
 
@@ -1670,6 +1672,44 @@ export default function DebugMenu() {
               tocarDia();
             }}>Probar flor</button>
             <button style={INPUT} onClick={() => { DBG_DIA.VELOCIDAD = 1; tocarDia(); }}>velocidad 1</button>
+          </div>
+          {/* Z67: base de la flor (hueco, grietas, astillas, pasto) */}
+          <span style={LABEL}>Base de la flor Z67 <span style={NOTE}>(hueco {BASE.hueco.toFixed(2)} · grietas {BASE.grietas.toFixed(2)} · pasto {BASE.pasto.toFixed(2)} · {BASE.fase} · live)</span></span>
+          {(["ACTIVO", "PASTO_ACTIVO", "OVERLAY"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k}</span>
+              <button style={INPUT} onClick={() => { DBG_BASE_FLOR[k] = !DBG_BASE_FLOR[k]; tocarDia(); }}>{DBG_BASE_FLOR[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["RADIO_HUECO_M", 0.05, 0.6, 0.01, "m"], ["PROFUNDIDAD_M", 0.02, 0.6, 0.01, "m"], ["BRILLO_BORDE", 0, 1.5, 0.01, ""],
+            ["N_GRIETAS", 0, 24, 1, ""], ["RADIO_GRIETAS_M", 0.3, 3, 0.05, "m"], ["ANCHO_GRIETA", 0.004, 0.08, 0.001, "m"],
+            ["IRREGULARIDAD", 0, 1, 0.01, ""], ["ASTILLAS", 0, 24, 1, ""], ["PASTO_RADIO_M", 0.2, 1.5, 0.01, "m"],
+            ["PASTO_ALTURA_M", 0.05, 0.8, 0.01, "m"], ["PASTO_CAPAS", 2, 16, 1, ""], ["SEMILLA", 1, 99, 1, ""],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{DBG_BASE_FLOR[k].toFixed(st < 0.01 ? 3 : st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_BASE_FLOR[k]}
+                onChange={e => { DBG_BASE_FLOR[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <button style={INPUT} onClick={() => {
+              // flor fija en su pico (tDia 0,5); si el ciclo con la flor no está montado, salta al checkpoint "dia_flor"
+              if (!FLOR.activo && DBG_CHECKPOINTS.HABILITADOS) irACheckpoint("dia_flor");
+              DBG_DIA.T_MANUAL = 0.5; tocarDia();
+            }}>Mostrar base con flor</button>
+            <button style={INPUT} onClick={() => {
+              DBG_DIA.T_MANUAL = -1; DBG_DIA.VELOCIDAD = 3;
+              posicionarDia(DIA, DBG_DIA, Math.max(0, DBG_FLOR.NACE_INICIO - 0.01), AMANECER, duracionTemaViz(), idTemaViz());
+              window.dispatchEvent(new CustomEvent("alight:base-flor-reiniciar"));
+              tocarDia();
+            }}>Animar nacimiento</button>
+            <button style={INPUT} onClick={() => {
+              DBG_DIA.T_MANUAL = -1; DBG_DIA.VELOCIDAD = 1;
+              window.dispatchEvent(new CustomEvent("alight:base-flor-reiniciar"));
+              tocarDia();
+            }}>Reiniciar</button>
           </div>
           {/* Z66: rendimiento (medición, sistemas, DPR adaptativo, optimización del pasto, benchmark) */}
           <RendimientoPanel />

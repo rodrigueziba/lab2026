@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_FLOR, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { DBG_FLOR, DEBUG_ENABLED, DBG_BASE_FLOR } from "@/lib/debugConfig";
 import { FLOR, crearEstadoRoll, avanzarRoll, anguloRoll, desfasePetalo } from "@/lib/prismaFlor";
 import { DIA } from "@/lib/cicloDia";
 import { RELOJ } from "@/lib/relojExperiencia";
@@ -62,6 +62,10 @@ const UNIFORMS = {
   uAnilloR:  { value: 0.26 },
   uLineal:   { value: 1 },          // paleta sRGB → lineal (el compositor convierte a sRGB al final)
 };
+/** Z67: BaseFlor lee la fase y la paleta del tallo (resplandor del borde del hueco del color de la flor). */
+export { UNIFORMS as FLOR_UNIFORMS };
+/** Z67: radio del tallo en su base (m), para BaseFlor. */
+export const FLOR_TALLO = { radio: 0 };
 const ROLL = crearEstadoRoll();   // Z60: fases del giro, la ola y el color (estado de módulo; persiste entre montajes)
 
 const VERT = /* glsl */`
@@ -192,6 +196,7 @@ export default function FlorCiclo() {
   const tallo = useRef<THREE.Mesh>(null);
   const cabeza = useRef<THREE.Group>(null);
   const rodar = useRef<THREE.Group>(null);   // Z60: padre de la cabeza; gira sobre un eje horizontal por su centro
+  const raiz = useRef<THREE.Mesh>(null);     // Z67: prolongación del tallo dentro del hueco de la tarima
   const petalos = useRef<THREE.InstancedMesh>(null);
   const estambres = useRef<THREE.InstancedMesh>(null);
   const giro = useRef(0);
@@ -208,10 +213,13 @@ export default function FlorCiclo() {
     geoEstambre.setAttribute("aFase", new THREE.InstancedBufferAttribute(new Float32Array(N_ESTAMBRES), 1));
     geoEstambre.setAttribute("aK", new THREE.InstancedBufferAttribute(new Float32Array(N_ESTAMBRES), 1));   // Z60
     const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: UNIFORMS });
-    return { geoTallo, geoPetalo, geoEstambre, mat };
+    // Z67: cilindro abierto bajo el nivel de la tarima (debajo de uBaseY el shader le da el color de la base, sin balanceo)
+    const geoRaiz = new THREE.CylinderGeometry(1, 1, 1, 14, 1, true);
+    return { geoTallo, geoPetalo, geoEstambre, mat, geoRaiz };
   }, []);
   useEffect(() => () => {
     recursos.geoTallo.dispose(); recursos.geoPetalo.dispose(); recursos.geoEstambre.dispose(); recursos.mat.dispose();
+    recursos.geoRaiz.dispose();
   }, [recursos]);
   // Z60: diagnóstico (Chrome headless): fases del giro, solo con el menú debug habilitado
   useEffect(() => {
@@ -301,6 +309,16 @@ export default function FlorCiclo() {
     T.position.set(0, TARIMA_H, 0);
     const grosor = Math.max(0.2, D.GROSOR_TALLO);   // Z60: el grosor escala x/z (la S se angosta con él)
     T.scale.set(HA * ALTO_TALLO * grosor, altoTallo, HA * ALTO_TALLO * grosor);
+    // Z67: el tallo entra en el hueco de la tarima (BaseFlor): prolongación hasta el fondo, del radio de la base
+    const rBase = 0.07 * HA * ALTO_TALLO * grosor;
+    FLOR_TALLO.radio = rBase;
+    const Rz = raiz.current;
+    if (Rz) {
+      const prof = Math.max(0.01, DBG_BASE_FLOR.PROFUNDIDAD_M);
+      Rz.visible = DBG_BASE_FLOR.ACTIVO;
+      Rz.position.set(0, TARIMA_H - prof / 2 + 0.01, 0);
+      Rz.scale.set(rBase, prof + 0.02, rBase);
+    }
     // cabeza en la punta del tallo, con el mismo balanceo que el shader (yN = 1)
     const w = U.uBalW.value;
     Rd.position.set(PUNTA_X * HA * ALTO_TALLO * grosor + U.uBal.value * Math.sin(t * w), TARIMA_H + altoTallo, U.uBal.value * 0.6 * Math.cos(t * w * 0.7));
@@ -317,6 +335,7 @@ export default function FlorCiclo() {
   return (
     <group ref={grupo} visible={false}>
       <mesh ref={tallo} geometry={recursos.geoTallo} material={recursos.mat} frustumCulled={false} />
+      <mesh ref={raiz} geometry={recursos.geoRaiz} material={recursos.mat} visible={false} />
       <group ref={rodar} rotation-order="YXZ">
         <group ref={cabeza}>
           <instancedMesh ref={petalos} args={[recursos.geoPetalo, recursos.mat, N_AFUERA + N_ADENTRO]} frustumCulled={false} />

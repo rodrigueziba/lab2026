@@ -13,6 +13,7 @@ import HazRings from "./HazRings";
 import LucesHaz from "./LucesHaz"; // Z42
 import Pasto, { MonolitosPasto } from "./Pasto"; // Z64
 import SistemaPerf from "./SistemaPerf"; // Z66
+import BaseFlor from "./BaseFlor"; // Z67
 import CicloDiaEscena from "./CicloDiaEscena"; // Z48
 import SolFlare from "./SolFlare"; // Z51
 import FlorCiclo from "./FlorCiclo"; // Z54
@@ -946,7 +947,7 @@ export default function ExperienceDome() {
       {vizActive && <SistemaPerf id="luces"><LucesHaz /></SistemaPerf>}{/* Z42: diseño de las 4 luces (estilo luz de la narrativa) */}
       {vizActive && <CicloDiaEscena />}{/* Z48: fondo, niebla y luces de la escena siguen el ciclo de día */}
       {vizActive && <SistemaPerf id="flare"><SolFlare /></SistemaPerf>}{/* Z51: destello de lente del sol del mundo (sprites en pantalla) */}
-      {vizActive && <SistemaPerf id="flor"><FlorCiclo /></SistemaPerf>}{/* Z54: flor del ciclo de día donde estaba el prisma */}
+      {vizActive && <SistemaPerf id="flor"><FlorCiclo /><BaseFlor /></SistemaPerf>}{/* Z67: hueco, grietas y pasto en la base */}{/* Z54: flor del ciclo de día donde estaba el prisma */}
       {vizActive && <EjeOverlay />}{/* Z55: overlay del eje de la composición (DBG_PORTAL.OVERLAY_EJE, oculto por defecto) */}
       {vizActive && <SymbolSystem />}
       {/* N5: monoliths flanking tarima path */}

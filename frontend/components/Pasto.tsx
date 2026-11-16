@@ -53,8 +53,9 @@ function rnd(x: number, y: number): number {   // rand(vec2) del original: fract
   const v = curva(px + py * 0.618034) * 43758.5453;
   return v - Math.floor(v);
 }
-interface TexturasBriznas { sinMip: THREE.DataTexture; conMip: THREE.DataTexture; colLejano: [number, number, number] }
-function crearTexturaBriznas(): TexturasBriznas {
+export interface TexturasBriznas { sinMip: THREE.DataTexture; conMip: THREE.DataTexture; colLejano: [number, number, number] }
+/** Z67: también la usa BaseFlor (pasto de la base de la flor). */
+export function crearTexturaBriznas(): TexturasBriznas {
   const data = new Uint8Array(TEX * TEX * 4);
   const r = (x: number, y: number) => rnd(((x % TEX) + TEX) % TEX, ((y % TEX) + TEX) % TEX);   // con repetición
   for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
@@ -149,7 +150,7 @@ const COMUN = {
 };
 
 // Z66: ruido de valor compartido por los dos shaders (réplica exacta de lib/pasto.ts: hashPasto / ruidoPasto)
-const RUIDO_GLSL = /* glsl */`
+export const RUIDO_GLSL = /* glsl */`
   float hashP(vec2 p) {
     float a = fract(p.x * 0.1271 + p.y * 0.3113), b = fract(p.y * 0.2177 + p.x * 0.0719);
     return fract((a + b + a * b * 61.7) * 43.13 + a * 17.9);

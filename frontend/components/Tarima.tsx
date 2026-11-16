@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { createWornPaintTex, createStripeBandTex } from "@/lib/retro/decals";
+import { HUECO_U, RADIO_HUECO_GLSL } from "@/lib/baseFlor"; // Z67
 
 const CAM_Y = 1.6;
 // Height = camera Y / 6. Exported so Prism.tsx can calculate landing Y.
@@ -35,6 +36,7 @@ function getSharedTex() {
     _tarimaMat = new THREE.MeshStandardMaterial({
       map: _tarimaTex, roughness: 0.88, metalness: 0.0,
     });
+    agregarHueco(_tarimaMat);
   }
   if (!_stripeTex) {
     _stripeTex = createStripeBandTex(undefined, 512, 64);
@@ -45,6 +47,28 @@ function getSharedTex() {
   }
   return { mat: _tarimaMat!, stripe: _stripeMat! };
 }
+
+// ── Z67: hueco real en la cara superior por donde sale la flor (BaseFlor.tsx). Los fragmentos de la cara de arriba
+// (y local = +TARIMA_H/2) dentro del borde irregular radioHueco() se descartan; adentro se ven las paredes y el fondo
+// del hueco que dibuja BaseFlor. uHuecoR = 0 (sin flor o DBG_BASE_FLOR.ACTIVO false) → no descarta nada. La caja está
+// centrada en x = z = 0, así que x/z locales = del mundo. Las astillas comparten el material: sus coordenadas locales
+// son pequeñas y nunca llegan a la cara superior.
+function agregarHueco(mat: THREE.MeshStandardMaterial) {
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uHuecoR = HUECO_U.uHuecoR;
+    shader.uniforms.uHuecoIrr = HUECO_U.uHuecoIrr;
+    shader.uniforms.uHuecoSemilla = HUECO_U.uHuecoSemilla;
+    shader.vertexShader = "varying vec3 vHuecoP;\n" + shader.vertexShader.replace(
+      "#include <begin_vertex>", "#include <begin_vertex>\n  vHuecoP = position;");
+    shader.fragmentShader = "varying vec3 vHuecoP;\nuniform float uHuecoR, uHuecoIrr, uHuecoSemilla;\n" + RADIO_HUECO_GLSL +
+      shader.fragmentShader.replace("#include <clipping_planes_fragment>", `#include <clipping_planes_fragment>
+  if (uHuecoR > 0.0 && vHuecoP.y > ${(TARIMA_H / 2 - 0.001).toFixed(5)}) {
+    if (length(vHuecoP.xz) < radioHueco(atan(vHuecoP.z, vHuecoP.x), uHuecoR, uHuecoIrr, uHuecoSemilla)) discard;
+  }`);
+  };
+}
+/** Z67: material compartido de la tarima (BaseFlor lo usa para las astillas). */
+export function materialTarima(): THREE.MeshStandardMaterial { return getSharedTex().mat; }
 
 // ── R5: hex screw geometry (shared) ──────────────────────────────────────────
 let _screwGeo: THREE.CylinderGeometry | null = null;

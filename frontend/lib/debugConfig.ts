@@ -1326,3 +1326,23 @@ export const DBG_FLOR = {
   MUSICA_APERTURA: 0.0,    // graves → apertura (0 = sin efecto) — live
   PROX_USA_BASE:   false,  // true = el fractal del prisma calcula su cercanía con la posición apoyada (aunque esté arriba) — live
 };
+
+// ── Z67: base de la flor sobre la tarima (lib/baseFlor.ts, components/BaseFlor.tsx): hueco por donde sale el tallo,
+// grietas alrededor, astillas y pasto corto en la base. Nace y desaparece con la flor (FLOR.escala, lib/prismaFlor.ts). ──
+export const DBG_BASE_FLOR = {
+  ACTIVO:          true,   // false = como antes (el tallo apoyado sobre la tarima, sin hueco) — live
+  RADIO_HUECO_M:   0.2,    // radio del hueco (borde irregular) — live
+  PROFUNDIDAD_M:   0.25,   // profundidad de las paredes del hueco (la tarima mide 0,267 m) — live
+  BRILLO_BORDE:    0.25,   // resplandor del color térmico de la flor en el borde (× escala de la flor) — live
+  N_GRIETAS:       9,      // grietas principales (cada una con 2 ramas) — live
+  RADIO_GRIETAS_M: 1.3,    // largo máximo de las grietas desde el centro — live
+  ANCHO_GRIETA:    0.022,  // ancho de las grietas junto al hueco (m); se afinan al alejarse — live
+  IRREGULARIDAD:   0.6,    // quiebre de las grietas y del borde del hueco (0 = rectas / círculo) — live
+  ASTILLAS:        8,      // fragmentos levantados en el borde del hueco (0…24) — live
+  PASTO_ACTIVO:    true,   // pasto corto alrededor del tallo — live
+  PASTO_RADIO_M:   0.6,    // radio de la mata — live
+  PASTO_ALTURA_M:  0.28,   // — live
+  PASTO_CAPAS:     10,     // capas del pasto de la base (técnica de Pasto.tsx) — live
+  SEMILLA:         7,      // grietas y astillas siempre iguales para la misma semilla — live
+  OVERLAY:         false,  // anillos del radio del hueco y de las grietas — live
+};
