@@ -7,7 +7,8 @@
 import { useRef, useEffect, useMemo, useState, Suspense } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS, DBG_AMANECER, DOME_METERS, DBG_DOME_LIVE, DBG_DIA, DBG_ONDAS } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_AMANECER, DOME_METERS, DBG_DOME_LIVE, DBG_DIA, DBG_ONDAS, DBG_FLUIDO } from "@/lib/debugConfig";
+import { FLUIDO, avanzarFluido } from "@/lib/fluidoBloques"; // Z63
 import { DIA, ganchosMusica } from "@/lib/cicloDia"; // Z48
 import { ONDAS, detectar, envejecer, lanzarOnda, limpiarOndas } from "@/lib/ondasKick"; // Z52
 import { RELOJ } from "@/lib/relojExperiencia"; // Z52
@@ -562,6 +563,9 @@ function DomeSkyAnchor() {
       const rf = 1 - Math.exp(-dt / _GRP_REL[i]);
       s.gp[i] = gated > prev ? prev + (gated - prev) * af : prev + (gated - prev) * rf;
     }
+
+    // Z63: fluir de color: bandas crudas con ganancia automática propia; la luz de cada grupo sigue siendo requisito
+    avanzarFluido(FLUIDO, DBG_FLUIDO, RELOJ.dtExp, BAND_STATE.energy, getHazBandOn(1), getHazBandOn(3), assign[1] ?? 1, assign[3] ?? 3);
 
     // Z52: detector de kick por luz/banda (energía normalizada, media móvil, flanco y enfriamiento) → ondas
     {

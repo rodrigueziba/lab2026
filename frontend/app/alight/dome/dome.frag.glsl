@@ -126,6 +126,11 @@ uniform float uFlPulso;        // luminosidad extra con la música
 uniform float uFlOct;          // octavas (2..4)
 uniform vec3  uFlPalA[5];      // paleta del bloque azul (sRGB)
 uniform vec3  uFlPalN[5];      // paleta del bloque naranja (sRGB)
+uniform vec2  uFlRango;        // Z63: rango observado del fbm distorsionado (se normaliza a 0..1)
+uniform vec2  uFlLum;          // Z63: luminancia media de cada bloque en la textura (azul, naranja)
+uniform vec2  uFlDet;          // Z63: límites del detalle (luminancia del píxel / media del bloque)
+uniform float uFlEscY;         // Z63: estiramiento vertical del ruido (el bloque es bajo y ancho)
+uniform float uFlTope;         // Z63: tope del color fluido (bajo el umbral del bloom 0,92: sin quemar a blanco)
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -213,7 +218,10 @@ float fluFbm(vec2 p) {     // 2..4 octavas (uFlOct), girando y corriendo cada un
 float fluCampo(vec2 x, float tt, float w) {
   vec2 q = vec2(fluFbm(x + vec2(0.0, 0.31 * tt)), fluFbm(x + vec2(4.7, 1.9) - 0.27 * tt));
   vec2 r = vec2(fluFbm(x + w * q + vec2(2.3, 7.1) + 0.19 * tt), fluFbm(x + w * q + vec2(6.1, 3.4) - 0.23 * tt));
-  return smoothstep(0.22, 0.78, fluFbm(x + w * r));
+  // Z63: el fbm distorsionado vive en ~0,35..0,72: se normaliza a ese rango y se pasa por una curva suave, así el
+  // campo recorre TODA la paleta (Z61: smoothstep 0,22..0,78 dejaba el primer quinto casi sin usar)
+  float c = clamp((fluFbm(x + w * r) - uFlRango.x) / max(uFlRango.y - uFlRango.x, 1e-3), 0.0, 1.0);
+  return c * c * (3.0 - 2.0 * c);
 }
 vec3 fluPal5(float f, vec3 a, vec3 b, vec3 c, vec3 d, vec3 e) {
   float x = clamp(f, 0.0, 1.0) * 4.0;
@@ -224,11 +232,14 @@ vec3 fluPal5(float f, vec3 a, vec3 b, vec3 c, vec3 d, vec3 e) {
 }
 // el dibujo se conserva: el color de la paleta toma la luminancia de la textura (líneas y contornos intactos);
 // encima, un corrimiento de luminosidad del propio campo y un pulso con la música
-vec3 fluTenir(vec3 base, vec3 pal, float f, float e, float mezcla) {
+// Z63: la paleta va a su brillo completo; la textura queda solo como DETALLE (luminancia del píxel / luminancia media
+// del bloque, con límites): las líneas oscuras siguen oscuras y el relieve se conserva. Z61 escalaba la paleta a la
+// luminancia oscura de la textura (≈ 0,2) y todos los colores salían igual de apagados.
+vec3 fluTenir(vec3 base, vec3 pal, float f, float e, float mezcla, float lumMedia) {
   float lb = dot(base, vec3(0.2126, 0.7152, 0.0722));
-  float lp = max(dot(pal, vec3(0.2126, 0.7152, 0.0722)), 0.02);
-  float luz = lb * (1.0 + uFlLuz * (f - 0.5) * 2.0) * (1.0 + uFlPulso * e);
-  return mix(base, min(pal * (luz / lp), vec3(0.95)), clamp(mezcla, 0.0, 1.0));
+  float detalle = clamp(lb / max(lumMedia, 0.02), uFlDet.x, uFlDet.y);
+  float luz = (1.0 + uFlLuz * (f - 0.5) * 2.0) * (1.0 + uFlPulso * e);
+  return mix(base, min(pal * detalle * luz, vec3(uFlTope)), clamp(mezcla, 0.0, 1.0));
 }
 float h31(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123); }
 vec3  h33(vec3 p) {
@@ -584,19 +595,19 @@ void main() {
     // olas frías (m.b con tono frío); NARANJA = olas cálidas (m.b con rojo > azul en la textura).
     if (uFluido > 0.5 && (m.g > 0.01 || m.b > 0.01)) {
       float calido = smoothstep(0.02, 0.10, waveCol.r - waveCol.b) * step(0.01, m.b);
-      vec2 xl = uv * uFlEsc;
+      vec2 xl = uv * uFlEsc * vec2(1.0, uFlEscY);
       vec3 olaFria = waveCol;
       if (m.g > 0.01 || (m.b > 0.01 && calido < 0.99)) {
         float fA = fluCampo(xl, uFlT.x, uFlWarp * (1.0 + 1.5 * uFlE.x));
         vec3 pA = fluPal5(fA, uFlPalA[0], uFlPalA[1], uFlPalA[2], uFlPalA[3], uFlPalA[4]);
-        strataCol = fluTenir(strataCol, pA, fA, uFlE.x, uFlMez.x);
-        olaFria = fluTenir(waveCol, pA, fA, uFlE.x, uFlMez.x);
+        strataCol = fluTenir(strataCol, pA, fA, uFlE.x, uFlMez.x, uFlLum.x);
+        olaFria = fluTenir(waveCol, pA, fA, uFlE.x, uFlMez.x, uFlLum.x);
       }
       vec3 olaCalida = waveCol;
       if (calido > 0.01) {
         float fN = fluCampo(xl + vec2(11.3, 5.7), uFlT.y, uFlWarp * (1.0 + 1.5 * uFlE.y));
         vec3 pN = fluPal5(fN, uFlPalN[0], uFlPalN[1], uFlPalN[2], uFlPalN[3], uFlPalN[4]);
-        olaCalida = fluTenir(waveCol, pN, fN, uFlE.y, uFlMez.y);
+        olaCalida = fluTenir(waveCol, pN, fN, uFlE.y, uFlMez.y, uFlLum.y);
       }
       waveCol = mix(olaFria, olaCalida, calido);
     }

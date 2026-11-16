@@ -14,7 +14,7 @@ useTexture.preload([
 ]);
 import { domeVert, domeFrag } from "./domeShaders";
 import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL, DBG_SOL, DBG_ONDAS, DBG_SILLAS, DBG_FLUIDO } from "@/lib/debugConfig";
-import { FLUIDO, avanzarFluido } from "@/lib/fluidoBloques"; // Z61
+import { FLUIDO } from "@/lib/fluidoBloques"; // Z61
 import { ONDAS, MAX_ONDAS, edad, evidenciaOndas } from "@/lib/ondasKick"; // Z52 · Z58
 
 const EVID = { amp: 0, brillo: 0, tinte: 0, contraste: 0, engrosar: 0 };   // Z58: valores efectivos (se reescriben, sin allocations)
@@ -219,6 +219,11 @@ export default function DomeSky({
           uFlLuz:   { value: 0.25 },
           uFlPulso: { value: 0.35 },
           uFlOct:   { value: 3 },
+          uFlRango: { value: new THREE.Vector2(0.35, 0.72) },   // Z63
+          uFlLum:   { value: new THREE.Vector2(0.207, 0.328) }, // Z63
+          uFlDet:   { value: new THREE.Vector2(0.3, 1.5) },     // Z63
+          uFlEscY:  { value: 4 },                               // Z63
+          uFlTope:  { value: 0.85 },                            // Z63
           uFlPalA:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
           uFlPalN:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
           uOndaEngrosar:    { value: 0 },   // Z58
@@ -293,8 +298,7 @@ export default function DomeSky({
       u.uDawn.value = ge.dawn;
       tmp.rv.set(ge.revMont, ge.revLin, ge.revSol, ge.revCielo);
       u.uReveal.value.copy(tmp.rv);
-      // Z61: energía del grupo de cada bloque (MONTAÑAS → azul, LÍNEAS → naranja; ya con su luz encendida o no)
-      avanzarFluido(FLUIDO, DBG_FLUIDO, RELOJ.dtExp, ge.mont, ge.lin);
+      // Z61/Z63: FLUIDO lo avanza DomeSkyAnchor (DomeVisualizer) con las bandas crudas y la luz de cada grupo
     }
     // Z61: fluir de color (tiempo acumulado propio por bloque: sin saltos al cambiar la velocidad; quieto en pausa)
     u.uFluido.value = DBG_FLUIDO.ACTIVO ? 1 : 0;
@@ -307,6 +311,11 @@ export default function DomeSky({
       u.uFlLuz.value = DBG_FLUIDO.LUZ_FLUJO;
       u.uFlPulso.value = DBG_FLUIDO.PULSO_LUZ;
       u.uFlOct.value = Math.max(2, Math.min(4, Math.round(DBG_FLUIDO.CALIDAD)));
+      u.uFlRango.value.set(DBG_FLUIDO.RANGO_MIN, Math.max(DBG_FLUIDO.RANGO_MIN + 0.01, DBG_FLUIDO.RANGO_MAX));
+      u.uFlLum.value.set(Math.max(0.02, DBG_FLUIDO.LUM_MEDIA_AZUL), Math.max(0.02, DBG_FLUIDO.LUM_MEDIA_NARANJA));
+      u.uFlDet.value.set(DBG_FLUIDO.DETALLE_MIN, DBG_FLUIDO.DETALLE_MAX);
+      u.uFlEscY.value = Math.max(0.2, DBG_FLUIDO.ESCALA_Y);
+      u.uFlTope.value = DBG_FLUIDO.TOPE;
       const pa = u.uFlPalA.value as THREE.Vector3[], pn = u.uFlPalN.value as THREE.Vector3[];
       for (let i = 0; i < 5; i++) {   // hexARgb tiene caché por texto: sin allocations por frame
         let c = hexARgb(DBG_FLUIDO.PALETA_AZUL[i] ?? "#FFFFFF"); pa[i].set(c[0], c[1], c[2]);

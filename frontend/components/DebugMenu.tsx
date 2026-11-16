@@ -78,6 +78,8 @@ import { DIA, PORTAL_GEOM, posicionarDia } from "@/lib/cicloDia"; // Z48 · Z50 
 import { EJE_PANT } from "@/components/EjeOverlay"; // Z55
 import { ENTRADA_POSE } from "@/components/EntradaTelon"; // Z59
 import { ENTRADA } from "@/lib/entradaTelon"; // Z59
+import { FLUIDO } from "@/lib/fluidoBloques"; // Z63
+const FLUIDO_DEFAULTS = { MEZCLA_AZUL: DBG_FLUIDO.MEZCLA_AZUL, MEZCLA_NARANJA: DBG_FLUIDO.MEZCLA_NARANJA, WARP: DBG_FLUIDO.WARP, VEL_BASE: DBG_FLUIDO.VEL_BASE, PULSO_LUZ: DBG_FLUIDO.PULSO_LUZ };   // Z63: para "Volver a defaults"
 import { FLOR } from "@/lib/prismaFlor"; // Z54
 import { duracionTemaViz, idTemaViz } from "@/lib/vizAudio"; // Z54
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
@@ -344,6 +346,11 @@ export default function DebugMenu() {
   const tocarDia = () => setDiaV(n => n + 1);
   const [diaLive, setDiaLive] = useState("");
   const [ejeLive, setEjeLive] = useState("");   // Z50: indicador del eje del sol (OVERLAY_EJE)
+  const [fluLive, setFluLive] = useState({ a: 0, n: 0, ba: 0, bn: 0 });   // Z63: energía de cada bloque
+  useEffect(() => {
+    const id = setInterval(() => setFluLive({ a: FLUIDO.eA, n: FLUIDO.eN, ba: FLUIDO.bandaA, bn: FLUIDO.bandaN }), 150);
+    return () => clearInterval(id);
+  }, []);
   useEffect(() => {
     const id = setInterval(() => {
       const g = (r: number) => ((r * 180 / Math.PI) % 360 + 360) % 360;
@@ -1667,6 +1674,8 @@ export default function DebugMenu() {
             ["MEZCLA_AZUL", 0, 1, 0.01, ""], ["MEZCLA_NARANJA", 0, 1, 0.01, ""], ["ESCALA", 0.5, 10, 0.1, "manchas"], ["VEL_BASE", 0, 0.5, 0.005, "deriva"],
             ["ACELERA", 0, 8, 0.1, "× energía"], ["WARP", 0, 4, 0.05, ""], ["LUZ_FLUJO", 0, 1, 0.01, ""], ["PULSO_LUZ", 0, 1.5, 0.01, "música"],
             ["MUSICA_AZUL", 0, 3, 0.05, "ganancia"], ["MUSICA_NARANJA", 0, 3, 0.05, "ganancia"], ["SUAVIZADO_S", 0.02, 2, 0.02, "s"], ["CALIDAD", 2, 4, 1, "octavas"],
+            ["ESCALA_Y", 0.5, 8, 0.1, "Z63"], ["RANGO_MIN", 0, 0.6, 0.01, "Z63 fbm"], ["RANGO_MAX", 0.4, 1, 0.01, "Z63 fbm"], ["DETALLE_MIN", 0, 1, 0.01, "Z63"],
+            ["DETALLE_MAX", 1, 3, 0.05, "Z63"], ["TOPE", 0.5, 1, 0.01, "Z63 bloom 0,92"], ["LUM_MEDIA_AZUL", 0.05, 0.6, 0.005, "Z63"], ["LUM_MEDIA_NARANJA", 0.05, 0.6, 0.005, "Z63"], ["MAX_S", 1, 30, 0.5, "Z63 s"], ["ATAQUE_S", 0.01, 0.5, 0.01, "Z63 s"], ["PISO", 0.001, 0.2, 0.001, "Z63"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{DBG_FLUIDO[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
@@ -1674,6 +1683,23 @@ export default function DebugMenu() {
                 onChange={e => { DBG_FLUIDO[k] = parseFloat(e.target.value); tocarDia(); }} />
             </div>
           ))}
+          {/* Z63: energía que llega a cada bloque (barra), banda de cada uno y prueba rápida */}
+          {([["azul", fluLive.a, fluLive.ba, "BANDA_AZUL"], ["naranja", fluLive.n, fluLive.bn, "BANDA_NARANJA"]] as const).map(([nom, e, b, k]) => (
+            <div key={nom} style={ROW}>
+              <span>{nom} <span style={NOTE}>banda {b} · {e.toFixed(2)}</span></span>
+              <div style={{ flex: 1, height: 8, background: "#333", position: "relative" }}>
+                <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.round(e * 100)}%`, background: nom === "azul" ? "#2A9D9A" : "#F0742A" }} />
+              </div>
+              {(["auto", "grupo", "0", "1", "2", "3"] as const).map(m => (
+                <button key={m} style={{ ...INPUT, width: "auto", padding: "0 4px", opacity: DBG_FLUIDO[k] === m ? 1 : 0.45 }}
+                  onClick={() => { DBG_FLUIDO[k] = m; tocarDia(); }}>{m}</button>
+              ))}
+            </div>
+          ))}
+          <div style={ROW}>
+            <button style={INPUT} onClick={() => { Object.assign(DBG_FLUIDO, { MEZCLA_AZUL: 1, MEZCLA_NARANJA: 1, WARP: 2.5, VEL_BASE: 0.3, PULSO_LUZ: 1 }); tocarDia(); }}>Exagerar efecto (probar)</button>
+            <button style={INPUT} onClick={() => { Object.assign(DBG_FLUIDO, FLUIDO_DEFAULTS); tocarDia(); }}>Volver a defaults</button>
+          </div>
           {(["PALETA_AZUL", "PALETA_NARANJA"] as const).map(k => (
             <div key={k} style={ROW}>
               <span>{k}</span>

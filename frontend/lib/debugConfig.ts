@@ -906,18 +906,34 @@ export const DBG_CHECKPOINTS = {
 // (grupo MONTAÑAS); NARANJA = olas/estratos cálidos de abajo (grupo LÍNEAS). Las siluetas y líneas no cambian. ──
 export const DBG_FLUIDO = {
   ACTIVO:          true,   // false = exactamente como antes de Z61 — live
-  MEZCLA_AZUL:     0.6,    // cuánto del color fluido se aplica al bloque azul — live
-  MEZCLA_NARANJA:  0.6,    // ídem bloque naranja — live
-  ESCALA:          3.0,    // tamaño de las manchas (más alto = manchas más chicas) — live
-  VEL_BASE:        0.05,   // deriva sin música — live
-  ACELERA:         2.5,    // la energía multiplica la velocidad por (1 + ACELERA·e) — live
-  WARP:            1.2,    // cuánto distorsiona el campo (con música sube hasta × 2,5) — live
-  LUZ_FLUJO:       0.25,   // variación de luminosidad del fluido (sin música) — live
-  PULSO_LUZ:       0.35,   // cuánto sube la luminosidad con la música — live
+  MEZCLA_AZUL:     0.9,    // Z63 (Z61 0,6): cuánto del color fluido se aplica al bloque azul — live
+  MEZCLA_NARANJA:  0.9,    // Z63 (Z61 0,6): ídem bloque naranja — live
+  ESCALA:          2.2,    // Z63 (Z61 3,0): manchas en uv × ESCALA… ver ESCALA_Y — live
+  ESCALA_Y:        4.0,    // Z63: el bloque es bajo y ancho: estira el ruido en vertical para que entren varias manchas — live
+  VEL_BASE:        0.08,   // Z63 (Z61 0,05): deriva sin música — live
+  ACELERA:         4,      // Z63 (Z61 2,5): la energía multiplica la velocidad por (1 + ACELERA·e) — live
+  WARP:            1.6,    // Z63 (Z61 1,2): cuánto distorsiona el campo (con música sube hasta × 2,5) — live
+  LUZ_FLUJO:       0.35,   // Z63 (Z61 0,25; pedido 0,5: con 0,5 el azul pálido quemaba a blanco): variación de luminosidad del fluido — live
+  PULSO_LUZ:       0.6,    // Z63 (Z61 0,35): cuánto sube la luminosidad con la música — live
   MUSICA_AZUL:     1.0,    // ganancia de la energía del grupo MONTAÑAS — live
   MUSICA_NARANJA:  1.0,    // ganancia de la energía del grupo LÍNEAS — live
-  SUAVIZADO_S:     0.3,    // lerp temporal de la energía — live
+  SUAVIZADO_S:     0.3,    // bajada de la energía (s) — live
+  ATAQUE_S:        0.05,   // Z63: subida de la energía (s): los golpes llegan arriba — live
   CALIDAD:         3,      // octavas del ruido (2…4) — live
+  // Z63: el campo se normaliza al rango observado del fbm distorsionado (p3–p97 medido en Node) y pasa por una curva
+  RANGO_MIN:       0.35,   // — live
+  RANGO_MAX:       0.72,   // — live
+  // Z63: la textura es solo detalle: luminancia del píxel / luminancia media del bloque, con límites; la paleta va a brillo completo
+  LUM_MEDIA_AZUL:  0.207,  // medida en portal-color.png (estratos + olas frías) — live
+  LUM_MEDIA_NARANJA: 0.328,// medida en portal-color.png (olas cálidas) — live
+  DETALLE_MIN:     0.3,    // las líneas oscuras siguen oscuras — live
+  DETALLE_MAX:     1.2,    // — live
+  TOPE:            0.7,    // tope del color fluido: con el tonemapping ACES y la exposición de día (1,19), 0,85 ya se veía blanco — live
+  // Z63: energía: banda de cada bloque y ganancia automática
+  BANDA_AZUL:      "auto" as string,   // "auto" (la más activa) · "grupo" (la de MONTAÑAS, al azar en cada carga, como Z61) · "0"…"3" — live
+  BANDA_NARANJA:   "auto" as string,   // "auto" (la más activa que no use el azul) · "grupo" (la de LÍNEAS) · "0"…"3" — live
+  MAX_S:           8,      // bajada del máximo móvil y subida del mínimo móvil (s) — live
+  PISO:            0.02,   // piso del máximo (silencio: no amplifica ruido) — live
   SIMULAR_AZUL:    false,  // música simulada (pulsos tipo bombo) para el bloque azul — live
   SIMULAR_NARANJA: false,  // ídem bloque naranja — live
   PALETA_AZUL:     ["#16294A", "#1F4E8C", "#2A9D9A", "#7CC6E0", "#D2E8F0"] as string[],   // marino, azul profundo, turquesa, celeste, azul pálido — live
