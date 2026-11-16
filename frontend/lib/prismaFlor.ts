@@ -54,7 +54,7 @@ export function estadoPrismaFlor(dia: number, c: CfgFlor, activo: boolean, out: 
 // Todo se atenúa con la escala de la flor (al nacer y al desaparecer gira y ondula más lento y con menos amplitud).
 export interface CfgRoll {
   ROLL_CABEZA_ACTIVO: boolean; ROLL_CABEZA_PERIODO_S: number; ROLL_CABEZA_AMP_DEG: number; ROLL_CABEZA_SENTIDO: number;
-  PETALO_OLA_ACTIVO: boolean; PETALO_OLA_PERIODO_S: number;
+  PETALO_ROLL_ACTIVO: boolean; PETALO_ROLL_PERIODO_S: number;
   COLOR_VEL: number; COLOR_TALLO_VEL: number; COLOR_TALLO_ACTIVO: boolean; MUSICA_ROLL: number;
 }
 export interface EstadoRoll { fase: number; ola: number; color: number; tallo: number; graves: number }
@@ -70,7 +70,8 @@ export function avanzarRoll(s: EstadoRoll, c: CfgRoll, dt: number, escala: numbe
   s.graves += (sat(fin(graves)) - s.graves) * (1 - Math.exp(-d / 0.25));
   const vRoll = c.ROLL_CABEZA_ACTIVO ? (TAU / Math.max(0.5, fin(c.ROLL_CABEZA_PERIODO_S, 4.2))) * (1 + Math.max(0, fin(c.MUSICA_ROLL)) * s.graves) : 0;
   s.fase = envolver(s.fase + vRoll * e * d);
-  const vOla = c.PETALO_OLA_ACTIVO ? TAU / Math.max(0.5, fin(c.PETALO_OLA_PERIODO_S, 4.2)) : 0;
+  // Z62: volteo de los pétalos (MUSICA_ROLL también lo acelera)
+  const vOla = c.PETALO_ROLL_ACTIVO ? (TAU / Math.max(0.5, fin(c.PETALO_ROLL_PERIODO_S, 4.2))) * (1 + Math.max(0, fin(c.MUSICA_ROLL)) * s.graves) : 0;
   s.ola = envolver(s.ola + vOla * e * d);
   s.color = (s.color + fin(c.COLOR_VEL) * d) % 1000;                                  // vueltas del degradado
   s.tallo = (s.tallo + (c.COLOR_TALLO_ACTIVO ? fin(c.COLOR_TALLO_VEL) : 0) * e * d) % 1000;
@@ -84,14 +85,25 @@ export function anguloRoll(s: EstadoRoll, c: CfgRoll): number {
   return sg * (amp >= 359.9 ? s.fase : ((amp * Math.PI) / 360) * Math.sin(s.fase));
 }
 
-/** Retraso (rad) de la ola de un pétalo: DESFASE por cada pétalo de distancia al frente del giro (az = π), por los
- *  dos lados del anillo (sin costura). azK = azimut del pétalo en el marco del giro (rad), n = pétalos del anillo.
- *  Réplica exacta de las cuentas del vertex shader de FlorCiclo. */
-export function retrasoPetalo(azK: number, n: number, desfase: number): number {
-  const d = Math.abs((((fin(azK) % TAU) + TAU) % TAU) - Math.PI);
-  return Math.max(0, fin(desfase)) * d * Math.max(1, fin(n, 1)) / TAU;
+// ── Z62: volteo de cada pétalo sobre su base (réplica exacta de las cuentas del vertex shader de FlorCiclo) ──
+export interface CfgPetalo { PETALO_ROLL_MODO: string; PETALO_ROLL_DESFASE: number; PETALO_ROLL_CAPAS: boolean; PETALO_ROLL_AMP_DEG: number; PETALO_ROLL_SENTIDO: number; PETALO_ROLL_OLA?: string; PETALO_ROLL_FRENTE_DEG?: number }
+/** Retraso (rad) entre pétalos vecinos: DESFASE en vueltas, redondeado a un número entero de olas alrededor del anillo
+ *  (sin costura entre el último pétalo y el primero). 1/n = una sola ola. */
+export function desfasePetalo(desfaseVueltas: number, n: number): number {
+  const N = Math.max(1, Math.round(fin(n, 1)));
+  return (TAU * Math.round(Math.max(0, fin(desfaseVueltas)) * N)) / N;
 }
-/** Apertura extra (−1…1) de un pétalo: cos(ángulo de giro − retraso). 1 = abierto (cara arriba), −1 = copa. */
-export function olaPetalo(anguloGiro: number, azK: number, n: number, desfase: number, capaInterior = false, contrafase = true): number {
-  return Math.cos(fin(anguloGiro) - retrasoPetalo(azK, n, desfase) + (capaInterior && contrafase ? Math.PI : 0));
+/** Giro (rad, con signo) del pétalo k de un anillo de n con la fase ola. "completo": 0…2π; "vaiven": ±AMP/2. */
+export function anguloPetalo(ola: number, k: number, n: number, c: CfgPetalo, interior = false, giroCabeza = 0): number {
+  const N = Math.max(1, fin(n, 1));
+  let retraso: number;
+  if (c.PETALO_ROLL_OLA === "anillo") retraso = fin(k) * desfasePetalo(c.PETALO_ROLL_DESFASE, N);
+  else {   // "frente": retraso por pétalos de distancia al frente, igual por los dos lados (sin costura)
+    const az = (fin(k) / N) * TAU + (interior ? Math.PI / N : 0) + fin(giroCabeza);
+    const dist = (Math.abs(envolver(az - (fin(c.PETALO_ROLL_FRENTE_DEG ?? -90, -90) * Math.PI) / 180 + Math.PI) - Math.PI) * N) / TAU;
+    retraso = dist * Math.max(0, fin(c.PETALO_ROLL_DESFASE)) * TAU;
+  }
+  let g = fin(ola) - retraso + (interior && c.PETALO_ROLL_CAPAS ? Math.PI : 0);
+  g = c.PETALO_ROLL_MODO === "vaiven" ? ((Math.max(0, fin(c.PETALO_ROLL_AMP_DEG)) * Math.PI) / 360) * Math.sin(g) : envolver(g);
+  return (fin(c.PETALO_ROLL_SENTIDO, 1) < 0 ? -1 : 1) * g;
 }

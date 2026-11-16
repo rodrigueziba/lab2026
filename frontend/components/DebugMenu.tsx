@@ -1608,7 +1608,7 @@ export default function DebugMenu() {
           </div>
           {/* Z54: prisma y flor dentro del ciclo de día */}
           <span style={LABEL}>Prisma y flor Z54 <span style={NOTE}>(ciclo de día · live)</span></span>
-          {(["ACTIVO", "PROX_USA_BASE", "ROLL_CABEZA_ACTIVO", "PETALO_OLA_ACTIVO", "PETALO_OLA_CAPAS", "COLOR_TALLO_ACTIVO"] as const).map(k => (
+          {(["ACTIVO", "PROX_USA_BASE", "ROLL_CABEZA_ACTIVO", "PETALO_ROLL_ACTIVO", "PETALO_ROLL_CAPAS", "COLOR_TALLO_ACTIVO", "COLOR_LINEAL"] as const).map(k => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{k === "ACTIVO" ? "off = prisma apoyado, sin flor" : k === "PROX_USA_BASE" ? "fractal con la posición apoyada" : "Z60"}</span></span>
               <button style={INPUT} onClick={() => { DBG_FLOR[k] = !DBG_FLOR[k]; tocarDia(); }}>{DBG_FLOR[k] ? "ON" : "off"}</button>
@@ -1621,7 +1621,9 @@ export default function DebugMenu() {
             ["BALANCEO_M", 0, 0.6, 0.01, "m"], ["BALANCEO_S", 1, 20, 0.5, "s"], ["GIRO_DEG_S", -40, 40, 1, "°/s"], ["INCLINACION_DEG", 0, 40, 1, "°"],
             ["COLOR_VEL", 0, 0.5, 0.01, ""], ["PALETA_PROYECTO", 0, 1, 0.01, "0 = video"], ["BRILLO", 0.2, 2, 0.05, ""], ["MUSICA_APERTURA", 0, 1, 0.01, "graves"],
             ["GROSOR_TALLO", 0.3, 1.5, 0.01, "Z60"], ["ROLL_CABEZA_PERIODO_S", 1, 20, 0.1, "Z60 s/vuelta"], ["ROLL_CABEZA_AMP_DEG", 0, 360, 5, "Z60 (360 = vuelta)"], ["ROLL_CABEZA_SENTIDO", -1, 1, 2, "Z60"],
-            ["ROLL_CABEZA_EJE_DEG", -180, 180, 5, "Z60 0 = hacia las sillas"], ["PETALO_OLA_AMP_DEG", 0, 80, 1, "Z60 °"], ["PETALO_OLA_DESFASE", 0, 2, 0.01, "Z60 rad"], ["PETALO_OLA_PERIODO_S", 1, 20, 0.1, "Z60 s"],
+            ["ROLL_CABEZA_EJE_DEG", -180, 180, 5, "Z60 0 = hacia las sillas"], ["PETALO_ROLL_PERIODO_S", 1, 20, 0.1, "Z62 s"], ["PETALO_ROLL_AMP_DEG", 0, 300, 5, "Z62 vaivén"], ["PETALO_ROLL_DESFASE", 0, 0.2, 0.005, "Z62 vueltas"], ["PETALO_ROLL_FRENTE_DEG", -180, 180, 5, "Z62 °"], ["PETALO_ROLL_SENTIDO", -1, 1, 2, "Z62"],
+            ["PETALO_ROLL_BASE_DEG", 0, 120, 1, "Z62 °"], ["PETALO_ACORTAR", 0, 0.9, 0.01, "Z62"], ["PETALO_ANCHO", 0.05, 0.3, 0.005, "Z62"], ["PETALO_GROSOR", 0.04, 0.3, 0.005, "Z62"],
+            ["PETALO_LARGO", 0.2, 1, 0.01, "Z62"], ["ANILLO_R", 0, 0.6, 0.01, "Z62"],
             ["COLOR_ACOPLE", 0, 2, 0.01, "Z60"], ["DORSO_AZUL", 0, 1, 0.01, "Z60"], ["COLOR_TALLO_VEL", 0, 1, 0.01, "Z60"], ["MUSICA_ROLL", 0, 3, 0.05, "Z60 graves"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
@@ -1630,6 +1632,20 @@ export default function DebugMenu() {
                 onChange={e => { DBG_FLOR[k] = parseFloat(e.target.value); tocarDia(); }} />
             </div>
           ))}
+          <div style={ROW}>
+            <span>PETALO_ROLL_OLA <span style={NOTE}>Z62</span></span>
+            {(["frente", "anillo"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, opacity: DBG_FLOR.PETALO_ROLL_OLA === m ? 1 : 0.45 }}
+                onClick={() => { DBG_FLOR.PETALO_ROLL_OLA = m; tocarDia(); }}>{m}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <span>PETALO_ROLL_MODO <span style={NOTE}>Z62</span></span>
+            {(["completo", "vaiven"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, opacity: DBG_FLOR.PETALO_ROLL_MODO === m ? 1 : 0.45 }}
+                onClick={() => { DBG_FLOR.PETALO_ROLL_MODO = m; tocarDia(); }}>{m}</button>
+            ))}
+          </div>
           <div style={ROW}>
             <span>Probar flor <span style={NOTE}>recorre el ciclo a VELOCIDAD 24 (con el visualizador activo)</span></span>
             <button style={INPUT} onClick={() => {

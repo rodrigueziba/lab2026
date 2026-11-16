@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_FLOR, DEBUG_ENABLED } from "@/lib/debugConfig";
-import { FLOR, crearEstadoRoll, avanzarRoll, anguloRoll } from "@/lib/prismaFlor";
+import { FLOR, crearEstadoRoll, avanzarRoll, anguloRoll, desfasePetalo } from "@/lib/prismaFlor";
 import { DIA } from "@/lib/cicloDia";
 import { RELOJ } from "@/lib/relojExperiencia";
 import { BAND_STATE } from "@/lib/vizAudio";
@@ -25,7 +25,7 @@ const ANCHO_REF_M = 2.7;           // Z57: alto de Z54. El ancho de la S y el gr
                                    // al bajar ALTURA_M la S se comprime solo en vertical (no se angosta ni adelgaza)
 const PUNTA_X = 0.03;              // x de la punta de la curva normalizada (ver CURVA)
 // pétalo: elipsoide (ancho, grosor, largo) en metros para una cabeza de radio 0,9 (ESCALA 1)
-const PET_W = 0.27, PET_T = 0.22, PET_L = 0.52;   // bulbosos, como el video
+// Z62: forma de los pétalos y radio del anillo en DBG_FLOR (PETALO_ANCHO/GROSOR/LARGO, ANILLO_R; uniforms uPetDim, uAnilloR)
 
 const UNIFORMS = {
   uT:        { value: 0 },
@@ -44,23 +44,37 @@ const UNIFORMS = {
   uRoll:     { value: 0 },          // ángulo de giro de la cabeza (rad) para el color
   uAcople:   { value: 0.7 },
   uDorso:    { value: 0.8 },
-  uOlaFase:  { value: 0 },
-  uOlaAmp:   { value: 0 },          // rad (× escala de la flor)
-  uOlaDesf:  { value: 0.35 },       // retraso por pétalo (rad) según su distancia al frente del giro
-  uGiro:     { value: 0 },          // giro lento de la cabeza (rad): ubica cada pétalo respecto del frente del giro
-  uOlaCapas: { value: 1 },
+  // Z62: volteo de cada pétalo sobre su base (eje tangente al anillo), en ola alrededor del anillo
+  uPetOn:    { value: 1 },
+  uPetModo:  { value: 0 },          // 0 completo (360°), 1 vaivén
+  uPetFase:  { value: 0 },          // fase acumulada (rad)
+  uPetDesf:  { value: new THREE.Vector2(0.39, 0.52) },   // retraso por pétalo vecino (rad): afuera, adentro
+  uPetCapas: { value: 1 },
+  uPetOla:   { value: 1 },          // 1 = retraso desde el frente (simétrico), 0 = índice en el anillo (olas enteras)
+  uPetDesfF: { value: 0.25 },       // retraso por pétalo de distancia al frente (rad)
+  uPetFrente:{ value: -1.5708 },    // azimut del frente en el mundo (rad, convención de las matrices: az desde +Z hacia +X)
+  uGiro:     { value: 0 },          // giro lento de la cabeza (rad): el frente queda fijo en el mundo
+  uPetAmp:   { value: 2.6 },        // vaivén: amplitud total (rad)
+  uPetSent:  { value: 1 },
+  uPetBase:  { value: 1.05 },       // ángulo desde la vertical con giro 0 (rad)
+  uPetAcortar:{ value: 0.45 },
+  uPetDim:   { value: new THREE.Vector3(0.12, 0.11, 0.62) },   // ancho, grosor, largo (m, cabeza de referencia)
+  uAnilloR:  { value: 0.26 },
+  uLineal:   { value: 1 },          // paleta sRGB → lineal (el compositor convierte a sRGB al final)
 };
 const ROLL = crearEstadoRoll();   // Z60: fases del giro, la ola y el color (estado de módulo; persiste entre montajes)
 
 const VERT = /* glsl */`
   uniform float uT, uAp, uBaseY, uAltoTallo, uBal, uBalW;
-  uniform float uOlaFase, uOlaAmp, uOlaCapas, uOlaDesf, uGiro;
+  uniform float uPetOn, uPetModo, uPetFase, uPetCapas, uPetAmp, uPetSent, uPetBase, uPetAcortar, uAnilloR, uPetOla, uPetDesfF, uPetFrente, uGiro;
+  uniform vec2  uPetDesf;
+  uniform vec3  uPetDim;
   varying vec3  vN;
   varying vec3  vV;
   varying float vU;
   varying float vTallo;    // Z60: 1 en el tallo
   varying float vCara;     // Z60: > 0 cara del pétalo (adentro de la copa), < 0 dorso
-  varying float vOla;      // Z60: ola de este pétalo (−1…1)
+  varying float vGiro;     // Z62: volteo de este pétalo (vueltas, con signo)
 #ifdef USE_INSTANCING
   attribute float aCapa;   // 0 pétalo de afuera, 1 de adentro, 2 estambre
   attribute float aFase;
@@ -69,30 +83,40 @@ const VERT = /* glsl */`
   void main() {
     vec3 p = position;
     vec3 n = normal;
-    vTallo = 0.0; vCara = 1.0; vOla = 0.0;
+    vTallo = 0.0; vCara = 1.0; vGiro = 0.0;
 #ifdef USE_INSTANCING
     if (aCapa < 1.5) {
       // pétalo: esfera unidad → elipsoide con la base en el origen, a lo largo de +z
-      float W = ${PET_W.toFixed(3)} * (aCapa > 0.5 ? 0.8 : 1.0), T = ${PET_T.toFixed(3)}, L = ${PET_L.toFixed(3)} * (aCapa > 0.5 ? 0.78 : 1.0);
+      // Z62: cada pétalo se voltea sobre su BASE alrededor del eje tangente al anillo (x local), hacia adelante:
+      // copa → plano → paraguas → colgando (dorso) → por debajo, hacia adentro → copa. La cabeza no rota.
+      // giro = fase − índice·desfase (+ π en la capa interior): la ola recorre el anillo sin costura.
+      float interior = step(0.5, aCapa);
+      float nAn = mix(${N_AFUERA.toFixed(1)}, ${N_ADENTRO.toFixed(1)}, interior);
+      float azW = aK / nAn * 6.2831853 + interior * 3.14159265 / nAn + uGiro;              // azimut del pétalo en el mundo
+      float dist = abs(mod(azW - uPetFrente + 3.14159265, 6.2831853) - 3.14159265) * nAn / 6.2831853;   // pétalos hasta el frente
+      float retraso = uPetOla > 0.5 ? dist * uPetDesfF : aK * mix(uPetDesf.x, uPetDesf.y, interior);
+      float giro = uPetFase - retraso + interior * 3.14159265 * uPetCapas;
+      giro = uPetModo < 0.5 ? mod(giro, 6.2831853) : 0.5 * uPetAmp * sin(giro);
+      float phiCerr = mix(0.28, 0.10, interior);                 // capullo (Z54)
+      float phiAb = mix(1.15, 0.80, interior);                   // abierta sin volteo (Z54)
+      float phiRoll = uPetBase - 0.35 * interior + uPetSent * giro;
+      float dphi = mod(phiRoll - phiCerr + 3.14159265, 6.2831853) - 3.14159265;   // camino corto desde el capullo
+      // al nacer y al cerrarse (uAp → 0) vuelve al capullo; abierta, sigue el volteo
+      float phi = uPetOn > 0.5 ? phiCerr + dphi * uAp : mix(phiCerr, phiAb, uAp);
+      vGiro = uPetOn * uPetSent * giro / 6.2831853;
+      // contra el tallo y el centro: cuando apunta hacia adentro (sin(phi) < 0) el pétalo se acorta (PETALO_ACORTAR)
+      float hacia = smoothstep(0.0, -0.8, sin(phi)) * uPetOn;
+      float W = uPetDim.x * mix(1.0, 0.8, interior), T = uPetDim.y, L = uPetDim.z * mix(1.0, 0.72, interior) * (1.0 - uPetAcortar * hacia);
       float lz = (p.z + 1.0) * 0.5;
       vCara = n.y;   // Z60: la cara +y de la esfera queda hacia adentro de la copa (arriba con el pétalo abierto)
       vU = lz * 0.55 + aFase * 0.12 + aCapa * 0.18;
       p = vec3(p.x * W, p.y * T, lz * L);
       n = normalize(vec3(n.x / W, n.y / T, n.z / (0.5 * L)));
-      // apertura: ángulo desde la vertical (cerrado ≈ hacia arriba, abierto ≈ casi horizontal)
-      float phi = aCapa > 0.5 ? mix(0.10, 0.80, uAp) : mix(0.28, 1.15, uAp);   // copa: abierta ≈ 66° desde la vertical
-      // Z60: ola de apertura atada al giro: cos(fase) abre (cara arriba, plana) y cierra (cara abajo, copa); cada
-      // pétalo se retrasa DESFASE por pétalo de distancia al frente del giro (la ola va del frente hacia atrás por
-      // los dos lados del anillo, sin costura); la capa interior en contrafase (PETALO_OLA_CAPAS)
-      float nAn = aCapa > 0.5 ? ${N_ADENTRO.toFixed(1)} : ${N_AFUERA.toFixed(1)};
-      float azK = aK / nAn * 6.2831853 + (aCapa > 0.5 ? 3.14159265 / nAn : 0.0) + uGiro;
-      float dAz = abs(mod(azK, 6.2831853) - 3.14159265);   // distancia angular al frente (az = π → −Z del giro)
-      vOla = cos(uOlaFase - uOlaDesf * dAz * nAn / 6.2831853 + aCapa * 3.14159265 * uOlaCapas);
-      phi = clamp(phi + uOlaAmp * vOla, 0.04, 1.62);
       float a = phi - 1.5707963;
       float ca = cos(a), sa = sin(a);
       p = vec3(p.x, ca * p.y - sa * p.z, sa * p.y + ca * p.z);
       n = vec3(n.x, ca * n.y - sa * n.z, sa * n.y + ca * n.z);
+      p.z += uAnilloR * mix(1.0, 0.45, interior);   // Z62: base sobre el anillo (radio en vivo; la matriz solo orienta)
     } else {
       // estambre: cilindro de y ∈ [0, 1], asoma con la apertura
       vU = (p.y + 0.5) * 0.4 + 0.75;
@@ -126,26 +150,33 @@ const FRAG = /* glsl */`
   varying float vU;
   varying float vTallo;
   varying float vCara;
-  varying float vOla;
+  varying float vGiro;
+  uniform float uLineal;
   // degradado térmico del video: azul marino → rojo → naranja → lima (y de vuelta), y la paleta del proyecto
   vec3 termico(float m) {
-    vec3 a = mix(vec3(0.07, 0.08, 0.36), vec3(0.122, 0.498, 0.722), uPaleta);   // azul marino · #1F7FB8
+    vec3 a = mix(vec3(0.07, 0.07, 0.42), vec3(0.122, 0.498, 0.722), uPaleta);   // azul marino · #1F7FB8
     vec3 b = mix(vec3(0.95, 0.07, 0.03), vec3(0.753, 0.333, 0.184), uPaleta);   // rojo · óxido #C0552F
     vec3 c = mix(vec3(1.00, 0.40, 0.08), vec3(0.941, 0.455, 0.165), uPaleta);   // naranja · #F0742A
-    vec3 d = mix(vec3(0.72, 0.86, 0.24), vec3(0.957, 0.714, 0.180), uPaleta);   // lima · amarillo #F4B62E
-    vec3 col = mix(a, b, smoothstep(0.0, 0.35, m));
-    col = mix(col, c, smoothstep(0.35, 0.65, m));
+    vec3 d = mix(vec3(0.62, 0.86, 0.12), vec3(0.957, 0.714, 0.180), uPaleta);   // lima · amarillo #F4B62E
+    // Z62: entre el azul marino y el rojo pasa por casi negro (como el video), no por violeta
+    vec3 o = vec3(0.04, 0.015, 0.03);
+    vec3 col = mix(a, o, smoothstep(0.0, 0.2, m));
+    col = mix(col, b, smoothstep(0.18, 0.38, m));
+    col = mix(col, c, smoothstep(0.38, 0.65, m));
     return mix(col, d, smoothstep(0.65, 1.0, m));
   }
   void main() {
     // Z60: fases acumuladas (antes uT·uColVel). En el tallo, bandas que suben (COLOR_TALLO_VEL); en la cabeza el
     // degradado sigue al giro y a la ola (COLOR_ACOPLE) y el dorso de los pétalos tira a azul marino (DORSO_AZUL)
-    float fase = vTallo > 0.5 ? mix(uColFase, uTalloFase, uTalloOn) : uColFase - uAcople * (uRoll / 6.2831853 + 0.12 * vOla);
+    float fase = vTallo > 0.5 ? mix(uColFase, uTalloFase, uTalloOn) : uColFase - uAcople * (uRoll / 6.2831853 + vGiro);
     float x = fract(vU - fase);
     float m = 1.0 - abs(2.0 * x - 1.0);
     float dorso = (1.0 - vTallo) * smoothstep(0.15, -0.45, vCara) * uDorso;
     m = mix(m, m * 0.18, dorso);
     vec3 col = termico(m);
+    // Z62: la paleta está en sRGB; el compositor la trata como lineal y la vuelve a pasar a sRGB al final, lo que
+    // la aclaraba y desaturaba (marino → lavanda, rojo → rosa). COLOR_LINEAL la convierte antes.
+    col = mix(col, pow(col, vec3(2.2)), uLineal);
     // volumen suave: más oscuro hacia los bordes (como el video), sin luces reales
     float nv = max(dot(normalize(vN), normalize(vV)), 0.0);
     col *= 0.35 + 0.65 * pow(nv, 0.6);
@@ -197,7 +228,7 @@ export default function FlorCiclo() {
       for (let i = 0; i < N_AFUERA + N_ADENTRO; i++) {
         const afuera = i < N_AFUERA, k = afuera ? i : i - N_AFUERA, n = afuera ? N_AFUERA : N_ADENTRO;
         const az = (k / n) * Math.PI * 2 + (afuera ? 0 : Math.PI / n);
-        const r = afuera ? 0.2 : 0.1;
+        const r = 0;   // Z62: el radio del anillo lo pone el shader (uAnilloR)
         q.setFromAxisAngle(y, az);
         t.set(Math.sin(az) * r, afuera ? 0 : 0.04, Math.cos(az) * r);
         P.setMatrixAt(i, m.compose(t, q, s));
@@ -245,10 +276,22 @@ export default function FlorCiclo() {
     U.uAcople.value = D.COLOR_ACOPLE;
     U.uDorso.value = D.DORSO_AZUL;
     // la ola sigue al ángulo de giro (abierta con la cara arriba, copa con la cara abajo); sin giro, su propia fase
-    U.uOlaFase.value = D.ROLL_CABEZA_ACTIVO ? roll : ROLL.ola;
-    U.uOlaAmp.value = D.PETALO_OLA_ACTIVO ? ((D.PETALO_OLA_AMP_DEG * Math.PI) / 180) * FLOR.escala : 0;
-    U.uOlaDesf.value = D.PETALO_OLA_DESFASE;
-    U.uOlaCapas.value = D.PETALO_OLA_CAPAS ? 1 : 0;
+    // Z62: volteo de los pétalos (fase acumulada en ROLL.ola: quieta en pausa, × escala, acelerada por la música)
+    U.uPetOn.value = D.PETALO_ROLL_ACTIVO ? 1 : 0;
+    U.uPetModo.value = D.PETALO_ROLL_MODO === "vaiven" ? 1 : 0;
+    U.uPetFase.value = ROLL.ola;
+    U.uPetDesf.value.set(desfasePetalo(D.PETALO_ROLL_DESFASE, N_AFUERA), desfasePetalo(D.PETALO_ROLL_DESFASE, N_ADENTRO));
+    U.uPetCapas.value = D.PETALO_ROLL_CAPAS ? 1 : 0;
+    U.uPetOla.value = D.PETALO_ROLL_OLA === "anillo" ? 0 : 1;
+    U.uPetDesfF.value = Math.max(0, D.PETALO_ROLL_DESFASE) * Math.PI * 2;
+    U.uPetFrente.value = (D.PETALO_ROLL_FRENTE_DEG * Math.PI) / 180;
+    U.uPetAmp.value = ((D.PETALO_ROLL_AMP_DEG * Math.PI) / 180) * FLOR.escala;
+    U.uPetSent.value = D.PETALO_ROLL_SENTIDO < 0 ? -1 : 1;
+    U.uPetBase.value = (D.PETALO_ROLL_BASE_DEG * Math.PI) / 180;
+    U.uPetAcortar.value = D.PETALO_ACORTAR;
+    U.uPetDim.value.set(D.PETALO_ANCHO, D.PETALO_GROSOR, D.PETALO_LARGO);
+    U.uAnilloR.value = D.ANILLO_R;
+    U.uLineal.value = D.COLOR_LINEAL ? 1 : 0;
     // apertura: la de la línea de tiempo × respiración + graves (gancho, 0 por defecto)
     const resp = 1 - D.RESPIRACION_AMP * (0.5 + 0.5 * Math.sin((t * Math.PI * 2) / Math.max(0.5, D.RESPIRACION_S)));
     const graves = Math.max(BAND_STATE.normEnergy[0] ?? 0, BAND_STATE.normEnergy[1] ?? 0);
@@ -262,9 +305,9 @@ export default function FlorCiclo() {
     const w = U.uBalW.value;
     Rd.position.set(PUNTA_X * HA * ALTO_TALLO * grosor + U.uBal.value * Math.sin(t * w), TARIMA_H + altoTallo, U.uBal.value * 0.6 * Math.cos(t * w * 0.7));
     // diámetro de la cabeza abierta (copa) ≈ 1,2 m × 1,45 ≈ 1,75 m (ancho de la base del prisma) con ESCALA 1
-    C.scale.setScalar(Math.max(1e-4, 1.45 * Math.max(0.1, D.ESCALA) * Math.max(0.1, D.ESCALA_CABEZA) * FLOR.escala * Math.max(0.001, FLOR.cabeza)));
+    C.scale.setScalar(Math.max(1e-4, 1.2 * Math.max(0.1, D.ESCALA) * Math.max(0.1, D.ESCALA_CABEZA) * FLOR.escala * Math.max(0.001, FLOR.cabeza)));
     giro.current += RELOJ.dtExp * (D.GIRO_DEG_S * Math.PI) / 180;   // reloj de la experiencia: quieto en pausa
-    U.uGiro.value = giro.current % (Math.PI * 2);   // Z60: la ola se mide desde el frente del giro
+    U.uGiro.value = giro.current % (Math.PI * 2);   // Z62: el frente de la ola queda fijo en el mundo
     // Z60: la cabeza rueda: una sola rotación del padre (orden YXZ: Y orienta el eje, X es el giro). Signo −: con
     // SENTIDO 1 la parte de arriba va hacia −Z (las sillas) con EJE 0
     Rd.rotation.set(-roll, (D.ROLL_CABEZA_EJE_DEG * Math.PI) / 180, 0);

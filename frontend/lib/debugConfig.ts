@@ -1196,21 +1196,33 @@ export const DBG_FLOR = {
   ALTURA_M:        1.8,    // Z57 (Z54 2,7): altura total, 33 % más baja; el valor efectivo es ALTURA_M × ALTURA_FACTOR — live
   ALTURA_FACTOR:   1.0,    // Z57: multiplica ALTURA_M en vivo (0,3…1,5; 1,5 = la altura de Z54) — live
   ESCALA_CABEZA:   0.67,   // Z60 (Z57 1,0): diámetro de la cabeza (× ESCALA), un tercio menos para equilibrar con la altura de Z57 — live
-  GROSOR_TALLO:    1.0,    // Z60: grosor del tallo (× el de Z54/Z57); ver el reporte de Z60 sobre las proporciones — live
+  GROSOR_TALLO:    0.6,    // Z62 (Z60 1,0): grosor del tallo; con la cabeza en 0,67 el tallo de 1,0 quedaba grueso frente al video — live
   // Z60: la cabeza rueda hacia adelante (eje horizontal por su centro, en la punta del tallo)
-  ROLL_CABEZA_ACTIVO:    true,  // — live
+  ROLL_CABEZA_ACTIVO:    false, // Z62 (Z60 true): la cabeza entera no rota; disponible — live
   ROLL_CABEZA_PERIODO_S: 4.2,   // una vuelta completa (360°) — live
   ROLL_CABEZA_AMP_DEG:   360,   // 360 = vuelta completa; menos = se mece ±AMP/2 — live
   ROLL_CABEZA_SENTIDO:   -1,    // −1 (como el video, ver Z60) = la cara sube y se aleja del observador y vuelve por abajo; 1 = al revés (la parte de arriba viene hacia el observador) — live
   ROLL_CABEZA_EJE_DEG:   0,     // orientación del eje (°, alrededor de la vertical): 0 = rueda hacia las sillas (−Z); 90 = hacia la entrada (−X) — live
-  // Z60: ola de apertura que recorre el anillo de pétalos
-  PETALO_OLA_ACTIVO:     true,  // — live
-  PETALO_OLA_AMP_DEG:    35,    // apertura extra ± (°) — live
-  PETALO_OLA_DESFASE:    0.35,  // retraso por pétalo de distancia al frente del giro (rad); la ola va del frente hacia atrás — live
-  PETALO_OLA_CAPAS:      true,  // la capa interior en contrafase — live
-  PETALO_OLA_PERIODO_S:  4.2,   // período de la ola SOLO sin giro (con giro, la ola sigue al ángulo de la cabeza) — live
+  // Z62: cada pétalo se voltea sobre su base (eje tangente al anillo), en ola; reemplaza la ola de Z60
+  PETALO_ROLL_ACTIVO:    true,  // false = pétalos como Z54 (solo abren y cierran) — live
+  PETALO_ROLL_MODO:      "completo" as string,   // "completo" (vuelta de 360°, hacia adelante) · "vaiven" (oscila ±AMP/2) — live
+  PETALO_ROLL_PERIODO_S: 4.2,   // una vuelta del volteo — live
+  PETALO_ROLL_AMP_DEG:   150,   // amplitud total del vaivén — live
+  PETALO_ROLL_DESFASE:   0.02,  // vueltas de retraso por pétalo: con OLA "frente", por pétalo de distancia al frente (0,02 → atrás 0,16 vuelta ≈ 58°); con "anillo", entre vecinos, redondeado a olas enteras (0,0625 = 1/16 = una ola) — live
+  PETALO_ROLL_OLA:       "frente" as string,   // "frente" (el frente adelanta, los dos lados retrasados igual, sin costura; como el video) · "anillo" (ola por índice que da la vuelta) — live
+  PETALO_ROLL_FRENTE_DEG: -90,  // azimut del frente (−90 = hacia −X, la pose de entrada de Z59; 180 = hacia las sillas, −Z) — live
+  PETALO_ROLL_CAPAS:     true,  // la capa interior en contrafase — live
+  PETALO_ROLL_SENTIDO:   1,     // 1 = hacia adelante (la punta sale hacia afuera y baja); −1 = al revés — live
+  PETALO_ROLL_BASE_DEG:  60,    // ángulo desde la vertical con giro 0 (copa abierta) — live
+  PETALO_ACORTAR:        0.45,  // se acorta al apuntar hacia adentro (no atraviesa tallo ni centro) — live
+  // Z62: forma (elipsoides ≈ 2:1 separados, como el video; Z54–Z60 eran 0,27 × 0,22 × 0,52, más anchos que largos)
+  PETALO_ANCHO:          0.16,  // semiancho (m, cabeza de referencia) — live
+  PETALO_GROSOR:         0.08,  // semigrosor (aplanado: corte elíptico, no un dedo) — live
+  PETALO_LARGO:          0.62,  // largo — live
+  ANILLO_R:              0.26,  // radio del anillo de bases (Z54–Z60: 0,2) — live
   // Z60: color
   COLOR_ACOPLE:          0.7,   // cuánto sigue el degradado al giro de la cabeza y a la ola — live
+  COLOR_LINEAL:          true,  // Z62: la paleta pasa de sRGB a lineal (sin ella sale lavanda y rosa) — live
   DORSO_AZUL:            0.8,   // el dorso de los pétalos tira a azul marino (como el video) — live
   COLOR_TALLO_ACTIVO:    true,  // bandas de color que suben por el tallo — live
   COLOR_TALLO_VEL:       0.15,  // vueltas del degradado por segundo en el tallo — live
