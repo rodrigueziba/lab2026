@@ -20,7 +20,7 @@ export interface Brand {
 }
 
 const BASE: Omit<Brand, "modelCode" | "descriptor" | "spec" | "checks"> = {
-  brandName: "KESTREL ELECTRIC",
+  brandName: NOMBRE_EMPRESA_MAYUS, // Z71 (antes "KESTREL ELECTRIC")
   secondary: "高品質制御卓",
   unitId:    "UNIT-07",
   owner:     "PROPERTY OF TARIMA-BASE",
@@ -90,6 +90,8 @@ export function createDecalTexture(b: Brand, w = 1024, h = 256): THREE.CanvasTex
     ctx.font = `700 ${h * 0.13}px ${SANS}`;
     ctx.letterSpacing = `${h * 0.02}px`;
     ctx.fillText(b.brandName, w * 0.03, h * 0.2);
+    // Z71: fin de la marca, para que la línea en japonés no se le superponga (ya pasaba con KESTREL ELECTRIC)
+    const finMarca = w * 0.03 + ctx.measureText(b.brandName).width;
     ctx.font = `700 ${h * 0.42}px ${SANS}`;
     ctx.letterSpacing = "0px";
     ctx.fillText(b.modelCode, w * 0.03, h * 0.64);
@@ -99,7 +101,7 @@ export function createDecalTexture(b: Brand, w = 1024, h = 256): THREE.CanvasTex
     ctx.fillText(b.spec, w * 0.03, h * 0.88);
     ctx.letterSpacing = "0px";
     ctx.font = `500 ${h * 0.09}px ${JP}`;
-    ctx.fillText(b.secondary, w * 0.30, h * 0.2);
+    ctx.fillText(b.secondary, Math.max(w * 0.30, finMarca + h * 0.06), h * 0.2);   // Z71: antes siempre en 0,30 · w
 
     // checkboxes (right block)
     ctx.font = `600 ${h * 0.065}px ${SANS}`;

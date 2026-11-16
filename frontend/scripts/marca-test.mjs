@@ -1,6 +1,7 @@
 // Z68: prueba del nombre de la empresa de la ficción. Correr en frontend/: node scripts/marca-test.mjs
 // 1) lib/marca.ts tiene los valores esperados (NOMBRE_EMPRESA y su variante en mayúsculas).
-// 2) Ningún texto visible del código de la experiencia (app, components, lib, hooks, public) dice "austral":
+// 2) Ningún texto visible del código de la experiencia (app, components, lib, hooks, public) dice "austral" ni (Z71)
+//    "kestrel" (la marca ficticia de los atriles, reemplazada por el nombre de la empresa):
 //    se quitan los comentarios y los identificadores permitidos (EXCEPCIONES) y se busca lo que queda.
 //    Fuera del recorrido: node_modules, .next, docs/, CREDITOS.md (documentación: no se toca).
 // 3) Los archivos que mostraban el nombre usan la constante (NOMBRE_EMPRESA o NOMBRE_EMPRESA_MAYUS).
@@ -22,6 +23,10 @@ ok(!/[‘’"]/.test(NOMBRE_EMPRESA), "apóstrofo recto y sin comillas");
 // EXCEPCIONES: identificadores internos que pueden contener "austral" (no se muestran). Agregar acá con su motivo.
 const EXCEPCIONES = [
   /\bAUSTRAL_BASE\b/g,   // lib/retro/brandDecal.ts: nombre de la constante base de las marcas de equipo (identificador)
+];
+// Z71: archivos que pueden decir "kestrel" sin mostrarlo. Agregar acá con su motivo.
+const ARCHIVOS_KESTREL_PERMITIDOS = [
+  'lib/retro/brand.config.js',   // legado sin uso: solo lo importa lib/retro/decalAtlas.js, que nadie importa (se reporta, no se toca)
 ];
 const RAICES = ["app", "components", "lib", "hooks", "public"];
 const EXT = /\.(tsx?|jsx?|mjs|cjs|json|css|html|svg|txt|md|ink)$/i;
@@ -48,10 +53,22 @@ for (const raiz of RAICES) {
     archivos++;
     let s = sinComentarios(readFileSync(p, "utf8"), p);
     for (const re of EXCEPCIONES) s = s.replace(re, "");
-    s.split("\n").forEach((l, i) => { if (/austral/i.test(l)) hallazgos.push(`${relative(".", p)} (línea aprox. ${i + 1}): ${l.trim().slice(0, 100)}`); });
+    const rel = relative(".", p);
+    const kestrelOk = ARCHIVOS_KESTREL_PERMITIDOS.includes(rel);
+    s.split("\n").forEach((l, i) => { if (/austral/i.test(l) || (!kestrelOk && /kestrel/i.test(l))) hallazgos.push(`${rel} (línea aprox. ${i + 1}): ${l.trim().slice(0, 100)}`); });
   }
 }
-ok(hallazgos.length === 0, `sin "austral" en textos visibles (${archivos} archivos)`);
+ok(hallazgos.length === 0, `sin "austral" ni "kestrel" en textos visibles (${archivos} archivos)`);
+// Z71: la excepción sigue siendo código sin uso (si alguien lo importa, el texto pasaría a verse)
+{
+  let usado = false;
+  for (const raiz of ["app", "components", "lib", "hooks"]) {
+    if (!existsSync(raiz)) continue;
+    for (const p of recorrer(raiz)) { const t = readFileSync(p, "utf8"); if (/from\s+["'][^"']*(decalAtlas|brand\.config)/.test(t) && !/lib\/retro\/decalAtlas\.js$/.test(p)) usado = true; }
+  }
+  ok(!usado, "brand.config.js / decalAtlas.js (KESTREL ELECTRIC) siguen sin usarse en la experiencia");
+}
+ok(/brandName:\s*NOMBRE_EMPRESA_MAYUS, \/\/ Z71/.test(readFileSync("lib/retro/brandDecal.ts", "utf8")), "atriles (LECTERN_BRANDS): la marca es NOMBRE_EMPRESA_MAYUS");
 for (const h of hallazgos) console.log("      ", h);
 
 // ── 3) la constante se usa donde estaba el nombre ──────────────────────────────────────────────────────────────────

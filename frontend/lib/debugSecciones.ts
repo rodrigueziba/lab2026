@@ -66,7 +66,7 @@ export const SECCIONES_DEBUG: SeccionDebug[] = [
   { id: "ondas-por-kick-z52", titulo: "Ondas por kick Z52", pestana: "sol", desdeZ: 52, ultimoZ: 58, avanzada: false, clase: "frecuente", descripcion: "Ondas expansivas por kick desde el portal" },
   { id: "sol-nuevo-z51", titulo: "Sol nuevo Z51", pestana: "sol", desdeZ: 51, ultimoZ: 57, avanzada: false, clase: "frecuente", descripcion: "Sol nuevo: núcleo, rayos y destello de lente" },
   { id: "composicion-del-domo-z49", titulo: "Composición del domo Z49", pestana: "composicion", desdeZ: 49, ultimoZ: 57, avanzada: false, clase: "frecuente", descripcion: "Escala del portal y tinte del cielo" },
-  { id: "texto-del-telon-z46", titulo: "Texto del telón Z46", pestana: "telon", desdeZ: 46, ultimoZ: 46, avanzada: false, clase: "frecuente", descripcion: "Texto proyectado sobre el telón" },
+  { id: "texto-del-telon-z46", titulo: "Texto del telón Z46", pestana: "telon", desdeZ: 46, ultimoZ: 71, avanzada: false, clase: "frecuente", descripcion: "Texto proyectado sobre el telón y crédito con efecto de foco (Z71)" },
   { id: "fractal-del-prisma-z43", titulo: "Fractal del prisma Z43", pestana: "flor", desdeZ: 43, ultimoZ: 45, avanzada: false, clase: "frecuente", descripcion: "Fractal de las caras del prisma (Z43 a Z45, Z69)" },
   { id: "luces-del-visualizador-z42", titulo: "Luces del visualizador Z42", pestana: "luces", desdeZ: 42, ultimoZ: 42, avanzada: false, clase: "frecuente", descripcion: "Luces del visualizador: halo, cono y charco" },
   { id: "reloj-de-la-experiencia-z39", titulo: "Reloj de la experiencia Z39", pestana: "sala", desdeZ: 39, ultimoZ: 39, avanzada: false, clase: "tecnica", descripcion: "Reloj único de la experiencia (RELOJ_UNIFICADO)" },

@@ -23,6 +23,16 @@ import { CK_STATE } from "@/lib/checkpoints";
 import { crearEstadoTexto, avanzarTexto, reiniciarTexto, anchoZonaIluminada } from "@/lib/telonTexto/lineaTiempo";
 import { crearTexturaTexto, TEX_ANCHO, TEX_ALTO, type TexturaTexto } from "@/lib/telonTexto/texturaTexto";
 import { anton } from "@/app/alight/fuentes";
+// Z71: crédito debajo del bloque con efecto de foco
+import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
+import { crearEstadoEnfoque, avanzarEnfoque, forzarDesenfoque, posicionCredito, type PosCredito } from "@/lib/telonTexto/credito";
+import { crearTexturaCredito, type TexturaCredito } from "@/lib/telonTexto/texturaCredito";
+import { TAM_REF } from "@/lib/telonTexto/layoutTexto";
+
+/** Z71: texto del crédito ("An" y "Simulation" con mayúsculas normales; el nombre de la empresa en mayúsculas). */
+export const TEXTO_CREDITO = `An ${NOMBRE_EMPRESA_MAYUS} Simulation`;
+/** Z71: estado del foco del crédito (módulo: lo lee el menú y el diagnóstico). */
+export const ENFOQUE_CREDITO = crearEstadoEnfoque(DBG_TELON_TEXTO.SEMILLA);
 
 // Reflector del telón (valores de Curtain.tsx: 5 m delante del telón, 9 m de alto, apunta a y = 4 m,
 // ángulo 0,6 rad, penumbra 0,7). Se repiten acá para no tocar Curtain.tsx.
@@ -33,7 +43,8 @@ const INICIO_DEMORA_S = 0.3;            // deja arrancar un checkpoint pedido po
 /** Estado de módulo: sobrevive a los remontajes del telón (no reaparece al volver). */
 export const TELON_TEXTO = crearEstadoTexto();
 /** Diagnóstico (lo lee el test en el navegador; sin overlay). */
-export const TELON_TEXTO_DIAG = { listo: false, aspecto: 0, bordeG: 0, bordeN: 0, interletra: 0, anchoZonaM: 0, anchoBloqueM: 0, familia: "" };
+export const TELON_TEXTO_DIAG = { listo: false, aspecto: 0, bordeG: 0, bordeN: 0, interletra: 0, anchoZonaM: 0, anchoBloqueM: 0, familia: "",
+  creditoListo: false, creditoAltoTintaM: 0, creditoCx: 0, creditoCy: 0, altoBloqueM: 0 };   // Z71
 
 const VERT = /* glsl */`
   uniform vec2  uFwd;          // hacia el telón (xz)
@@ -78,6 +89,45 @@ const FRAG = /* glsl */`
   }
 `;
 
+// Z71: crédito. Desenfoque en el shader con 10 lecturas en disco (espiral de ángulo áureo) de radio proporcional al nivel
+// de desenfoque, más 4 lecturas corridas para la imagen doble; con nivel ≈ 0 hace UNA lectura (costo nulo enfocado).
+// Baja un poco el contraste al desenfocarse. Solo afecta al crédito: el título usa su propio material.
+const FRAG_CREDITO = /* glsl */`
+  uniform sampler2D uMapa;
+  uniform float uAlfa;
+  uniform float uNivel;        // 0 = enfocado, 1 = desenfoque máximo
+  uniform vec2  uRadio;        // radio máximo del disco en uv (x corregido por el aspecto)
+  uniform float uDoble;
+  uniform float uInvertido;
+  uniform vec3  uTinte;
+  uniform float uBrillo;
+  varying vec2 vUv;
+  const vec2 DISCO[10] = vec2[10](
+    vec2( 0.316,  0.000), vec2(-0.333,  0.305), vec2( 0.052, -0.632), vec2( 0.470,  0.555), vec2(-0.795, -0.133),
+    vec2( 0.737, -0.488), vec2(-0.190,  0.913), vec2(-0.513, -0.794), vec2( 0.982,  0.250), vec2(-0.946,  0.415));
+  void main() {
+    float a;
+    if (uNivel < 0.004) {
+      a = texture2D(uMapa, vUv).a;
+    } else {
+      vec2 r = uRadio * uNivel;
+      float s = 0.0;
+      for (int i = 0; i < 10; i++) s += texture2D(uMapa, vUv + DISCO[i] * r).a;
+      a = s * 0.1 * (1.0 - 0.15 * uNivel);                    // pierde un poco de contraste
+      if (uDoble > 0.001) {
+        vec2 o = vec2(r.x * 1.6, r.y * 0.25);
+        float g = 0.0;
+        for (int i = 0; i < 4; i++) g += texture2D(uMapa, vUv + o + DISCO[i] * r * 0.6).a;
+        a = max(a, g * 0.25 * uDoble * min(1.0, uNivel * 1.5));
+      }
+    }
+    float k = a * uAlfa;
+    vec3 gobo = mix(vec3(1.0), uTinte, k);
+    vec3 inv = vec3(1.0 + uBrillo * k);
+    gl_FragColor = vec4(mix(gobo, inv, uInvertido), 1.0);
+  }
+`;
+
 const UNIFORMS = {
   uMapa:        { value: null as THREE.Texture | null },
   uAlfa:        { value: 0 },
@@ -95,13 +145,35 @@ const UNIFORMS = {
   uSep:         { value: DBG_TELON_TEXTO.SEPARACION_M },
 };
 
+// Z71: uniforms del crédito; los de los pliegues, el tinte y el brillo son los MISMOS objetos que los del título
+const UNIFORMS_CREDITO = {
+  uMapa:        { value: null as THREE.Texture | null },
+  uAlfa:        { value: 0 },
+  uNivel:       { value: 0 },
+  uRadio:       { value: new THREE.Vector2(0, 0) },
+  uDoble:       { value: DBG_TELON_TEXTO.ENFOQUE_DOBLE },
+  uInvertido:   UNIFORMS.uInvertido,
+  uTinte:       UNIFORMS.uTinte,
+  uBrillo:      UNIFORMS.uBrillo,
+  uFwd:         UNIFORMS.uFwd,
+  uRight:       UNIFORMS.uRight,
+  uCentroTelon: UNIFORMS.uCentroTelon,
+  uAnchoTelon:  UNIFORMS.uAnchoTelon,
+  uFrunce:      UNIFORMS.uFrunce,
+  uPliegue:     UNIFORMS.uPliegue,
+  uSep:         UNIFORMS.uSep,
+};
+
 const CFG_TIEMPO = DBG_TELON_TEXTO;   // FADE_IN_S, FADE_OUT_S, DURACION_S, FLICKER_* (vivo)
 
 export default function TelonTexto() {
   const { gl, camera } = useThree();
   const meshRef = useRef<THREE.Mesh>(null);
   const texRef = useRef<TexturaTexto | null>(null);
-  const hecho = useRef({ blur: -1, inter: -1, col: -1, ent: -1, tinte: "" });
+  const hecho = useRef({ blur: -1, inter: -1, col: -1, ent: -1, tinte: "", crTrack: -1, crBlur: -1 });
+  const creditoRef = useRef<THREE.Mesh>(null);                 // Z71
+  const texCredRef = useRef<TexturaCredito | null>(null);       // Z71
+  const posCred = useRef<PosCredito>({ cx: 0, cy: 0, ancho: 0, alto: 0, inkDerX: 0, inkArribaY: 0, inkAbajoY: 0, inkAltoM: 0 });
   const familia = useRef("");
 
   // fuente lista → textura (una vez). Sin fetch propio: la carga la resuelve next/font.
@@ -116,16 +188,24 @@ export default function TelonTexto() {
     };
     void listo();
     const onReproducir = () => reiniciarTexto(TELON_TEXTO);
+    const onDesenfocar = () => forzarDesenfoque(ENFOQUE_CREDITO);   // Z71: botón del menú
     // diagnóstico solo en modo debug (pruebas en Chrome headless): estado, medidas y la textura como imagen
     const w = window as unknown as { __telonTexto?: object };
     if (DEBUG_ENABLED) w.__telonTexto = {
       diag: TELON_TEXTO_DIAG, estado: TELON_TEXTO,
       textura: () => (texRef.current?.tex.image as HTMLCanvasElement | undefined)?.toDataURL() ?? "",
+      enfoque: ENFOQUE_CREDITO,   // Z71
     };
     window.addEventListener("alight:telon-texto-reproducir", onReproducir);
+    window.addEventListener("alight:telon-credito-desenfocar", onDesenfocar);
     return () => {
       vivo = false;
       window.removeEventListener("alight:telon-texto-reproducir", onReproducir);
+      window.removeEventListener("alight:telon-credito-desenfocar", onDesenfocar);
+      texCredRef.current?.tex.dispose();   // Z71
+      texCredRef.current = null;
+      UNIFORMS_CREDITO.uMapa.value = null;
+      TELON_TEXTO_DIAG.creditoListo = false;
       if (DEBUG_ENABLED) delete w.__telonTexto;
       // el telón se fue: el texto no vuelve a aparecer (salvo "Reproducir texto")
       if (TELON_TEXTO.fase === "activo" || TELON_TEXTO.fase === "saliendo") { TELON_TEXTO.fase = "terminado"; TELON_TEXTO.alfa = 0; }
@@ -172,6 +252,10 @@ export default function TelonTexto() {
 
     const alfa = D.ACTIVO && tx ? TELON_TEXTO.alfa : 0;
     mesh.visible = alfa > 0.001;
+    // Z71: foco del crédito (reloj de la experiencia: quieto en pausa)
+    avanzarEnfoque(ENFOQUE_CREDITO, D, RELOJ.tExp, mesh.visible && D.CREDITO_ACTIVO);
+    const cred = creditoRef.current;
+    if (cred) cred.visible = false;
     if (!mesh.visible || !tx) return;
 
     // tamaño: TAMANO × ancho de la zona iluminada; el plano incluye el margen de la textura
@@ -196,9 +280,40 @@ export default function TelonTexto() {
     U.uFrunce.value = DBG_SILLAS.curtainGather;
     U.uPliegue.value = Math.max(0, Math.min(1, D.PLIEGUE));
     U.uSep.value = D.SEPARACION_M;
+
+    // Z71: crédito. Textura una vez (y al cambiar el tracking o el borde suave); posición a partir del bloque
+    if (!cred || !D.CREDITO_ACTIVO) return;
+    const blurRel = D.BLUR_PX / Math.max(1e-3, TAM_REF * tx.escala);   // mismo borde suave relativo que el título
+    if (h.crTrack !== D.CREDITO_TRACKING || h.crBlur !== blurRel) {
+      texCredRef.current?.tex.dispose();
+      const tc = crearTexturaCredito(familia.current, TEXTO_CREDITO, D.CREDITO_TRACKING, blurRel, gl.capabilities.getMaxAnisotropy());
+      texCredRef.current = tc;
+      UNIFORMS_CREDITO.uMapa.value = tc.tex;
+      h.crTrack = D.CREDITO_TRACKING; h.crBlur = blurRel;
+      TELON_TEXTO_DIAG.creditoListo = true;
+    }
+    const tc = texCredRef.current;
+    if (!tc) return;
+    const altoBloque = anchoBloque / Math.max(1e-3, tx.layout.aspecto);
+    const P = posicionCredito(anchoBloque, altoBloque, tc.medidas, D.CREDITO_TAMANO, D.CREDITO_MARGEN, posCred.current);
+    TELON_TEXTO_DIAG.creditoAltoTintaM = P.inkAltoM; TELON_TEXTO_DIAG.creditoCx = P.cx; TELON_TEXTO_DIAG.creditoCy = P.cy;
+    TELON_TEXTO_DIAG.altoBloqueM = altoBloque;
+    // el bloque está centrado en el plano del título: centro del bloque = posición del plano
+    cred.position.set(mesh.position.x + rx * P.cx, mesh.position.y + P.cy, mesh.position.z + rz * P.cx);
+    cred.rotation.copy(mesh.rotation);
+    cred.scale.set(P.ancho, P.alto, 1);
+    cred.visible = true;
+    const UC = UNIFORMS_CREDITO;
+    UC.uAlfa.value = alfa * Math.max(0, Math.min(1, D.CREDITO_OPACIDAD));
+    UC.uNivel.value = ENFOQUE_CREDITO.nivel;
+    // radio máximo: DESENFOQUE_MAX × alto de la tinta, en uv (x corregido por el aspecto de la textura)
+    const rV = Math.max(0, D.ENFOQUE_DESENFOQUE_MAX) * (tc.medidas.inkAbajo - tc.medidas.inkArriba) / tc.medidas.texH;
+    UC.uRadio.value.set(rV * tc.medidas.texH / tc.medidas.texW, rV);
+    UC.uDoble.value = Math.max(0, D.ENFOQUE_DOBLE);
   });
 
   return (
+    <>
     <mesh ref={meshRef} visible={false} renderOrder={1} frustumCulled={false}>
       <planeGeometry args={[1, 1, 96, 1]} />
       <shaderMaterial
@@ -216,5 +331,24 @@ export default function TelonTexto() {
         blendDstAlpha={THREE.OneFactor}
       />
     </mesh>
+    {/* Z71: crédito (misma técnica: gobo multiplicativo; desenfoque solo acá) */}
+    <mesh ref={creditoRef} visible={false} renderOrder={1} frustumCulled={false}>
+      <planeGeometry args={[1, 1, 24, 1]} />
+      <shaderMaterial
+        vertexShader={VERT}
+        fragmentShader={FRAG_CREDITO}
+        uniforms={UNIFORMS_CREDITO}
+        transparent
+        depthWrite={false}
+        depthTest
+        blending={THREE.CustomBlending}
+        blendEquation={THREE.AddEquation}
+        blendSrc={THREE.DstColorFactor}
+        blendDst={THREE.ZeroFactor}
+        blendSrcAlpha={THREE.ZeroFactor}
+        blendDstAlpha={THREE.OneFactor}
+      />
+    </mesh>
+    </>
   );
 }

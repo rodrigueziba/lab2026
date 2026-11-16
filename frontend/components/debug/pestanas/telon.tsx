@@ -76,6 +76,29 @@ export function SecTextoDelTelonZ46() {
             </div>
           ))}
           <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:telon-texto-reproducir"))}>Reproducir texto</button>
+          {/* Z71: crédito "An IN-GO'S WAN INC. Simulation" debajo del bloque, con efecto de foco */}
+          <span style={{ ...LABEL, marginTop: 8 }}>Crédito y foco Z71 <span style={NOTE}>(debajo del bloque, a la derecha · live)</span></span>
+          {(["CREDITO_ACTIVO", "ENFOQUE_ACTIVO"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{k === "CREDITO_ACTIVO" ? "off = como estaba" : "off = siempre enfocado"}</span></span>
+              <button style={INPUT} onClick={() => { const v = !ttx[k]; DBG_TELON_TEXTO[k] = v; setTtx(o => ({ ...o, [k]: v })); }}>{ttx[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["CREDITO_TAMANO", 0.03, 0.4, 0.005, "× alto del bloque (mayúscula)"], ["CREDITO_MARGEN", 0, 0.5, 0.01, "× alto del bloque"],
+            ["CREDITO_OPACIDAD", 0, 1, 0.01, ""], ["CREDITO_TRACKING", 0, 0.3, 0.005, "× tamaño (recrea la textura)"],
+            ["ENFOQUE_DESENFOQUE_MAX", 0, 0.6, 0.01, "× alto del texto"], ["ENFOQUE_INTERVALO_MIN_S", 0.5, 20, 0.5, "s"],
+            ["ENFOQUE_INTERVALO_MAX_S", 0.5, 30, 0.5, "s"], ["ENFOQUE_SALIDA_S", 0.05, 3, 0.05, "s"],
+            ["ENFOQUE_RETENCION_S", 0, 3, 0.05, "s"], ["ENFOQUE_ENTRADA_S", 0.05, 3, 0.05, "s"],
+            ["ENFOQUE_SOBREIMPULSO", 0, 0.5, 0.01, ""], ["ENFOQUE_DOBLE", 0, 1, 0.01, "imagen doble"], ["SEMILLA", 1, 999, 1, ""],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{ttx[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={ttx[k]}
+                onChange={e => { const v = parseFloat(e.target.value); DBG_TELON_TEXTO[k] = v; setTtx(o => ({ ...o, [k]: v })); }} />
+            </div>
+          ))}
+          <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:telon-credito-desenfocar"))}>Forzar desenfoque ahora</button>
     </>
   );
 }

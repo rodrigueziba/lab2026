@@ -1164,6 +1164,23 @@ export const DBG_TELON_TEXTO = {
   FLICKER_PICO:    0.7,     // opacidad de cada destello
   DURACION_S:      25,      // s de experiencia desde que aparece
   DIST_OCULTAR_M:  12,      // se desvanece si el usuario se aleja más que esto del telón (el spawn está a 8 m)
+  // Z71: crédito "An IN-GO'S WAN INC. Simulation" debajo del bloque, alineado a su borde derecho, con efecto de foco
+  CREDITO_ACTIVO:   true,    // false = como estaba (sin crédito)
+  CREDITO_TAMANO:   0.2,     // altura de mayúscula del crédito / alto del bloque. Se pidió 0,05–0,08: desde el inicio (8 m)
+                             // el bloque mide ~45 px a 1440×900 y eso daría 2–4 px; con 0,2 son ~9 px (un quinto del título)
+  CREDITO_MARGEN:   0.12,    // separación entre el bloque y el crédito / alto del bloque
+  CREDITO_OPACIDAD: 0.75,
+  CREDITO_TRACKING: 0.08,    // espaciado entre letras (fracción del tamaño de la fuente; recrea la textura)
+  ENFOQUE_ACTIVO:   true,    // false = siempre enfocado
+  ENFOQUE_DESENFOQUE_MAX: 0.3,    // radio del desenfoque en el máximo / alto del texto (0,22 casi no se nota; con 0,45 el texto chico se borra)
+  ENFOQUE_INTERVALO_MIN_S: 3,     // enfocado entre MIN y MAX s (al azar con SEMILLA)
+  ENFOQUE_INTERVALO_MAX_S: 8,
+  ENFOQUE_SALIDA_S:  0.9,   // se desenfoca (suavizado)
+  ENFOQUE_RETENCION_S: 0.4, // se mantiene borroso
+  ENFOQUE_ENTRADA_S: 0.5,   // vuelve a enfocar
+  ENFOQUE_SOBREIMPULSO: 0.15, // se pasa de foco hacia el otro lado (fracción del máximo) y se acomoda
+  ENFOQUE_DOBLE:     0.3,   // imagen doble o halo durante el desenfoque (0 = no)
+  SEMILLA:           71,
 };
 
 // ── Z48: ciclo de día (lib/cicloDia.ts) atado a la duración del tema, con introducción lenta de amanecer ──

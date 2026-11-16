@@ -2,9 +2,11 @@
 //  (a) cada sección dibujada (marca "// sección: <id>" en components/debug/pestanas/*.tsx y entrada del mapa) tiene su
 //      entrada en lib/debugSecciones.ts y viceversa; la pestaña del registro es la del archivo
 //  (b) el orden por ultimoZ (pestañas, secciones, Recientes, NUEVO) es el esperado
-//  (c) ningún control perdido: los controles de cada sección (firma = código normalizado del elemento) son los mismos
-//      que en el inventario del paso 1 (docs/debug-menu-inventario.json, DebugMenu.tsx monolítico de Z69)
-//  (d) todos los exports de debugConfig (DBG_*) conservan nombre y default respecto de la copia del inventario
+//  (c) ningún control perdido: los controles de cada sección (firma = código normalizado del elemento) del inventario del
+//      paso 1 (docs/debug-menu-inventario.json, DebugMenu.tsx monolítico de Z69) siguen, idénticos, en su sección.
+//      Los controles agregados después (Z71 en adelante) se informan y no son error
+//  (d) todos los exports de debugConfig (DBG_*) conservan nombre y default respecto de la copia del inventario (los
+//      campos nuevos se informan y no son error)
 //      (si se cambia un default A PROPÓSITO: node scripts/debug-menu-test.mjs --actualizar-defaults)
 //  (e) el índice del buscador (lib/debugIndiceControles.ts) está al día
 //  (f) estado persistente: lectura y escritura con almacenamiento bloqueado o con datos inválidos
@@ -71,18 +73,17 @@ console.log('\n(b) orden por ultimoZ');
 
 console.log('\n(c) ningún control perdido');
 {
-  let total = 0, malos = [];
+  let presentes = 0, nuevos = 0, malos = [];
   for (const s of inv.secciones) {
     const d = dibujadas[s.id];
     if (!d) { malos.push(`${s.id}: no está`); continue; }
-    const ahora = controles(d.texto).map(c => c.firma).sort(), antes = [...s.firmas].sort();
-    total += ahora.length;
-    if (ahora.length !== antes.length || ahora.some((f, i) => f !== antes[i])) {
-      const faltan = antes.filter(f => !ahora.includes(f)), sobran = ahora.filter(f => !antes.includes(f));
-      malos.push(`${s.id}: ${antes.length} → ${ahora.length}${faltan.length ? ` · falta ${faltan[0].slice(0, 80)}` : ''}${sobran.length ? ` · sobra ${sobran[0].slice(0, 80)}` : ''}`);
-    }
+    const ahora = controles(d.texto).map(c => c.firma);
+    const resto = [...ahora];
+    for (const f of s.firmas) { const i = resto.indexOf(f); if (i < 0) malos.push(`${s.id}: falta ${f.slice(0, 90)}`); else { resto.splice(i, 1); presentes++; } }
+    nuevos += resto.length;
   }
-  check(!malos.length && total === inv.controlesEnSecciones, `los ${inv.controlesEnSecciones} controles del inventario están, idénticos, en su sección (${total})`, malos.slice(0, 5).join(' | '));
+  check(!malos.length && presentes === inv.controlesEnSecciones, `los ${inv.controlesEnSecciones} controles del inventario están, idénticos, en su sección (${presentes})`, malos.slice(0, 5).join(' | '));
+  console.log(`      controles agregados después del inventario: ${nuevos}`);
   const menu = fs.readFileSync(new URL('../components/DebugMenu.tsx', import.meta.url), 'utf8');
   check(menu.includes(normalizar('<button style={{ ...INPUT, opacity: 0.4, cursor: "not-allowed" }} disabled>off</button>')) || normalizar(menu).includes(normalizar('<button style={{ ...INPUT, opacity: 0.4, cursor: "not-allowed" }} disabled>off</button>')),
     'el control del premio (mapa de decisiones) sigue en el contenedor');
@@ -98,14 +99,15 @@ console.log('\n(d) DBG_* con sus nombres y defaults');
   }
   const faltan = Object.keys(inv.defaults).filter(k => !(k in actual));
   check(!faltan.length, `los ${Object.keys(inv.defaults).length} exports de debugConfig siguen existiendo con el mismo nombre`, faltan.join(', '));
-  const distintos = [];
+  const distintos = [], nuevosCampos = [];
   const cmp = (a, b, ruta) => {
     if (typeof a !== typeof b || Array.isArray(a) !== Array.isArray(b)) { distintos.push(ruta); return; }
-    if (a && typeof a === 'object') { for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) if (!(k in b) || !(k in a)) distintos.push(`${ruta}.${k}`); else cmp(a[k], b[k], `${ruta}.${k}`); return; }
+    if (a && typeof a === 'object') { for (const k of Object.keys(a)) if (!(k in b)) distintos.push(`${ruta}.${k} (falta)`); else cmp(a[k], b[k], `${ruta}.${k}`); for (const k of Object.keys(b)) if (!(k in a)) nuevosCampos.push(`${ruta}.${k}`); return; }
     if (a !== b) distintos.push(`${ruta} (${JSON.stringify(a)} → ${JSON.stringify(b)})`);
   };
   for (const k of Object.keys(inv.defaults)) if (k in actual) cmp(inv.defaults[k], actual[k], k);
-  check(!distintos.length, 'ningún default ni campo cambió', distintos.slice(0, 6).join(' · '));
+  check(!distintos.length, 'ningún default ni campo existente cambió', distintos.slice(0, 6).join(' · '));
+  console.log(`      campos nuevos después del inventario: ${nuevosCampos.length}${nuevosCampos.length ? ` (${nuevosCampos.slice(0, 4).join(', ')}${nuevosCampos.length > 4 ? '…' : ''})` : ''}`);
 }
 
 console.log('\n(e) índice del buscador');
