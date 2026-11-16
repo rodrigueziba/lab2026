@@ -4728,5 +4728,1194 @@
   "LECTERN_OUTWARD_OFFSET_M": 0.3,
   "PEOPLE_MIN_DELAY_MS": 5000,
   "POINTERLOCK_RETRY_MS": 1300
+ },
+ "organizacion": {
+  "generado": "2026-11-16",
+  "lineas": {
+   "components/DebugMenu.tsx": 157,
+   "components/debug/comun.tsx": 264,
+   "components/debug/estado.tsx": 395,
+   "components/debug/contexto.ts": 14,
+   "components/debug/mapaSecciones.ts": 87,
+   "components/debug/pestanas/cielo.tsx": 277,
+   "components/debug/pestanas/composicion.tsx": 519,
+   "components/debug/pestanas/flor.tsx": 172,
+   "components/debug/pestanas/luces.tsx": 177,
+   "components/debug/pestanas/narrativa.tsx": 277,
+   "components/debug/pestanas/obsoletos.tsx": 433,
+   "components/debug/pestanas/otros.tsx": 25,
+   "components/debug/pestanas/paneles.tsx": 644,
+   "components/debug/pestanas/pasto.tsx": 151,
+   "components/debug/pestanas/rendimiento.tsx": 95,
+   "components/debug/pestanas/sala.tsx": 161,
+   "components/debug/pestanas/sol.tsx": 106,
+   "components/debug/pestanas/tarima.tsx": 232,
+   "components/debug/pestanas/telon.tsx": 289,
+   "components/debug/pestanas/visualizador.tsx": 228
+  },
+  "lineasDebugConfig": 1394,
+  "pestanas": [
+   "recientes",
+   "favoritos",
+   "rendimiento",
+   "telon",
+   "flor",
+   "cielo",
+   "pasto",
+   "composicion",
+   "sol",
+   "luces",
+   "sala",
+   "narrativa",
+   "paneles",
+   "visualizador",
+   "tarima",
+   "otros",
+   "obsoletos"
+  ],
+  "secciones": [
+   {
+    "id": "diagonalspot",
+    "titulo": "DiagonalSpot",
+    "pestana": "luces",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Reflector diagonal de la sala (recargar)",
+    "controles": 7,
+    "porTipo": {
+     "color": 1,
+     "numero": 6
+    },
+    "partes": [],
+    "archivo": "luces.tsx"
+   },
+   {
+    "id": "prism",
+    "titulo": "Prism",
+    "pestana": "obsoletos",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": true,
+    "clase": "obsoleta",
+    "descripcion": "Información del aterrizaje del prisma (solo lectura)",
+    "etiqueta": "sin efecto hoy",
+    "flagApaga": "solo lectura (landOffset se cambia en el código y al recargar)",
+    "controles": 1,
+    "porTipo": {
+     "numero": 1
+    },
+    "partes": [],
+    "archivo": "obsoletos.tsx"
+   },
+   {
+    "id": "prism-proximity",
+    "titulo": "Prism proximity",
+    "pestana": "flor",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Cercanía al prisma: distancias, giro, translucidez (N2)",
+    "controles": 7,
+    "porTipo": {
+     "numero": 7
+    },
+    "partes": [],
+    "archivo": "flor.tsx"
+   },
+   {
+    "id": "dome-visualizer",
+    "titulo": "Dome visualizer",
+    "pestana": "composicion",
+    "desdeZ": 2,
+    "ultimoZ": 2,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Esfera del visualizador, música, mallas grandes (F2, G1)",
+    "controles": 25,
+    "porTipo": {
+     "numero": 14,
+     "interruptor": 4,
+     "boton": 4,
+     "color": 2,
+     "campo": 1
+    },
+    "partes": [],
+    "archivo": "composicion.tsx"
+   },
+   {
+    "id": "legado",
+    "titulo": "Legado",
+    "pestana": "obsoletos",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": true,
+    "clase": "obsoleta",
+    "descripcion": "FloorVisualizer y SectorAudioFX desactivados (N2)",
+    "etiqueta": "sin efecto hoy",
+    "flagApaga": "LEGACY_FLOOR_TEXTURES_ENABLED y LEGACY_SECTOR_AUDIO_ENABLED = false (ExperienceDome.tsx)",
+    "controles": 21,
+    "porTipo": {
+     "boton": 2,
+     "numero": 18,
+     "interruptor": 1
+    },
+    "partes": [],
+    "archivo": "obsoletos.tsx"
+   },
+   {
+    "id": "secuencia-sillas",
+    "titulo": "Secuencia sillas",
+    "pestana": "sala",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "ocasional",
+    "descripcion": "Secuencia SILLAS: liberación y simulación (N1)",
+    "controles": 4,
+    "porTipo": {
+     "numero": 1,
+     "interruptor": 1,
+     "boton": 2
+    },
+    "partes": [],
+    "archivo": "sala.tsx"
+   },
+   {
+    "id": "haces-n3-r2-v1",
+    "titulo": "Haces N3 R2 V1",
+    "pestana": "luces",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Haces: distancias, colores, interruptores por banda",
+    "controles": 16,
+    "porTipo": {
+     "numero": 10,
+     "color": 4,
+     "interruptor": 1,
+     "boton": 1
+    },
+    "partes": [],
+    "archivo": "luces.tsx"
+   },
+   {
+    "id": "sol-n3",
+    "titulo": "Sol de la sala (N3)",
+    "pestana": "sol",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Sol de la sala (N3): intensidad y tamaño",
+    "controles": 3,
+    "porTipo": {
+     "numero": 2,
+     "interruptor": 1
+    },
+    "partes": [],
+    "archivo": "sol.tsx"
+   },
+   {
+    "id": "simbolos-n3",
+    "titulo": "Símbolos N3",
+    "pestana": "visualizador",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Símbolos del visualizador (N3)",
+    "controles": 3,
+    "porTipo": {
+     "numero": 3
+    },
+    "partes": [],
+    "archivo": "visualizador.tsx"
+   },
+   {
+    "id": "audio-bandas-n4",
+    "titulo": "Audio bandas N4",
+    "pestana": "visualizador",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "ocasional",
+    "descripcion": "Bandas de audio: puertas y reasignación (N4)",
+    "controles": 4,
+    "porTipo": {
+     "numero": 2,
+     "boton": 1,
+     "interruptor": 1
+    },
+    "partes": [],
+    "archivo": "visualizador.tsx"
+   },
+   {
+    "id": "monolitos-n5-v1-v2-v3",
+    "titulo": "Monolitos N5 V1/V2/V3",
+    "pestana": "pasto",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Monolitos de obsidiana: distancia, material, pantallas, luces",
+    "controles": 25,
+    "porTipo": {
+     "numero": 21,
+     "interruptor": 4
+    },
+    "partes": [],
+    "archivo": "pasto.tsx"
+   },
+   {
+    "id": "telon-n6",
+    "titulo": "Telón N6",
+    "pestana": "telon",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Telón rojo: distancia, tela, color (N6)",
+    "controles": 7,
+    "porTipo": {
+     "numero": 4,
+     "color": 1,
+     "boton": 2
+    },
+    "partes": [],
+    "archivo": "telon.tsx"
+   },
+   {
+    "id": "paneles-sillas",
+    "titulo": "Paneles SILLAS",
+    "pestana": "paneles",
+    "desdeZ": 1,
+    "ultimoZ": 13,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Paneles de proyectos del camino SILLAS: paneles (P1), órbitas (Z7) y linterna (Z2) (Z73: fusionadas)",
+    "controles": 41,
+    "porTipo": {
+     "interruptor": 7,
+     "numero": 32,
+     "boton": 2
+    },
+    "partes": [
+     "paneles-sillas-p1",
+     "orbitas-z7-paneles-sillas",
+     "linterna-z2-paneles-sillas"
+    ],
+    "archivo": "paneles.tsx"
+   },
+   {
+    "id": "acercamiento-z8",
+    "titulo": "Acercamiento Z8",
+    "pestana": "paneles",
+    "desdeZ": 8,
+    "ultimoZ": 18,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Acercamiento a un panel y subpaneles (Z8 a Z18)",
+    "controles": 48,
+    "porTipo": {
+     "interruptor": 11,
+     "numero": 35,
+     "selector": 2
+    },
+    "partes": [],
+    "archivo": "paneles.tsx"
+   },
+   {
+    "id": "prioridad-z10-proyecto-abierto-sobre-las",
+    "titulo": "Prioridad Z10 — proyecto abierto sobre las órbitas",
+    "pestana": "paneles",
+    "desdeZ": 10,
+    "ultimoZ": 10,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Prioridad del proyecto abierto sobre las órbitas",
+    "controles": 7,
+    "porTipo": {
+     "interruptor": 2,
+     "numero": 5
+    },
+    "partes": [],
+    "archivo": "paneles.tsx"
+   },
+   {
+    "id": "inicio-z24",
+    "titulo": "Inicio Z24",
+    "pestana": "telon",
+    "desdeZ": 24,
+    "ultimoZ": 25,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Inicio de la experiencia (recargar)",
+    "controles": 2,
+    "porTipo": {
+     "numero": 2
+    },
+    "partes": [],
+    "archivo": "telon.tsx"
+   },
+   {
+    "id": "iconos-del-piso-z23",
+    "titulo": "Iconos del piso Z23",
+    "pestana": "sala",
+    "desdeZ": 23,
+    "ultimoZ": 24,
+    "avanzada": false,
+    "clase": "ocasional",
+    "descripcion": "Iconos del piso (SILLAS / LUZ)",
+    "controles": 12,
+    "porTipo": {
+     "interruptor": 1,
+     "numero": 11
+    },
+    "partes": [],
+    "archivo": "sala.tsx"
+   },
+   {
+    "id": "checkpoints-z40",
+    "titulo": "Checkpoints Z40",
+    "pestana": "narrativa",
+    "desdeZ": 40,
+    "ultimoZ": 40,
+    "avanzada": false,
+    "clase": "ocasional",
+    "descripcion": "Saltos a checkpoints",
+    "controles": 3,
+    "porTipo": {
+     "interruptor": 1,
+     "boton": 1,
+     "numero": 1
+    },
+    "partes": [],
+    "archivo": "narrativa.tsx"
+   },
+   {
+    "id": "layout-z41",
+    "titulo": "Layout Z41",
+    "pestana": "sala",
+    "desdeZ": 41,
+    "ultimoZ": 41,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Posiciones de sillas, público y monolitos",
+    "controles": 3,
+    "porTipo": {
+     "interruptor": 1,
+     "slider": 2
+    },
+    "partes": [],
+    "archivo": "sala.tsx"
+   },
+   {
+    "id": "control-del-dia",
+    "titulo": "Control del día",
+    "pestana": "cielo",
+    "desdeZ": 73,
+    "ultimoZ": 67,
+    "avanzada": false,
+    "clase": "ocasional",
+    "descripcion": "tDia, velocidad, ir a una etapa, checkpoints del día y acciones de la flor (lib/controlDia.ts); los botones de Prisma y flor y Base de la flor son atajos",
+    "controles": 10,
+    "porTipo": {
+     "slider": 2,
+     "boton": 8
+    },
+    "partes": [],
+    "archivo": "cielo.tsx"
+   },
+   {
+    "id": "ciclo-de-dia-z48",
+    "titulo": "Ciclo de día Z48",
+    "pestana": "cielo",
+    "desdeZ": 48,
+    "ultimoZ": 55,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Ciclo de día: tDia, velocidad, etapas, saltos",
+    "controles": 5,
+    "porTipo": {
+     "interruptor": 2,
+     "slider": 1,
+     "boton": 2
+    },
+    "partes": [],
+    "archivo": "cielo.tsx"
+   },
+   {
+    "id": "prisma-y-flor-z54",
+    "titulo": "Prisma y flor Z54",
+    "pestana": "flor",
+    "desdeZ": 54,
+    "ultimoZ": 62,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Prisma que sube y flor del ciclo del día",
+    "controles": 6,
+    "porTipo": {
+     "interruptor": 1,
+     "slider": 1,
+     "boton": 4
+    },
+    "partes": [],
+    "archivo": "flor.tsx"
+   },
+   {
+    "id": "base-de-la-flor-z67",
+    "titulo": "Base de la flor Z67",
+    "pestana": "flor",
+    "desdeZ": 67,
+    "ultimoZ": 67,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Hueco, grietas, astillas y pasto de la base de la flor",
+    "controles": 5,
+    "porTipo": {
+     "interruptor": 1,
+     "slider": 1,
+     "boton": 3
+    },
+    "partes": [],
+    "archivo": "flor.tsx"
+   },
+   {
+    "id": "rendimiento-z66",
+    "titulo": "Rendimiento Z66",
+    "pestana": "rendimiento",
+    "desdeZ": 66,
+    "ultimoZ": 72,
+    "avanzada": false,
+    "clase": "ocasional",
+    "descripcion": "Medición, DPR adaptativo, sistemas, pasto, benchmark, post-proceso y perfiles (Z66, Z69, Z72: poses, domo a escala, objetivo por refresco)",
+    "controles": 1,
+    "porTipo": {
+     "panel": 1
+    },
+    "partes": [],
+    "archivo": "rendimiento.tsx"
+   },
+   {
+    "id": "pasto-z64",
+    "titulo": "Pasto Z64",
+    "pestana": "pasto",
+    "desdeZ": 64,
+    "ultimoZ": 65,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Pasto bajo las 4 luces: progreso, aspecto, completar, monolitos",
+    "controles": 7,
+    "porTipo": {
+     "interruptor": 1,
+     "slider": 1,
+     "boton": 5
+    },
+    "partes": [],
+    "archivo": "pasto.tsx"
+   },
+   {
+    "id": "fluir-de-color-z61",
+    "titulo": "Fluir de color Z61",
+    "pestana": "composicion",
+    "desdeZ": 61,
+    "ultimoZ": 65,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Fluir de color de los bloques azul y naranja",
+    "controles": 7,
+    "porTipo": {
+     "interruptor": 1,
+     "slider": 1,
+     "boton": 4,
+     "color": 1
+    },
+    "partes": [],
+    "archivo": "composicion.tsx"
+   },
+   {
+    "id": "ondas-por-kick-z52",
+    "titulo": "Ondas por kick Z52",
+    "pestana": "sol",
+    "desdeZ": 52,
+    "ultimoZ": 58,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Ondas expansivas por kick desde el portal",
+    "controles": 6,
+    "porTipo": {
+     "interruptor": 1,
+     "slider": 2,
+     "boton": 3
+    },
+    "partes": [],
+    "archivo": "sol.tsx"
+   },
+   {
+    "id": "sol-nuevo-z51",
+    "titulo": "Sol del cielo (Z51)",
+    "pestana": "sol",
+    "desdeZ": 51,
+    "ultimoZ": 57,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Sol nuevo: núcleo, rayos y destello de lente",
+    "controles": 2,
+    "porTipo": {
+     "interruptor": 1,
+     "slider": 1
+    },
+    "partes": [],
+    "archivo": "sol.tsx"
+   },
+   {
+    "id": "composicion-del-domo-z49",
+    "titulo": "Composición del domo Z49",
+    "pestana": "composicion",
+    "desdeZ": 49,
+    "ultimoZ": 57,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Escala del portal y tinte del cielo",
+    "controles": 5,
+    "porTipo": {
+     "interruptor": 2,
+     "slider": 2,
+     "color": 1
+    },
+    "partes": [],
+    "archivo": "composicion.tsx"
+   },
+   {
+    "id": "texto-del-telon-z46",
+    "titulo": "Texto del telón Z46",
+    "pestana": "telon",
+    "desdeZ": 46,
+    "ultimoZ": 71,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Texto proyectado sobre el telón y crédito con efecto de foco (Z71)",
+    "controles": 6,
+    "porTipo": {
+     "interruptor": 2,
+     "slider": 2,
+     "boton": 2
+    },
+    "partes": [],
+    "archivo": "telon.tsx"
+   },
+   {
+    "id": "fractal-del-prisma-z43",
+    "titulo": "Fractal del prisma Z43",
+    "pestana": "flor",
+    "desdeZ": 43,
+    "ultimoZ": 45,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Fractal de las caras del prisma (Z43 a Z45, Z69)",
+    "controles": 3,
+    "porTipo": {
+     "interruptor": 1,
+     "slider": 1,
+     "color": 1
+    },
+    "partes": [],
+    "archivo": "flor.tsx"
+   },
+   {
+    "id": "luces-del-visualizador-z42",
+    "titulo": "Luces del visualizador Z42",
+    "pestana": "luces",
+    "desdeZ": 42,
+    "ultimoZ": 42,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Luces del visualizador: halo, cono y charco",
+    "controles": 3,
+    "porTipo": {
+     "interruptor": 1,
+     "slider": 2
+    },
+    "partes": [],
+    "archivo": "luces.tsx"
+   },
+   {
+    "id": "reloj-de-la-experiencia-z39",
+    "titulo": "Reloj de la experiencia Z39",
+    "pestana": "sala",
+    "desdeZ": 39,
+    "ultimoZ": 39,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Reloj único de la experiencia (RELOJ_UNIFICADO)",
+    "controles": 4,
+    "porTipo": {
+     "interruptor": 1,
+     "numero": 3
+    },
+    "partes": [],
+    "archivo": "sala.tsx"
+   },
+   {
+    "id": "movimiento-z34",
+    "titulo": "Movimiento Z34",
+    "pestana": "sala",
+    "desdeZ": 34,
+    "ultimoZ": 34,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Velocidad y movimiento WASD",
+    "controles": 5,
+    "porTipo": {
+     "numero": 4,
+     "interruptor": 1
+    },
+    "partes": [],
+    "archivo": "sala.tsx"
+   },
+   {
+    "id": "efectos-del-dialogo-z29",
+    "titulo": "Efectos del diálogo Z29",
+    "pestana": "narrativa",
+    "desdeZ": 29,
+    "ultimoZ": 40,
+    "avanzada": false,
+    "clase": "ocasional",
+    "descripcion": "Efectos del diálogo: alarma, premio, pruebas",
+    "controles": 20,
+    "porTipo": {
+     "interruptor": 1,
+     "boton": 6,
+     "numero": 13
+    },
+    "partes": [],
+    "archivo": "narrativa.tsx"
+   },
+   {
+    "id": "camino-luz-z28",
+    "titulo": "Camino LUZ Z28",
+    "pestana": "narrativa",
+    "desdeZ": 28,
+    "ultimoZ": 28,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Luz lejana del camino LUZ",
+    "controles": 33,
+    "porTipo": {
+     "boton": 1,
+     "interruptor": 5,
+     "numero": 26,
+     "color": 1
+    },
+    "partes": [],
+    "archivo": "narrativa.tsx"
+   },
+   {
+    "id": "cielo-estrellado-z30",
+    "titulo": "Cielo estrellado Z30",
+    "pestana": "cielo",
+    "desdeZ": 30,
+    "ultimoZ": 33,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Cielo estrellado del camino LUZ y límites del exterior",
+    "controles": 27,
+    "porTipo": {
+     "interruptor": 9,
+     "numero": 15,
+     "color": 2,
+     "slider": 1
+    },
+    "partes": [],
+    "archivo": "cielo.tsx"
+   },
+   {
+    "id": "dialogo-z27",
+    "titulo": "Diálogo Z27 (terminal)",
+    "pestana": "narrativa",
+    "desdeZ": 27,
+    "ultimoZ": 35,
+    "avanzada": false,
+    "clase": "ocasional",
+    "descripcion": "Terminal de diálogo ink: probar, cerrar, tiempos",
+    "controles": 13,
+    "porTipo": {
+     "boton": 3,
+     "interruptor": 2,
+     "numero": 8
+    },
+    "partes": [],
+    "archivo": "narrativa.tsx"
+   },
+   {
+    "id": "video-etapa-1",
+    "titulo": "Video — etapa 1 (reproductor aparte)",
+    "pestana": "paneles",
+    "desdeZ": 23,
+    "ultimoZ": 23,
+    "avanzada": false,
+    "clase": "ocasional",
+    "descripcion": "Reproductor de video aparte",
+    "controles": 4,
+    "porTipo": {
+     "interruptor": 4
+    },
+    "partes": [],
+    "archivo": "paneles.tsx"
+   },
+   {
+    "id": "foco-z19-subpanel-agrandado",
+    "titulo": "Foco Z19 — subpanel agrandado",
+    "pestana": "paneles",
+    "desdeZ": 19,
+    "ultimoZ": 21,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Foco: subpanel agrandado",
+    "controles": 25,
+    "porTipo": {
+     "interruptor": 5,
+     "numero": 18,
+     "color": 2
+    },
+    "partes": [],
+    "archivo": "paneles.tsx"
+   },
+   {
+    "id": "subpaneles-z4-historia-galeria-ficha",
+    "titulo": "Subpaneles Z4 — HISTORIA / GALERÍA / FICHA",
+    "pestana": "paneles",
+    "desdeZ": 4,
+    "ultimoZ": 11,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Subpaneles HISTORIA / GALERÍA / FICHA",
+    "controles": 22,
+    "porTipo": {
+     "interruptor": 4,
+     "numero": 18
+    },
+    "partes": [],
+    "archivo": "paneles.tsx"
+   },
+   {
+    "id": "destello-de-cortina-f1",
+    "titulo": "Destello de cortina F1",
+    "pestana": "telon",
+    "desdeZ": 1,
+    "ultimoZ": 1,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Destello al cruzar el telón (F1 a G3)",
+    "controles": 39,
+    "porTipo": {
+     "interruptor": 3,
+     "numero": 31,
+     "slider": 1,
+     "color": 2,
+     "boton": 2
+    },
+    "partes": [],
+    "archivo": "telon.tsx"
+   },
+   {
+    "id": "entrada-tras-el-telon-z59",
+    "titulo": "Entrada tras el telón Z59",
+    "pestana": "telon",
+    "desdeZ": 59,
+    "ultimoZ": 65,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Pose de entrada tras el telón",
+    "controles": 5,
+    "porTipo": {
+     "interruptor": 2,
+     "slider": 1,
+     "boton": 2
+    },
+    "partes": [],
+    "archivo": "telon.tsx"
+   },
+   {
+    "id": "panorama-svg",
+    "titulo": "Panorama SVG (apagado)",
+    "pestana": "obsoletos",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": true,
+    "clase": "obsoleta",
+    "descripcion": "Panorama de capas SVG: T2, U4 (sol, montañas, cielo, líneas), U5, U7, U10A y AA1 (Z73: fusionadas)",
+    "etiqueta": "código viejo",
+    "flagApaga": "DBG_SILLAS.usarDomoShader = true y domoOriginal = false (el shader del domo reemplaza a VizPanorama)",
+    "controles": 38,
+    "porTipo": {
+     "numero": 31,
+     "slider": 1,
+     "boton": 2,
+     "interruptor": 4
+    },
+    "partes": [
+     "panorama-t2-crecimiento-de-grupos",
+     "u4-sol",
+     "u4-montanas",
+     "u4-cielo",
+     "u4-lineas",
+     "u5-lineas-liquidas",
+     "u7-capas-visibles",
+     "u10a-parallax-por-capa",
+     "aa1-domo-original"
+    ],
+    "archivo": "obsoletos.tsx"
+   },
+   {
+    "id": "reaccion-t3-audio",
+    "titulo": "Reacción T3 — audio",
+    "pestana": "visualizador",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Reacción al audio de los grupos (T3)",
+    "controles": 10,
+    "porTipo": {
+     "numero": 8,
+     "slider": 1,
+     "interruptor": 1
+    },
+    "partes": [],
+    "archivo": "visualizador.tsx"
+   },
+   {
+    "id": "u6a-anillos-en-piso",
+    "titulo": "U6A — Anillos en piso",
+    "pestana": "luces",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "ocasional",
+    "descripcion": "Anillos en el piso al entrar al haz (U6A)",
+    "controles": 7,
+    "porTipo": {
+     "numero": 7
+    },
+    "partes": [],
+    "archivo": "luces.tsx"
+   },
+   {
+    "id": "u6b-destello-del-haz",
+    "titulo": "U6B — Destello del haz",
+    "pestana": "luces",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "ocasional",
+    "descripcion": "Destello del haz al activar (U6B)",
+    "controles": 5,
+    "porTipo": {
+     "numero": 5
+    },
+    "partes": [],
+    "archivo": "luces.tsx"
+   },
+   {
+    "id": "amanecer-viejo",
+    "titulo": "Amanecer viejo",
+    "pestana": "obsoletos",
+    "desdeZ": 38,
+    "ultimoZ": 38,
+    "avanzada": true,
+    "clase": "obsoleta",
+    "descripcion": "Amanecer del panorama SVG (U9) y del shader (W3), reemplazados por el amanecer único (Z38) y el ciclo de día (Z48) (Z73: fusionadas)",
+    "etiqueta": "código viejo",
+    "flagApaga": "DBG_AMANECER.UNIFICADO = true (con false vuelven las dos máquinas viejas)",
+    "controles": 11,
+    "porTipo": {
+     "numero": 11
+    },
+    "partes": [
+     "u9-secuencia-amanecer",
+     "w3-amanecer-domesky"
+    ],
+    "archivo": "obsoletos.tsx"
+   },
+   {
+    "id": "amanecer-z38",
+    "titulo": "Amanecer Z38",
+    "pestana": "cielo",
+    "desdeZ": 38,
+    "ultimoZ": 38,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Máquina única del amanecer (UNIFICADO, MONOLITOS_CAPTURA)",
+    "controles": 5,
+    "porTipo": {
+     "interruptor": 2,
+     "numero": 1,
+     "boton": 2
+    },
+    "partes": [],
+    "archivo": "cielo.tsx"
+   },
+   {
+    "id": "u10b-reaccion-al-sonido",
+    "titulo": "U10B — Reacción al sonido",
+    "pestana": "visualizador",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Reacción al sonido por capa (U10B)",
+    "controles": 13,
+    "porTipo": {
+     "numero": 13
+    },
+    "partes": [],
+    "archivo": "visualizador.tsx"
+   },
+   {
+    "id": "u11-camera-feedback",
+    "titulo": "U11 — Camera feedback (haz-toggle)",
+    "pestana": "visualizador",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Respuesta de cámara al interruptor de haz (U11)",
+    "controles": 11,
+    "porTipo": {
+     "numero": 11
+    },
+    "partes": [],
+    "archivo": "visualizador.tsx"
+   },
+   {
+    "id": "shader-del-domo",
+    "titulo": "Shader del domo",
+    "pestana": "composicion",
+    "desdeZ": 0,
+    "ultimoZ": 1,
+    "avanzada": true,
+    "clase": "tecnica",
+    "descripcion": "Shader del domo: W1 (flags y escala), W2 (multiplicadores), W4 (ajustes), W5 (siluetas) y X2 (diagnóstico) (Z73: fusionadas)",
+    "controles": 23,
+    "porTipo": {
+     "interruptor": 7,
+     "numero": 16
+    },
+    "partes": [
+     "w1-domo-de-shader",
+     "w2-multiplicadores-de-grupo",
+     "w4-domesky-ajuste-de-shader",
+     "w5-siluetas-suaves",
+     "x2-domo-diagnostico"
+    ],
+    "archivo": "composicion.tsx"
+   },
+   {
+    "id": "u2-agc-amplitudes",
+    "titulo": "U2 — AGC + amplitudes",
+    "pestana": "visualizador",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Control automático de ganancia y medidores (U2)",
+    "controles": 12,
+    "porTipo": {
+     "numero": 11,
+     "interruptor": 1
+    },
+    "partes": [],
+    "archivo": "visualizador.tsx"
+   },
+   {
+    "id": "debug-overlays",
+    "titulo": "Overlays del prisma, audio y efectos (R1)",
+    "pestana": "otros",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Overlays de diagnóstico (prisma, audio, efectos)",
+    "controles": 1,
+    "porTipo": {
+     "interruptor": 1
+    },
+    "partes": [],
+    "archivo": "otros.tsx"
+   },
+   {
+    "id": "post-proceso-r4",
+    "titulo": "Post-proceso R4",
+    "pestana": "rendimiento",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "CRT y bloom: intensidades, curvatura, scanlines, exposición (R4)",
+    "controles": 17,
+    "porTipo": {
+     "interruptor": 3,
+     "selector": 1,
+     "numero": 13
+    },
+    "partes": [],
+    "archivo": "rendimiento.tsx"
+   },
+   {
+    "id": "stars",
+    "titulo": "Stars",
+    "pestana": "tarima",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Estrellas del domo de caras",
+    "controles": 7,
+    "porTipo": {
+     "numero": 7
+    },
+    "partes": [],
+    "archivo": "tarima.tsx"
+   },
+   {
+    "id": "dome",
+    "titulo": "Dome",
+    "pestana": "tarima",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Domo de caras",
+    "controles": 2,
+    "porTipo": {
+     "numero": 2
+    },
+    "partes": [],
+    "archivo": "tarima.tsx"
+   },
+   {
+    "id": "sector-effects",
+    "titulo": "Sector effects",
+    "pestana": "tarima",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Efectos por sector del domo de caras",
+    "controles": 1,
+    "porTipo": {
+     "selector": 1
+    },
+    "partes": [],
+    "archivo": "tarima.tsx"
+   },
+   {
+    "id": "lecterns",
+    "titulo": "Lecterns",
+    "pestana": "tarima",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Atriles: posiciones, cámaras, overlays de atriles (T7)",
+    "controles": 22,
+    "porTipo": {
+     "numero": 15,
+     "interruptor": 4,
+     "boton": 3
+    },
+    "partes": [],
+    "archivo": "tarima.tsx"
+   },
+   {
+    "id": "retro-atriles",
+    "titulo": "Retro atriles",
+    "pestana": "tarima",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "frecuente",
+    "descripcion": "Estilo retro de los atriles (J5)",
+    "controles": 2,
+    "porTipo": {
+     "interruptor": 1,
+     "numero": 1
+    },
+    "partes": [],
+    "archivo": "tarima.tsx"
+   },
+   {
+    "id": "face-capture",
+    "titulo": "Face capture",
+    "pestana": "tarima",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Captura de caras (recargar)",
+    "controles": 2,
+    "porTipo": {
+     "numero": 2
+    },
+    "partes": [],
+    "archivo": "tarima.tsx"
+   },
+   {
+    "id": "audio",
+    "titulo": "Audio (T7 — read-only live)",
+    "pestana": "tarima",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Audio de los atriles (solo lectura)",
+    "controles": 6,
+    "porTipo": {
+     "numero": 6
+    },
+    "partes": [],
+    "archivo": "tarima.tsx"
+   },
+   {
+    "id": "extra-lights",
+    "titulo": "Extra lights",
+    "pestana": "tarima",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": false,
+    "clase": "tecnica",
+    "descripcion": "Luces extra del panel T5 (solo lectura)",
+    "controles": 2,
+    "porTipo": {
+     "numero": 2
+    },
+    "partes": [],
+    "archivo": "tarima.tsx"
+   },
+   {
+    "id": "controles-sin-efecto",
+    "titulo": "Controles sin efecto",
+    "pestana": "obsoletos",
+    "desdeZ": 0,
+    "ultimoZ": 0,
+    "avanzada": true,
+    "clase": "obsoleta",
+    "descripcion": "Controles que ya no hacen nada, movidos desde su sección (prismRangeScale de Prism proximity)",
+    "etiqueta": "sin efecto hoy",
+    "flagApaga": "prismRangeScale: legacy N1, ya no se aplica (la cercanía usa nearM / closeM / maxEffectM)",
+    "controles": 1,
+    "porTipo": {
+     "numero": 1
+    },
+    "partes": [],
+    "archivo": "obsoletos.tsx"
+   }
+  ],
+  "controles": 700
  }
 }

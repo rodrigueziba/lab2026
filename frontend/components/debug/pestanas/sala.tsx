@@ -4,7 +4,7 @@
 import { DBG_SILLAS, DBG_PISO_ICONOS, DBG_LAYOUT, DBG_SECUENCIA, DBG_MOV } from "@/lib/debugConfig";
 import { RELOJ, esperasPendientes } from "@/lib/relojExperiencia";
 import { SECUENCIA } from "@/lib/secuenciaSillas";
-import { LABEL, NOTE, NumField, ROW, INPUT } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, NumField } from "../comun";
 import { useDbg } from "../contexto";
 
 // sección: secuencia-sillas
@@ -36,6 +36,7 @@ export function SecSecuenciaSillas() {
     </>
   );
 }
+
 // sección: iconos-del-piso-z23
 export function SecIconosDelPisoZ23() {
   const { piso, setPiso } = useDbg();
@@ -75,6 +76,7 @@ export function SecIconosDelPisoZ23() {
     </>
   );
 }
+
 // sección: layout-z41
 export function SecLayoutZ41() {
   const { lay, setLay } = useDbg();
@@ -103,6 +105,7 @@ export function SecLayoutZ41() {
     </>
   );
 }
+
 // sección: reloj-de-la-experiencia-z39
 export function SecRelojDeLaExperienciaZ39() {
   const { sec, setSec } = useDbg();
@@ -129,6 +132,7 @@ export function SecRelojDeLaExperienciaZ39() {
     </>
   );
 }
+
 // sección: movimiento-z34
 export function SecMovimientoZ34() {
   const { mov, setMov } = useDbg();

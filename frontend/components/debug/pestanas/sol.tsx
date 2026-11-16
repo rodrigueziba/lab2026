@@ -3,7 +3,7 @@
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { DBG_SILLAS, DBG_ONDAS, DBG_SOL } from "@/lib/debugConfig";
 import { crearEspera } from "@/lib/relojExperiencia";
-import { LABEL, NOTE, NumField, ROW, INPUT } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, NumField } from "../comun";
 import { useDbg } from "../contexto";
 
 // sección: sol-n3
@@ -11,7 +11,7 @@ export function SecSolN3() {
   const { sillas, setSillas } = useDbg();
   return (
     <>
-          <span style={LABEL}>Sol N3 <span style={NOTE}>(live)</span></span>
+          <span style={LABEL}>Sol de la sala (N3) <span style={NOTE}>(live)</span></span>
           <NumField label="sunIntensity" value={sillas.sunIntensity} step={0.05} min={0} max={3} note="live"
             onChange={v => { DBG_SILLAS.sunIntensity = v; setSillas(s => ({ ...s, sunIntensity: v })); }} />
           <NumField label="sunAngularDeg" value={sillas.sunAngularDeg} step={0.5} min={0.5} max={20} note="live"
@@ -27,6 +27,7 @@ export function SecSolN3() {
     </>
   );
 }
+
 // sección: ondas-por-kick-z52
 export function SecOndasPorKickZ52() {
   const { tocarDia } = useDbg();
@@ -73,12 +74,13 @@ export function SecOndasPorKickZ52() {
     </>
   );
 }
+
 // sección: sol-nuevo-z51
 export function SecSolNuevoZ51() {
   const { tocarDia } = useDbg();
   return (
     <>
-          <span style={LABEL}>Sol nuevo Z51 <span style={NOTE}>(núcleo, rayos y destello de lente · live)</span></span>
+          <span style={LABEL}>Sol del cielo (Z51) <span style={NOTE}>(núcleo, rayos y destello de lente · live)</span></span>
           {(["DISENO_NUEVO", "FLARE"] as const).map(k => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{k === "DISENO_NUEVO" ? "off = disco anterior" : "destello de lente"}</span></span>

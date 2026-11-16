@@ -76,6 +76,13 @@ export const DIVIDER: React.CSSProperties = {
   margin:       "8px 0",
 };
 
+// Z73: indicadores. ⟳ = el control pide recargar (o remontar) para aplicarse; los de solo lectura van sin caja y en gris.
+export const requiereRecargar = (note?: string): boolean => !!note && /reload|recarg|remont/i.test(note);
+export const RECARGA: React.CSSProperties = { color: "#c9a26b", marginRight: 3, fontSize: 10 };
+export const INPUT_LECTURA: React.CSSProperties = {
+  ...INPUT, background: "transparent", border: "1px dashed rgba(100,120,180,0.25)", color: "#6f7a92", fontStyle: "italic",
+};
+
 export function NumField({
   label,
   value,
@@ -96,12 +103,14 @@ export function NumField({
   return (
     <div style={ROW}>
       <span>
+        {requiereRecargar(note) && <span style={RECARGA} title="requiere recargar">⟳</span>}
         {label}
         {note && <span style={NOTE}>{note}</span>}
       </span>
       <input
         type="number"
-        style={INPUT}
+        style={onChange ? INPUT : INPUT_LECTURA}
+        title={onChange ? undefined : "solo lectura"}
         value={value}
         min={min}
         max={max}
@@ -127,12 +136,14 @@ export function ColorField({
   return (
     <div style={ROW}>
       <span>
+        {requiereRecargar(note) && <span style={RECARGA} title="requiere recargar">⟳</span>}
         {label}
         {note && <span style={NOTE}>{note}</span>}
       </span>
       <input
         type="color"
-        style={{ ...INPUT, width: 40, padding: 2, cursor: onChange ? "pointer" : "default" }}
+        style={{ ...(onChange ? INPUT : INPUT_LECTURA), width: 40, padding: 2, cursor: onChange ? "pointer" : "default" }}
+        title={onChange ? undefined : "solo lectura"}
         value={value}
         readOnly={!onChange}
         onChange={e => onChange?.(e.target.value)}

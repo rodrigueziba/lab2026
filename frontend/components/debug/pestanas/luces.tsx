@@ -3,7 +3,7 @@
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { DBG_SILLAS, DBG_LUCES } from "@/lib/debugConfig";
 import { setHazBandOn } from "@/lib/haz";
-import { LABEL, NOTE, ColorField, NumField, INPUT, ROW } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, NumField, ColorField } from "../comun";
 import { useDbg } from "../contexto";
 
 // sección: diagonalspot
@@ -31,6 +31,7 @@ export function SecDiagonalspot() {
     </>
   );
 }
+
 // sección: haces-n3-r2-v1
 export function SecHacesN3R2V1() {
   const { sillas, setSillas, bandOnArr } = useDbg();
@@ -86,6 +87,7 @@ export function SecHacesN3R2V1() {
     </>
   );
 }
+
 // sección: luces-del-visualizador-z42
 export function SecLucesDelVisualizadorZ42() {
   const { luc, setLuc } = useDbg();
@@ -128,6 +130,7 @@ export function SecLucesDelVisualizadorZ42() {
     </>
   );
 }
+
 // sección: u6a-anillos-en-piso
 export function SecU6aAnillosEnPiso() {
   const { sillas, setSillas } = useDbg();
@@ -151,6 +154,7 @@ export function SecU6aAnillosEnPiso() {
     </>
   );
 }
+
 // sección: u6b-destello-del-haz
 export function SecU6bDestelloDelHaz() {
   const { sillas, setSillas } = useDbg();

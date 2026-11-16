@@ -1,11 +1,56 @@
 "use client";
 // Z70: pestaña "Cielo y ciclo del día" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
-import { DBG_DIA, DBG_LUZ, DBG_SILLAS, DBG_AMANECER } from "@/lib/debugConfig";
+import { DBG_DIA, DBG_CHECKPOINTS, DBG_LUZ, DBG_AMANECER } from "@/lib/debugConfig";
+import { fijarTDia, velocidadDia, ETAPAS_DIA, irATDia, usarReloj, CHECKPOINTS_DIA, irCheckpointDia, probarFlor, mostrarBaseConFlor, animarNacimiento, reiniciarBaseFlor } from "@/lib/controlDia";
 import { CIELO_STATE, LUZ_STATE } from "@/lib/caminoLuz";
 import { AMANECER } from "@/lib/amanecer";
-import { LABEL, NOTE, ROW, INPUT, NumField, ColorField, DIVIDER } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, NumField, ColorField } from "../comun";
 import { useDbg } from "../contexto";
+
+// sección: control-del-dia
+export function SecControlDelDia() {
+  const { tocarDia, diaLive } = useDbg();
+  return (
+    <>
+          {/* Z73: el día en un solo lugar (lib/controlDia.ts). "Probar flor", "velocidad 1" (Prisma y flor) y los botones
+              de Base de la flor son atajos a estas mismas funciones; T_MANUAL y VELOCIDAD siguen también en Ciclo de día */}
+          <span style={LABEL}>Control del día <span style={NOTE}>(tDia, velocidad, saltos · live)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{diaLive}</span></div>
+          <div style={ROW}>
+            <span>T_MANUAL <span style={NOTE}>{DBG_DIA.T_MANUAL.toFixed(3)} −1 = reloj; 0…1 fija tDia</span></span>
+            <input type="range" min={-1} max={1} step={0.005} style={{ flex: 1 }} value={DBG_DIA.T_MANUAL}
+              onChange={e => { fijarTDia(parseFloat(e.target.value)); tocarDia(); }} />
+          </div>
+          <div style={ROW}>
+            <span>VELOCIDAD <span style={NOTE}>{DBG_DIA.VELOCIDAD.toFixed(2)} × tiempo</span></span>
+            <input type="range" min={0.25} max={24} step={0.25} style={{ flex: 1 }} value={DBG_DIA.VELOCIDAD}
+              onChange={e => { velocidadDia(parseFloat(e.target.value)); tocarDia(); }} />
+          </div>
+          <div style={{ ...ROW, flexWrap: "wrap", gap: 4, justifyContent: "flex-start" }}>
+            <span>ir a tDia <span style={NOTE}>(sigue el reloj desde ahí)</span></span>
+            {ETAPAS_DIA.map(([n, t]) => (
+              <button key={n} style={{ ...INPUT, width: "auto" }} onClick={() => { irATDia(t); tocarDia(); }}>{n} {t}</button>
+            ))}
+            <button style={{ ...INPUT, width: "auto" }} onClick={() => { usarReloj(); tocarDia(); }}>reloj</button>
+          </div>
+          <div style={{ ...ROW, flexWrap: "wrap", gap: 4, justifyContent: "flex-start" }}>
+            <span>checkpoints del día <span style={NOTE}>{DBG_CHECKPOINTS.HABILITADOS ? "" : "(deshabilitados)"}</span></span>
+            {CHECKPOINTS_DIA.map(c => (
+              <button key={c.id} title={c.descripcion} disabled={!DBG_CHECKPOINTS.HABILITADOS} style={{ ...INPUT, width: "auto" }}
+                onClick={() => { irCheckpointDia(c.id); tocarDia(); }}>{c.nombre}</button>
+            ))}
+          </div>
+          <div style={{ ...ROW, flexWrap: "wrap", gap: 4, justifyContent: "flex-start" }}>
+            <button style={{ ...INPUT, width: "auto" }} onClick={() => { probarFlor(); tocarDia(); }}>Probar flor (×24)</button>
+            <button style={{ ...INPUT, width: "auto" }} onClick={() => { usarReloj(1); tocarDia(); }}>velocidad 1</button>
+            <button style={{ ...INPUT, width: "auto" }} onClick={() => { mostrarBaseConFlor(); tocarDia(); }}>Mostrar base con flor</button>
+            <button style={{ ...INPUT, width: "auto" }} onClick={() => { animarNacimiento(); tocarDia(); }}>Animar nacimiento</button>
+            <button style={{ ...INPUT, width: "auto" }} onClick={() => { reiniciarBaseFlor(); tocarDia(); }}>Reiniciar base</button>
+          </div>
+    </>
+  );
+}
 
 // sección: ciclo-de-dia-z48
 export function SecCicloDeDiaZ48() {
@@ -57,6 +102,7 @@ export function SecCicloDeDiaZ48() {
     </>
   );
 }
+
 // sección: cielo-estrellado-z30
 export function SecCieloEstrelladoZ30() {
   const { luz, setLuz } = useDbg();
@@ -183,47 +229,10 @@ export function SecCieloEstrelladoZ30() {
             onChange={v => { DBG_LUZ.ESTRELLAS_U_PAN = v; setLuz(o => ({ ...o, ESTRELLAS_U_PAN: v })); }} />
           <ColorField label="ESTRELLAS_TINTE_HORIZONTE" value={luz.ESTRELLAS_TINTE_HORIZONTE}
             onChange={v => { DBG_LUZ.ESTRELLAS_TINTE_HORIZONTE = v; setLuz(o => ({ ...o, ESTRELLAS_TINTE_HORIZONTE: v })); }} />
-          <div style={DIVIDER} />
-          <NumField label="EXTERIOR_RADIO_M" value={luz.EXTERIOR_RADIO_M} step={1} min={5} max={100} note="m caminable"
-            onChange={v => { DBG_LUZ.EXTERIOR_RADIO_M = v; setLuz(o => ({ ...o, EXTERIOR_RADIO_M: v })); }} />
-          <NumField label="AREA_HIST_M" value={luz.AREA_HIST_M} step={0.25} min={0} max={5} note="m"
-            onChange={v => { DBG_LUZ.AREA_HIST_M = v; setLuz(o => ({ ...o, AREA_HIST_M: v })); }} />
-          <NumField label="ACTIVACION_M" value={luz.ACTIVACION_M} step={0.25} min={0.5} max={10} note="m"
-            onChange={v => { DBG_LUZ.ACTIVACION_M = v; setLuz(o => ({ ...o, ACTIVACION_M: v })); }} />
-          <NumField label="ACTIVACION_SALIDA_M" value={luz.ACTIVACION_SALIDA_M} step={0.25} min={0.5} max={15} note="m"
-            onChange={v => { DBG_LUZ.ACTIVACION_SALIDA_M = v; setLuz(o => ({ ...o, ACTIVACION_SALIDA_M: v })); }} />
-          <NumField label="GIRO_MS" value={luz.GIRO_MS} step={50} min={0} max={5000} note="ms"
-            onChange={v => { DBG_LUZ.GIRO_MS = v; setLuz(o => ({ ...o, GIRO_MS: v })); }} />
-          <NumField label="PITCH_MAX_DEG" value={luz.PITCH_MAX_DEG} step={1} min={0} max={89} note="°"
-            onChange={v => { DBG_LUZ.PITCH_MAX_DEG = v; setLuz(o => ({ ...o, PITCH_MAX_DEG: v })); }} />
-          <NumField label="CIERRE_DIALOGO_MS" value={luz.CIERRE_DIALOGO_MS} step={100} min={0} max={10000} note="ms"
-            onChange={v => { DBG_LUZ.CIERRE_DIALOGO_MS = v; setLuz(o => ({ ...o, CIERRE_DIALOGO_MS: v })); }} />
-          <NumField label="TELEPORT_DIST_M" value={luz.TELEPORT_DIST_M} step={0.5} min={1} max={30} note="m"
-            onChange={v => { DBG_LUZ.TELEPORT_DIST_M = v; setLuz(o => ({ ...o, TELEPORT_DIST_M: v })); }} />
-          <ColorField label="LUZ_COLOR" value={luz.LUZ_COLOR}
-            onChange={v => { DBG_LUZ.LUZ_COLOR = v; setLuz(o => ({ ...o, LUZ_COLOR: v })); }} />
     </>
   );
 }
-// sección: u9-secuencia-amanecer
-export function SecU9SecuenciaAmanecer() {
-  const { sillas, setSillas } = useDbg();
-  return (
-    <>
-          <span style={LABEL}>U9 — Secuencia amanecer <span style={NOTE}>(debug)</span></span>
-          <NumField label="amanecerDurS"       value={sillas.amanecerDurS}       step={1}    min={1}   max={60}   note="fase 1 (s) — solo modo viejo (Z38)"
-            onChange={v => { DBG_SILLAS.amanecerDurS       = v; setSillas(s => ({ ...s, amanecerDurS:       v })); }} />
-          <NumField label="amanecerSectorDeg"  value={sillas.amanecerSectorDeg}  step={10}   min={10}  max={360}  note="ancho sector (°)"
-            onChange={v => { DBG_SILLAS.amanecerSectorDeg  = v; setSillas(s => ({ ...s, amanecerSectorDeg:  v })); }} />
-          <NumField label="amanecerEdgeDeg"    value={sillas.amanecerEdgeDeg}    step={1}    min={0}   max={30}   note="borde suave (°)"
-            onChange={v => { DBG_SILLAS.amanecerEdgeDeg    = v; setSillas(s => ({ ...s, amanecerEdgeDeg:    v })); }} />
-          <NumField label="amanecerP2StaggerS" value={sillas.amanecerP2StaggerS} step={0.5}  min={0}   max={5}    note="retraso entre capas fase 2 (s)"
-            onChange={v => { DBG_SILLAS.amanecerP2StaggerS = v; setSillas(s => ({ ...s, amanecerP2StaggerS: v })); }} />
-          <NumField label="amanecerP2GrowS"    value={sillas.amanecerP2GrowS}    step={0.5}  min={0.5} max={10}   note="duración crecimiento fase 2 (s)"
-            onChange={v => { DBG_SILLAS.amanecerP2GrowS    = v; setSillas(s => ({ ...s, amanecerP2GrowS:    v })); }} />
-    </>
-  );
-}
+
 // sección: amanecer-z38
 export function SecAmanecerZ38() {
   const { amn, setAmn } = useDbg();
@@ -262,27 +271,6 @@ export function SecAmanecerZ38() {
               Saltar al final
             </button>
           </div>
-    </>
-  );
-}
-// sección: w3-amanecer-domesky
-export function SecW3AmanecerDomesky() {
-  const { sillas, setSillas } = useDbg();
-  return (
-    <>
-          <span style={LABEL}>W3 — Amanecer DomeSky <span style={NOTE}>(debug)</span></span>
-          <NumField label="domeAmanecerDurS"    value={sillas.domeAmanecerDurS}    step={1}   min={1}   max={60}  note="fase 1 (s) — solo modo viejo (Z38)"
-            onChange={v => { DBG_SILLAS.domeAmanecerDurS    = v; setSillas(s => ({ ...s, domeAmanecerDurS:    v })); }} />
-          <NumField label="domeRevDelayMontS"   value={sillas.domeRevDelayMontS}   step={0.5} min={0}   max={20}  note="delay MONTAÑAS strata (s)"
-            onChange={v => { DBG_SILLAS.domeRevDelayMontS   = v; setSillas(s => ({ ...s, domeRevDelayMontS:   v })); }} />
-          <NumField label="domeRevDelayLinS"    value={sillas.domeRevDelayLinS}    step={0.5} min={0}   max={20}  note="delay LÍNEAS waves (s)"
-            onChange={v => { DBG_SILLAS.domeRevDelayLinS    = v; setSillas(s => ({ ...s, domeRevDelayLinS:    v })); }} />
-          <NumField label="domeRevDelaySolS"    value={sillas.domeRevDelaySolS}    step={0.5} min={0}   max={20}  note="delay SOL rings (s)"
-            onChange={v => { DBG_SILLAS.domeRevDelaySolS    = v; setSillas(s => ({ ...s, domeRevDelaySolS:    v })); }} />
-          <NumField label="domeRevDelayCieloS"  value={sillas.domeRevDelayCieloS}  step={0.5} min={0}   max={20}  note="delay CIELO stars+warp (s)"
-            onChange={v => { DBG_SILLAS.domeRevDelayCieloS  = v; setSillas(s => ({ ...s, domeRevDelayCieloS:  v })); }} />
-          <NumField label="domeRevDurS"         value={sillas.domeRevDurS}         step={0.5} min={0.5} max={20}  note="duración de cada reveal (s)"
-            onChange={v => { DBG_SILLAS.domeRevDurS         = v; setSillas(s => ({ ...s, domeRevDurS:         v })); }} />
     </>
   );
 }

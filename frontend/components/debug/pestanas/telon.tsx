@@ -5,7 +5,7 @@ import { DBG_SILLAS, DBG_INICIO, DBG_TELON_TEXTO, DBG_FLASH, DBG_ENTRADA } from 
 import { pedirMedicionFlash } from "@/lib/curtainFlash";
 import { ENTRADA_POSE, calcularPoseEntrada } from "@/components/EntradaTelon";
 import { ENTRADA } from "@/lib/entradaTelon";
-import { LABEL, NOTE, NumField, ColorField, ROW, INPUT } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, NumField, ColorField } from "../comun";
 import { useDbg } from "../contexto";
 
 // sección: telon-n6
@@ -37,6 +37,7 @@ export function SecTelonN6() {
     </>
   );
 }
+
 // sección: inicio-z24
 export function SecInicioZ24() {
   const { inicio, setInicio } = useDbg();
@@ -50,6 +51,7 @@ export function SecInicioZ24() {
     </>
   );
 }
+
 // sección: texto-del-telon-z46
 export function SecTextoDelTelonZ46() {
   const { ttx, setTtx } = useDbg();
@@ -102,6 +104,7 @@ export function SecTextoDelTelonZ46() {
     </>
   );
 }
+
 // sección: destello-de-cortina-f1
 export function SecDestelloDeCortinaF1() {
   const { flash, setFlash, flashLive, medicion } = useDbg();
@@ -244,6 +247,7 @@ export function SecDestelloDeCortinaF1() {
     </>
   );
 }
+
 // sección: entrada-tras-el-telon-z59
 export function SecEntradaTrasElTelonZ59() {
   const { tocarDia } = useDbg();

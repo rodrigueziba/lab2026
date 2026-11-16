@@ -17,6 +17,7 @@ import { COMPONENTES_SECCION } from "./debug/mapaSecciones";
 import {
   PESTANA_RECIENTES, ordenPestanas, seccionesDePestana, esNueva, tituloPestana, buscarSecciones,
   leerEstadoMenu, guardarEstadoMenu, type SeccionDebug,
+  PESTANA_FAVORITOS, seccionesFavoritas, leerFavoritos, guardarFavoritos, alternarFavorito,   // Z73
 } from "@/lib/debugSecciones";
 import { INDICE_CONTROLES } from "@/lib/debugIndiceControles";
 
@@ -24,6 +25,8 @@ const MAX_RESULTADOS = 12;
 const ETIQ: CSSProperties = { fontSize: 9, padding: "0 4px", borderRadius: 2, marginLeft: 4, border: "1px solid rgba(100,120,180,0.3)", color: "#7f8fb5" };
 const NUEVO: CSSProperties = { ...ETIQ, color: "#ffb347", borderColor: "rgba(255,154,31,0.55)" };
 const CABE: CSSProperties = { display: "flex", alignItems: "center", gap: 2, cursor: "pointer", marginBottom: 4, color: "#6f7fa6", fontSize: 10 };
+const OBS: CSSProperties = { ...ETIQ, color: "#c9a26b", borderColor: "rgba(201,162,107,0.5)" };   // Z73: "sin efecto hoy" / "código viejo"
+const ESTRELLA = (fija: boolean): CSSProperties => ({ cursor: "pointer", color: fija ? "#ffb347" : "#4c5878", fontSize: 12, marginRight: 2 });
 
 /** localStorage sin romper el render del servidor ni los navegadores que lo bloquean. */
 function almacen(): Storage | null {
@@ -38,6 +41,9 @@ export default function DebugMenu() {
   const [plegadas, setPlegadas] = useState<Record<string, boolean>>(() => leerEstadoMenu(almacen())?.plegadas ?? {});
   const [busca, setBusca] = useState("");
   useEffect(() => { guardarEstadoMenu(almacen(), { pestana, plegadas }); }, [pestana, plegadas]);
+  // Z73: favoritos (solo ids de sección, con su propia clave)
+  const [favoritos, setFavoritos] = useState<string[]>(() => leerFavoritos(almacen()));
+  useEffect(() => { guardarFavoritos(almacen(), favoritos); }, [favoritos]);
 
   // Z29: aviso tenue de desbloqueo (también con el menú cerrado)
   const aviso = avisoDesbloqueo ? (
@@ -62,8 +68,9 @@ export default function DebugMenu() {
   const resultados = enBusqueda ? buscarSecciones(busca, INDICE_CONTROLES) : [];
   const lista: { s: SeccionDebug; co?: string[] }[] = enBusqueda
     ? resultados.slice(0, MAX_RESULTADOS).map(r => ({ s: r.seccion, co: r.coincidencias }))
+    : pestana === PESTANA_FAVORITOS ? seccionesFavoritas(favoritos).map(s => ({ s }))   // Z73
     : seccionesDePestana(pestana).map(s => ({ s }));
-  const mixta = enBusqueda || pestana === PESTANA_RECIENTES;
+  const mixta = enBusqueda || pestana === PESTANA_RECIENTES || pestana === PESTANA_FAVORITOS;
 
   return (
     <div
@@ -115,6 +122,9 @@ export default function DebugMenu() {
         </div>
       )}
 
+      {!enBusqueda && pestana === PESTANA_FAVORITOS && lista.length === 0 && (
+        <div style={{ ...NOTE, marginLeft: 0 }}>Sin favoritos todavía: tocá la ☆ en el título de una sección para fijarla acá.</div>
+      )}
       <DebugCtx.Provider value={D}>
         {lista.map(({ s, co }, i) => {
           const plegada = !enBusqueda && (plegadas[s.id] ?? s.avanzada);
@@ -124,14 +134,18 @@ export default function DebugMenu() {
               {i > 0 && <div style={DIVIDER} />}
               <div style={CABE} onClick={() => setPlegadas(p => ({ ...p, [s.id]: !plegada }))} title={s.descripcion}>
                 <span>{plegada ? "▸" : "▾"}</span>
+                {/* Z73: fijar en Favoritos (no pliega ni despliega) */}
+                <span style={ESTRELLA(favoritos.includes(s.id))} title={favoritos.includes(s.id) ? "quitar de Favoritos" : "fijar en Favoritos"}
+                  onClick={e => { e.stopPropagation(); setFavoritos(f => alternarFavorito(f, s.id)); }}>{favoritos.includes(s.id) ? "★" : "☆"}</span>
                 {(plegada || mixta) && <span style={{ color: "#8899bb" }}>{s.titulo}</span>}
                 {mixta && <span style={ETIQ}>{tituloPestana(s.pestana)}</span>}
                 <span style={ETIQ}>{s.desdeZ > 0 ? `Z${s.desdeZ}` : "pre-Z"}{s.ultimoZ > s.desdeZ ? ` → Z${s.ultimoZ}` : ""}</span>
                 {esNueva(s) && <span style={NUEVO}>NUEVO</span>}
-                {s.clase === "obsoleta" && <span style={ETIQ}>obsoleta</span>}
+                {s.clase === "obsoleta" && <span style={OBS} title={s.flagApaga ? `la apaga: ${s.flagApaga}` : undefined}>{s.etiqueta ?? "obsoleta"}</span>}
                 {s.avanzada && <span style={ETIQ}>avanzada</span>}
               </div>
               {co && co.length > 0 && <div style={{ ...NOTE, marginLeft: 0, marginBottom: 4 }}>coincide: {co.slice(0, 8).join(", ")}{co.length > 8 ? "…" : ""}</div>}
+              {s.flagApaga && !plegada && <div style={{ ...NOTE, marginLeft: 0, marginBottom: 4 }}>{s.etiqueta ?? "obsoleta"} · la apaga: {s.flagApaga}</div>}
               {!plegada && comp && createElement(comp)}
             </div>
           );

@@ -5,7 +5,7 @@ import RendimientoPanel from "@/components/RendimientoPanel";
 import { DBG_RETRO_FX } from "@/lib/debugConfig";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { CRT_UNIFORMS } from "@/lib/retro/retroCRT";
-import { LABEL, NOTE, ROW, INPUT, NumField } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, NumField } from "../comun";
 import { useDbg } from "../contexto";
 
 // sección: rendimiento-z66
@@ -17,6 +17,7 @@ export function SecRendimientoZ66() {
     </>
   );
 }
+
 // sección: post-proceso-r4
 export function SecPostProcesoR4() {
   const { retroFx, setRetroFx } = useDbg();

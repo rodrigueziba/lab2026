@@ -4,7 +4,7 @@
 import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE } from "@/lib/debugConfig";
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { STORE } from "@/lib/alightStore";
-import { LABEL, NOTE, NumField, ROW, INPUT, EFFECT_NAMES } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
 import { useDbg } from "../contexto";
 
 // sección: stars
@@ -30,6 +30,7 @@ export function SecStars() {
     </>
   );
 }
+
 // sección: dome
 export function SecDome() {
   const { dome, setDome } = useDbg();
@@ -41,6 +42,7 @@ export function SecDome() {
     </>
   );
 }
+
 // sección: sector-effects
 export function SecSectorEffects() {
   const { setSector } = useDbg();
@@ -64,6 +66,7 @@ export function SecSectorEffects() {
     </>
   );
 }
+
 // sección: lecterns
 export function SecLecterns() {
   const { lectern, setLectern, camImg, setCamImg, camSnd, setCamSnd } = useDbg();
@@ -130,7 +133,7 @@ export function SecLecterns() {
               onChange={e => { DBG_LECTERNS.showGizmo = e.target.checked; setLectern(l => ({ ...l, showGizmo: e.target.checked })); }} />
           </div>
           <div style={ROW}>
-            <span style={LABEL}>Debug overlays (mode/lock/hover)</span>
+            <span style={LABEL}>Overlays de atriles <span style={NOTE}>(mode/lock/hover)</span></span>
             <input type="checkbox" checked={lectern.debugOverlays}
               onChange={e => { DBG_LECTERNS.debugOverlays = e.target.checked; setLectern(l => ({ ...l, debugOverlays: e.target.checked })); }} />
           </div>
@@ -157,6 +160,7 @@ export function SecLecterns() {
     </>
   );
 }
+
 // sección: retro-atriles
 export function SecRetroAtriles() {
   const { retro, setRetro } = useDbg();
@@ -176,6 +180,7 @@ export function SecRetroAtriles() {
     </>
   );
 }
+
 // sección: face-capture
 export function SecFaceCapture() {
   const { face, setFace } = useDbg();
@@ -197,6 +202,7 @@ export function SecFaceCapture() {
     </>
   );
 }
+
 // sección: audio
 export function SecAudio() {
   const { audioVol } = useDbg();
@@ -212,6 +218,7 @@ export function SecAudio() {
     </>
   );
 }
+
 // sección: extra-lights
 export function SecExtraLights() {
   return (

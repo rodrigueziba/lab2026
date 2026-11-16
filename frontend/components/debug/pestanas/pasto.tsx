@@ -3,7 +3,7 @@
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { DBG_SILLAS, DBG_PASTO } from "@/lib/debugConfig";
 import { MONO_PASTO } from "@/lib/monolitosPasto";
-import { LABEL, NOTE, NumField, N5ProximityOverlay, ROW, INPUT } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, NumField, N5ProximityOverlay } from "../comun";
 import { useDbg } from "../contexto";
 
 // sección: monolitos-n5-v1-v2-v3
@@ -93,6 +93,7 @@ export function SecMonolitosN5V1V2V3() {
     </>
   );
 }
+
 // sección: pasto-z64
 export function SecPastoZ64() {
   const { pastoLive, tocarDia } = useDbg();

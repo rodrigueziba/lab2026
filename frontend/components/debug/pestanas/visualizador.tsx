@@ -1,95 +1,11 @@
 "use client";
 // Z70: pestaña "Visualizador y música" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
-import { DBG_FLOOR, DBG_EFFECTS, DBG_SILLAS } from "@/lib/debugConfig";
+import { DBG_SILLAS } from "@/lib/debugConfig";
 import { BAND_STATE, reshuffleAssignment } from "@/lib/vizAudio";
-import { ROW, LABEL, NOTE, INPUT, NumField, DIVIDER, BandEnergyOverlay, AudioU2Meters } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, NumField, BandEnergyOverlay, AudioU2Meters } from "../comun";
 import { useDbg } from "../contexto";
 
-// sección: legado
-export function SecLegado() {
-  const { setLegacyOpen, legacyOpen, floor, setFloor, fx, setFx } = useDbg();
-  return (
-    <>
-          {/* N2: Legado — FloorVisualizer + SectorAudioFX (disabled, kept for reference) */}
-          <div style={{ ...ROW, marginBottom: 4 }}>
-            <span style={{ ...LABEL, marginBottom: 0 }}>Legado <span style={NOTE}>(N2 — desactivado)</span></span>
-            <button style={{ ...INPUT, width: "auto", padding: "1px 6px", cursor: "pointer" }}
-              onClick={() => setLegacyOpen(o => !o)}>{legacyOpen ? "▲" : "▼"}</button>
-          </div>
-          {legacyOpen && <>
-          <span style={LABEL}>Floor visualizer <span style={NOTE}>(H2 — live)</span></span>
-          <NumField label="innerR (m)"   value={floor.innerR}   step={0.1} min={0} max={10}
-            onChange={v => { DBG_FLOOR.innerR = v;   setFloor(f => ({ ...f, innerR: v })); }} />
-          <NumField label="outerR (m)"   value={floor.outerR}   step={0.5} min={5} max={30}
-            onChange={v => { DBG_FLOOR.outerR = v;   setFloor(f => ({ ...f, outerR: v })); }} />
-          <NumField label="rotationDeg"  value={floor.rotationDeg} step={5} min={-180} max={180}
-            onChange={v => { DBG_FLOOR.rotationDeg = v; setFloor(f => ({ ...f, rotationDeg: v })); }} />
-          <NumField label="opacity"      value={floor.opacity}  step={0.05} min={0} max={1}
-            onChange={v => { DBG_FLOOR.opacity = v;  setFloor(f => ({ ...f, opacity: v })); }} />
-          <NumField label="baseSpeed"    value={floor.baseSpeed} step={0.1} min={0} max={5}
-            onChange={v => { DBG_FLOOR.baseSpeed = v; setFloor(f => ({ ...f, baseSpeed: v })); }} />
-          <NumField label="speedGain"    value={floor.speedGain} step={0.5} min={0} max={20}
-            onChange={v => { DBG_FLOOR.speedGain = v; setFloor(f => ({ ...f, speedGain: v })); }} />
-          <NumField label="speedExp"     value={floor.speedExp}  step={0.1} min={0.1} max={4}
-            onChange={v => { DBG_FLOOR.speedExp = v; setFloor(f => ({ ...f, speedExp: v })); }} />
-          <NumField label="typeMinS"     value={floor.typeMinS}  step={1} min={1}
-            onChange={v => { DBG_FLOOR.typeMinS = v; setFloor(f => ({ ...f, typeMinS: v })); }} />
-          <NumField label="typeMaxS"     value={floor.typeMaxS}  step={1} min={2}
-            onChange={v => { DBG_FLOOR.typeMaxS = v; setFloor(f => ({ ...f, typeMaxS: v })); }} />
-          <div style={ROW}>
-            <span>speedMode</span>
-            <button
-              style={{ ...INPUT, width: 72, textAlign: "center", cursor: "pointer",
-                background: floor.speedMode === "user" ? "rgba(60,100,20,0.5)" : "rgba(20,60,100,0.5)" }}
-              onClick={() => {
-                const v = floor.speedMode === "spatial" ? "user" : "spatial";
-                DBG_FLOOR.speedMode = v as "spatial" | "user";
-                setFloor(f => ({ ...f, speedMode: v as "spatial" | "user" }));
-              }}
-            >{floor.speedMode}</button>
-          </div>
-          <span style={LABEL}>Sector type override <span style={NOTE}>(-1 = auto, 0-3 = forced)</span></span>
-          {([0,1,2,3] as const).map(i => {
-            const key = `s${i}Type` as "s0Type"|"s1Type"|"s2Type"|"s3Type";
-            return (
-              <NumField key={i} label={`S${i} type`} value={floor[key]} step={1} min={-1} max={3}
-                onChange={v => { DBG_FLOOR[key] = v; setFloor(f => ({ ...f, [key]: v })); }} />
-            );
-          })}
-
-          <div style={DIVIDER} />
-          <span style={LABEL}>Audio FX <span style={NOTE}>(H3, sector 0=LP 1=HP 2=rate 3=echo+rev)</span></span>
-          <NumField label="lpEnd (Hz)"    value={fx.lpEnd}       step={50}  min={20}   max={20000}
-            onChange={v => { DBG_EFFECTS.lpEnd = v;        setFx(f => ({ ...f, lpEnd: v })); }} />
-          <NumField label="hpEnd (Hz)"    value={fx.hpEnd}       step={100} min={20}   max={20000}
-            onChange={v => { DBG_EFFECTS.hpEnd = v;        setFx(f => ({ ...f, hpEnd: v })); }} />
-          <NumField label="rateEnd"       value={fx.rateEnd}     step={0.05} min={0.25} max={4}
-            onChange={v => { DBG_EFFECTS.rateEnd = v;      setFx(f => ({ ...f, rateEnd: v })); }} />
-          <NumField label="echoFbEnd"     value={fx.echoFbEnd}   step={0.05} min={0}    max={0.95}
-            onChange={v => { DBG_EFFECTS.echoFbEnd = v;    setFx(f => ({ ...f, echoFbEnd: v })); }} />
-          <NumField label="echoMixEnd"    value={fx.echoMixEnd}  step={0.05} min={0}    max={1}
-            onChange={v => { DBG_EFFECTS.echoMixEnd = v;   setFx(f => ({ ...f, echoMixEnd: v })); }} />
-          <NumField label="reverbMixEnd"  value={fx.reverbMixEnd} step={0.05} min={0}   max={1}
-            onChange={v => { DBG_EFFECTS.reverbMixEnd = v; setFx(f => ({ ...f, reverbMixEnd: v })); }} />
-          <div style={ROW}>
-            <span>Simulate pos</span>
-            <button style={INPUT} onClick={() => {
-              const v = !fx.simEnabled;
-              DBG_EFFECTS.simEnabled = v;
-              setFx(f => ({ ...f, simEnabled: v }));
-            }}>{fx.simEnabled ? "ON" : "off"}</button>
-          </div>
-          {fx.simEnabled && <>
-            <NumField label="simSector" value={fx.simSector} step={1} min={-1} max={3}
-              onChange={v => { DBG_EFFECTS.simSector = v; setFx(f => ({ ...f, simSector: v })); }} />
-            <NumField label="simT (0-1)" value={fx.simT} step={0.05} min={0} max={1}
-              onChange={v => { DBG_EFFECTS.simT = v; setFx(f => ({ ...f, simT: v })); }} />
-          </>}
-          </>} {/* end Legado */}
-    </>
-  );
-}
 // sección: simbolos-n3
 export function SecSimbolosN3() {
   const { sillas, setSillas } = useDbg();
@@ -105,6 +21,7 @@ export function SecSimbolosN3() {
     </>
   );
 }
+
 // sección: audio-bandas-n4
 export function SecAudioBandasN4() {
   const { sillas, setSillas, bandRev, setBandRev } = useDbg();
@@ -139,6 +56,7 @@ export function SecAudioBandasN4() {
     </>
   );
 }
+
 // sección: reaccion-t3-audio
 export function SecReaccionT3Audio() {
   const { sillas, setSillas } = useDbg();
@@ -198,6 +116,7 @@ export function SecReaccionT3Audio() {
     </>
   );
 }
+
 // sección: u10b-reaccion-al-sonido
 export function SecU10bReaccionAlSonido() {
   const { sillas, setSillas } = useDbg();
@@ -233,6 +152,7 @@ export function SecU10bReaccionAlSonido() {
     </>
   );
 }
+
 // sección: u11-camera-feedback
 export function SecU11CameraFeedback() {
   const { sillas, setSillas } = useDbg();
@@ -264,6 +184,7 @@ export function SecU11CameraFeedback() {
     </>
   );
 }
+
 // sección: u2-agc-amplitudes
 export function SecU2AgcAmplitudes() {
   const { sillas, setSillas } = useDbg();

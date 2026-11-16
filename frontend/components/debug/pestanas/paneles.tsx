@@ -3,10 +3,25 @@
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { DBG_PANELES, DBG_ORBITAS, DBG_LINTERNA, DBG_ACERC, DBG_SUBPANELES, DBG_AISLAR_UI, DBG_LOG_PANEL, DBG_PRIORIDAD, DBG_VIDEO, DBG_FOCO } from "@/lib/debugConfig";
 import { PANELES_SILLAS } from "@/lib/alightStore";
-import { LABEL, NOTE, ROW, INPUT, NumField, ColorField } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, DIVIDER, NumField, ColorField } from "../comun";
 import { useDbg } from "../contexto";
 
-// sección: paneles-sillas-p1
+// sección: paneles-sillas
+export function SecPanelesSillas() {
+  return (
+    <>
+          {/* Z73: sección fusionada; cada parte es la sección anterior movida tal cual (subtítulo = su título) */}
+          <span style={LABEL}>Paneles SILLAS <span style={NOTE}>(Z73: paneles P1, órbitas Z7 y linterna Z2)</span></span>
+          <SecPanelesSillasP1 />
+          <div style={DIVIDER} />
+          <SecOrbitasZ7PanelesSillas />
+          <div style={DIVIDER} />
+          <SecLinternaZ2PanelesSillas />
+    </>
+  );
+}
+
+// subsección: paneles-sillas-p1
 export function SecPanelesSillasP1() {
   const { paneles, setPaneles, panelesFase } = useDbg();
   return (
@@ -82,7 +97,8 @@ export function SecPanelesSillasP1() {
     </>
   );
 }
-// sección: orbitas-z7-paneles-sillas
+
+// subsección: orbitas-z7-paneles-sillas
 export function SecOrbitasZ7PanelesSillas() {
   const { orb, setOrb, orbInfo } = useDbg();
   return (
@@ -130,7 +146,8 @@ export function SecOrbitasZ7PanelesSillas() {
     </>
   );
 }
-// sección: linterna-z2-paneles-sillas
+
+// subsección: linterna-z2-paneles-sillas
 export function SecLinternaZ2PanelesSillas() {
   const { linterna, setLinterna, linternaLive } = useDbg();
   return (
@@ -176,6 +193,7 @@ export function SecLinternaZ2PanelesSillas() {
     </>
   );
 }
+
 // sección: acercamiento-z8
 export function SecAcercamientoZ8() {
   const { acerc, setAcerc, subp, setSubp, aislar, setAislar, logPanelOn, setLogPanelOn, acercLive } = useDbg();
@@ -374,6 +392,7 @@ export function SecAcercamientoZ8() {
     </>
   );
 }
+
 // sección: prioridad-z10-proyecto-abierto-sobre-las
 export function SecPrioridadZ10ProyectoAbiertoSobreLas() {
   const { prio, setPrio } = useDbg();
@@ -409,6 +428,7 @@ export function SecPrioridadZ10ProyectoAbiertoSobreLas() {
     </>
   );
 }
+
 // sección: video-etapa-1
 export function SecVideoEtapa1() {
   const { video, setVideo } = useDbg();
@@ -450,6 +470,7 @@ export function SecVideoEtapa1() {
     </>
   );
 }
+
 // sección: foco-z19-subpanel-agrandado
 export function SecFocoZ19SubpanelAgrandado() {
   const { foco, setFoco, focoLive } = useDbg();
@@ -542,6 +563,7 @@ export function SecFocoZ19SubpanelAgrandado() {
     </>
   );
 }
+
 // sección: subpaneles-z4-historia-galeria-ficha
 export function SecSubpanelesZ4HistoriaGaleriaFicha() {
   const { subp, setSubp } = useDbg();

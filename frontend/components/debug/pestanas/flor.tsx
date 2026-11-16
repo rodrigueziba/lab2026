@@ -1,32 +1,19 @@
 "use client";
 // Z70: pestaña "Flor, prisma y tarima" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
-import { DBG_PRISM, DBG_FLOR, DBG_DIA, DBG_BASE_FLOR, DBG_CHECKPOINTS, DBG_FRACTAL } from "@/lib/debugConfig";
-import { DIA, posicionarDia } from "@/lib/cicloDia";
-import { AMANECER } from "@/lib/amanecer";
-import { duracionTemaViz, idTemaViz } from "@/lib/vizAudio";
+import { DBG_PRISM, DBG_FLOR, DBG_BASE_FLOR, DBG_FRACTAL } from "@/lib/debugConfig";
+import { probarFlor, velocidadDia, mostrarBaseConFlor, animarNacimiento, reiniciarBaseFlor } from "@/lib/controlDia";
 import { BASE } from "@/lib/baseFlor";
-import { FLOR } from "@/lib/prismaFlor";
-import { irACheckpoint } from "@/lib/checkpoints";
-import { LABEL, NOTE, NumField, ROW, INPUT, ColorField } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, NumField, ColorField } from "../comun";
 import { useDbg } from "../contexto";
 
-// sección: prism
-export function SecPrism() {
-  return (
-    <>
-          <span style={LABEL}>Prism <span style={NOTE}>(info)</span></span>
-          <NumField label="landOffset (m)" value={DBG_PRISM.landOffset} note="reload to change" />
-    </>
-  );
-}
 // sección: prism-proximity
 export function SecPrismProximity() {
   const { prism, setPrism } = useDbg();
   return (
     <>
           <span style={LABEL}>Prism proximity <span style={NOTE}>(N2 — live, absolute)</span></span>
-          <NumField label="prismRangeScale" value={prism.prismRangeScale} note="legacy N1 — no longer applied" />
+          {/* Z73: prismRangeScale (sin efecto) pasó a Obsoletos › Controles sin efecto */}
           <NumField label="spinDir" value={prism.spinDir} step={2} min={-1} max={1} note="live"
             onChange={v => { DBG_PRISM.spinDir = v; setPrism(p => ({ ...p, spinDir: v })); }} />
           <NumField label="nearM" value={prism.nearM} step={0.1} min={0} max={5} note="live"
@@ -44,6 +31,7 @@ export function SecPrismProximity() {
     </>
   );
 }
+
 // sección: prisma-y-flor-z54
 export function SecPrismaYFlorZ54() {
   const { tocarDia } = useDbg();
@@ -90,17 +78,15 @@ export function SecPrismaYFlorZ54() {
             ))}
           </div>
           <div style={ROW}>
-            <span>Probar flor <span style={NOTE}>recorre el ciclo a VELOCIDAD 24 (con el visualizador activo)</span></span>
-            <button style={INPUT} onClick={() => {
-              DBG_DIA.T_MANUAL = -1; DBG_DIA.VELOCIDAD = 24;
-              if (DIA.fase === "espera") posicionarDia(DIA, DBG_DIA, 0.2, AMANECER, duracionTemaViz(), idTemaViz());
-              tocarDia();
-            }}>Probar flor</button>
-            <button style={INPUT} onClick={() => { DBG_DIA.VELOCIDAD = 1; tocarDia(); }}>velocidad 1</button>
+            <span>Probar flor <span style={NOTE}>recorre el ciclo a VELOCIDAD 24 (con el visualizador activo) · atajo de Control del día</span></span>
+            {/* Z73: atajos de Cielo › Control del día (mismas funciones: lib/controlDia.ts) */}
+            <button style={INPUT} title="atajo · Control del día" onClick={() => { probarFlor(); tocarDia(); }}>Probar flor</button>
+            <button style={INPUT} title="atajo · Control del día" onClick={() => { velocidadDia(1); tocarDia(); }}>velocidad 1</button>
           </div>
     </>
   );
 }
+
 // sección: base-de-la-flor-z67
 export function SecBaseDeLaFlorZ67() {
   const { tocarDia } = useDbg();
@@ -126,27 +112,17 @@ export function SecBaseDeLaFlorZ67() {
                 onChange={e => { DBG_BASE_FLOR[k] = parseFloat(e.target.value); tocarDia(); }} />
             </div>
           ))}
+          {/* Z73: atajos de Cielo › Control del día (mismas funciones: lib/controlDia.ts) */}
           <div style={ROW}>
-            <button style={INPUT} onClick={() => {
-              // flor fija en su pico (tDia 0,5); si el ciclo con la flor no está montado, salta al checkpoint "dia_flor"
-              if (!FLOR.activo && DBG_CHECKPOINTS.HABILITADOS) irACheckpoint("dia_flor");
-              DBG_DIA.T_MANUAL = 0.5; tocarDia();
-            }}>Mostrar base con flor</button>
-            <button style={INPUT} onClick={() => {
-              DBG_DIA.T_MANUAL = -1; DBG_DIA.VELOCIDAD = 3;
-              posicionarDia(DIA, DBG_DIA, Math.max(0, DBG_FLOR.NACE_INICIO - 0.01), AMANECER, duracionTemaViz(), idTemaViz());
-              window.dispatchEvent(new CustomEvent("alight:base-flor-reiniciar"));
-              tocarDia();
-            }}>Animar nacimiento</button>
-            <button style={INPUT} onClick={() => {
-              DBG_DIA.T_MANUAL = -1; DBG_DIA.VELOCIDAD = 1;
-              window.dispatchEvent(new CustomEvent("alight:base-flor-reiniciar"));
-              tocarDia();
-            }}>Reiniciar</button>
+            <span style={NOTE}>atajos de Control del día</span>
+            <button style={INPUT} title="atajo · Control del día" onClick={() => { mostrarBaseConFlor(); tocarDia(); }}>Mostrar base con flor</button>
+            <button style={INPUT} title="atajo · Control del día" onClick={() => { animarNacimiento(); tocarDia(); }}>Animar nacimiento</button>
+            <button style={INPUT} title="atajo · Control del día" onClick={() => { reiniciarBaseFlor(); tocarDia(); }}>Reiniciar</button>
           </div>
     </>
   );
 }
+
 // sección: fractal-del-prisma-z43
 export function SecFractalDelPrismaZ43() {
   const { frc, setFrc } = useDbg();

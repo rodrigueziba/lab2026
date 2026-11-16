@@ -16,6 +16,7 @@ import { construirIndice, textoIndice } from './debug-menu-indice.mjs';
 import {
   SECCIONES_DEBUG, PESTANAS_DEBUG, PESTANA_RECIENTES, ordenPestanas, seccionesDePestana, esNueva, zetasDistintas,
   ordenarSecciones, buscarSecciones, leerEstadoMenu, guardarEstadoMenu, CLAVE_MENU, N_RECIENTES, N_NUEVO,
+  PESTANA_FAVORITOS, PESTANA_OBSOLETOS, seccionesFavoritas, leerFavoritos, guardarFavoritos, alternarFavorito, CLAVE_FAVORITOS,
 } from '../lib/debugSecciones.ts';
 
 let ok = 0, fallas = 0;
@@ -53,7 +54,10 @@ console.log('\n(b) orden por ultimoZ');
 {
   const P = ordenPestanas();
   check(P[0].id === PESTANA_RECIENTES, 'la primera pestaña es Recientes');
-  check(P.slice(1).every((p, i, a) => i === 0 || a[i - 1].ultimoZ >= p.ultimoZ), `pestañas por última modificación: ${P.map(p => `${p.titulo} (Z${p.ultimoZ})`).join(' · ')}`);
+  // Z73: Favoritos siempre segunda y Obsoletos última; el resto por última modificación
+  check(P[1].id === PESTANA_FAVORITOS && P[P.length - 1].id === PESTANA_OBSOLETOS, 'Favoritos segunda y Obsoletos última (Z73)');
+  const medio = P.slice(2, -1);
+  check(medio.every((p, i, a) => i === 0 || a[i - 1].ultimoZ >= p.ultimoZ), `pestañas por última modificación: ${P.map(p => `${p.titulo} (Z${p.ultimoZ})`).join(' · ')}`);
   let bien = true;
   for (const p of PESTANAS_DEBUG) { const s = seccionesDePestana(p.id); for (let i = 1; i < s.length; i++) if (s[i - 1].ultimoZ < s[i].ultimoZ) bien = false; }
   check(bien, 'dentro de cada pestaña, las secciones van de ultimoZ mayor a menor');
@@ -63,7 +67,7 @@ console.log('\n(b) orden por ultimoZ');
   check(SECCIONES_DEBUG.filter(s => esNueva(s)).every(s => Z.slice(0, N_NUEVO).includes(s.ultimoZ)), `NUEVO = últimos ${N_NUEVO} Z distintos (${Z.slice(0, N_NUEVO).join(', ')})`);
   // registro ficticio: una sección tocada en Z99 pasa a encabezar su pestaña, Recientes y el orden de pestañas
   const fict = SECCIONES_DEBUG.map(s => (s.id === 'telon-n6' ? { ...s, ultimoZ: 99 } : s));
-  check(ordenPestanas(fict)[1].id === 'telon' && seccionesDePestana('telon', fict)[0].id === 'telon-n6' && seccionesDePestana(PESTANA_RECIENTES, fict)[0].id === 'telon-n6' && esNueva(fict.find(s => s.id === 'telon-n6'), fict),
+  check(ordenPestanas(fict)[2].id === 'telon' && seccionesDePestana('telon', fict)[0].id === 'telon-n6' && seccionesDePestana(PESTANA_RECIENTES, fict)[0].id === 'telon-n6' && esNueva(fict.find(s => s.id === 'telon-n6'), fict),
     'al subir ultimoZ de una sección (prueba con Z99) se ordena sola: primera de su pestaña, de Recientes y su pestaña primera, con NUEVO');
   check(ordenarSecciones(SECCIONES_DEBUG).length === SECCIONES_DEBUG.length, 'ordenar no pierde secciones');
   const b = buscarSecciones('ESCALA', { 'composicion-del-domo-z49': ['ESCALA'] });
@@ -73,20 +77,47 @@ console.log('\n(b) orden por ultimoZ');
 
 console.log('\n(c) ningún control perdido');
 {
-  let presentes = 0, nuevos = 0, malos = [];
+  // Z73: secciones fusionadas o movidas (id del inventario → id actual) y controles que cambiaron de sección
+  const REUBICADAS = {
+    'panorama-t2-crecimiento-de-grupos': 'panorama-svg', 'u4-sol': 'panorama-svg', 'u4-montanas': 'panorama-svg', 'u4-cielo': 'panorama-svg',
+    'u4-lineas': 'panorama-svg', 'u5-lineas-liquidas': 'panorama-svg', 'u7-capas-visibles': 'panorama-svg', 'u10a-parallax-por-capa': 'panorama-svg',
+    'aa1-domo-original': 'panorama-svg',
+    'w1-domo-de-shader': 'shader-del-domo', 'w2-multiplicadores-de-grupo': 'shader-del-domo', 'w4-domesky-ajuste-de-shader': 'shader-del-domo',
+    'w5-siluetas-suaves': 'shader-del-domo', 'x2-domo-diagnostico': 'shader-del-domo',
+    'u9-secuencia-amanecer': 'amanecer-viejo', 'w3-amanecer-domesky': 'amanecer-viejo',
+    'paneles-sillas-p1': 'paneles-sillas', 'orbitas-z7-paneles-sillas': 'paneles-sillas', 'linterna-z2-paneles-sillas': 'paneles-sillas',
+  };
+  const MOVIDOS = { 'cielo-estrellado-z30': ['camino-luz-z28'], 'prism-proximity': ['controles-sin-efecto'] };   // controles sueltos
+  // Z73: botones repetidos del día que pasaron a ser atajos de lib/controlDia.ts (misma lógica, ya no duplicada)
+  const ATAJOS = [
+    { viejo: 'DBG_DIA.VELOCIDAD = 24', texto: '>Probar flor</button>' }, { viejo: '{ DBG_DIA.VELOCIDAD = 1; tocarDia(); }}>velocidad 1', texto: '>velocidad 1</button>' },
+    { viejo: 'irACheckpoint("dia_flor")', texto: '>Mostrar base con flor</button>' }, { viejo: 'DBG_DIA.VELOCIDAD = 3', texto: '>Animar nacimiento</button>' },
+    { viejo: 'base-flor-reiniciar")); tocarDia(); }}>Reiniciar', texto: '>Reiniciar</button>' },
+  ];
+  const disponibles = {};
+  for (const [id, d] of Object.entries(dibujadas)) disponibles[id] = controles(d.texto).map(c => c.firma);
+  const total = Object.values(disponibles).reduce((a, l) => a + l.length, 0);
+  let presentes = 0, atajos = 0; const malos = [];
+  const tomar = (id, f) => { const l = disponibles[id]; const i = l ? l.indexOf(f) : -1; if (i < 0) return false; l.splice(i, 1); return true; };
   for (const s of inv.secciones) {
-    const d = dibujadas[s.id];
-    if (!d) { malos.push(`${s.id}: no está`); continue; }
-    const ahora = controles(d.texto).map(c => c.firma);
-    const resto = [...ahora];
-    for (const f of s.firmas) { const i = resto.indexOf(f); if (i < 0) malos.push(`${s.id}: falta ${f.slice(0, 90)}`); else { resto.splice(i, 1); presentes++; } }
-    nuevos += resto.length;
+    const destinos = [REUBICADAS[s.id] ?? s.id, ...(MOVIDOS[s.id] ?? [])];
+    for (const f of s.firmas) {
+      if (destinos.some(d => tomar(d, f))) { presentes++; continue; }
+      const a = ATAJOS.find(x => f.includes(x.viejo));
+      const destino = REUBICADAS[s.id] ?? s.id;
+      const nuevo = a && (disponibles[destino] ?? []).find(n => n.includes(a.texto) && n.includes('atajo · Control del día'));
+      if (nuevo) { tomar(destino, nuevo); presentes++; atajos++; continue; }
+      malos.push(`${s.id}: falta ${f.slice(0, 90)}`);
+    }
   }
-  check(!malos.length && presentes === inv.controlesEnSecciones, `los ${inv.controlesEnSecciones} controles del inventario están, idénticos, en su sección (${presentes})`, malos.slice(0, 5).join(' | '));
-  console.log(`      controles agregados después del inventario: ${nuevos}`);
+  check(!malos.length && presentes === inv.controlesEnSecciones, `los ${inv.controlesEnSecciones} controles del inventario están en su sección o en la que los reunió (${presentes}; ${atajos} convertidos en atajos)`, malos.slice(0, 5).join(' | '));
+  check(atajos === ATAJOS.length, `los ${ATAJOS.length} botones repetidos del día son atajos marcados de lib/controlDia.ts`);
+  console.log(`      controles dibujados ahora: ${total} (agregados después del inventario: ${total - presentes})`);
   const menu = fs.readFileSync(new URL('../components/DebugMenu.tsx', import.meta.url), 'utf8');
-  check(menu.includes(normalizar('<button style={{ ...INPUT, opacity: 0.4, cursor: "not-allowed" }} disabled>off</button>')) || normalizar(menu).includes(normalizar('<button style={{ ...INPUT, opacity: 0.4, cursor: "not-allowed" }} disabled>off</button>')),
+  check(normalizar(menu).includes(normalizar('<button style={{ ...INPUT, opacity: 0.4, cursor: "not-allowed" }} disabled>off</button>')),
     'el control del premio (mapa de decisiones) sigue en el contenedor');
+  const comun = fs.readFileSync(new URL('../components/debug/comun.tsx', import.meta.url), 'utf8');
+  check(/requiereRecargar\(note\) && <span style=\{RECARGA\}/.test(comun) && /onChange \? INPUT : INPUT_LECTURA/.test(comun), 'indicadores: ⟳ en los que piden recargar y estilo propio para los de solo lectura (Z73)');
 }
 
 console.log('\n(d) DBG_* con sus nombres y defaults');
@@ -127,6 +158,24 @@ console.log('\n(f) estado persistente');
   mem[CLAVE_MENU] = '{roto'; check(leerEstadoMenu(st) === null, 'JSON roto → null');
   const roto = { getItem() { throw new Error('x'); }, setItem() { throw new Error('x'); } };
   check(leerEstadoMenu(roto) === null && guardarEstadoMenu(roto, { pestana: 'x', plegadas: {} }) === false && leerEstadoMenu(null) === null, 'almacenamiento bloqueado o ausente (SSR): sin errores');
+}
+
+console.log('\n(g) Z73: favoritos y obsoletos');
+{
+  const mem = {}; const st = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = v; } };
+  let f = leerFavoritos(st);
+  f = alternarFavorito(f, 'pasto-z64'); f = alternarFavorito(f, 'telon-n6'); guardarFavoritos(st, f);
+  check(JSON.stringify(leerFavoritos(st)) === '["pasto-z64","telon-n6"]' && JSON.parse(mem[CLAVE_FAVORITOS]).length === 2, 'fijar y guardar favoritos (clave propia)');
+  check(alternarFavorito(f, 'pasto-z64').join() === 'telon-n6', 'quitar un favorito');
+  mem[CLAVE_FAVORITOS] = '["no-existe","pasto-z64",3]';
+  check(leerFavoritos(st).join() === 'pasto-z64' && seccionesFavoritas(['pasto-z64', 'x']).map(s => s.id).join() === 'pasto-z64', 'ids inexistentes o inválidos se ignoran');
+  const roto = { getItem() { throw 0; }, setItem() { throw 0; } };
+  check(leerFavoritos(roto).length === 0 && !guardarFavoritos(roto, ['a']), 'almacenamiento bloqueado: sin errores');
+  const obs = SECCIONES_DEBUG.filter(s => s.pestana === PESTANA_OBSOLETOS);
+  check(obs.length >= 5 && obs.every(s => s.clase === 'obsoleta' && s.avanzada && s.etiqueta && s.flagApaga), `Obsoletos: ${obs.map(s => s.titulo).join(', ')} (plegadas, con etiqueta y flag)`);
+  check(SECCIONES_DEBUG.filter(s => s.clase === 'obsoleta').every(s => s.pestana === PESTANA_OBSOLETOS), 'todas las secciones obsoletas están en Obsoletos');
+  const t = id => SECCIONES_DEBUG.find(s => s.id === id)?.titulo;
+  check(t('sol-n3') === 'Sol de la sala (N3)' && t('sol-nuevo-z51') === 'Sol del cielo (Z51)' && t('debug-overlays') === 'Overlays del prisma, audio y efectos (R1)', 'nombres que se distinguen (Z73)');
 }
 
 console.log(`\n${ok} OK · ${fallas} fallas`);

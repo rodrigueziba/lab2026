@@ -7,7 +7,7 @@ import { EFECTOS_STATE, probarEfecto, borrarPremio } from "@/lib/dialogo/efectos
 import { LUZ_STATE } from "@/lib/caminoLuz";
 import { PAUSA } from "@/lib/pausaExperiencia";
 import { abrirDialogo, cerrarDialogo } from "@/lib/dialogo/dialogoEstado";
-import { LABEL, NOTE, ROW, INPUT, NumField } from "../comun";
+import { LABEL, ROW, INPUT, NOTE, DIVIDER, NumField, ColorField } from "../comun";
 import { useDbg } from "../contexto";
 
 // sección: checkpoints-z40
@@ -50,6 +50,7 @@ export function SecCheckpointsZ40() {
     </>
   );
 }
+
 // sección: efectos-del-dialogo-z29
 export function SecEfectosDelDialogoZ29() {
   const { premio, efx, setEfx } = useDbg();
@@ -104,6 +105,7 @@ export function SecEfectosDelDialogoZ29() {
     </>
   );
 }
+
 // sección: camino-luz-z28
 export function SecCaminoLuzZ28() {
   const { luz, setLuz } = useDbg();
@@ -192,9 +194,30 @@ export function SecCaminoLuzZ28() {
             onChange={v => { DBG_LUZ.ESTRELLAS_D_CERCA_M = v; setLuz(o => ({ ...o, ESTRELLAS_D_CERCA_M: v })); }} />
           <NumField label="ESTRELLAS_TAM_PX" value={luz.ESTRELLAS_TAM_PX} step={0.1} min={0.5} max={10} note="px"
             onChange={v => { DBG_LUZ.ESTRELLAS_TAM_PX = v; setLuz(o => ({ ...o, ESTRELLAS_TAM_PX: v })); }} />
+          {/* Z73: movidos desde "Cielo estrellado Z30" (exterior, activación, giro, teletransporte y color de la luz) */}
+          <div style={DIVIDER} />
+          <NumField label="EXTERIOR_RADIO_M" value={luz.EXTERIOR_RADIO_M} step={1} min={5} max={100} note="m caminable"
+            onChange={v => { DBG_LUZ.EXTERIOR_RADIO_M = v; setLuz(o => ({ ...o, EXTERIOR_RADIO_M: v })); }} />
+          <NumField label="AREA_HIST_M" value={luz.AREA_HIST_M} step={0.25} min={0} max={5} note="m"
+            onChange={v => { DBG_LUZ.AREA_HIST_M = v; setLuz(o => ({ ...o, AREA_HIST_M: v })); }} />
+          <NumField label="ACTIVACION_M" value={luz.ACTIVACION_M} step={0.25} min={0.5} max={10} note="m"
+            onChange={v => { DBG_LUZ.ACTIVACION_M = v; setLuz(o => ({ ...o, ACTIVACION_M: v })); }} />
+          <NumField label="ACTIVACION_SALIDA_M" value={luz.ACTIVACION_SALIDA_M} step={0.25} min={0.5} max={15} note="m"
+            onChange={v => { DBG_LUZ.ACTIVACION_SALIDA_M = v; setLuz(o => ({ ...o, ACTIVACION_SALIDA_M: v })); }} />
+          <NumField label="GIRO_MS" value={luz.GIRO_MS} step={50} min={0} max={5000} note="ms"
+            onChange={v => { DBG_LUZ.GIRO_MS = v; setLuz(o => ({ ...o, GIRO_MS: v })); }} />
+          <NumField label="PITCH_MAX_DEG" value={luz.PITCH_MAX_DEG} step={1} min={0} max={89} note="°"
+            onChange={v => { DBG_LUZ.PITCH_MAX_DEG = v; setLuz(o => ({ ...o, PITCH_MAX_DEG: v })); }} />
+          <NumField label="CIERRE_DIALOGO_MS" value={luz.CIERRE_DIALOGO_MS} step={100} min={0} max={10000} note="ms"
+            onChange={v => { DBG_LUZ.CIERRE_DIALOGO_MS = v; setLuz(o => ({ ...o, CIERRE_DIALOGO_MS: v })); }} />
+          <NumField label="TELEPORT_DIST_M" value={luz.TELEPORT_DIST_M} step={0.5} min={1} max={30} note="m"
+            onChange={v => { DBG_LUZ.TELEPORT_DIST_M = v; setLuz(o => ({ ...o, TELEPORT_DIST_M: v })); }} />
+          <ColorField label="LUZ_COLOR" value={luz.LUZ_COLOR}
+            onChange={v => { DBG_LUZ.LUZ_COLOR = v; setLuz(o => ({ ...o, LUZ_COLOR: v })); }} />
     </>
   );
 }
+
 // sección: dialogo-z27
 export function SecDialogoZ27() {
   const { dlg, setDlg } = useDbg();

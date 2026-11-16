@@ -4,7 +4,7 @@
 import { DBG_SILLAS, DBG_FLUIDO, DBG_PORTAL, DBG_DIA, DBG_DOME_FORCE } from "@/lib/debugConfig";
 import { setVizVolume, restartVizAudio } from "@/lib/vizAudio";
 import { activateVisualizerOnce, resetVizActivated } from "@/lib/alightStore";
-import { LABEL, NOTE, NumField, ROW, INPUT, ColorField, FLUIDO_DEFAULTS } from "../comun";
+import { FLUIDO_DEFAULTS, LABEL, ROW, INPUT, NOTE, DIVIDER, NumField, ColorField } from "../comun";
 import { useDbg } from "../contexto";
 
 // sección: dome-visualizer
@@ -154,6 +154,7 @@ export function SecDomeVisualizer() {
     </>
   );
 }
+
 // sección: fluir-de-color-z61
 export function SecFluirDeColorZ61() {
   const { tocarDia, fluLive } = useDbg();
@@ -217,6 +218,7 @@ export function SecFluirDeColorZ61() {
     </>
   );
 }
+
 // sección: composicion-del-domo-z49
 export function SecComposicionDelDomoZ49() {
   const { tocarDia, ejeLive } = useDbg();
@@ -267,233 +269,27 @@ export function SecComposicionDelDomoZ49() {
     </>
   );
 }
-// sección: panorama-t2-crecimiento-de-grupos
-export function SecPanoramaT2CrecimientoDeGrupos() {
-  const { sillas, setSillas } = useDbg();
+
+// sección: shader-del-domo
+export function SecShaderDelDomo() {
   return (
     <>
-          <span style={LABEL}>Panorama T2 — crecimiento de grupos <span style={NOTE}>(live)</span></span>
-          <NumField label="vizGrowS" value={sillas.vizGrowS} step={0.5} min={0.5} max={15} note="live"
-            onChange={v => { DBG_SILLAS.vizGrowS = v; setSillas(s => ({ ...s, vizGrowS: v })); }} />
-          {([0,1,2,3] as const).map(i => {
-            const key = `vizGrowForce${i}` as "vizGrowForce0"|"vizGrowForce1"|"vizGrowForce2"|"vizGrowForce3";
-            const labels = ["SOL","MONTAÑAS","CIELO","LÍNEAS"] as const;
-            return (
-              <div key={i} style={ROW}>
-                <span>force{i} {labels[i]}</span>
-                <input type="range" min={-1} max={1} step={0.01} style={{ flex: 1 }}
-                  value={sillas[key]}
-                  onChange={e => {
-                    const v = parseFloat(e.target.value);
-                    DBG_SILLAS[key] = v;
-                    setSillas(s => ({ ...s, [key]: v }));
-                  }} />
-                <span style={{ width: 34, textAlign: "right" }}>{(sillas[key] as number).toFixed(2)}</span>
-              </div>
-            );
-          })}
-          {/* U3: forzar todos los grupos al máximo — activa visualizador + fuerza grow=1 */}
-          <div style={ROW}>
-            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
-              onClick={() => {
-                (["vizGrowForce0","vizGrowForce1","vizGrowForce2","vizGrowForce3"] as const).forEach(k => {
-                  DBG_SILLAS[k] = 1;
-                });
-                setSillas(s => ({ ...s, vizGrowForce0: 1, vizGrowForce1: 1, vizGrowForce2: 1, vizGrowForce3: 1 }));
-                activateVisualizerOnce();
-              }}>
-              Todos grow=1 (U3)
-            </button>
-            <button style={{ ...INPUT, width: "auto", padding: "3px 8px", cursor: "pointer" }}
-              onClick={() => {
-                (["vizGrowForce0","vizGrowForce1","vizGrowForce2","vizGrowForce3"] as const).forEach(k => {
-                  DBG_SILLAS[k] = -1;
-                });
-                setSillas(s => ({ ...s, vizGrowForce0: -1, vizGrowForce1: -1, vizGrowForce2: -1, vizGrowForce3: -1 }));
-                resetVizActivated();
-              }}>
-              Reset (U3)
-            </button>
-          </div>
+          {/* Z73: sección fusionada; cada parte es la sección anterior movida tal cual (subtítulo = su título) */}
+          <span style={LABEL}>Shader del domo <span style={NOTE}>(Z73: W1, W2, W4, W5 y X2)</span></span>
+          <SecW1DomoDeShader />
+          <div style={DIVIDER} />
+          <SecW2MultiplicadoresDeGrupo />
+          <div style={DIVIDER} />
+          <SecW4DomeskyAjusteDeShader />
+          <div style={DIVIDER} />
+          <SecW5SiluetasSuaves />
+          <div style={DIVIDER} />
+          <SecX2DomoDiagnostico />
     </>
   );
 }
-// sección: u4-sol
-export function SecU4Sol() {
-  const { sillas, setSillas } = useDbg();
-  return (
-    <>
-          <span style={LABEL}>U4 — SOL <span style={NOTE}>(anillos desfasados)</span></span>
-          <NumField label="grp0AtkMs"     value={sillas.grp0AtkMs}     step={5}    min={5}   max={500}  note="live"
-            onChange={v => { DBG_SILLAS.grp0AtkMs     = v; setSillas(s => ({ ...s, grp0AtkMs:     v })); }} />
-          <NumField label="grp0RelMs"     value={sillas.grp0RelMs}     step={10}   min={10}  max={2000} note="live"
-            onChange={v => { DBG_SILLAS.grp0RelMs     = v; setSillas(s => ({ ...s, grp0RelMs:     v })); }} />
-          <NumField label="sunRingLagMs"  value={sillas.sunRingLagMs}  step={5}    min={0}   max={200}  note="live"
-            onChange={v => { DBG_SILLAS.sunRingLagMs  = v; setSillas(s => ({ ...s, sunRingLagMs:  v })); }} />
-          <NumField label="sunCoreKickBrt" value={sillas.sunCoreKickBrt} step={0.05} min={0}  max={3}   note="live"
-            onChange={v => { DBG_SILLAS.sunCoreKickBrt = v; setSillas(s => ({ ...s, sunCoreKickBrt: v })); }} />
-    </>
-  );
-}
-// sección: u4-montanas
-export function SecU4Montanas() {
-  const { sillas, setSillas } = useDbg();
-  return (
-    <>
-          <span style={LABEL}>U4 — MONTAÑAS <span style={NOTE}>(respiración lenta)</span></span>
-          <NumField label="grp1AtkMs"    value={sillas.grp1AtkMs}    step={10}   min={10}  max={2000} note="live"
-            onChange={v => { DBG_SILLAS.grp1AtkMs    = v; setSillas(s => ({ ...s, grp1AtkMs:    v })); }} />
-          <NumField label="grp1RelMs"    value={sillas.grp1RelMs}    step={50}   min={50}  max={5000} note="live"
-            onChange={v => { DBG_SILLAS.grp1RelMs    = v; setSillas(s => ({ ...s, grp1RelMs:    v })); }} />
-          <NumField label="mt0AmpBoost"  value={sillas.mt0AmpBoost}  step={0.01} min={0}   max={0.5}  note="fondo"
-            onChange={v => { DBG_SILLAS.mt0AmpBoost  = v; setSillas(s => ({ ...s, mt0AmpBoost:  v })); }} />
-          <NumField label="mt1AmpBoost"  value={sillas.mt1AmpBoost}  step={0.01} min={0}   max={0.5}  note="medias"
-            onChange={v => { DBG_SILLAS.mt1AmpBoost  = v; setSillas(s => ({ ...s, mt1AmpBoost:  v })); }} />
-          <NumField label="mt2AmpBoost"  value={sillas.mt2AmpBoost}  step={0.01} min={0}   max={0.5}  note="frente"
-            onChange={v => { DBG_SILLAS.mt2AmpBoost  = v; setSillas(s => ({ ...s, mt2AmpBoost:  v })); }} />
-          <NumField label="mtPhaseSpd"   value={sillas.mtPhaseSpd}   step={0.1}  min={0}   max={5}    note="rad/s"
-            onChange={v => { DBG_SILLAS.mtPhaseSpd   = v; setSillas(s => ({ ...s, mtPhaseSpd:   v })); }} />
-          <NumField label="mtAzParallax" value={sillas.mtAzParallax} step={0.1}  min={0}   max={5}    note="grados"
-            onChange={v => { DBG_SILLAS.mtAzParallax = v; setSillas(s => ({ ...s, mtAzParallax: v })); }} />
-    </>
-  );
-}
-// sección: u4-cielo
-export function SecU4Cielo() {
-  const { sillas, setSillas } = useDbg();
-  return (
-    <>
-          <span style={LABEL}>U4 — CIELO <span style={NOTE}>(centelleo)</span></span>
-          <NumField label="grp2AtkMs"      value={sillas.grp2AtkMs}      step={5}    min={5}  max={500}  note="live"
-            onChange={v => { DBG_SILLAS.grp2AtkMs      = v; setSillas(s => ({ ...s, grp2AtkMs:      v })); }} />
-          <NumField label="grp2RelMs"      value={sillas.grp2RelMs}      step={10}   min={10} max={2000} note="live"
-            onChange={v => { DBG_SILLAS.grp2RelMs      = v; setSillas(s => ({ ...s, grp2RelMs:      v })); }} />
-          <NumField label="starTwinkleAmp" value={sillas.starTwinkleAmp} step={0.05} min={0}  max={2}    note="live"
-            onChange={v => { DBG_SILLAS.starTwinkleAmp = v; setSillas(s => ({ ...s, starTwinkleAmp: v })); }} />
-          <NumField label="starTwinkleFq"  value={sillas.starTwinkleFq}  step={0.1}  min={0}  max={10}   note="rad/s"
-            onChange={v => { DBG_SILLAS.starTwinkleFq  = v; setSillas(s => ({ ...s, starTwinkleFq:  v })); }} />
-    </>
-  );
-}
-// sección: u4-lineas
-export function SecU4Lineas() {
-  const { sillas, setSillas } = useDbg();
-  return (
-    <>
-          <span style={LABEL}>U4 — LÍNEAS <span style={NOTE}>(envelope)</span></span>
-          <NumField label="grp3AtkMs" value={sillas.grp3AtkMs} step={5}  min={5}  max={500}  note="live"
-            onChange={v => { DBG_SILLAS.grp3AtkMs = v; setSillas(s => ({ ...s, grp3AtkMs: v })); }} />
-          <NumField label="grp3RelMs" value={sillas.grp3RelMs} step={10} min={10} max={2000} note="live"
-            onChange={v => { DBG_SILLAS.grp3RelMs = v; setSillas(s => ({ ...s, grp3RelMs: v })); }} />
-    </>
-  );
-}
-// sección: u5-lineas-liquidas
-export function SecU5LineasLiquidas() {
-  const { sillas, setSillas } = useDbg();
-  return (
-    <>
-          <span style={LABEL}>U5 — LÍNEAS líquidas <span style={NOTE}>(psico shader)</span></span>
-          <div style={ROW}>
-            <span>u5PsyMode</span>
-            <button style={INPUT} onClick={() => {
-              const v = !sillas.u5PsyMode;
-              DBG_SILLAS.u5PsyMode = v; setSillas(s => ({ ...s, u5PsyMode: v }));
-            }}>{sillas.u5PsyMode ? "ON" : "off"}</button>
-          </div>
-          <NumField label="u5PsyMixMin" value={sillas.u5PsyMixMin} step={0.05} min={0} max={1} note="live"
-            onChange={v => { DBG_SILLAS.u5PsyMixMin = v; setSillas(s => ({ ...s, u5PsyMixMin: v })); }} />
-          <NumField label="u5PsyMixMax" value={sillas.u5PsyMixMax} step={0.05} min={0} max={1} note="live"
-            onChange={v => { DBG_SILLAS.u5PsyMixMax = v; setSillas(s => ({ ...s, u5PsyMixMax: v })); }} />
-          <NumField label="u5WaveAmp"   value={sillas.u5WaveAmp}   step={0.01} min={0} max={0.6} note="live"
-            onChange={v => { DBG_SILLAS.u5WaveAmp   = v; setSillas(s => ({ ...s, u5WaveAmp:   v })); }} />
-          <NumField label="u5WaveFreq"  value={sillas.u5WaveFreq}  step={0.5}  min={0} max={20}  note="live"
-            onChange={v => { DBG_SILLAS.u5WaveFreq  = v; setSillas(s => ({ ...s, u5WaveFreq:  v })); }} />
-          <NumField label="u5WaveSpd"   value={sillas.u5WaveSpd}   step={0.1}  min={0} max={10}  note="live"
-            onChange={v => { DBG_SILLAS.u5WaveSpd   = v; setSillas(s => ({ ...s, u5WaveSpd:   v })); }} />
-          <NumField label="u5FbmSpd"    value={sillas.u5FbmSpd}    step={0.01} min={0} max={0.5} note="live"
-            onChange={v => { DBG_SILLAS.u5FbmSpd    = v; setSillas(s => ({ ...s, u5FbmSpd:    v })); }} />
-    </>
-  );
-}
-// sección: u7-capas-visibles
-export function SecU7CapasVisibles() {
-  const { sillas, setSillas } = useDbg();
-  return (
-    <>
-          <span style={LABEL}>U7 — Capas visibles <span style={NOTE}>(debug)</span></span>
-          {([
-            ["u7VisStars",    "estrellas"],
-            ["u7VisClouds",   "nubes"],
-            ["u7VisSun",      "sol"],
-            ["u7VisSky",      "cielo"],
-            ["u7VisMtFondo",  "mt-fondo"],
-            ["u7VisMtMedias", "mt-medias"],
-            ["u7VisMtFrente", "mt-frente"],
-            ["u7VisLines",    "líneas"],
-          ] as [keyof typeof DBG_SILLAS, string][]).map(([key, label]) => (
-            <div key={key} style={ROW}>
-              <span>{label}</span>
-              <button style={INPUT} onClick={() => {
-                const v = !sillas[key];
-                (DBG_SILLAS as Record<string, unknown>)[key] = v;
-                setSillas(s => ({ ...s, [key]: v }));
-              }}>{sillas[key] ? "ON" : "off"}</button>
-            </div>
-          ))}
-          <NumField label="u7MagentaIdx" value={sillas.u7MagentaIdx} step={1} min={0} max={8}
-            note="0=off 1=stars 2=clouds 3=sun 4=sky 5=mt-fondo 6=mt-medias 7=mt-frente 8=lines"
-            onChange={v => { DBG_SILLAS.u7MagentaIdx = v; setSillas(s => ({ ...s, u7MagentaIdx: v })); }} />
-    </>
-  );
-}
-// sección: u10a-parallax-por-capa
-export function SecU10aParallaxPorCapa() {
-  const { sillas, setSillas } = useDbg();
-  return (
-    <>
-          <span style={LABEL}>U10A — Parallax por capa <span style={NOTE}>(live)</span></span>
-          <NumField label="parFrenteFact"  value={sillas.parFrenteFact}  step={0.01} min={0.5} max={1.0}  note="frente position factor (0.93)"
-            onChange={v => { DBG_SILLAS.parFrenteFact  = v; setSillas(s => ({ ...s, parFrenteFact:  v })); }} />
-          <NumField label="parMediasFact"  value={sillas.parMediasFact}  step={0.01} min={0.5} max={1.0}  note="medias position factor (0.97)"
-            onChange={v => { DBG_SILLAS.parMediasFact  = v; setSillas(s => ({ ...s, parMediasFact:  v })); }} />
-          <NumField label="parPitchFre"    value={sillas.parPitchFre}    step={0.01} min={0}   max={0.2}  note="V shift/rad pitch (frente)"
-            onChange={v => { DBG_SILLAS.parPitchFre    = v; setSillas(s => ({ ...s, parPitchFre:    v })); }} />
-          <NumField label="parPitchMed"    value={sillas.parPitchMed}    step={0.01} min={0}   max={0.2}  note="V shift/rad pitch (medias)"
-            onChange={v => { DBG_SILLAS.parPitchMed    = v; setSillas(s => ({ ...s, parPitchMed:    v })); }} />
-          <NumField label="parYawTau"      value={sillas.parYawTau}      step={0.05} min={0.1} max={2}    note="yaw-lag decay τ (s)"
-            onChange={v => { DBG_SILLAS.parYawTau      = v; setSillas(s => ({ ...s, parYawTau:      v })); }} />
-          <NumField label="parYawScale"    value={sillas.parYawScale}    step={0.05} min={0}   max={2}    note="yaw delta → UV offset scale"
-            onChange={v => { DBG_SILLAS.parYawScale    = v; setSillas(s => ({ ...s, parYawScale:    v })); }} />
-    </>
-  );
-}
-// sección: aa1-domo-original
-export function SecAa1DomoOriginal() {
-  const { sillas, setSillas } = useDbg();
-  return (
-    <>
-          <span style={LABEL}>AA1 — Domo original <span style={NOTE}>(pre-W1: VizPanorama + esfera panorama)</span></span>
-          <div style={ROW}>
-            <span>domoOriginal</span>
-            <button style={INPUT} onClick={() => {
-              const v = !sillas.domoOriginal;
-              DBG_SILLAS.domoOriginal = v;
-              setSillas(s => ({ ...s, domoOriginal: v }));
-            }}>{sillas.domoOriginal ? "ON" : "off"}</button>
-          </div>
-          <div style={ROW}>
-            <span>domoShaderEnMalla</span>
-            <button style={INPUT} onClick={() => {
-              const v = !sillas.domoShaderEnMalla;
-              DBG_SILLAS.domoShaderEnMalla = v;
-              setSillas(s => ({ ...s, domoShaderEnMalla: v }));
-            }}>{sillas.domoShaderEnMalla ? "ON" : "off"}</button>
-          </div>
-    </>
-  );
-}
-// sección: w1-domo-de-shader
+
+// subsección: w1-domo-de-shader
 export function SecW1DomoDeShader() {
   const { sillas, setSillas } = useDbg();
   return (
@@ -519,7 +315,8 @@ export function SecW1DomoDeShader() {
     </>
   );
 }
-// sección: w2-multiplicadores-de-grupo
+
+// subsección: w2-multiplicadores-de-grupo
 export function SecW2MultiplicadoresDeGrupo() {
   const { sillas, setSillas } = useDbg();
   return (
@@ -538,7 +335,8 @@ export function SecW2MultiplicadoresDeGrupo() {
     </>
   );
 }
-// sección: w4-domesky-ajuste-de-shader
+
+// subsección: w4-domesky-ajuste-de-shader
 export function SecW4DomeskyAjusteDeShader() {
   const { sillas, setSillas, domeM } = useDbg();
   return (
@@ -598,7 +396,8 @@ export function SecW4DomeskyAjusteDeShader() {
     </>
   );
 }
-// sección: w5-siluetas-suaves
+
+// subsección: w5-siluetas-suaves
 export function SecW5SiluetasSuaves() {
   const { sillas, setSillas } = useDbg();
   return (
@@ -616,7 +415,8 @@ export function SecW5SiluetasSuaves() {
     </>
   );
 }
-// sección: x2-domo-diagnostico
+
+// subsección: x2-domo-diagnostico
 export function SecX2DomoDiagnostico() {
   const { sillas, setSillas, domeForce, setDomeForce, domeX2 } = useDbg();
   return (
