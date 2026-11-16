@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { crearEstadFrame, agregarFrame, resumir, crearResumen, percentilOrdenado, escalonesPara, crearEstadoDpr, dprActual, tickDpr,
   reescalonar, crearEstadoBench, pasosBench, iniciarBench, tickBench, cancelarBench, reporteBench, SISTEMAS, duracionBenchS } from '../lib/rendimiento.ts';
 const src = fs.readFileSync(new URL('../lib/debugConfig.ts', import.meta.url), 'utf8');
-const C = Function(`return (${/export const DBG_RENDIMIENTO = (\{[\s\S]*?\n\});/.exec(src)[1].replace(/ as Record<string, boolean>/g, '')});`)();
+const C = Function(`return (${/export const DBG_RENDIMIENTO = (\{[\s\S]*?\n\});/.exec(src)[1].replace(/ as Record<string, boolean>/g, '').replace(/ as string/g, '')});`)();
 let ok = 0, fallas = 0;
 const check = (c, m) => { if (c) { ok++; console.log('  ✓ ' + m); } else { fallas++; console.log('  ✗ ' + m); } };
 const f = (n, d = 2) => n.toFixed(d);

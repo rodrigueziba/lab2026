@@ -1002,6 +1002,19 @@ export const DBG_RENDIMIENTO = {
   LOD_LEJOS_M:         20,     // desde acá, CAPAS_LEJOS
   LOD_HISTERESIS_M:    0.75,   // banda para no saltar de capas al moverse en el borde
   LEJANO_BRILLO:       1.0,    // brillo del suelo lejano respecto del color medio de las briznas
+  // Z69: bloom (components/RetroPostFX + lib/retro/bloomLigero.ts; plan de niveles en lib/rendimientoPost.ts) — live
+  BLOOM_OPTIMIZADO:    true,   // false = UnrealBloomPass como estaba (5 niveles desde la mitad de la resolución)
+  BLOOM_CALIDAD:       "media" as string,   // "alta" (1 · 5 niveles = como estaba) | "media" (0,5 · 4) | "baja" (0,35 · 3): fija los dos de abajo
+  BLOOM_ESCALA:        0.5,    // resolución del bloom respecto del canvas (1 = como estaba: su primer nivel a la mitad)
+  BLOOM_NIVELES:       4,      // niveles de desenfoque (1…5); el radio total del halo se conserva. Se pidió 3: con 3 el halo
+                               // cambia a la vista (disco marcado alrededor del sol); con 4 casi no cambia y cuesta < 1/3 del original
+  // Z69: pases finales — live
+  PASES_FUSIONADOS:    true,   // CRT + salida (ACES + sRGB) + suma del bloom + antialiasing en un único pase a pantalla
+  ANTIALIAS_MODO:      "fxaa" as string,   // "ninguno" | "fxaa" (dentro del pase final; requiere PASES_FUSIONADOS) | "smaa" (pase aparte)
+  ANTIALIAS_CONTEXTO:  false,  // MSAA del contexto WebGL (antes true: no actuaba sobre la escena, que se dibuja en targets sin MSAA). Requiere recargar
+  // Z69: medición — live
+  GPU_POR_PASE:        false,  // temporizador de GPU por pase (escena, fractal, bloom, AA, final) en vez de uno por cuadro
+  LUCES_MONOLITO_DIFERIDAS: true, // las 2 SpotLights de los monolitos solo cuentan cuando se ven (precompiladas con compileAsync)
   // interruptores por sistema (solo debug; true = activo). Apagar quita el costo de dibujo (ver el reporte de Z66)
   SIS: {
     pasto: true, fractal: true, domo: true, anillos: true, flare: true, bloom: true, crt: true, salida: true,
@@ -1115,6 +1128,9 @@ export const DBG_FRACTAL = {
   TEX_RES_CERCA:    1024,
   TEX_UMBRAL_CERCA: 0.7,
   TEX_HISTERESIS:   0.05,   // sube a TEX_RES_CERCA con prox > umbral + h y vuelve con prox < umbral − h
+  // Z69: reparto del cálculo de cada actualización en franjas, una por cuadro (doble textura: se muestra la anterior
+  // hasta que la nueva está completa). Franjas = min(TEX_REPARTIR, cuadros por actualización). 1 = como estaba
+  TEX_REPARTIR:     4,
   RUIDO_TEXTURA:    false,  // ruido celular desde una textura precalculada (256 × 256) en vez de calcularlo
   RUIDO_CELDAS:     32,     // celdas por repetición de la textura de ruido (se fija al montar)
   ADAPTATIVO:       false,  // baja resolución/iteraciones si el frame tarda más de MS_MAX

@@ -91,3 +91,20 @@ export function avanzarFractalTex(e: EstadoFractalTex, c: CfgFractalTex, dt: num
   e.iter = Math.max(1, Math.min(32, Math.round(Math.min(fin(c.ITERACIONES, 16), n.iterMax))));
   return e;
 }
+
+// Z69: reparto de cada actualización en franjas (una por cuadro), para no tener cuadros caros alternados. Las franjas
+// caben en el período de actualización: a 120 Hz y TEX_FPS 30 → 4 cuadros por actualización → hasta 4 franjas; a 60 Hz
+// → 2. Con 1 (o TEX_FPS 0 = cada frame) es como antes.
+export function franjasFractal(texFps: number, dtMedio: number, max: number): number {
+  const m = Math.max(1, Math.min(16, Math.round(fin(max, 1))));
+  const f = fin(texFps), dt = fin(dtMedio);
+  if (f <= 0 || dt <= 0) return 1;
+  const cuadros = Math.floor(1 / f / dt + 0.1);
+  return Math.max(1, Math.min(m, cuadros));
+}
+/** Primera fila de la franja i de n (la franja i va de filaFranja(i) a filaFranja(i + 1): cubren todas, sin huecos ni
+ *  solapes). Devuelve un número (sin allocations). */
+export function filaFranja(i: number, n: number, res: number): number {
+  const nn = Math.max(1, Math.round(n)), r = Math.max(0, Math.round(res));
+  return Math.floor((Math.max(0, Math.min(nn, i)) * r) / nn);
+}

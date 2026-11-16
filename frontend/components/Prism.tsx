@@ -12,7 +12,7 @@ import { RELOJ, ahoraExp } from "@/lib/relojExperiencia"; // Z39
 // Z43: fractal nuevo de las caras ("jungle fractal II"), progresión por distancia y música
 import { FRACTAL_JUNGLA_VERT, FRACTAL_JUNGLA_FRAG, FRACTAL_CARA_TEX_FRAG } from "@/lib/prisma/fractalJungla.glsl";
 import { crearEstadoFractalTex, avanzarFractalTex, tocaActualizar } from "@/lib/prisma/fractalTextura"; // Z45
-import { crearRecursosFractalTex, crearTexturaRuido, renderFractalTex, liberarRecursosFractalTex, type RecursosFractalTex } from "@/lib/prisma/fractalTexturaRender"; // Z45
+import { crearRecursosFractalTex, crearTexturaRuido, renderFractalTex, liberarRecursosFractalTex, ajustarResFractalTex, pedirFranjas, type RecursosFractalTex } from "@/lib/prisma/fractalTexturaRender"; // Z45, Z69
 import { crearGeoCarasPrisma, dimCaraPrisma } from "@/lib/prisma/geoCarasPrisma";
 import { RETRO_FLAGS } from "@/lib/retro/retroFlags"; // Z44
 import { crearEstadoFractal, avanzarFractal } from "@/lib/prisma/fractalProgresion";
@@ -306,7 +306,8 @@ export default function Prism() {
       const R = texRecursos.current;
       if (R) {
         R.frame++;
-        if (R.rt.width !== te.res) { R.rt.setSize(te.res, te.res); R.pendiente = true; }   // solo al cambiar
+        ajustarResFractalTex(R, te.res);   // solo al cambiar (Z69: las dos texturas, actualización completa inmediata)
+        pedirFranjas(R, dt, DBG_FRACTAL.TEX_FPS, DBG_FRACTAL.TEX_REPARTIR);   // Z69
         if (tocaActualizar(te, dt, DBG_FRACTAL.TEX_FPS, PAUSA.activa)) R.pendiente = true;
       }
       U.uZoom.value = DBG_FRACTAL.ZOOM;

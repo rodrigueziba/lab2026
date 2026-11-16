@@ -2,7 +2,8 @@
 // Z66: sección "Rendimiento Z66" del menú debug (Shift). Lee RENDIMIENTO (components/RendimientoHost) y PASTO_RENDER
 // (lib/pastoChunks) cada 0,5 s; escribe DBG_RENDIMIENTO y manda eventos al host (benchmark, DPR forzado, estrés).
 import { useEffect, useState, type CSSProperties } from "react";
-import { DBG_RENDIMIENTO } from "@/lib/debugConfig";
+import { DBG_RENDIMIENTO, DBG_PASTO, DBG_FRACTAL } from "@/lib/debugConfig";
+import { aplicarPerfil, guardarPerfil, aplicarCalidadBloom, PERFILES, PRESETS_BLOOM, type NombrePerfil } from "@/lib/rendimientoPost"; // Z69
 import { SISTEMAS } from "@/lib/rendimiento";
 import { PASTO_RENDER } from "@/lib/pastoChunks";
 import { RENDIMIENTO } from "./RendimientoHost";
@@ -24,6 +25,13 @@ const NUM: readonly (readonly [keyof typeof DBG_RENDIMIENTO, number, number, num
   ["LEJANO_BRILLO", 0, 3, 0.05, ""],
 ];
 
+// Z69: guarda el perfil elegido (localStorage con try/catch: puede estar bloqueado)
+function guardar(n: NombrePerfil): boolean {
+  let s: Storage | null = null;
+  try { s = window.localStorage; } catch { s = null; }
+  return guardarPerfil(s, n);
+}
+
 export default function RendimientoPanel() {
   const [, setTick] = useState(0);
   const [copiado, setCopiado] = useState("");
@@ -44,7 +52,49 @@ export default function RendimientoPanel() {
         {`draw calls ${E.calls} · triángulos ${E.tris} · geometrías ${E.geos} · texturas ${E.texs} · programas ${E.progs}\n`}
         {`GPU: ${E.gpuNombre}\n`}
         {`tiempo de GPU: ${E.timer === "disponible" ? `${E.gpuMs.toFixed(2)} ms/cuadro` : E.timer}\n`}
-        {`pasto (${P.montado ? P.modo : "no montado"}): mallas ${P.chunks} · dibujadas ${P.mallasVisibles} · en cuadro ${P.enCuadro} · capas dibujadas ${P.instancias} · suelo lejano ${P.lejanas}`}
+        {`pasto (${P.montado ? P.modo : "no montado"}): mallas ${P.chunks} · dibujadas ${P.mallasVisibles} · en cuadro ${P.enCuadro} · capas dibujadas ${P.instancias} · suelo lejano ${P.lejanas}\n`}
+        {`refresco estimado: ${E.hzTexto}\n`}
+        {`fractal: ${E.fractal}`}
+        {E.gpuPases && `\nGPU por pase (ms/cuadro): ${E.gpuPases}`}
+        {E.avisoCanvas && `\n${E.avisoCanvas}`}
+      </div>
+
+      <span style={{ ...LABEL, marginTop: 8 }}>Perfil de calidad Z69 <span style={NOTE}>(se guarda en este navegador; actual: {E.perfil || "sin guardar (valores por defecto)"})</span></span>
+      <div style={ROW}>
+        {(Object.keys(PERFILES) as NombrePerfil[]).map(n => (
+          <button key={n} style={{ ...BTN, opacity: E.perfil === n ? 1 : 0.7 }} title={JSON.stringify(PERFILES[n])}
+            onClick={() => { aplicarPerfil(n, R, DBG_PASTO, DBG_FRACTAL); E.perfil = n; setCopiado(guardar(n) ? "" : "no se pudo guardar el perfil"); tocar(); }}>
+            Calidad {n}
+          </button>
+        ))}
+      </div>
+
+      <span style={{ ...LABEL, marginTop: 8 }}>Post-proceso Z69</span>
+      {(["BLOOM_OPTIMIZADO", "PASES_FUSIONADOS", "GPU_POR_PASE", "LUCES_MONOLITO_DIFERIDAS", "ANTIALIAS_CONTEXTO"] as const).map(k => (
+        <div key={k} style={ROW}>
+          <span>{k}{k === "ANTIALIAS_CONTEXTO" && <span style={NOTE}>requiere recargar la página</span>}</span>
+          <button style={BTN} onClick={() => { R[k] = !R[k]; tocar(); }}>{R[k] ? "ON" : "off"}</button>
+        </div>
+      ))}
+      <div style={ROW}>
+        <span>BLOOM_CALIDAD <span style={NOTE}>{R.BLOOM_CALIDAD}</span></span>
+        {Object.keys(PRESETS_BLOOM).map(c => <button key={c} style={BTN} onClick={() => { aplicarCalidadBloom(R, c); tocar(); }}>{c}</button>)}
+      </div>
+      {([["BLOOM_ESCALA", 0.2, 1, 0.05], ["BLOOM_NIVELES", 1, 5, 1]] as const).map(([k, mn, mx, st]) => (
+        <div key={k} style={ROW}>
+          <span>{k} <span style={NOTE}>{R[k].toFixed(st < 1 ? 2 : 0)}</span></span>
+          <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={R[k]}
+            onChange={e => { R[k] = parseFloat(e.target.value); R.BLOOM_CALIDAD = "personalizada"; tocar(); }} />
+        </div>
+      ))}
+      <div style={ROW}>
+        <span>ANTIALIAS_MODO <span style={NOTE}>{R.ANTIALIAS_MODO}</span></span>
+        {["ninguno", "fxaa", "smaa"].map(m => <button key={m} style={BTN} onClick={() => { R.ANTIALIAS_MODO = m; tocar(); }}>{m}</button>)}
+      </div>
+      <div style={ROW}>
+        <span>fractal TEX_REPARTIR <span style={NOTE}>{DBG_FRACTAL.TEX_REPARTIR} franjas máx. · TEX_FPS {DBG_FRACTAL.TEX_FPS}</span></span>
+        <input type="range" min={1} max={8} step={1} style={{ flex: 1 }} value={DBG_FRACTAL.TEX_REPARTIR}
+          onChange={e => { DBG_FRACTAL.TEX_REPARTIR = parseInt(e.target.value, 10); tocar(); }} />
       </div>
 
       <span style={{ ...LABEL, marginTop: 8 }}>Resolución adaptativa</span>
@@ -81,13 +131,13 @@ export default function RendimientoPanel() {
         </div>
       ))}
 
-      <span style={{ ...LABEL, marginTop: 8 }}>Benchmark <span style={NOTE}>(cámara quieta; ~94 s)</span></span>
+      <span style={{ ...LABEL, marginTop: 8 }}>Benchmark <span style={NOTE}>(cámara quieta; cada condición dos veces, ida y vuelta; ~3 min)</span></span>
       <div style={ROW}>
         <button style={BTN} onClick={() => emitir("alight:rend-estres")}>Escena de estrés</button>
         <span style={NOTE}>{E.estres}</span>
       </div>
       <div style={ROW}>
-        <button style={BTN} disabled={E.benchActivo} onClick={() => { setCopiado(""); emitir("alight:rend-bench"); }}>Benchmark (aprox. 2 min)</button>
+        <button style={BTN} disabled={E.benchActivo} onClick={() => { setCopiado(""); emitir("alight:rend-bench"); }}>Benchmark (aprox. 3 min)</button>
         <button style={BTN} disabled={!E.benchActivo} onClick={() => emitir("alight:rend-bench-cancelar")}>Cancelar</button>
       </div>
       {E.bench && <div style={MONO}>{E.bench}</div>}

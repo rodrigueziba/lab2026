@@ -7,7 +7,7 @@
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS, DBG_AMANECER, DBG_LAYOUT } from "@/lib/debugConfig"; // Z38
+import { DBG_SILLAS, DBG_AMANECER, DBG_LAYOUT, DBG_RENDIMIENTO } from "@/lib/debugConfig"; // Z38, Z69
 import { monolitoEn, monolitoDistM } from "@/lib/layoutSala"; // Z41
 import { setMonolithProximity } from "@/lib/vizAudio";
 import { createBasePlateTex } from "@/lib/retro/decals";
@@ -365,6 +365,9 @@ export default function Monoliths({ pasto = false }: { pasto?: boolean }) {
   const rightScreenRef = useRef<THREE.Mesh>(null);
   const leftLightRef   = useRef<THREE.SpotLight>(null);
   const rightLightRef  = useRef<THREE.SpotLight>(null);
+  // Z69: las SpotLights cuentan para los materiales solo cuando el monolito se ve (LUCES_MONOLITO_DIFERIDAS); la
+  // variante de los materiales con estas luces se precompila con compileAsync al empezar la aparición
+  const lucesDif       = useRef({ listas: false, compilando: false, nuevos: [] as { isReady?: () => boolean }[], t0: 0 });
   const leftGlowRef    = useRef<THREE.Mesh>(null);
   const rightGlowRef   = useRef<THREE.Mesh>(null);
   // Z41: cada monolito y todo lo anclado a él (base, placa, pantalla, aro, luces) cuelga de su grupo
@@ -533,6 +536,36 @@ export default function Monoliths({ pasto = false }: { pasto?: boolean }) {
 
     if (leftLightRef.current)  leftLightRef.current.intensity  = op * DBG_SILLAS.monolithLightIntensity;
     if (rightLightRef.current) rightLightRef.current.intensity = op * DBG_SILLAS.monolithLightIntensity;
+    // Z69: luces fuera del cálculo mientras op ≈ 0 (intensidad 0: no cambia lo que se ve). Al empezar a aparecer se
+    // precompila en segundo plano la variante con las 2 luces y recién lista se encienden (op todavía es mínimo)
+    {
+      const L = lucesDif.current, l = leftLightRef.current, r = rightLightRef.current;
+      if (DBG_RENDIMIENTO.LUCES_MONOLITO_DIFERIDAS) {
+        const quiere = op > 0.001;
+        if (quiere && !L.listas && !L.compilando && l && r) {
+          // compile() (no bloquea con KHR_parallel_shader_compile) toma las luces visibles en este momento; los programas
+          // nuevos quedan al final de renderer.info.programs y se consultan cuadro a cuadro. No se usa compileAsync: su
+          // promesa mira el programa actual de cada material, que el cuadro siguiente (luces ocultas) vuelve a ser el
+          // viejo, y se resolvería antes de tiempo
+          L.compilando = true; L.t0 = performance.now();
+          const progs = gl.info.programs, antes = progs ? progs.length : 0;
+          l.visible = true; r.visible = true;
+          try { gl.compile(scene, camera); } catch { /* si falla, se encienden igual (como antes) */ }
+          L.nuevos = progs ? (progs.slice(antes) as unknown as { isReady?: () => boolean }[]) : [];
+        }
+        if (L.compilando && !L.listas) {
+          let listos = true;
+          for (const p of L.nuevos) if (p.isReady && !p.isReady()) { listos = false; break; }
+          if (listos || performance.now() - L.t0 > 5000) { L.listas = true; L.compilando = false; L.nuevos = []; }
+        }
+        const v = quiere && L.listas;
+        if (l) l.visible = v;
+        if (r) r.visible = v;
+      } else {
+        if (l) l.visible = true;
+        if (r) r.visible = true;
+      }
+    }
 
     // V3: point lights only when flag is on
     if (DBG_SILLAS.monolithLucesPropias) {

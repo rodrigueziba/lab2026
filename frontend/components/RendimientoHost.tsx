@@ -10,10 +10,10 @@
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_RENDIMIENTO, DBG_PASTO } from "@/lib/debugConfig";
+import { DBG_RENDIMIENTO, DBG_PASTO, DBG_FRACTAL } from "@/lib/debugConfig";
 import {
   crearEstadFrame, agregarFrame, resumir, crearResumen, escalonesPara, crearEstadoDpr, dprActual, reescalonar, tickDpr,
-  crearEstadoBench, pasosBench, DPR_VIVO, iniciarBench, tickBench, cancelarBench, reporteBench, SISTEMAS, duracionBenchS, CALIENTA_S, MIDE_S,
+  crearEstadoBench, DPR_VIVO, iniciarBench, tickBench, cancelarBench, reporteBench, SISTEMAS, duracionBenchS, CALIENTA_S, MIDE_S,
 } from "@/lib/rendimiento";
 import { FLASH_STATE } from "@/lib/curtainFlash";
 import { ENTRADA, bloquearMovimiento, liberarMovimiento } from "@/lib/entradaTelon";
@@ -22,6 +22,11 @@ import { CK_STATE, irACheckpoint } from "@/lib/checkpoints";
 import { PASTO } from "@/lib/pasto";
 import { PASTO_RENDER } from "@/lib/pastoChunks";
 import { DIA } from "@/lib/cicloDia";
+// Z69: tiempo de GPU por pase, refresco por intervalos, ida y vuelta, perfiles de calidad
+import { GPU_PASES, iniciarGpuPases, liberarGpuPases, finCuadroGpu, resumirGpu, textoGpuPases } from "@/lib/gpuPases";
+import { estimarRefrescoIntervalos, pasosBenchIdaVuelta, combinarIdaVuelta, avisoCanvas, MAX_MUESTRAS } from "@/lib/rendimiento";
+import { leerPerfil, aplicarPerfil } from "@/lib/rendimientoPost";
+import { FRACTAL_PERF } from "@/lib/prisma/fractalTexturaRender";
 
 /** Lecturas para el panel (las actualiza este componente cada 0,5 s). */
 export const RENDIMIENTO = {
@@ -31,6 +36,8 @@ export const RENDIMIENTO = {
   gpuNombre: "", timer: "sin medir", gpuMs: 0,
   escalon: "", escalones: "", cambios: 0, ultimoFpsEval: 0, bloqueadoPor: "",
   bench: "", benchActivo: false, reporte: "", estres: "",
+  // Z69
+  hz: 60, hzTexto: "", gpuPases: "", fractal: "", perfil: "", avisoCanvas: "",
 };
 const RAZON_BENCH = "benchmark";
 
@@ -43,6 +50,8 @@ export default function RendimientoHost() {
     tUlt: -1, tPanel: 0, timer: null as Timer | null, gpuUlt: 0, gpuMs: new Float64Array(240), gpuN: 0, gpuI: 0,
     camPos: new THREE.Vector3(), camQ: new THREE.Quaternion(), sisPrevio: {} as Record<string, boolean>, dprPrevio: 1,
     claveEsc: "", estresPendiente: 0, aplicado: 1, calls: 0, tris: 0,
+    // Z69: refresco (el mayor estimado en la sesión), buffer para ordenar, lista por pase de la línea base
+    hzSesion: 0, tmpHz: new Float64Array(MAX_MUESTRAS), estHz: { hz: 60, grilla: 0, minimos: 0, n: 0 }, gpuPasesBase: "", fracAct: 0,
   });
   const terminarRef = useRef<(cancelado: boolean) => void>(() => {});
 
@@ -64,9 +73,16 @@ export default function RendimientoHost() {
       const gl2 = ctx as WebGL2RenderingContext;
       R.timer = { ext, gl2, q: [gl2.createQuery(), gl2.createQuery(), gl2.createQuery(), gl2.createQuery()], ocupada: [false, false, false, false], i: 0 };
       RENDIMIENTO.timer = "disponible";
+      iniciarGpuPases(gl2, ext);   // Z69: cola aparte para la medición por pase
     } else {
       RENDIMIENTO.timer = esGl2 ? "no disponible: el navegador no expone EXT_disjoint_timer_query_webgl2 (Safari y Firefox no lo hacen; Chrome sí)" : "no disponible: sin WebGL2";
     }
+    // Z69: perfil de calidad guardado (sin nada guardado quedan los valores de debugConfig)
+    let almacen: Storage | null = null;
+    try { almacen = window.localStorage; } catch { almacen = null; }
+    const perfil = leerPerfil(almacen);
+    if (perfil) aplicarPerfil(perfil, DBG_RENDIMIENTO, DBG_PASTO, DBG_FRACTAL);
+    RENDIMIENTO.perfil = perfil ?? "";
     const autoPrevio = gl.info.autoReset;
     fijarAutoReset(gl, false);   // se reinicia una vez por cuadro (abajo)
     RENDIMIENTO.montado = true;
@@ -78,7 +94,8 @@ export default function RendimientoHost() {
       R.sisPrevio = { ...DBG_RENDIMIENTO.SIS };
       R.dprPrevio = gl.getPixelRatio();
       bloquearMovimiento(RAZON_BENCH);
-      iniciarBench(B, pasosBench(SISTEMAS), performance.now() / 1000);
+      iniciarBench(B, pasosBenchIdaVuelta(SISTEMAS), performance.now() / 1000);   // Z69: ida y vuelta
+      R.gpuPasesBase = "";
       RENDIMIENTO.reporte = "";
     };
     const terminar = (cancelado: boolean) => {
@@ -87,12 +104,16 @@ export default function RendimientoHost() {
       aplicarDpr(setDpr, r.current, R.dprPrevio);
       liberarMovimiento(RAZON_BENCH);
       if (cancelado) { RENDIMIENTO.bench = "benchmark cancelado"; return; }
-      // refresco del monitor: el percentil 10 de los cuadros de la línea base (sin carga, cae en el período de vsync)
-      const base = B.resultados[0];
-      const hz = base ? estimarRefresco(base.media) : 60;
-      RENDIMIENTO.reporte = reporteBench(B.resultados, {
+      // Z69: refresco = el mayor estimado en la sesión a partir de los intervalos de rAF (grilla de vsync y mínimos);
+      // antes salía del tiempo medio de la línea base, que con carga da 60 en un monitor de 120 Hz
+      const hz = R.hzSesion > 0 ? R.hzSesion : 60;
+      const RD = DBG_RENDIMIENTO;
+      RENDIMIENTO.reporte = reporteBench(combinarIdaVuelta(B.resultados), {
         gpu: RENDIMIENTO.gpuNombre, dpr: R.dprPrevio, px: `${RENDIMIENTO.w}×${RENDIMIENTO.h}`, refrescoHz: hz,
-        timerGpu: R.timer !== null,
+        timerGpu: R.timer !== null, canvasW: RENDIMIENTO.w, canvasH: RENDIMIENTO.h,
+        metodoRefresco: `intervalos de rAF: grilla ${R.estHz.grilla || "-"} Hz, mínimos ${R.estHz.minimos || "-"} Hz; el mayor de la sesión`,
+        gpuPases: R.gpuPasesBase || undefined,
+        config: `perfil ${RENDIMIENTO.perfil || "sin guardar"} · bloom ${RD.BLOOM_OPTIMIZADO ? `liviano ${RD.BLOOM_CALIDAD} (escala ${RD.BLOOM_ESCALA}, ${RD.BLOOM_NIVELES} niveles)` : "Unreal (como estaba)"} · pases ${RD.PASES_FUSIONADOS ? "fusionados" : "separados"} · AA ${RD.ANTIALIAS_MODO} · fractal ${DBG_FRACTAL.TEX_RES}/${DBG_FRACTAL.TEX_RES_CERCA} a ${DBG_FRACTAL.TEX_FPS} FPS en ≤ ${DBG_FRACTAL.TEX_REPARTIR} franjas · GPU ${RD.GPU_POR_PASE ? "por pase" : "por cuadro"}`,
         escena: `cámara (${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}) · pasto p [${PASTO.p.map(v => v.toFixed(2)).join(", ")}] (${PASTO_RENDER.montado ? PASTO_RENDER.modo : "no montado"}) · tDia ${DIA.dia.toFixed(2)} (${DIA.fase}) · flags pasto: chunks ${on(DBG_RENDIMIENTO.PASTO_CHUNKS)} cull ${on(DBG_RENDIMIENTO.PASTO_CULL_PROGRESO)} lod ${on(DBG_RENDIMIENTO.PASTO_LOD)} lejano ${on(DBG_RENDIMIENTO.PASTO_LEJANO)} viento ${on(DBG_RENDIMIENTO.PASTO_VIENTO_BARATO)} descarte ${on(DBG_RENDIMIENTO.PASTO_DESCARTE_TEMPRANO)} mip ${on(DBG_RENDIMIENTO.PASTO_MIPMAPS)} · DIST_MAX_M ${DBG_PASTO.DIST_MAX_M} · CAPAS ${DBG_PASTO.CAPAS}`,
       });
       RENDIMIENTO.bench = "benchmark terminado";
@@ -122,6 +143,7 @@ export default function RendimientoHost() {
       liberarMovimiento(RAZON_BENCH);
       if (R.timer) for (const q of R.timer.q) if (q) R.timer.gl2.deleteQuery(q);
       R.timer = null;
+      liberarGpuPases();   // Z69
       fijarAutoReset(gl, autoPrevio);
       RENDIMIENTO.montado = false;
     };
@@ -149,6 +171,7 @@ export default function RendimientoHost() {
       if (accion === "restaurar" || accion === "fin") {
         const prev = B.pasos[B.k - 1];
         if (prev.tipo === "sistema") DBG_RENDIMIENTO.SIS[prev.id] = R.sisPrevio[prev.id] !== false;
+        if (prev.tipo === "base" && !R.gpuPasesBase && GPU_PASES.activo) R.gpuPasesBase = textoGpuPases();   // Z69
         if (accion === "fin") terminarRef.current(false);
       }
       if (B.activo) {
@@ -176,9 +199,11 @@ export default function RendimientoHost() {
     }
 
     // dibujo del cuadro: info una vez por cuadro y temporizador de GPU
-    const T = R.timer;
+    // Z69: con GPU_POR_PASE la medición la hacen los pases (lib/gpuPases); la del cuadro entero queda apagada
+    GPU_PASES.activo = DBG_RENDIMIENTO.GPU_POR_PASE && GPU_PASES.disponible;
+    const T = R.timer, porCuadro = !GPU_PASES.activo;
     let q: WebGLQuery | null = null;
-    if (T) {
+    if (T && porCuadro) {
       // recoger resultados listos (sin bloquear)
       const disjunto = T.gl2.getParameter(T.ext.GPU_DISJOINT_EXT);
       for (let k = 0; k < T.q.length; k++) {
@@ -195,6 +220,8 @@ export default function RendimientoHost() {
     gl.info.reset();
     gl.render(scene, state.camera);
     if (T && q) T.gl2.endQuery(T.ext.TIME_ELAPSED_EXT);
+    finCuadroGpu();   // Z69: recoge las consultas por pase listas (y cierra cualquier pase abierto)
+    if (GPU_PASES.activo) R.gpuUlt = GPU_PASES.total;   // el benchmark usa la suma de los pases
     R.calls = gl.info.render.calls; R.tris = gl.info.render.triangles;
 
     // lecturas del panel cada 0,5 s
@@ -210,6 +237,17 @@ export default function RendimientoHost() {
         let suma = 0; for (let k = 0; k < R.gpuN; k++) suma += R.gpuMs[k];
         E.gpuMs = R.gpuN ? suma / R.gpuN : 0;
       }
+      // Z69: por pase, refresco, aviso de canvas chico y fractal (textos cada 0,5 s, no por frame)
+      resumirGpu();
+      if (GPU_PASES.activo) { E.gpuPases = textoGpuPases(); E.gpuMs = GPU_PASES.total; } else E.gpuPases = "";
+      estimarRefrescoIntervalos(R.estad.ms, R.estad.n, R.tmpHz, R.estHz);
+      if (R.estHz.n >= 30 && R.estHz.hz > R.hzSesion) R.hzSesion = R.estHz.hz;
+      E.hz = R.hzSesion || R.estHz.hz;
+      E.hzTexto = `${E.hz} Hz (grilla ${R.estHz.grilla || "-"}, mínimos ${R.estHz.minimos || "-"}; cuadros a ${E.hz}, ${(E.hz / 2).toFixed(0)}, ${(E.hz / 3).toFixed(0)}, ${(E.hz / 4).toFixed(0)} FPS)`;
+      E.avisoCanvas = avisoCanvas(c.width, c.height);
+      const F = FRACTAL_PERF, act = F.actualizaciones - R.fracAct;
+      R.fracAct = F.actualizaciones;
+      E.fractal = `${(act * 2).toFixed(0)} act./s · ${F.franjas} franja(s) · res ${F.res} · CPU ${F.cpuMsFranja.toFixed(2)} ms/franja${GPU_PASES.activo ? ` · GPU ${GPU_PASES.fractalPorActualizacion.toFixed(2)} ms/franja` : ""}`;
       E.escalon = D.forzado > 0 ? `forzado ${D.forzado}` : `${dprActual(D)} (${cfg.DPR_AUTO ? "auto" : "fijo"})`;
       E.escalones = D.escalones.join(" · "); E.cambios = D.cambios; E.ultimoFpsEval = D.ultimoFps; E.bloqueadoPor = bloqueo;
       E.benchActivo = B.activo;

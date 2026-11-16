@@ -136,9 +136,9 @@ export const SISTEMAS = [
   { id: "domo",       etiqueta: "cúpula y cielo",   como: "ExperienceDome: malla domo-cielo (shader del portal entero) invisible" },
   { id: "anillos",    etiqueta: "anillos y ondas",  como: "dome.frag.glsl: rama por uniform (uPerfAnillos) que salta túnel de anillos y ondas" },
   { id: "flare",      etiqueta: "lens flare del sol", como: "SolFlare dentro de un grupo invisible" },
-  { id: "bloom",      etiqueta: "bloom",            como: "RetroPostFX: UnrealBloomPass.enabled = false" },
-  { id: "crt",        etiqueta: "CRT",              como: "RetroPostFX: pase CRT enabled = false" },
-  { id: "salida",     etiqueta: "salida (ACES+sRGB)", como: "RetroPostFX: OutputPass enabled = false (los colores se ven mal: solo para medir)" },
+  { id: "bloom",      etiqueta: "bloom",            como: "RetroPostFX: el bloom (Z69: liviano, o el Unreal con BLOOM_OPTIMIZADO off) enabled = false" },
+  { id: "crt",        etiqueta: "CRT",              como: "RetroPostFX: pase CRT enabled = false (Z69, pases fusionados: el pase final saltea el CRT por uniform; no ahorra un pase)" },
+  { id: "salida",     etiqueta: "salida (ACES+sRGB)", como: "RetroPostFX: OutputPass enabled = false (Z69, fusionados: el pase final saltea ACES + sRGB). Los colores se ven mal: solo para medir" },
   { id: "luces",      etiqueta: "luces y haces",    como: "LucesHaz en grupo invisible + las 4 SpotLights de HazSystem invisibles (recompila). No aísla los anillos de HazRings (transitorios, van directo a la escena)" },
   { id: "flor",       etiqueta: "flor",             como: "FlorCiclo dentro de un grupo invisible" },
   { id: "monolitos",  etiqueta: "monolitos",        como: "MonolitosPasto dentro de un grupo invisible (con sus 8 luces: recompila)" },
@@ -148,8 +148,11 @@ export const SISTEMAS = [
 
 // ── benchmark ──
 export const DPR_BENCH = [1, 0.75, 0.5] as const;
-export interface PasoBench { tipo: "base" | "sistema" | "dpr"; id: string; etiqueta: string; dpr: number }
-export interface ResultadoBench { paso: PasoBench; media: number; p95: number; fps: number; gpu: number; n: number }
+export interface PasoBench { tipo: "base" | "sistema" | "dpr"; id: string; etiqueta: string; dpr: number; vuelta?: boolean }
+export interface ResultadoBench {
+  paso: PasoBench; media: number; p95: number; fps: number; gpu: number; n: number;
+  dif?: number; difGpu?: number; vueltas?: number;   // Z69: |ida − vuelta| (ms) y cuántas mediciones se promediaron
+}
 export interface EstadoBench {
   activo: boolean; pasos: PasoBench[]; k: number; fase: "calentando" | "midiendo"; t0: number;
   suma: number; n: number; muestras: Float64Array; gpuSuma: number; gpuN: number;
@@ -164,6 +167,66 @@ export function pasosBench(sistemas: readonly { id: string; etiqueta: string }[]
   for (const d of DPR_BENCH) p.push({ tipo: "dpr", id: `dpr${d}`, etiqueta: `DPR ${d}`, dpr: d });
   return p;
 }
+/** Z69: cada condición se mide dos veces, a la ida y a la vuelta (orden inverso), para estimar el ruido. */
+export function pasosBenchIdaVuelta(sistemas: readonly { id: string; etiqueta: string }[]): PasoBench[] {
+  const ida = pasosBench(sistemas);
+  const vuelta: PasoBench[] = [];
+  for (let i = ida.length - 1; i >= 0; i--) vuelta.push({ ...ida[i], vuelta: true });
+  return ida.concat(vuelta);
+}
+/** Z69: promedia las mediciones de la misma condición (ida y vuelta) y guarda su diferencia. */
+export function combinarIdaVuelta(res: ResultadoBench[]): ResultadoBench[] {
+  const orden: string[] = [], grupos: Record<string, ResultadoBench[]> = {};
+  for (const r of res) { if (!grupos[r.paso.id]) { grupos[r.paso.id] = []; orden.push(r.paso.id); } grupos[r.paso.id].push(r); }
+  return orden.map(id => {
+    const g = grupos[id], n = g.length;
+    const media = g.reduce((a, r) => a + r.media, 0) / n, p95 = g.reduce((a, r) => a + r.p95, 0) / n;
+    const conGpu = g.filter(r => r.gpu > 0), gpu = conGpu.length ? conGpu.reduce((a, r) => a + r.gpu, 0) / conGpu.length : 0;
+    const dif = n > 1 ? Math.max(...g.map(r => r.media)) - Math.min(...g.map(r => r.media)) : undefined;
+    const difGpu = conGpu.length > 1 ? Math.max(...conGpu.map(r => r.gpu)) - Math.min(...conGpu.map(r => r.gpu)) : undefined;
+    return { paso: { ...g[0].paso, vuelta: false }, media, p95, fps: media > 0 ? 1000 / media : 0, gpu, n: g.reduce((a, r) => a + r.n, 0), dif, difGpu, vueltas: n };
+  });
+}
+/** Z69: diferencias menores que esto (ms) se marcan "ruido" en el reporte (ruido medido ≈ 0,3 ms). */
+export const UMBRAL_RUIDO_MS = 0.4;
+export function esRuido(difMs: number, umbral = UMBRAL_RUIDO_MS): boolean { return Math.abs(fin(difMs)) < umbral; }
+
+// ── Z69: refresco del monitor ──
+export const HZ_CANDIDATOS = [60, 75, 90, 100, 120, 144, 165, 240] as const;
+/** FPS posibles con vsync a hz (un cuadro tarda 1, 2, 3… períodos): 120 → 120, 60, 40, 30. */
+export function cuantizacion(hz: number, n = 4): number[] {
+  const r: number[] = [];
+  for (let k = 1; k <= n; k++) r.push(fin(hz, 60) / k);
+  return r;
+}
+export interface EstimacionRefresco { hz: number; grilla: number; minimos: number; n: number }
+/** Refresco a partir de los intervalos de rAF (ms). Dos estimadores, se toma el mayor:
+ *   · grilla: el menor refresco candidato cuya grilla (múltiplos del período) explica ≥ 85 % de los intervalos
+ *     (a 120 Hz con cuadros de 16,7 y 25 ms, 60 Hz no explica los de 25 ms y 120 sí)
+ *   · mínimos: la mediana del 10 % de intervalos más cortos (período tranquilo), llevada al candidato más cercano.
+ *  tmp: buffer preasignado de al menos n valores (se ordena ahí; no se toca ms). */
+export function estimarRefrescoIntervalos(ms: ArrayLike<number>, n: number, tmp: Float64Array, out?: EstimacionRefresco): EstimacionRefresco {
+  const o = out ?? { hz: 60, grilla: 0, minimos: 0, n: 0 };
+  let m = 0;
+  for (let i = 0; i < Math.min(n, ms.length, tmp.length); i++) { const x = ms[i]; if (x >= 2 && x <= 100) tmp[m++] = x; }
+  o.n = m; o.grilla = 0; o.minimos = 0; o.hz = 60;
+  if (m < 30) return o;
+  for (const hz of HZ_CANDIDATOS) {
+    const P = 1000 / hz, tol = Math.max(0.6, 0.07 * P);
+    let ok = 0;
+    for (let i = 0; i < m; i++) { const k = Math.round(tmp[i] / P); if (k >= 1 && Math.abs(tmp[i] - k * P) <= tol) ok++; }
+    if (ok >= 0.85 * m) { o.grilla = hz; break; }
+  }
+  const sub = tmp.subarray(0, m); sub.sort();
+  const nb = Math.max(1, Math.floor(m * 0.1)), med = sub[Math.floor(nb / 2)];
+  const hzMin = 1000 / med;
+  let mejor: number = HZ_CANDIDATOS[0];
+  for (const hz of HZ_CANDIDATOS) if (Math.abs(hz - hzMin) < Math.abs(mejor - hzMin)) mejor = hz;
+  o.minimos = Math.abs(mejor - hzMin) <= 0.06 * mejor ? mejor : Math.round(hzMin);
+  o.hz = Math.max(o.grilla, o.minimos, 30);
+  return o;
+}
+
 export const CALIENTA_S = 1.5, MIDE_S = 4;
 export function duracionBenchS(nPasos: number): number { return nPasos * (CALIENTA_S + MIDE_S); }
 export function iniciarBench(b: EstadoBench, pasos: PasoBench[], ahoraS: number): void {
@@ -192,7 +255,17 @@ export function tickBench(b: EstadoBench, frameMs: number, gpuMs: number, ahoraS
 }
 export function cancelarBench(b: EstadoBench): void { b.activo = false; b.cancelado = true; }
 
-export interface InfoBench { gpu: string; dpr: number; px: string; refrescoHz: number; timerGpu: boolean; escena: string }
+export interface InfoBench {
+  gpu: string; dpr: number; px: string; refrescoHz: number; timerGpu: boolean; escena: string;
+  // Z69 (opcionales)
+  canvasW?: number; canvasH?: number; metodoRefresco?: string; gpuPases?: string; config?: string;
+}
+/** Z69: aviso si el canvas medido es chico (< 1 Mpx): los tiempos no representan el uso real. "" si está bien. */
+export function avisoCanvas(w: number, h: number): string {
+  const px = fin(w) * fin(h);
+  if (!(px > 0) || px >= 1e6) return "";
+  return `AVISO: el canvas medido es de ${Math.round(w)}×${Math.round(h)} = ${(px / 1e6).toFixed(2)} Mpx (menos de 1 Mpx): medí con la ventana al tamaño real de uso.`;
+}
 /** Tabla de texto del benchmark (para copiar y pegar). */
 export function reporteBench(res: ResultadoBench[], info: InfoBench): string {
   const base = res.find(r => r.paso.tipo === "base");
@@ -200,17 +273,29 @@ export function reporteBench(res: ResultadoBench[], info: InfoBench): string {
   L.push(`alight Z66 · benchmark · ${new Date().toISOString()}`);
   L.push(`GPU: ${info.gpu} · DPR ${info.dpr} · canvas ${info.px} · refresco estimado ${info.refrescoHz.toFixed(0)} Hz · temporizador de GPU: ${info.timerGpu ? "sí" : "no disponible"}`);
   L.push(`escena: ${info.escena}`);
+  if (info.config) L.push(`configuración: ${info.config}`);
+  // Z69: refresco, cuantización, tamaño del canvas, límites del temporizador y lista por pase
+  L.push(`refresco: ${info.refrescoHz.toFixed(0)} Hz${info.metodoRefresco ? ` (${info.metodoRefresco})` : ""}; con vsync los FPS se cuantizan a ${cuantizacion(info.refrescoHz).map(v => v.toFixed(v % 1 ? 1 : 0)).join(", ")}…`);
+  const av = info.canvasW !== undefined && info.canvasH !== undefined ? avisoCanvas(info.canvasW, info.canvasH) : "";
+  if (av) L.push(av);
+  if (info.timerGpu) L.push("GPU ms: en ANGLE/Metal el temporizador por cuadro mide el intervalo de reloj entre el comienzo y el fin del trabajo del cuadro (incluye esperas y solapes con otros procesos, como el compositor): puede superar el tiempo de cuadro. Usar las diferencias entre filas, no el valor absoluto; la lista por pase (GPU_POR_PASE) es secuencial y no se solapa.");
+  if (info.gpuPases) L.push(`GPU por pase (línea base): ${info.gpuPases}`);
   if (base && base.fps >= 0.93 * info.refrescoHz) {
     L.push(`AVISO: la línea base (${base.fps.toFixed(1)} FPS) está pegada al refresco del monitor (vsync): los ms por frame (rAF) no distinguen mejoras; ${info.timerGpu ? "mirar la columna GPU ms" : "no hay temporizador de GPU: probar con la escena de estrés o con DPR más alto"}.`);
   }
   const pad = (s: string, n: number) => (s.length >= n ? s : s + " ".repeat(n - s.length));
   const padI = (s: string, n: number) => (s.length >= n ? s : " ".repeat(n - s.length) + s);
-  L.push(`${pad("sistema", 26)}${padI("ms", 8)}${padI("p95", 8)}${padI("FPS", 7)}${padI("GPU ms", 8)}${padI("ganancia", 10)}${padI("GPU gan.", 10)}`);
+  const conDif = res.some(r => r.dif !== undefined);
+  L.push(`${pad("sistema", 26)}${padI("ms", 8)}${padI("p95", 8)}${padI("FPS", 7)}${padI("GPU ms", 8)}${padI("ganancia", 10)}${padI("GPU gan.", 10)}${conDif ? padI("dif i/v", 9) : ""}`);
   for (const r of res) {
     const g = base && r !== base ? base.media - r.media : 0, gg = base && r !== base && base.gpu > 0 && r.gpu > 0 ? base.gpu - r.gpu : 0;
     const pct = base && base.media > 0 && r !== base ? ` (${((100 * g) / base.media).toFixed(0)}%)` : "";
-    L.push(`${pad(r.paso.etiqueta, 26)}${padI(r.media.toFixed(2), 8)}${padI(r.p95.toFixed(2), 8)}${padI(r.fps.toFixed(1), 7)}${padI(r.gpu > 0 ? r.gpu.toFixed(2) : "-", 8)}${padI(r !== base ? (g >= 0 ? "+" : "") + g.toFixed(2) : "", 10)}${padI(r !== base && gg ? (gg >= 0 ? "+" : "") + gg.toFixed(2) : "", 10)}${pct}`);
+    // Z69: diferencias menores que UMBRAL_RUIDO_MS se marcan como ruido
+    const ruido = r !== base && (esRuido(g) && (!gg || esRuido(gg))) ? " ruido" : r !== base && esRuido(g) ? " (ms dentro del ruido; GPU sí)" : "";
+    const dif = conDif ? padI(r.dif !== undefined ? r.dif.toFixed(2) : "-", 9) : "";
+    L.push(`${pad(r.paso.etiqueta, 26)}${padI(r.media.toFixed(2), 8)}${padI(r.p95.toFixed(2), 8)}${padI(r.fps.toFixed(1), 7)}${padI(r.gpu > 0 ? r.gpu.toFixed(2) : "-", 8)}${padI(r !== base ? (g >= 0 ? "+" : "") + g.toFixed(2) : "", 10)}${padI(r !== base && gg ? (gg >= 0 ? "+" : "") + gg.toFixed(2) : "", 10)}${dif}${pct}${ruido}`);
   }
   L.push("ganancia = ms ahorrados por frame respecto de la línea base (positivo = más rápido sin ese sistema)");
+  L.push(`ruido = diferencia menor que ${UMBRAL_RUIDO_MS} ms (en ms y en GPU): no se distingue de la variación entre mediciones${conDif ? "; dif i/v = diferencia entre la ida y la vuelta de la misma condición" : ""}`);
   return L.join("\n");
 }

@@ -78,3 +78,8 @@ Z45: cálculo en una textura compartida por las 3 caras; port a TypeScript del r
 - Licencia asumida: CC BY-NC-SA 3.0 (la de Shadertoy por defecto). Uso académico no comercial (TIF, UNTDF); si la obra se vuelve comercial, revisar.
 - Se adaptó: la técnica de capas apiladas (acá como planos 3D en lugar de capas por píxel de pantalla), la textura de briznas (máximos locales de un campo aleatorio, altura con raíz cuadrada, tres verdes), el viento proporcional a la altura, el oscurecimiento por altura y la punta rojiza. No se usaron las nubes (que el original acredita a "drift", https://www.shadertoy.com/view/4tdSWr), el cielo ni la cámara libre ("Free fly by Tempally").
 - Propio de este proyecto: el crecimiento por cuartos, el umbral irregular y su ruido, la iluminación y la integración con las luces.
+
+## Antialiasing FXAA y SMAA del post-proceso (Z69)
+- Archivo: `frontend/lib/retro/paseFinal.ts` (función `correccionAA`, dentro del pase final fusionado).
+- FXAA: versión simplificada del algoritmo **NVIDIA FXAA de Timothy Lottes** (2009–2011), en la forma del `FXAAShader` clásico de **three.js** (MIT). Se adaptó para calcularse una vez por píxel, sobre la escena HDR (luma con compresión l/(1+l)), y sumarse como corrección a las tres lecturas de la aberración cromática del CRT.
+- SMAA (opción `ANTIALIAS_MODO: "smaa"`): `SMAAPass` de three.js (MIT), basado en SMAA de Jorge Jimenez et al. (MIT). Se usa sin cambios.

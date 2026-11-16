@@ -845,7 +845,9 @@ export default function ThreeScene() {
         // Z25: rotation explícita → R3F no hace camera.lookAt(0,0,0); el spawn lo fija aplicarSpawn
         camera={{ position: posicionInicial(), rotation: [0, 0, 0], fov: 90 }}
         onCreated={({ camera: cam }) => aplicarSpawn(cam)}
-        gl={{ antialias: true }}
+        // Z69: la escena se dibuja en targets del composer sin MSAA: el antialias del contexto solo reservaba un buffer
+        // ×4 para el último pase. Sin post-proceso (RETRO_FLAGS apagado) se dibuja directo a pantalla y sí sirve
+        gl={{ antialias: DBG_RENDIMIENTO.ANTIALIAS_CONTEXTO || !RETRO_FLAGS.enabled }}
         // Z66: DPR inicial con tope (Retina 2 → 1,5); después lo maneja RendimientoHost (resolución adaptativa)
         dpr={dprCanvas(DBG_RENDIMIENTO.DPR_MAX, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1)}
       >
