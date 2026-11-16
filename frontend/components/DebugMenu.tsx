@@ -84,6 +84,7 @@ import { PASTO } from "@/lib/pasto"; // Z64
 const FLUIDO_DEFAULTS = { MEZCLA_AZUL: DBG_FLUIDO.MEZCLA_AZUL, MEZCLA_NARANJA: DBG_FLUIDO.MEZCLA_NARANJA, WARP: DBG_FLUIDO.WARP, VEL_BASE: DBG_FLUIDO.VEL_BASE, PULSO_LUZ: DBG_FLUIDO.PULSO_LUZ };   // Z63: para "Volver a defaults"
 import { FLOR } from "@/lib/prismaFlor"; // Z54
 import { MONO_PASTO } from "@/lib/monolitosPasto"; // Z65
+import RendimientoPanel from "@/components/RendimientoPanel"; // Z66
 import { duracionTemaViz, idTemaViz } from "@/lib/vizAudio"; // Z54
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
 
@@ -1670,6 +1671,8 @@ export default function DebugMenu() {
             }}>Probar flor</button>
             <button style={INPUT} onClick={() => { DBG_DIA.VELOCIDAD = 1; tocarDia(); }}>velocidad 1</button>
           </div>
+          {/* Z66: rendimiento (medición, sistemas, DPR adaptativo, optimización del pasto, benchmark) */}
+          <RendimientoPanel />
           {/* Z64: pasto bajo las luces */}
           <span style={LABEL}>Pasto Z64 <span style={NOTE}>(bajo las 4 luces · live)</span></span>
           <div style={ROW}><span style={NOTE}>p {pastoLive}</span></div>

@@ -13,7 +13,7 @@ import { OutputPass }      from "three/addons/postprocessing/OutputPass.js";
 import { Pass }            from "three/addons/postprocessing/Pass.js";
 import { CAPA_UI, CAPA_UI_ESTADO } from "@/lib/retro/capaUI";
 import { RetroCRTShader, CRT_UNIFORMS } from "@/lib/retro/retroCRT";
-import { DBG_RETRO_FX, DBG_FLASH, DBG_DIA } from "@/lib/debugConfig";
+import { DBG_RETRO_FX, DBG_FLASH, DBG_DIA, DBG_RENDIMIENTO } from "@/lib/debugConfig";
 import { DIA } from "@/lib/cicloDia"; // Z48
 import { flashBoost, FLASH_STATE, medicionFlashLista, medirPicoFlash } from "@/lib/curtainFlash";
 import { createFlashBlowoutMaterial } from "@/lib/retro/flashBlowout";
@@ -61,11 +61,13 @@ const CRT_FLASH_KEYS = [
 
 export default function RetroPostFX() {
   const { gl, scene, camera, size } = useThree();
+  const dpr = useThree(s => s.viewport.dpr);   // Z66: el composer sigue al DPR (resolución adaptativa)
 
   const composerRef  = useRef<EffectComposer | null>(null);
   const crtPassRef   = useRef<ShaderPass | null>(null);
   const bloomRef     = useRef<UnrealBloomPass | null>(null);
   const blowoutRef   = useRef<ShaderPass | null>(null); // G2
+  const outputRef    = useRef<OutputPass | null>(null); // Z66: interruptor de rendimiento
   const colorRef     = useRef({ flash: "", glare: "" }); // G2: último color aplicado (sin parsear por frame)
   const blowoutCompiled = useRef(false); // G2
   const curveBaseRef = useRef(0.06);
@@ -131,7 +133,9 @@ export default function RetroPostFX() {
       for (const k of keys) dst[k] = src[k];
     }
     composer.addPass(crt);
-    composer.addPass(new OutputPass());
+    const output = new OutputPass();
+    composer.addPass(output);
+    outputRef.current = output;
     // G2: blow-out final tras ACES + sRGB (solo habilitado con uBlowout > 0).
     // Arranca habilitado para que su shader compile en el primer frame (uBlowout 0 → imagen idéntica)
     // y no al disparar el destello.
@@ -169,16 +173,20 @@ export default function RetroPostFX() {
       crtPassRef.current  = null;
       bloomRef.current    = null;
       blowoutRef.current  = null;
+      outputRef.current   = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gl, scene, camera]);
 
   useEffect(() => {
     if (!composerRef.current) return;
+    // Z66: setPixelRatio también: el EffectComposer copia el DPR del renderer al crearse y no lo vuelve a leer
+    // (sus render targets y el bloom quedaban al DPR inicial si este cambiaba)
+    composerRef.current.setPixelRatio(gl.getPixelRatio());
     composerRef.current.setSize(size.width, size.height);
     const pr = gl.getPixelRatio();
     CRT_UNIFORMS.uRes.value.set(size.width * pr, size.height * pr);
-  }, [size, gl]);
+  }, [size, gl, dpr]);
 
   useEffect(() => {
     const onMode = (e: Event) => {
@@ -240,6 +248,11 @@ export default function RetroPostFX() {
     const expoDia = DIA.escena && DBG_DIA.NUEVO ? DIA.expo : 1;
     const expo = DBG_RETRO_FX.toneExposure * expoDia * (1 + (DBG_FLASH.FLASH_EXPOSICION_MULT - 1) * I * b);
     renderer.toneMappingExposure = Number.isFinite(expo) ? Math.min(expo, DBG_FLASH.FLASH_EXPOSICION_TOPE) : DBG_RETRO_FX.toneExposure;
+    // Z66: interruptores del panel de rendimiento (un pase deshabilitado no se ejecuta; el último habilitado va a pantalla)
+    const SIS = DBG_RENDIMIENTO.SIS;
+    if (bloomRef.current) bloomRef.current.enabled = SIS.bloom !== false;
+    if (crtPassRef.current) crtPassRef.current.enabled = SIS.crt !== false;
+    if (outputRef.current) outputRef.current.enabled = SIS.salida !== false;
     if (bloomRef.current) {
       bloomRef.current.threshold = DBG_RETRO_FX.bloomThreshold;
       const bs = DBG_RETRO_FX.bloomIntensity * (1 + (DBG_FLASH.FLASH_BLOOM_MULT - 1) * I * b);

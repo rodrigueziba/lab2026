@@ -133,6 +133,7 @@ uniform float uFlEscY;         // Z63: estiramiento vertical del ruido (el bloqu
 uniform float uFlTope;         // Z63: tope del color fluido (bajo el umbral del bloom 0,92: sin quemar a blanco)
 uniform float uFlTopeModo;     // Z65: 1 = el tope escala el color entero (conserva el tono) · 0 = min por canal (Z63)
 uniform float uFlDiaAt;        // Z65: atenuación de día de los tonos claros del fluido (× uLuzDia; 0 = como Z63)
+uniform float uPerfAnillos;    // Z66: 0 = salta el túnel de anillos y las ondas (panel de rendimiento); 1 = normal
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -439,11 +440,14 @@ void main() {
 
   // ---- marco de anillos (tunel) ----
   float wob  = fbm4(q * 2.2 + vec2(0.0, t * 0.04));
-  float wob2 = fbm4(q * 1.1 + vec2(5.0, t * 0.03));
   float sw = s + 0.040 * wob * (0.6 + 0.4 * sol);
   // Z49: feather del borde con BORDE_SUAVE (misma forma, solo el ancho de la transición)
   float bw = mix(0.012, mix(0.012, 0.05, uBordeSuave), uDiaNuevo);
   float inside = 1.0 - smoothstep(PORTAL_R - bw, PORTAL_R + bw, sw);
+  float reach = 1.0 - smoothstep(uRingFade.x, uRingFade.y, s);
+  float ringA = 0.0, bordeZ = 0.0;
+  if (uPerfAnillos > 0.5) {   // Z66: rama uniforme (todo el cuadro toma el mismo camino)
+  float wob2 = fbm4(q * 1.1 + vec2(5.0, t * 0.03));
   float sph = s + 0.050 * wob + 0.130 * wob2 * (0.7 + 0.5 * sol);
   float ph = sph / (RING_PERIOD * uRingScale) - uRingFlow * t * 12.0 - sol * 0.6;
   // Z52: ondas. La coordenada radial es la distancia angular al centro del portal (s · atan(tan), en rad); cada
@@ -479,13 +483,12 @@ void main() {
   float pulsoAnillo = 0.85 + 0.35 * sol * band + 0.20 * kick * band;
   vec3 ringCol = mix(dark, gold, band) * pulsoAnillo;
   // Z49: anillos y borde teñidos con el cielo del mundo de ese píxel (mismo patrón de franjas; de noche oscuros)
-  float bordeZ = 1.0 - smoothstep(0.0, 0.10, sw - PORTAL_R);                 // franja junto al borde del portal
+  bordeZ = 1.0 - smoothstep(0.0, 0.10, sw - PORTAL_R);                       // franja junto al borde del portal
   float tinteA = mix(uTinteAnillos, uTinteBorde, bordeZ) * uDiaNuevo;
   // Z50: junto al contorno las franjas pierden contraste y convergen al color del cielo (continuo con la banda de adentro)
   float franja = mix(0.55 + 0.9 * band, 1.0, bordeZ * uTinteBorde * uDiaNuevo);
   ringCol = mix(ringCol, min(colCielo * franja, vec3(1.0)) * mix(pulsoAnillo, 1.0, bordeZ * uDiaNuevo), tinteA);
-  float reach = 1.0 - smoothstep(uRingFade.x, uRingFade.y, s);
-  float ringA = max(reach, 0.10);
+  ringA = max(reach, 0.10);
   // Z52: bajo la cresta las franjas brillan, toman algo del color de su luz y se ven aunque estén fuera del alcance
   float crestaC = clamp(cresta, 0.0, 1.0);
   // Z58: la onda se aplica DESPUÉS del tinte del cielo (Z49/Z50), así TINTE_ANILLOS no le apaga el color.
@@ -508,6 +511,7 @@ void main() {
   ringA = max(ringA, crestaC * uOndaRevelar);
   // W3: anillos (SOL) aparecen en fase 2
   col = mix(col, ringCol, ringA * (1.0 - inside) * uReveal.z);
+  }   // Z66: fin de la rama de anillos y ondas
 
   // cordillera que rodea el domo: capa lejana azul oscuro + capa cercana negra
   // W3: la cordillera crece desde el horizonte durante la fase 1 (escala por uDawn)

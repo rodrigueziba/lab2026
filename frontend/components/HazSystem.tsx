@@ -7,7 +7,7 @@
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS, DBG_RETRO_FX, DBG_AMANECER, DBG_LUCES, DBG_DIA } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_RETRO_FX, DBG_AMANECER, DBG_LUCES, DBG_DIA, DBG_RENDIMIENTO } from "@/lib/debugConfig";
 import { getHazUnderUser, getHazPositionsXZ } from "@/lib/haz";
 import { startVizAudio, openGate, closeGate, isPlaying } from "@/lib/vizAudio";
 import { getDawnState, startDawnSequence } from "@/lib/alightStore";
@@ -302,6 +302,7 @@ export default function HazSystem() {
       const light = lights[i];
       light.position.set(bx, originH, bz);
       light.intensity = DBG_SILLAS.hazSpotIntensity * scale * flashMult;
+      light.visible = DBG_RENDIMIENTO.SIS.luces !== false;   // Z66: apagar quita la luz del cálculo (recompila los materiales)
       // U6B: widen angle 15 % proportionally to peak overshoot
       const baseAngle  = Math.atan(DBG_SILLAS.hazConeFloorRM / DBG_SILLAS.hazOriginHM);
       const peakOver   = fl.active && fl.wasOn

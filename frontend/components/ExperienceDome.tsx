@@ -12,13 +12,14 @@ import HazSystem from "./HazSystem";
 import HazRings from "./HazRings";
 import LucesHaz from "./LucesHaz"; // Z42
 import Pasto, { MonolitosPasto } from "./Pasto"; // Z64
+import SistemaPerf from "./SistemaPerf"; // Z66
 import CicloDiaEscena from "./CicloDiaEscena"; // Z48
 import SolFlare from "./SolFlare"; // Z51
 import FlorCiclo from "./FlorCiclo"; // Z54
 import EjeOverlay from "./EjeOverlay"; // Z55
 import SymbolSystem from "./SymbolSystem";
 // Z64: Monoliths se monta desde ./Pasto (MonolitosPasto, según DBG_PASTO.MONOLITOS_ACTIVO)
-import { DBG_SILLAS, DBG_PANELES, DBG_ORBITAS, DBG_SECUENCIA, DBG_DIA } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_PANELES, DBG_ORBITAS, DBG_SECUENCIA, DBG_DIA, DBG_RENDIMIENTO } from "@/lib/debugConfig";
 import { RELOJ, ahoraExp } from "@/lib/relojExperiencia"; // Z39
 import { SECUENCIA, iniciarRevelado, revelarFinal } from "@/lib/secuenciaSillas"; // Z39
 import { PRISM_CENTER_Y } from "./Prism"; // Z7: altura del origen de los haces
@@ -896,7 +897,7 @@ export default function ExperienceDome() {
     if (skyShell) {
       const useDomeSky = vizActiveRef.current && DBG_SILLAS.domoShaderEnMalla && !DBG_SILLAS.domoOriginal;
       const dmat = DOME_SKY_MAT_EXPORT.mat;
-      skyShell.visible = useDomeSky && dmat !== null;
+      skyShell.visible = useDomeSky && dmat !== null && DBG_RENDIMIENTO.SIS.domo !== false;   // Z66: interruptor de rendimiento
       if (dmat && skyShell.material !== dmat) skyShell.material = dmat;
     }
   });
@@ -942,15 +943,15 @@ export default function ExperienceDome() {
       {/* N3: beams + floor symbols */}
       {vizActive && <HazSystem />}
       {vizActive && <HazRings />}
-      {vizActive && <LucesHaz />}{/* Z42: diseño de las 4 luces (estilo luz de la narrativa) */}
+      {vizActive && <SistemaPerf id="luces"><LucesHaz /></SistemaPerf>}{/* Z42: diseño de las 4 luces (estilo luz de la narrativa) */}
       {vizActive && <CicloDiaEscena />}{/* Z48: fondo, niebla y luces de la escena siguen el ciclo de día */}
-      {vizActive && <SolFlare />}{/* Z51: destello de lente del sol del mundo (sprites en pantalla) */}
-      {vizActive && <FlorCiclo />}{/* Z54: flor del ciclo de día donde estaba el prisma */}
+      {vizActive && <SistemaPerf id="flare"><SolFlare /></SistemaPerf>}{/* Z51: destello de lente del sol del mundo (sprites en pantalla) */}
+      {vizActive && <SistemaPerf id="flor"><FlorCiclo /></SistemaPerf>}{/* Z54: flor del ciclo de día donde estaba el prisma */}
       {vizActive && <EjeOverlay />}{/* Z55: overlay del eje de la composición (DBG_PORTAL.OVERLAY_EJE, oculto por defecto) */}
       {vizActive && <SymbolSystem />}
       {/* N5: monoliths flanking tarima path */}
       {/* Z64: el pasto crece bajo cada luz · Z65: los monolitos aparecen al completar los 4 cuartos (DBG_PASTO.MONOLITOS_MODO) */}
-      {vizActive && <MonolitosPasto />}
+      {vizActive && <SistemaPerf id="monolitos"><MonolitosPasto /></SistemaPerf>}
       {vizActive && <Pasto />}
 
       {/* Dome shell — upper hemisphere, BackSide.

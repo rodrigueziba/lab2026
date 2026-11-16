@@ -13,7 +13,7 @@ useTexture.preload([
   "/portal/portal-color.png",
 ]);
 import { domeVert, domeFrag } from "./domeShaders";
-import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL, DBG_SOL, DBG_ONDAS, DBG_SILLAS, DBG_FLUIDO } from "@/lib/debugConfig";
+import { DBG_DOME_LIVE, DBG_DOME_FORCE, DBG_DIA, DBG_PORTAL, DBG_SOL, DBG_ONDAS, DBG_SILLAS, DBG_FLUIDO, DBG_RENDIMIENTO } from "@/lib/debugConfig";
 import { FLUIDO } from "@/lib/fluidoBloques"; // Z61
 import { ONDAS, MAX_ONDAS, edad, evidenciaOndas } from "@/lib/ondasKick"; // Z52 · Z58
 
@@ -226,6 +226,7 @@ export default function DomeSky({
           uFlTope:  { value: 0.85 },                            // Z63
           uFlTopeModo: { value: 1 },                            // Z65
           uFlDiaAt: { value: 0.5 },                             // Z65
+          uPerfAnillos: { value: 1 },                           // Z66
           uFlPalA:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
           uFlPalN:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
           uOndaEngrosar:    { value: 0 },   // Z58
@@ -303,6 +304,7 @@ export default function DomeSky({
       // Z61/Z63: FLUIDO lo avanza DomeSkyAnchor (DomeVisualizer) con las bandas crudas y la luz de cada grupo
     }
     // Z61: fluir de color (tiempo acumulado propio por bloque: sin saltos al cambiar la velocidad; quieto en pausa)
+    u.uPerfAnillos.value = DBG_RENDIMIENTO.SIS.anillos !== false ? 1 : 0;   // Z66: interruptor de rendimiento
     u.uFluido.value = DBG_FLUIDO.ACTIVO ? 1 : 0;
     if (DBG_FLUIDO.ACTIVO) {
       u.uFlT.value.set(FLUIDO.tA, FLUIDO.tN);

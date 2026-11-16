@@ -19,6 +19,9 @@ import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import CurtainFlash from "./CurtainFlash"; // F1: destello al atravesar el telón
 import EntradaTelon from "./EntradaTelon"; // Z59: pose de entrada fija tras el telón
+import RendimientoHost from "./RendimientoHost"; // Z66: medición, DPR adaptativo y benchmark
+import { dprCanvas } from "@/lib/rendimiento"; // Z66
+import SistemaPerf from "./SistemaPerf"; // Z66
 import { movimientoBloqueado } from "@/lib/entradaTelon"; // Z59
 import FlashAviso from "./FlashAviso"; // G2: aviso de fotosensibilidad (flag, off por defecto)
 import VideoModal from "./VideoModal"; // video etapa 1: reproductor aparte (modal)
@@ -28,7 +31,7 @@ import { moverConLimites } from "@/lib/caminoLuz"; // Z28: límites sala ∪ ext
 import { EFECTOS_STATE } from "@/lib/dialogo/efectosEstado"; // Z29: bloqueo de la zona TARIMA en juego_alarma
 import { posicionInicial, aplicarSpawn } from "@/lib/inicioEscena"; // Z24/Z25
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
-import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV, DBG_SECUENCIA, DBG_LAYOUT, DBG_TELON_TEXTO } from "@/lib/debugConfig";
+import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV, DBG_SECUENCIA, DBG_LAYOUT, DBG_TELON_TEXTO, DBG_RENDIMIENTO } from "@/lib/debugConfig";
 import { crearEspera, type Espera } from "@/lib/relojExperiencia"; // Z39
 import { cancelarSecuencia } from "@/lib/secuenciaSillas"; // Z39
 import { ZONA_TARIMA, ZONA_SILLAS_BASE, zonaSillasEn } from "@/lib/layoutSala"; // Z41
@@ -508,7 +511,7 @@ function Scene() {
       {/* Z59: pose de entrada fija tras el telón (siempre montado: el telón se desmonta después del cruce) */}
       <EntradaTelon />
       {/* Z46: "A LIGHT FOR ATTRACTING ATTENTION" sobre el telón (recorte del reflector); se va con el telón */}
-      {curtainVisible && DBG_TELON_TEXTO.ACTIVO && <TelonTexto />}
+      {curtainVisible && DBG_TELON_TEXTO.ACTIVO && <SistemaPerf id="telonTexto"><TelonTexto /></SistemaPerf>}
       {/* Z23: iconos de los dos caminos grabados en el piso, entre el inicio y el telón */}
       <PisoIconos />
       {/* Z28: luz lejana detrás del inicio (camino LUZ), estrellas y salida de la sala */}
@@ -843,8 +846,11 @@ export default function ThreeScene() {
         camera={{ position: posicionInicial(), rotation: [0, 0, 0], fov: 90 }}
         onCreated={({ camera: cam }) => aplicarSpawn(cam)}
         gl={{ antialias: true }}
+        // Z66: DPR inicial con tope (Retina 2 → 1,5); después lo maneja RendimientoHost (resolución adaptativa)
+        dpr={dprCanvas(DBG_RENDIMIENTO.DPR_MAX, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1)}
       >
         <Scene key={epocaEscena} />
+        <RendimientoHost />{/* Z66: fuera de Scene: sobrevive a los remontajes de los checkpoints */}
       </Canvas>
       <DebugMenu />
       <CurtainFlash />

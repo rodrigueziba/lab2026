@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
 import { TARIMA_H } from "./Tarima";
 import { INTERACT_STATE } from "@/lib/alightStore";
-import { DBG_PRISM, DBG_SECUENCIA, DBG_FRACTAL, DEBUG_ENABLED, DBG_FLOR } from "@/lib/debugConfig";
+import { DBG_PRISM, DBG_SECUENCIA, DBG_FRACTAL, DEBUG_ENABLED, DBG_FLOR, DBG_RENDIMIENTO } from "@/lib/debugConfig";
 import { FLOR } from "@/lib/prismaFlor"; // Z54
 import { RELOJ, ahoraExp } from "@/lib/relojExperiencia"; // Z39
 // Z43: fractal nuevo de las caras ("jungle fractal II"), progresión por distancia y música
@@ -348,7 +348,7 @@ export default function Prism() {
     // invisible (prox ≈ 0 o diseño anterior) → no se dibuja: costo 0 lejos del prisma
     // Z45: con USAR_TEXTURA solo se dibuja la malla liviana (la textura se recalcula en su onBeforeRender);
     // con prox 0 las dos mallas quedan invisibles y no se evalúa ningún shader del fractal.
-    const visFrac = nuevo && FRACTAL_UNIFORMS.uProx.value > 0.001;
+    const visFrac = nuevo && FRACTAL_UNIFORMS.uProx.value > 0.001 && DBG_RENDIMIENTO.SIS.fractal !== false;   // Z66: interruptor de rendimiento
     const usarTex = DBG_FRACTAL.USAR_TEXTURA && !DBG_FRACTAL.CARAS_DISTINTAS && texRecursos.current !== null;
     if (fracMeshRef.current) fracMeshRef.current.visible = visFrac && !usarTex;
     if (texMeshRef.current) texMeshRef.current.visible = visFrac && usarTex;

@@ -974,6 +974,41 @@ export const DBG_PASTO = {
   SIMULAR:          -1,     // −1 o 0…3: como si el usuario estuviera bajo esa luz (pruebas) — live
 };
 
+// ── Z66: rendimiento (lib/rendimiento.ts, components/RendimientoHost.tsx, components/RendimientoPanel.tsx,
+// lib/pastoChunks.ts). Medición, interruptores por sistema (solo debug), resolución adaptativa y optimización del pasto. ──
+export const DBG_RENDIMIENTO = {
+  // resolución adaptativa (DPR del Canvas; el postproceso y el CRT lo siguen)
+  DPR_MAX:        1.5,    // tope (Retina = 2: con 1,5 se dibuja el 56 % de los píxeles) — live
+  DPR_MIN:        0.5,    // piso — live
+  DPR_AUTO:       true,   // false = DPR fijo (el último escalón o el forzado) — live
+  OBJETIVO_FPS:   50,     // si el promedio de una ventana queda por debajo, baja un escalón — live
+  SUBIR_FPS:      58,     // si se sostiene por encima SUBIR_S, sube un escalón — live
+  EVAL_S:         1.5,    // ventana de evaluación — live
+  SUBIR_S:        4,      // segundos sostenidos por encima de SUBIR_FPS para subir — live
+  ENTRE_CAMBIOS_S: 3,     // mínimo entre dos cambios (histéresis) — live
+  REBOTE_S:       10,     // si tras subir hay que bajar antes de esto, ese escalón queda vedado REBOTE_VEDA_S — live
+  REBOTE_VEDA_S:  30,     // — live
+  // optimizaciones del pasto (cada una comparable con su flag) — live
+  PASTO_CHUNKS:        true,   // bloques de ~CHUNK_M con frustum culling (Z64: una malla del rectángulo entero por cuarto)
+  PASTO_CULL_PROGRESO: true,   // un bloque no se dibuja si p del cuarto ≤ el umbral mínimo de sus puntos (requiere CHUNKS)
+  PASTO_LOD:           true,   // capas por distancia: CAPAS hasta LOD_CERCA_M, CAPAS_LEJOS desde LOD_LEJOS_M (requiere CHUNKS)
+  PASTO_LEJANO:        true,   // suelo verde medio barato donde el pasto ya no se dibuja (en vez del negro de Z64)
+  PASTO_VIENTO_BARATO: true,   // viento calculado por vértice (malla subdividida) en vez de por fragmento
+  PASTO_DESCARTE_TEMPRANO: true, // cotas exactas del umbral antes del ruido de manchas (mismo resultado, menos cálculo)
+  PASTO_MIPMAPS:       true,   // mipmaps de la textura de briznas (alfa por máximo: las briznas no desaparecen lejos) + anisotropía 2
+  CHUNK_M:             4,      // lado aproximado de cada bloque (m)
+  CAPAS_LEJOS:         6,      // capas a LOD_LEJOS_M o más
+  LOD_CERCA_M:         8,      // hasta acá, CAPAS completas
+  LOD_LEJOS_M:         20,     // desde acá, CAPAS_LEJOS
+  LOD_HISTERESIS_M:    0.75,   // banda para no saltar de capas al moverse en el borde
+  LEJANO_BRILLO:       1.0,    // brillo del suelo lejano respecto del color medio de las briznas
+  // interruptores por sistema (solo debug; true = activo). Apagar quita el costo de dibujo (ver el reporte de Z66)
+  SIS: {
+    pasto: true, fractal: true, domo: true, anillos: true, flare: true, bloom: true, crt: true, salida: true,
+    luces: true, flor: true, monolitos: true, telonTexto: true, estrellas: true,
+  } as Record<string, boolean>,
+};
+
 // ── Z59: entrada fija después de cruzar el telón (lib/entradaTelon.ts, components/EntradaTelon.tsx) ──
 export const DBG_ENTRADA = {
   ACTIVO:                 true,   // false = como antes de Z59 (el usuario queda donde cruzó el telón) — live
