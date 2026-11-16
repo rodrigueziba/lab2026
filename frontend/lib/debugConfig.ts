@@ -1015,10 +1015,22 @@ export const DBG_RENDIMIENTO = {
   // Z69: medición — live
   GPU_POR_PASE:        false,  // temporizador de GPU por pase (escena, fractal, bloom, AA, final) en vez de uno por cuadro
   LUCES_MONOLITO_DIFERIDAS: true, // las 2 SpotLights de los monolitos solo cuentan cuando se ven (precompiladas con compileAsync)
+  // Z72: domo a escala (lib/domoEscala.ts): el shader del portal se dibuja en un target de escala × resolución — live
+  DOME_ESCALA:         1,      // 1 = como estaba; perfiles media 0,75 y baja 0,5
+  // Z72: objetivo de la resolución adaptativa según el refresco detectado (lib/rendimiento.ts, objetivosDpr)
+  OBJETIVO_POR_REFRESCO: true, // con refresco ≥ 100 Hz: objetivo = refresco / 2 − MARGEN_ALTO_HZ (57 a 120 Hz); con 60 Hz, OBJETIVO_FPS
+  MARGEN_ALTO_HZ:      3,
+  SUBIR_FRACCION_ALTO: 0.75,   // con refresco ≥ 100 Hz, subir de escalón si se sostiene por encima de refresco × esto (90 a 120 Hz)
+  RECORDAR_ESCALON:    true,   // guarda el último escalón estable (localStorage) y arranca ahí la próxima vez
+  // Z72: pase final (evaluadas: no cumplen la diferencia ≤ 2/255; quedan apagadas para comparar)
+  ACES_RAPIDO:         false,  // aproximación de ACES de Narkowicz en vez de la de three (RRT+ODT de Hill)
+  FXAA_LIGERO:         false,  // FXAA sin la segunda pareja de lecturas (7 en vez de 9)
   // interruptores por sistema (solo debug; true = activo). Apagar quita el costo de dibujo (ver el reporte de Z66)
   SIS: {
     pasto: true, fractal: true, domo: true, anillos: true, flare: true, bloom: true, crt: true, salida: true,
     luces: true, flor: true, monolitos: true, telonTexto: true, estrellas: true,
+    // Z72: sub-sistemas del shader del domo (uniforms uPerf* de dome.frag.glsl)
+    domoFluido: true, domoSol: true, domoOndas: true, domoEstrellas: true, domoPortal: true, domoSiluetas: true,
   } as Record<string, boolean>,
 };
 

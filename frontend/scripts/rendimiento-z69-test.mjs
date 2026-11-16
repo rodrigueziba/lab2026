@@ -158,7 +158,8 @@ console.log('\nbenchmark');
   const txt = reporteBench(comb, { gpu: 'Apple M3', dpr: 1.5, px: '756×430', refrescoHz: 120, timerGpu: true, escena: 'prueba', canvasW: 756, canvasH: 430, metodoRefresco: 'prueba', gpuPases: 'escena 3 · bloom 1' });
   console.log(txt.split('\n').map(l => '    | ' + l).join('\n'));
   const lineaFlare = txt.split('\n').find(l => l.startsWith('sin flare')), lineaBloom = txt.split('\n').find(l => l.startsWith('sin bloom'));
-  check(lineaFlare.endsWith(' ruido') && !lineaBloom.endsWith(' ruido') && lineaBloom.includes('GPU sí'), 'reporte: el flare (0,15 ms y 0,1 GPU) es ruido; el bloom (13 ms de GPU) no, aunque en ms (vsync) sí');
+  // Z72: la GPU es secundaria; si su ganancia difiere más de 3× de la de rAF se marca "GPU no fiable" (antes "GPU sí")
+  check(lineaFlare.endsWith(' ruido') && !lineaFlare.includes('no fiable') && lineaBloom.includes('GPU no fiable'), 'reporte: el flare (0,15 ms y 0,1 GPU) es ruido; el bloom (0,2 ms de rAF y 13 de GPU) marca "GPU no fiable" (Z72)');
   check(txt.includes('120, 60, 40, 30') && txt.includes('AVISO: el canvas medido') && !txt.includes('vsync)'), 'reporte: cuantización a 120 Hz, aviso de canvas chico y sin el aviso de vsync equivocado');
   check(avisoCanvas(1920, 1080) === '' && avisoCanvas(756, 430) !== '', 'aviso de canvas: < 1 Mpx');
 }

@@ -67,7 +67,7 @@ console.log('\n(b) orden por ultimoZ');
     'al subir ultimoZ de una sección (prueba con Z99) se ordena sola: primera de su pestaña, de Recientes y su pestaña primera, con NUEVO');
   check(ordenarSecciones(SECCIONES_DEBUG).length === SECCIONES_DEBUG.length, 'ordenar no pierde secciones');
   const b = buscarSecciones('ESCALA', { 'composicion-del-domo-z49': ['ESCALA'] });
-  check(b.length > 0 && b[0].seccion.id === 'composicion-del-domo-z49' && buscarSecciones('  ', {}).length === 0, 'buscador: encuentra por nombre de control; vacío = sin resultados');
+  check(b.some(r => r.seccion.id === 'composicion-del-domo-z49' && r.coincidencias.includes('ESCALA')) && buscarSecciones('  ', {}).length === 0, 'buscador: encuentra por nombre de control; vacío = sin resultados');
   check(buscarSecciones('telon', {}).some(r => r.seccion.id === 'telon-n6'), 'buscador: sin distinguir tildes ni mayúsculas (telon → "Telón N6")');
 }
 

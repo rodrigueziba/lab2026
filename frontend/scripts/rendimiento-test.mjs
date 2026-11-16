@@ -74,7 +74,7 @@ console.log('\nbenchmark');
   while (b.activo && t < 300) { t += 1 / 60; const a = tickBench(b, 16.7 + (b.pasos[b.k]?.id === 'pasto' ? -5 : 0), 9, t); if (a !== 'nada') acciones.push([a, b.k]); }
   check(pasos.length === 1 + SISTEMAS.length + 3 && pasos[0].tipo === 'base' && pasos.at(-1).dpr === 0.5, `${pasos.length} pasos: línea base, ${SISTEMAS.length} sistemas, DPR 1 / 0,75 / 0,5`);
   console.log(`    duración: ${f(t, 1)} s (estimada ${duracionBenchS(pasos.length)} s)`);
-  check(Math.abs(t - duracionBenchS(pasos.length)) < 1 && t < 120, 'dura ~1,5 min (1,5 s de calentamiento + 4 s de medición por paso)');
+  check(Math.abs(t - duracionBenchS(pasos.length)) < 1, `dura lo estimado: 1,5 s de calentamiento + 4 s de medición por paso (${pasos.length} pasos; Z72: + 6 filas del domo)`);
   check(acciones.filter(a => a[0] === 'restaurar').length === pasos.length - 1 && acciones.at(-1)[0] === 'fin', 'cada paso se restaura antes del siguiente; termina con "fin"');
   const rp = b.resultados.find(r => r.paso.id === 'pasto'), rb = b.resultados[0];
   check(Math.abs(rb.media - 16.7) < 0.01 && Math.abs(rp.media - 11.7) < 0.01 && rp.gpu === 9, 'mide solo durante la medición (sin calentamiento) y promedia el tiempo de GPU');

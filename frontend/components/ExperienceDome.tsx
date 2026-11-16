@@ -14,6 +14,7 @@ import LucesHaz from "./LucesHaz"; // Z42
 import Pasto, { MonolitosPasto } from "./Pasto"; // Z64
 import SistemaPerf from "./SistemaPerf"; // Z66
 import BaseFlor from "./BaseFlor"; // Z67
+import { aplicarEscalaDomo, liberarEscalaDomo } from "@/lib/domoEscala"; // Z72
 import CicloDiaEscena from "./CicloDiaEscena"; // Z48
 import SolFlare from "./SolFlare"; // Z51
 import FlorCiclo from "./FlorCiclo"; // Z54
@@ -849,6 +850,7 @@ export default function ExperienceDome() {
 
   const shellRef    = useRef<THREE.Mesh>(null);
   const skyShellRef = useRef<THREE.Mesh>(null);
+  useEffect(() => () => liberarEscalaDomo(), []);   // Z72: libera el target del domo escalado
   const panelsRef   = useRef<THREE.Group>(null); // P1: contenedor de los paneles SILLAS
   const { gl, scene, camera } = useThree();
 
@@ -899,7 +901,7 @@ export default function ExperienceDome() {
       const useDomeSky = vizActiveRef.current && DBG_SILLAS.domoShaderEnMalla && !DBG_SILLAS.domoOriginal;
       const dmat = DOME_SKY_MAT_EXPORT.mat;
       skyShell.visible = useDomeSky && dmat !== null && DBG_RENDIMIENTO.SIS.domo !== false;   // Z66: interruptor de rendimiento
-      if (dmat && skyShell.material !== dmat) skyShell.material = dmat;
+      if (dmat) aplicarEscalaDomo(skyShell, dmat, DBG_RENDIMIENTO.DOME_ESCALA);   // Z72: 1 = material original (como antes)
     }
   });
 

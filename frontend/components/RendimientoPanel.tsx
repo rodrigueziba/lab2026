@@ -6,7 +6,7 @@ import { DBG_RENDIMIENTO, DBG_PASTO, DBG_FRACTAL } from "@/lib/debugConfig";
 import { aplicarPerfil, guardarPerfil, aplicarCalidadBloom, PERFILES, PRESETS_BLOOM, type NombrePerfil } from "@/lib/rendimientoPost"; // Z69
 import { SISTEMAS } from "@/lib/rendimiento";
 import { PASTO_RENDER } from "@/lib/pastoChunks";
-import { RENDIMIENTO } from "./RendimientoHost";
+import { RENDIMIENTO, POSES_BENCH } from "./RendimientoHost";
 
 const LABEL: CSSProperties = { display: "block", marginBottom: 5, color: "#8899bb" };
 const ROW: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 };
@@ -23,6 +23,7 @@ const NUM: readonly (readonly [keyof typeof DBG_RENDIMIENTO, number, number, num
   ["OBJETIVO_FPS", 20, 120, 1, "FPS"], ["DPR_MAX", 0.5, 3, 0.05, ""], ["DPR_MIN", 0.25, 1.5, 0.05, ""],
   ["CHUNK_M", 2, 12, 0.5, "m"], ["CAPAS_LEJOS", 1, 40, 1, "capas"], ["LOD_CERCA_M", 1, 40, 0.5, "m"], ["LOD_LEJOS_M", 2, 60, 0.5, "m"],
   ["LEJANO_BRILLO", 0, 3, 0.05, ""],
+  ["MARGEN_ALTO_HZ", 0, 15, 0.5, "FPS (Z72)"], ["SUBIR_FRACCION_ALTO", 0.5, 1, 0.01, "× refresco (Z72)"],
 ];
 
 // Z69: guarda el perfil elegido (localStorage con try/catch: puede estar bloqueado)
@@ -70,7 +71,7 @@ export default function RendimientoPanel() {
       </div>
 
       <span style={{ ...LABEL, marginTop: 8 }}>Post-proceso Z69</span>
-      {(["BLOOM_OPTIMIZADO", "PASES_FUSIONADOS", "GPU_POR_PASE", "LUCES_MONOLITO_DIFERIDAS", "ANTIALIAS_CONTEXTO"] as const).map(k => (
+      {(["BLOOM_OPTIMIZADO", "PASES_FUSIONADOS", "GPU_POR_PASE", "LUCES_MONOLITO_DIFERIDAS", "ANTIALIAS_CONTEXTO", "ACES_RAPIDO", "FXAA_LIGERO"] as const).map(k => (
         <div key={k} style={ROW}>
           <span>{k}{k === "ANTIALIAS_CONTEXTO" && <span style={NOTE}>requiere recargar la página</span>}</span>
           <button style={BTN} onClick={() => { R[k] = !R[k]; tocar(); }}>{R[k] ? "ON" : "off"}</button>
@@ -79,6 +80,11 @@ export default function RendimientoPanel() {
       <div style={ROW}>
         <span>BLOOM_CALIDAD <span style={NOTE}>{R.BLOOM_CALIDAD}</span></span>
         {Object.keys(PRESETS_BLOOM).map(c => <button key={c} style={BTN} onClick={() => { aplicarCalidadBloom(R, c); tocar(); }}>{c}</button>)}
+      </div>
+      <div style={ROW}>
+        <span>DOME_ESCALA <span style={NOTE}>{R.DOME_ESCALA.toFixed(2)} Z72 · 1 = como estaba</span></span>
+        <input type="range" min={0.3} max={1} step={0.05} style={{ flex: 1 }} value={R.DOME_ESCALA}
+          onChange={e => { R.DOME_ESCALA = parseFloat(e.target.value); tocar(); }} />
       </div>
       {([["BLOOM_ESCALA", 0.2, 1, 0.05], ["BLOOM_NIVELES", 1, 5, 1]] as const).map(([k, mn, mx, st]) => (
         <div key={k} style={ROW}>
@@ -99,6 +105,13 @@ export default function RendimientoPanel() {
 
       <span style={{ ...LABEL, marginTop: 8 }}>Resolución adaptativa</span>
       <div style={MONO}>{`escalón ${E.escalon} · escalones ${E.escalones} · cambios ${E.cambios} · última ventana ${E.ultimoFpsEval.toFixed(1)} FPS${E.bloqueadoPor ? ` · quieto por ${E.bloqueadoPor}` : ""}`}</div>
+      <div style={MONO}>{`Z72: objetivo ${E.objetivo.toFixed(1)} FPS · subir con ≥ ${E.subir.toFixed(1)} FPS (refresco ${E.hz} Hz${R.OBJETIVO_POR_REFRESCO && E.hz >= 100 ? ", alto refresco" : ""}) · escalón guardado ${E.escalonGuardado || "—"}`}</div>
+      {(["OBJETIVO_POR_REFRESCO", "RECORDAR_ESCALON"] as const).map(k => (
+        <div key={k} style={ROW}>
+          <span>{k}</span>
+          <button style={BTN} onClick={() => { R[k] = !R[k]; tocar(); }}>{R[k] ? "ON" : "off"}</button>
+        </div>
+      ))}
       <div style={ROW}>
         <span>DPR_AUTO</span>
         <button style={BTN} onClick={() => { R.DPR_AUTO = !R.DPR_AUTO; tocar(); }}>{R.DPR_AUTO ? "ON" : "off"}</button>
@@ -131,13 +144,16 @@ export default function RendimientoPanel() {
         </div>
       ))}
 
-      <span style={{ ...LABEL, marginTop: 8 }}>Benchmark <span style={NOTE}>(cámara quieta; cada condición dos veces, ida y vuelta; ~3 min)</span></span>
+      <span style={{ ...LABEL, marginTop: 8 }}>Benchmark <span style={NOTE}>(cámara quieta; cada condición dos veces, ida y vuelta; ~4 min)</span></span>
       <div style={ROW}>
         <button style={BTN} onClick={() => emitir("alight:rend-estres")}>Escena de estrés</button>
         <span style={NOTE}>{E.estres}</span>
       </div>
       <div style={ROW}>
-        <button style={BTN} disabled={E.benchActivo} onClick={() => { setCopiado(""); emitir("alight:rend-bench"); }}>Benchmark (aprox. 3 min)</button>
+        {/* Z72: dónde medir (la pose se informa en el reporte; la cámara vuelve a su lugar al terminar) */}
+        <button style={BTN} disabled={E.benchActivo} title={POSES_BENCH.aqui} onClick={() => { setCopiado(""); emitir("alight:rend-bench", { pose: "aqui" }); }}>Medir aquí</button>
+        <button style={BTN} disabled={E.benchActivo} title="(0.3, 1.6, -2.9) mirando al prisma: ejercita el fractal y sus franjas" onClick={() => { setCopiado(""); emitir("alight:rend-bench", { pose: "prisma" }); }}>Medir cerca del prisma (3 m)</button>
+        <button style={BTN} disabled={E.benchActivo} title="en la posición de la luz 1, mirando al prisma" onClick={() => { setCopiado(""); emitir("alight:rend-bench", { pose: "luz1" }); }}>Medir en la luz 1</button>
         <button style={BTN} disabled={!E.benchActivo} onClick={() => emitir("alight:rend-bench-cancelar")}>Cancelar</button>
       </div>
       {E.bench && <div style={MONO}>{E.bench}</div>}

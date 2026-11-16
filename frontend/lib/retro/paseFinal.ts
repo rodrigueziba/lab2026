@@ -63,6 +63,9 @@ vec3 correccionAA(vec2 p) {
   float rcpMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + reduce);
   dir = clamp(dir * rcpMin, vec2(-8.0), vec2(8.0)) * uTexel;
   vec3 rgbA = 0.5 * (texture2D(tDiffuse, p + dir * (1.0 / 3.0 - 0.5)).rgb + texture2D(tDiffuse, p + dir * (2.0 / 3.0 - 0.5)).rgb);
+  #if FXAA_LIGERO
+  return rgbA - rgbM;   // Z72: sin la segunda pareja de lecturas (7 en vez de 9)
+  #endif
   vec3 rgbB = rgbA * 0.5 + 0.25 * (texture2D(tDiffuse, p - dir * 0.5).rgb + texture2D(tDiffuse, p + dir * 0.5).rgb);
   float lB = lumaAA(rgbB);
   return ((lB < lMin || lB > lMax) ? rgbA : rgbB) - rgbM;
@@ -86,7 +89,13 @@ void main() {
     #elif defined(CINEON_TONE_MAPPING)
       c.rgb = CineonToneMapping(c.rgb);
     #elif defined(ACES_FILMIC_TONE_MAPPING)
+      #if ACES_RAPIDO
+      // Z72: aproximación de Narkowicz (2015) con la misma exposición; sin las dos matrices del ajuste de Hill
+      vec3 xa = c.rgb * toneMappingExposure * 0.82;   // 0,82: la escala que mejor iguala los grises (1,4/255)
+      c.rgb = clamp((xa * (2.51 * xa + 0.03)) / (xa * (2.43 * xa + 0.59) + 0.14), 0.0, 1.0);
+      #else
       c.rgb = ACESFilmicToneMapping(c.rgb);
+      #endif
     #elif defined(AGX_TONE_MAPPING)
       c.rgb = AgXToneMapping(c.rgb);
     #elif defined(NEUTRAL_TONE_MAPPING)
@@ -123,10 +132,19 @@ export class PaseFinalPass extends Pass {
     u.toneMappingExposure = { value: 1 };
     this.uniforms = u;
     this.material = new THREE.RawShaderMaterial({
-      name: "PaseFinalZ69", glslVersion: THREE.GLSL3, uniforms: u, defines: { AA_FXAA: 0 },
+      name: "PaseFinalZ69", glslVersion: THREE.GLSL3, uniforms: u, defines: { AA_FXAA: 0, FXAA_LIGERO: 0, ACES_RAPIDO: 0 },
       vertexShader: VERT, fragmentShader: fragmento(t.codigo), depthTest: false, depthWrite: false,
     });
     this.fsq = new FullScreenQuad(this.material);
+  }
+
+  /** Z72: variantes más baratas (evaluadas en Z72: no cumplen la diferencia ≤ 2/255; quedan para comparar). */
+  fijarVariantes(acesRapido: boolean, fxaaLigero: boolean): void {
+    const d = this.material.defines as Record<string, number | string>;
+    const a = acesRapido ? 1 : 0, f = fxaaLigero ? 1 : 0;
+    if (d.ACES_RAPIDO === a && d.FXAA_LIGERO === f) return;
+    d.ACES_RAPIDO = a; d.FXAA_LIGERO = f;
+    this.material.needsUpdate = true;
   }
 
   /** FXAA dentro del pase (recompila solo al cambiar). */

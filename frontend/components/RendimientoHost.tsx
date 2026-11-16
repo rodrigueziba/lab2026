@@ -25,6 +25,10 @@ import { DIA } from "@/lib/cicloDia";
 // Z69: tiempo de GPU por pase, refresco por intervalos, ida y vuelta, perfiles de calidad
 import { GPU_PASES, iniciarGpuPases, liberarGpuPases, finCuadroGpu, resumirGpu, textoGpuPases } from "@/lib/gpuPases";
 import { estimarRefrescoIntervalos, pasosBenchIdaVuelta, combinarIdaVuelta, avisoCanvas, MAX_MUESTRAS } from "@/lib/rendimiento";
+// Z72: objetivo según el refresco, escalón recordado y poses de medición
+import { objetivosDpr, leerEscalon, guardarEscalon, indiceEscalon, type CfgDpr } from "@/lib/rendimiento";
+import { PRISM_POS_UNIFORM } from "@/lib/prismUniforms";
+import { hazPosXZEn } from "@/lib/haz";
 import { leerPerfil, aplicarPerfil } from "@/lib/rendimientoPost";
 import { FRACTAL_PERF } from "@/lib/prisma/fractalTexturaRender";
 
@@ -38,7 +42,10 @@ export const RENDIMIENTO = {
   bench: "", benchActivo: false, reporte: "", estres: "",
   // Z69
   hz: 60, hzTexto: "", gpuPases: "", fractal: "", perfil: "", avisoCanvas: "",
+  objetivo: 50, subir: 58, escalonGuardado: 0, pose: "",   // Z72
 };
+/** Z72: poses de medición del benchmark (botones del panel). */
+export const POSES_BENCH = { aqui: "aquí (donde está la cámara)", prisma: "cerca del prisma (3 m)", luz1: "en la luz 1" } as const;
 const RAZON_BENCH = "benchmark";
 
 interface Timer { ext: { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number }; gl2: WebGL2RenderingContext; q: (WebGLQuery | null)[]; ocupada: boolean[]; i: number }
@@ -51,7 +58,10 @@ export default function RendimientoHost() {
     camPos: new THREE.Vector3(), camQ: new THREE.Quaternion(), sisPrevio: {} as Record<string, boolean>, dprPrevio: 1,
     claveEsc: "", estresPendiente: 0, aplicado: 1, calls: 0, tris: 0,
     // Z69: refresco (el mayor estimado en la sesión), buffer para ordenar, lista por pase de la línea base
-    hzSesion: 0, tmpHz: new Float64Array(MAX_MUESTRAS), estHz: { hz: 60, grilla: 0, minimos: 0, n: 0 }, gpuPasesBase: "", fracAct: 0,
+    hzSesion: 0, tmpHz: new Float64Array(MAX_MUESTRAS), estHz: { hz: 60, grilla: 0, minimos: 0, n: 0, meseta: 0, fpsMeseta: 0 }, gpuPasesBase: "", fracAct: 0,
+    // Z72: pose original (se restaura al terminar), configuración efectiva del DPR adaptativo y escalón guardado
+    camPosOrig: new THREE.Vector3(), camQOrig: new THREE.Quaternion(), pose: "", xz: { x: 0, z: 0 },
+    cfgEf: { ...DBG_RENDIMIENTO } as CfgDpr, obj: { objetivo: 50, subir: 58 }, escGuardado: 0,
   });
   const terminarRef = useRef<(cancelado: boolean) => void>(() => {});
 
@@ -60,6 +70,11 @@ export default function RendimientoHost() {
     const R = r.current;
     const dprDisp = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
     R.dpr = crearEstadoDpr(escalonesPara(DBG_RENDIMIENTO, dprDisp));
+    // Z72: arrancar en el último escalón estable guardado
+    if (DBG_RENDIMIENTO.RECORDAR_ESCALON) {
+      const g = leerEscalon(almacenLocal());
+      if (g !== null) { R.dpr.idx = indiceEscalon(R.dpr.escalones, g); R.escGuardado = g; RENDIMIENTO.escalonGuardado = g; }
+    }
     R.aplicado = gl.getPixelRatio(); DPR_VIVO.v = R.aplicado;
     RENDIMIENTO.dprDispositivo = dprDisp;
     const ctx = gl.getContext();
@@ -87,9 +102,17 @@ export default function RendimientoHost() {
     fijarAutoReset(gl, false);   // se reinicia una vez por cuadro (abajo)
     RENDIMIENTO.montado = true;
 
-    const onBench = () => {
+    const onBench = (e: Event) => {
       const B = R.bench;
       if (B.activo) return;
+      // Z72: pose de medición (aquí, cerca del prisma o en la luz 1); la original se restaura al terminar
+      R.camPosOrig.copy(camera.position); R.camQOrig.copy(camera.quaternion);
+      const pose = ((e as CustomEvent).detail?.pose ?? "aqui") as keyof typeof POSES_BENCH;
+      const pp = PRISM_POS_UNIFORM.value;
+      if (pose === "prisma") { camera.position.set(0.3, 1.6, -2.9); camera.lookAt(pp.x, pp.y, pp.z); }
+      else if (pose === "luz1") { hazPosXZEn(0, R.xz); camera.position.set(R.xz.x, 1.6, R.xz.z); camera.lookAt(pp.x, pp.y, pp.z); }
+      R.pose = `${POSES_BENCH[pose] ?? POSES_BENCH.aqui} · cámara (${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)})${pose !== "aqui" ? ` mirando al prisma (${pp.x.toFixed(2)}, ${pp.y.toFixed(2)}, ${pp.z.toFixed(2)})` : ""}`;
+      RENDIMIENTO.pose = R.pose;
       R.camPos.copy(camera.position); R.camQ.copy(camera.quaternion);
       R.sisPrevio = { ...DBG_RENDIMIENTO.SIS };
       R.dprPrevio = gl.getPixelRatio();
@@ -102,6 +125,7 @@ export default function RendimientoHost() {
       const B = R.bench;
       Object.assign(DBG_RENDIMIENTO.SIS, R.sisPrevio);
       aplicarDpr(setDpr, r.current, R.dprPrevio);
+      camera.position.copy(R.camPosOrig); camera.quaternion.copy(R.camQOrig);   // Z72: vuelve a donde estaba
       liberarMovimiento(RAZON_BENCH);
       if (cancelado) { RENDIMIENTO.bench = "benchmark cancelado"; return; }
       // Z69: refresco = el mayor estimado en la sesión a partir de los intervalos de rAF (grilla de vsync y mínimos);
@@ -111,7 +135,8 @@ export default function RendimientoHost() {
       RENDIMIENTO.reporte = reporteBench(combinarIdaVuelta(B.resultados), {
         gpu: RENDIMIENTO.gpuNombre, dpr: R.dprPrevio, px: `${RENDIMIENTO.w}×${RENDIMIENTO.h}`, refrescoHz: hz,
         timerGpu: R.timer !== null, canvasW: RENDIMIENTO.w, canvasH: RENDIMIENTO.h,
-        metodoRefresco: `intervalos de rAF: grilla ${R.estHz.grilla || "-"} Hz, mínimos ${R.estHz.minimos || "-"} Hz; el mayor de la sesión`,
+        metodoRefresco: `intervalos de rAF: meseta ${R.estHz.meseta || "-"} Hz (${(R.estHz.fpsMeseta ?? 0).toFixed(1)} FPS en las mejores ventanas), grilla ${R.estHz.grilla || "-"} Hz; el mayor de la sesión`,
+        pose: R.pose,
         gpuPases: R.gpuPasesBase || undefined,
         config: `perfil ${RENDIMIENTO.perfil || "sin guardar"} · bloom ${RD.BLOOM_OPTIMIZADO ? `liviano ${RD.BLOOM_CALIDAD} (escala ${RD.BLOOM_ESCALA}, ${RD.BLOOM_NIVELES} niveles)` : "Unreal (como estaba)"} · pases ${RD.PASES_FUSIONADOS ? "fusionados" : "separados"} · AA ${RD.ANTIALIAS_MODO} · fractal ${DBG_FRACTAL.TEX_RES}/${DBG_FRACTAL.TEX_RES_CERCA} a ${DBG_FRACTAL.TEX_FPS} FPS en ≤ ${DBG_FRACTAL.TEX_REPARTIR} franjas · GPU ${RD.GPU_POR_PASE ? "por pase" : "por cuadro"}`,
         escena: `cámara (${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}) · pasto p [${PASTO.p.map(v => v.toFixed(2)).join(", ")}] (${PASTO_RENDER.montado ? PASTO_RENDER.modo : "no montado"}) · tDia ${DIA.dia.toFixed(2)} (${DIA.fase}) · flags pasto: chunks ${on(DBG_RENDIMIENTO.PASTO_CHUNKS)} cull ${on(DBG_RENDIMIENTO.PASTO_CULL_PROGRESO)} lod ${on(DBG_RENDIMIENTO.PASTO_LOD)} lejano ${on(DBG_RENDIMIENTO.PASTO_LEJANO)} viento ${on(DBG_RENDIMIENTO.PASTO_VIENTO_BARATO)} descarte ${on(DBG_RENDIMIENTO.PASTO_DESCARTE_TEMPRANO)} mip ${on(DBG_RENDIMIENTO.PASTO_MIPMAPS)} · DIST_MAX_M ${DBG_PASTO.DIST_MAX_M} · CAPAS ${DBG_PASTO.CAPAS}`,
@@ -192,7 +217,10 @@ export default function RendimientoHost() {
     if (clave !== R.claveEsc) { R.claveEsc = clave; reescalonar(D, escalonesPara(cfg, RENDIMIENTO.dprDispositivo)); }
     const bloqueo = FLASH_STATE.fase !== "inactivo" ? "destello" : ENTRADA.fase !== "inactiva" ? "entrada" : PAUSA.activa ? "pausa"
       : CK_STATE.fase === "aplicando" ? "checkpoint" : B.activo ? "benchmark" : "";
-    tickDpr(D, cfg, dtMs / 1000, ahoraS, bloqueo !== "");
+    // Z72: objetivo y umbral de subida según el refresco detectado (120 Hz → 57 y 90 FPS; 60 Hz → los de siempre)
+    objetivosDpr(RENDIMIENTO.hz, cfg, R.obj);
+    copiarCfgDpr(cfg, R.cfgEf, R.obj.objetivo, R.obj.subir);
+    tickDpr(D, R.cfgEf, dtMs / 1000, ahoraS, bloqueo !== "");
     if (!B.activo && (bloqueo === "" || D.forzado > 0)) {
       const objetivo = dprActual(D);
       if (Math.abs(R.aplicado - objetivo) > 1e-3) { aplicarDpr(setDpr, r.current, objetivo); }
@@ -240,10 +268,16 @@ export default function RendimientoHost() {
       // Z69: por pase, refresco, aviso de canvas chico y fractal (textos cada 0,5 s, no por frame)
       resumirGpu();
       if (GPU_PASES.activo) { E.gpuPases = textoGpuPases(); E.gpuMs = GPU_PASES.total; } else E.gpuPases = "";
-      estimarRefrescoIntervalos(R.estad.ms, R.estad.n, R.tmpHz, R.estHz);
+      estimarRefrescoIntervalos(R.estad.ms, R.estad.n, R.tmpHz, R.estHz, (R.estad.i - R.estad.n + MAX_MUESTRAS) % MAX_MUESTRAS);   // Z72: en orden
       if (R.estHz.n >= 30 && R.estHz.hz > R.hzSesion) R.hzSesion = R.estHz.hz;
       E.hz = R.hzSesion || R.estHz.hz;
-      E.hzTexto = `${E.hz} Hz (grilla ${R.estHz.grilla || "-"}, mínimos ${R.estHz.minimos || "-"}; cuadros a ${E.hz}, ${(E.hz / 2).toFixed(0)}, ${(E.hz / 3).toFixed(0)}, ${(E.hz / 4).toFixed(0)} FPS)`;
+      E.hzTexto = `${E.hz} Hz (meseta ${R.estHz.meseta || "-"} · ${(R.estHz.fpsMeseta ?? 0).toFixed(1)} FPS, grilla ${R.estHz.grilla || "-"}; cuadros a ${E.hz}, ${(E.hz / 2).toFixed(0)}, ${(E.hz / 3).toFixed(0)}, ${(E.hz / 4).toFixed(0)} FPS)`;
+      E.objetivo = R.obj.objetivo; E.subir = R.obj.subir;
+      // Z72: guardar el escalón cuando lleva 20 s sin cambiar (no forzado, sin benchmark)
+      if (cfg.RECORDAR_ESCALON && cfg.DPR_AUTO && D.forzado <= 0 && !B.activo && ahoraS - D.tCambio > 20) {
+        const v = dprActual(D);
+        if (v !== R.escGuardado && guardarEscalon(almacenLocal(), v)) { R.escGuardado = v; E.escalonGuardado = v; }
+      }
       E.avisoCanvas = avisoCanvas(c.width, c.height);
       const F = FRACTAL_PERF, act = F.actualizaciones - R.fracAct;
       R.fracAct = F.actualizaciones;
@@ -258,6 +292,14 @@ export default function RendimientoHost() {
 }
 
 const on = (b: boolean) => (b ? "on" : "off");
+/** Z72: localStorage sin romper el render del servidor ni navegadores que lo bloquean. */
+function almacenLocal(): Storage | null { try { return typeof window !== "undefined" ? window.localStorage : null; } catch { return null; } }
+/** Z72: copia la configuración del DPR adaptativo con el objetivo y el umbral de subida efectivos (sin allocations). */
+function copiarCfgDpr(src: CfgDpr, dst: CfgDpr, objetivo: number, subir: number): void {
+  dst.DPR_MAX = src.DPR_MAX; dst.DPR_MIN = src.DPR_MIN; dst.DPR_AUTO = src.DPR_AUTO; dst.EVAL_S = src.EVAL_S; dst.SUBIR_S = src.SUBIR_S;
+  dst.ENTRE_CAMBIOS_S = src.ENTRE_CAMBIOS_S; dst.REBOTE_S = src.REBOTE_S; dst.REBOTE_VEDA_S = src.REBOTE_VEDA_S;
+  dst.OBJETIVO_FPS = objetivo; dst.SUBIR_FPS = subir;
+}
 /** Un solo lugar para cambiar el DPR: R3F (Canvas y renderer), DPR_VIVO (prop del Canvas) y el valor aplicado. */
 function aplicarDpr(setDpr: (v: number) => void, R: { aplicado: number }, v: number): void {
   setDpr(v); R.aplicado = v; DPR_VIVO.v = v;

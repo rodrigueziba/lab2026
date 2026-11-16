@@ -149,6 +149,16 @@ uniform float uFlTope;         // Z63: tope del color fluido (bajo el umbral del
 uniform float uFlTopeModo;     // Z65: 1 = el tope escala el color entero (conserva el tono) · 0 = min por canal (Z63)
 uniform float uFlDiaAt;        // Z65: atenuación de día de los tonos claros del fluido (× uLuzDia; 0 = como Z63)
 uniform float uPerfAnillos;    // Z66: 0 = salta el túnel de anillos y las ondas (panel de rendimiento); 1 = normal
+// Z72: optimización (mismo resultado) e interruptores por sub-sistema del panel de rendimiento (0 = salta; solo medir)
+uniform float uOndasN;         // ondas vivas: las primeras uOndasN de uOndas (el JS las junta adelante); 0 = sin bucle
+uniform vec3  uPortalCDir;     // dirección del centro del círculo del portal (antes normalize(...) en cada píxel)
+uniform float uPortalAtan;     // atan(uPortalTan) (antes tres veces por píxel)
+uniform float uPerfFluido;     // fluir de color (Z61/Z63)
+uniform float uPerfSol;        // sol del mundo: núcleo, rayos y resplandor (Z48/Z51)
+uniform float uPerfOndas;      // ondas por kick (Z52), separadas de los anillos base
+uniform float uPerfEstrellas;  // estrellas del mundo y del portal + textura (fbm) del cielo del mundo
+uniform float uPerfPortal;     // cielo del portal: warp, sol ilustrado, nubes, estrellas y destellos
+uniform float uPerfSiluetas;   // siluetas del portal: montañas y olas ilustradas (máscaras, texturas)
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -357,7 +367,7 @@ vec3 cieloDia(vec3 d, float t) {
   float h = d.y;
   vec3 c = mix(uColHor, uColMed, smoothstep(0.0, 0.35, h));
   c = mix(c, uColCen, smoothstep(0.25, 0.95, h));
-  c *= 0.85 + 0.15 * (0.5 + 0.5 * fbm4(d.xz * 3.0 + t * 0.03));
+  c *= 0.85 + 0.15 * (0.5 + 0.5 * (uPerfEstrellas > 0.5 ? fbm4(d.xz * 3.0 + t * 0.03) : 0.0));   // Z72: interruptor
   vec2 dh = normalize(d.xz + vec2(1e-5, 0.0));
   vec2 sh = normalize(uSolDir.xz + vec2(1e-5, 0.0));
   // Z49: solo el hemisferio que mira al sol (antes 0,5 + 0,5·cos llegaba, débil, a todo el domo)
@@ -416,6 +426,9 @@ float ridgeH(float u, float seed) {
 
 void main() {
   vec3 d = normalize(vDir);
+  // Z72: bajo el horizonte el alfa es 0 (AA2, a = smoothstep(-0,015, 0,015, d.y)): no hay nada que calcular. Con
+  // mezcla normal, vec4(0) y vec4(col, 0) dan lo mismo. Los modos de diagnóstico siguen calculando todo.
+  if (d.y < -0.0151 && uDebugCapas < 0.5 && uDebugMasks < 0.5) { gl_FragColor = vec4(0.0); return; }
   float t = uTime;
   // W2: group energies replace raw frequency bands
   float sol   = uGroupEnergy.x * uSolAmt;
@@ -432,8 +445,8 @@ void main() {
   // Z57: el centro del círculo y de los anillos puede correrse en x al eje de la composición (uPortalCx); el
   // contorno, el tinte del borde (Z50) y las ondas (Z52) usan s y q, así que lo siguen sin más cambios
   vec2 pc = vec2(uPortalCx, PORTAL_C.y);
-  vec3 cDir = normalize(uPortalF + (uPortalR * pc.x + uPortalU * pc.y) * uPortalTan);
-  float s = acos(clamp(dot(d, cDir), -1.0, 1.0)) / atan(uPortalTan);    // radio angular ~ unidades p
+  vec3 cDir = uPortalCDir;   // Z72: = normalize(uPortalF + (uPortalR·pc.x + uPortalU·pc.y)·uPortalTan), calculado en la CPU
+  float s = acos(clamp(dot(d, cDir), -1.0, 1.0)) / uPortalAtan;          // radio angular ~ unidades p
   vec2 q = tp - pc;
 
   // ---- mundo alrededor ----
@@ -442,16 +455,20 @@ void main() {
   vec3 col;
   if (uDiaNuevo > 0.5) col = cieloDia(d, t);                 // Z48: rama uniforme (un solo fbm en cada una)
   else col = mix(nightSky, worldSky(d, t), uDawn);
-  float worldStars = starLayer(d, 58.0, uStarCut - 0.02 * cielo, 0.20, t, 0.6 + 0.4 * cielo);
   // W3: estrellas del mundo solo después del amanecer + fase 2 CIELO
   // Z48: con el ciclo, visibles de noche y apagadas con la luz del día (uEstrellas)
-  col += vec3(1.0, 0.92, 0.80) * worldStars * (0.7 + 0.9 * cielo + 0.5 * kick) * smoothstep(0.02, 0.45, d.y) * mix(uReveal.w, uEstrellas, uDiaNuevo);
+  // Z72: se calculan solo donde se ven (visibilidad > 0: mismo resultado)
+  float visEstrellas = smoothstep(0.02, 0.45, d.y) * mix(uReveal.w, uEstrellas, uDiaNuevo);
+  if (visEstrellas > 0.0 && uPerfEstrellas > 0.5) {
+    float worldStars = starLayer(d, 58.0, uStarCut - 0.02 * cielo, 0.20, t, 0.6 + 0.4 * cielo);
+    col += vec3(1.0, 0.92, 0.80) * worldStars * (0.7 + 0.9 * cielo + 0.5 * kick) * visEstrellas;
+  }
 
   // Z48: sol en el cielo del mundo (estética del sol del portal: anillo rojo, crema y núcleo amarillo, con
   // halo). Se dibuja antes de la cordillera, así sale DETRÁS de las montañas; bajo el horizonte lo corta el alfa.
   // Z49: función (también se dibuja dentro del portal, detrás de las montañas ilustradas); halo con tope.
   vec3 colCielo = col;   // Z49: cielo del mundo de este píxel, sin el sol (tiñe el borde y los anillos)
-  if (uDiaNuevo > 0.5) col = solMundo(col, d, 1.0);
+  if (uDiaNuevo > 0.5 && uPerfSol > 0.5) col = solMundo(col, d, 1.0);   // Z72: interruptor
 
   // ---- marco de anillos (tunel) ----
   float wob  = fbm4(q * 2.2 + vec2(0.0, t * 0.04));
@@ -461,22 +478,27 @@ void main() {
   float inside = 1.0 - smoothstep(PORTAL_R - bw, PORTAL_R + bw, sw);
   float reach = 1.0 - smoothstep(uRingFade.x, uRingFade.y, s);
   float ringA = 0.0, bordeZ = 0.0;
-  if (uPerfAnillos > 0.5) {   // Z66: rama uniforme (todo el cuadro toma el mismo camino)
+  // Z72: + solo donde los anillos se ven: fuera del portal y con el SOL revelado (el resultado se multiplica por
+  // (1 − inside) · uReveal.z); ringA y bordeZ fuera de la rama solo los usa DEBUG_CAPAS, que calcula todo
+  if (uPerfAnillos > 0.5 && ((1.0 - inside) * uReveal.z > 1e-5 || uDebugCapas > 0.5)) {   // Z66: rama por uniform
   float wob2 = fbm4(q * 1.1 + vec2(5.0, t * 0.03));
   float sph = s + 0.050 * wob + 0.130 * wob2 * (0.7 + 0.5 * sol);
   float ph = sph / (RING_PERIOD * uRingScale) - uRingFlow * t * 12.0 - sol * 0.6;
   // Z52: ondas. La coordenada radial es la distancia angular al centro del portal (s · atan(tan), en rad); cada
   // onda nace en el borde del portal y avanza a uOndaVel. Perfil de campana con seno adentro (cresta y valle):
   // las franjas se empujan hacia afuera y vuelven. Se apaga con la edad y con la distancia recorrida.
-  float angP = s * atan(uPortalTan);
-  float r0 = PORTAL_R * atan(uPortalTan);
+  float angP = s * uPortalAtan;   // Z72: atan precalculado
+  float r0 = PORTAL_R * uPortalAtan;
   float desp = 0.0, cresta = 0.0;
   vec3 tinteOnda = vec3(0.0);
-  for (int i = 0; i < ONDAS_N; i++) {
+  // Z72: solo las ondas vivas (uOndasN, juntas al principio del arreglo); sin ondas, ni una vuelta
+  if (uPerfOndas > 0.5) for (int i = 0; i < ONDAS_N; i++) {
+    if (float(i) >= uOndasN) break;
     vec4 o = uOndas[i];
     if (o.w < 0.5) continue;
     float R = r0 + o.x * uOndaVel;
     float x = (angP - R) / max(uOndaAncho, 1e-3);
+    if (abs(x) > 4.0) continue;   // Z72: fuera de la campana (exp(−16) ≈ 1e−7): no aporta
     float vida = (1.0 - smoothstep(0.6 * uOndaDur, uOndaDur, o.x)) / (1.0 + 1.5 * (R - r0));
     float perfil = exp(-x * x) * o.y * vida;
     desp += uOndaAmp * perfil * sin(-x * 2.2);
@@ -506,6 +528,8 @@ void main() {
   ringA = max(reach, 0.10);
   // Z52: bajo la cresta las franjas brillan, toman algo del color de su luz y se ven aunque estén fuera del alcance
   float crestaC = clamp(cresta, 0.0, 1.0);
+  // Z72: sin cresta en este píxel, el tramo de la onda no cambia nada (pesos 0): se saltea
+  if (cresta > 1e-6) {
   // Z58: la onda se aplica DESPUÉS del tinte del cielo (Z49/Z50), así TINTE_ANILLOS no le apaga el color.
   // Sin saturar: sobre fondo oscuro aclara tipo pantalla (no pasa de 1); sobre fondo claro (de día) oscurece
   // (inversión parcial) en vez de sumar luz. Y nunca empuja por encima de 0,9 (umbral del bloom 0,92).
@@ -524,6 +548,7 @@ void main() {
   ringCol = mix(ringCol, mix(ringCol + (1.0 - ringCol) * kC, ringCol * (1.0 - 0.7 * kC), claro), mix(band, 1.0 - band, claro));
   ringCol = min(ringCol, max(antesOnda, vec3(0.9)));
   ringA = max(ringA, crestaC * uOndaRevelar);
+  }   // Z72: fin del tramo de la onda
   // W3: anillos (SOL) aparecen en fase 2
   col = mix(col, ringCol, ringA * (1.0 - inside) * uReveal.z);
   }   // Z66: fin de la rama de anillos y ondas
@@ -546,7 +571,8 @@ void main() {
   col = mix(col, vec3(0.098, 0.102, 0.133) * luzM, smoothstep(0.0015, -0.0015, d.y - hNear) * (1.0 - inside) * opM);
 
   // ---- cielo del portal ----
-  if (inside > 0.001) {
+  // Z72: con uDawn = 0 el portal no se ve (todo se mezcla × inside · uDawn): se saltea, salvo DEBUG_CAPAS
+  if (inside > 0.001 && (uDawn > 1e-5 || uDebugCapas > 0.5) && uPerfPortal > 0.5) {
     // W3: el warp del cielo (CIELO) solo aparece en fase 2; en fase 1 es skyRamp plano
     float amt = uWarp * (0.35 + 0.9 * cielo) * uReveal.w;
     float f = warpField(p * 1.1, t * (0.6 + cielo), max(amt, 0.001));
@@ -591,7 +617,10 @@ void main() {
 
     // estrellas y destellos fijos de la referencia — W3: solo en fase 2 CIELO
     float tw = 0.75 + 0.25 * sin(t * 3.0) + 0.6 * cielo + 0.4 * kick;
-    sky += vec3(1.0, 0.95, 0.85) * starLayer(d, 70.0, uStarCut - 0.03 * cielo, 0.22, t, 0.7) * smoothstep(-0.1, 0.5, p.y) * (0.7 + cielo + 0.5 * kick) * uReveal.w * mix(1.0, uEstrellas, uDiaNuevo);
+    // Z72: estrellas del portal solo donde se ven
+    float visEstP = smoothstep(-0.1, 0.5, p.y) * uReveal.w * mix(1.0, uEstrellas, uDiaNuevo);
+    if (visEstP > 0.0 && uPerfEstrellas > 0.5)
+      sky += vec3(1.0, 0.95, 0.85) * starLayer(d, 70.0, uStarCut - 0.03 * cielo, 0.22, t, 0.7) * (0.7 + cielo + 0.5 * kick) * visEstP;
     sky = mix(sky, vec3(0.30, 0.45, 0.83), sparkle4(p - vec2(-0.3740, 0.3651), 0.040 * tw) * uReveal.w);
     sky = mix(sky, vec3(0.91, 0.32, 0.18), sparkle4(p - vec2( 0.0214, 0.7105), 0.036 * tw) * uReveal.w);
     sky = mix(sky, vec3(0.96, 0.92, 0.82), disc(p - vec2( 0.3245, 0.4836), 0.022) * uReveal.w);
@@ -607,13 +636,13 @@ void main() {
     col = mix(col, skyN, inside * uDawn);
     // Z49: el sol del mundo también se ve dentro del portal, delante de su cielo y DETRÁS de las montañas
     // ilustradas (que se dibujan después); con SOL_UNICO reemplaza al sol ilustrado.
-    if (uDiaNuevo > 0.5) col = solMundo(col, d, inside * uDawn);
+    if (uDiaNuevo > 0.5 && uPerfSol > 0.5) col = solMundo(col, d, inside * uDawn);   // Z72: interruptor
   }
 
   // ---- montanas (mascaras + color posterizado) ----
   vec2 uv = p * 0.5 + 0.5;
   float inImg = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0) * step(0.02, fz);
-  if (inImg > 0.5) {
+  if (inImg > 0.5 && uPerfSiluetas > 0.5) {   // Z72: interruptor
     float a1 = 0.0015 + 0.010 * lin;
     vec2 uvw = uv + vec2(a1 * sin(uv.y * 38.0 + t * 1.3) + 0.5 * a1 * sin(uv.y * 71.0 - t * 0.9),
                          0.0010 * lin * sin(uv.x * 22.0 + t * 1.1));
@@ -627,7 +656,7 @@ void main() {
     capaMont = max(m.r, max(m.g, m.b));   // Z50 (DEBUG_CAPAS)
     // Z61: fluir de color dentro de cada bloque (salida temprana fuera de sus máscaras). AZUL = estratos (m.g) y las
     // olas frías (m.b con tono frío); NARANJA = olas cálidas (m.b con rojo > azul en la textura).
-    if (uFluido > 0.5 && (m.g > 0.01 || m.b > 0.01)) {
+    if (uFluido > 0.5 && uPerfFluido > 0.5 && (m.g > 0.01 || m.b > 0.01)) {   // Z72: interruptor
       float calido = smoothstep(0.02, 0.10, waveCol.r - waveCol.b) * step(0.01, m.b);
       vec2 xl = uv * uFlEsc * vec2(1.0, uFlEscY);
       vec3 olaFria = waveCol;

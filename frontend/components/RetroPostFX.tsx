@@ -334,6 +334,7 @@ function aplicarPases(
   u.uCrtOn.value = SIS.crt !== false ? 1 : 0;
   u.uSalidaOn.value = SIS.salida !== false ? 1 : 0;
   final.fijarAA(fus && R.ANTIALIAS_MODO === "fxaa");
+  final.fijarVariantes(R.ACES_RAPIDO, R.FXAA_LIGERO);   // Z72
   if (smaa) smaa.enabled = R.ANTIALIAS_MODO === "smaa";
 }
 /** Crea el pase SMAA y lo inserta después de la salida (o del pase final) y antes del destello: SMAA detecta bordes

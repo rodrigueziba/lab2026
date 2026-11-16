@@ -138,23 +138,24 @@ export function pasesFinales(fusionado: boolean, w: number, h: number): { pases:
 
 // ── perfiles de calidad (Z69, panel de rendimiento) ──
 export type NombrePerfil = "alta" | "media" | "baja";
-export interface Perfil { DPR_MAX: number; CAPAS: number; BLOOM_CALIDAD: CalidadBloom; TEX_FPS: number; ANTIALIAS_MODO: string }
+export interface Perfil { DPR_MAX: number; CAPAS: number; BLOOM_CALIDAD: CalidadBloom; TEX_FPS: number; ANTIALIAS_MODO: string; DOME_ESCALA: number }
 export const PERFILES: Record<NombrePerfil, Perfil> = {
-  alta:  { DPR_MAX: 1.5,  CAPAS: 20, BLOOM_CALIDAD: "alta",  TEX_FPS: 30, ANTIALIAS_MODO: "fxaa" },
-  media: { DPR_MAX: 1.25, CAPAS: 14, BLOOM_CALIDAD: "media", TEX_FPS: 20, ANTIALIAS_MODO: "fxaa" },
-  baja:  { DPR_MAX: 1.0,  CAPAS: 10, BLOOM_CALIDAD: "baja",  TEX_FPS: 15, ANTIALIAS_MODO: "ninguno" },
+  alta:  { DPR_MAX: 1.5,  CAPAS: 20, BLOOM_CALIDAD: "alta",  TEX_FPS: 30, ANTIALIAS_MODO: "fxaa",    DOME_ESCALA: 1 },
+  media: { DPR_MAX: 1.25, CAPAS: 14, BLOOM_CALIDAD: "media", TEX_FPS: 20, ANTIALIAS_MODO: "fxaa",    DOME_ESCALA: 0.75 },   // Z72
+  baja:  { DPR_MAX: 1.0,  CAPAS: 10, BLOOM_CALIDAD: "baja",  TEX_FPS: 15, ANTIALIAS_MODO: "ninguno", DOME_ESCALA: 0.5 },
 };
 export const CLAVE_PERFIL = "alight:perfil-calidad";
 export const esPerfil = (v: unknown): v is NombrePerfil => v === "alta" || v === "media" || v === "baja";
 /** Aplica un perfil sobre los objetos de configuración (DBG_RENDIMIENTO, DBG_PASTO, DBG_FRACTAL). */
 export function aplicarPerfil(
   nombre: string,
-  rend: { DPR_MAX: number; BLOOM_CALIDAD: string; BLOOM_ESCALA: number; BLOOM_NIVELES: number; ANTIALIAS_MODO: string },
+  rend: { DPR_MAX: number; BLOOM_CALIDAD: string; BLOOM_ESCALA: number; BLOOM_NIVELES: number; ANTIALIAS_MODO: string; DOME_ESCALA?: number },
   pasto: { CAPAS: number }, fractal: { TEX_FPS: number },
 ): boolean {
   if (!esPerfil(nombre)) return false;
   const p = PERFILES[nombre];
   rend.DPR_MAX = p.DPR_MAX; pasto.CAPAS = p.CAPAS; fractal.TEX_FPS = p.TEX_FPS; rend.ANTIALIAS_MODO = p.ANTIALIAS_MODO;
+  rend.DOME_ESCALA = p.DOME_ESCALA;   // Z72
   aplicarCalidadBloom(rend, p.BLOOM_CALIDAD);
   return true;
 }

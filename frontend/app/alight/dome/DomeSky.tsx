@@ -227,6 +227,16 @@ export default function DomeSky({
           uFlTopeModo: { value: 1 },                            // Z65
           uFlDiaAt: { value: 0.5 },                             // Z65
           uPerfAnillos: { value: 1 },                           // Z66
+          // Z72: precalculados en la CPU, ondas vivas e interruptores por sub-sistema del panel de rendimiento
+          uOndasN:        { value: 0 },
+          uPortalCDir:    { value: new THREE.Vector3(0, 0, -1) },
+          uPortalAtan:    { value: 1 },
+          uPerfFluido:    { value: 1 },
+          uPerfSol:       { value: 1 },
+          uPerfOndas:     { value: 1 },
+          uPerfEstrellas: { value: 1 },
+          uPerfPortal:    { value: 1 },
+          uPerfSiluetas:  { value: 1 },
           uFlPalA:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
           uFlPalN:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
           uOndaEngrosar:    { value: 0 },   // Z58
@@ -286,6 +296,9 @@ export default function DomeSky({
     u.uPortalR.value.copy(R);
     u.uPortalU.value.copy(U);
     u.uPortalTan.value = tmp.esc.tan;   // Z49: tan(semi-FOV) × ESCALA
+    // Z72: lo que el shader calculaba igual en cada píxel: centro del círculo (pc = (uPortalCx, PORTAL_C.y)) y atan(tan)
+    (u.uPortalCDir.value as THREE.Vector3).copy(F).addScaledVector(R, cxAnillos * tmp.esc.tan).addScaledVector(U, PORTAL_C_SHADER[1] * tmp.esc.tan).normalize();
+    u.uPortalAtan.value = Math.atan(tmp.esc.tan);
     u.uWarp.value = warp;
     u.uRingFlow.value = ringFlow;
     u.uRingScale.value = ringScale;
@@ -305,6 +318,15 @@ export default function DomeSky({
     }
     // Z61: fluir de color (tiempo acumulado propio por bloque: sin saltos al cambiar la velocidad; quieto en pausa)
     u.uPerfAnillos.value = DBG_RENDIMIENTO.SIS.anillos !== false ? 1 : 0;   // Z66: interruptor de rendimiento
+    { // Z72: sub-sistemas del domo (solo para medir; true = activo)
+      const SIS = DBG_RENDIMIENTO.SIS;
+      u.uPerfFluido.value = SIS.domoFluido !== false ? 1 : 0;
+      u.uPerfSol.value = SIS.domoSol !== false ? 1 : 0;
+      u.uPerfOndas.value = SIS.domoOndas !== false ? 1 : 0;
+      u.uPerfEstrellas.value = SIS.domoEstrellas !== false ? 1 : 0;
+      u.uPerfPortal.value = SIS.domoPortal !== false ? 1 : 0;
+      u.uPerfSiluetas.value = SIS.domoSiluetas !== false ? 1 : 0;
+    }
     u.uFluido.value = DBG_FLUIDO.ACTIVO ? 1 : 0;
     if (DBG_FLUIDO.ACTIVO) {
       u.uFlT.value.set(FLUIDO.tA, FLUIDO.tN);
@@ -415,10 +437,14 @@ export default function DomeSky({
     // Z52: ondas (lib/ondasKick.ts; las detecta DomeSkyAnchor). Edad con el reloj de la experiencia (pausa = quietas)
     {
       const tOnda = RELOJ.tExp, arr = u.uOndas.value as THREE.Vector4[];
+      // Z72: las ondas vivas van juntas al principio y uOndasN dice cuántas son (el shader solo recorre esas)
+      let vivas = 0;
       for (let i = 0; i < MAX_ONDAS; i++) {
         const w = ONDAS.lista[i];
-        arr[i].set(w.activa ? edad(w, tOnda) : 0, w.fuerza, w.luz, w.activa && DBG_ONDAS.ACTIVO ? 1 : 0);
+        if (w.activa && DBG_ONDAS.ACTIVO) arr[vivas++].set(edad(w, tOnda), w.fuerza, w.luz, 1);
       }
+      for (let i = vivas; i < MAX_ONDAS; i++) arr[i].set(0, 0, 0, 0);
+      u.uOndasN.value = vivas;
       const cols = u.uOndaCol.value as THREE.Vector3[];
       // sin arrays por frame: hexARgb tiene caché por texto
       let c = hexARgb(DBG_SILLAS.hazColor0); cols[0].set(c[0], c[1], c[2]);
