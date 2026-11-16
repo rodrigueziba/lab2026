@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import { crearEstadoPasto, avanzarPasto, cuartoDe, rectPasto, distMaxCuarto, umbralPasto, manchaPasto, alturaPasto, HISTERESIS_M } from '../lib/pasto.ts';
 const src = fs.readFileSync(new URL('../lib/debugConfig.ts', import.meta.url), 'utf8');
-const C = Function(`return (${/export const DBG_PASTO = (\{[\s\S]*?\n\});/.exec(src)[1]});`)();
+const C = Function(`return (${/export const DBG_PASTO = (\{[\s\S]*?\n\});/.exec(src)[1].replace(/ as string/g, "")});`)();
 let ok = 0, fallas = 0;
 const check = (c, m) => { if (c) { ok++; console.log('  ✓ ' + m); } else { fallas++; console.log('  ✗ ' + m); } };
 const f = (n, d = 3) => n.toFixed(d);

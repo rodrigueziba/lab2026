@@ -10,14 +10,29 @@
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_ENTRADA, DEBUG_ENABLED } from "@/lib/debugConfig";
-import { ENTRADA, BLOQUEO_MOV, iniciarEntrada, tickEntrada, cancelarEntrada } from "@/lib/entradaTelon";
+import { DBG_ENTRADA, DBG_LUZ, DBG_LAYOUT, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { ENTRADA, BLOQUEO_MOV, iniciarEntrada, tickEntrada, cancelarEntrada, poseEntrada, POSE_ENTRADA, type RectXZ } from "@/lib/entradaTelon";
+import { sillaEn, N_SILLAS, TARIMA_CENTRO } from "@/lib/layoutSala"; // Z65
+import { TARIMA_W, TARIMA_D } from "./Tarima"; // Z65
 import { FLASH_STATE } from "@/lib/curtainFlash";
 import { CK_STATE } from "@/lib/checkpoints";
 import { INICIO_BASE } from "@/lib/inicioEscena";
 
 /** Última pose guardada con el botón de debug (texto para el panel). */
 export const ENTRADA_POSE = { texto: "" };
+
+/** Z65: obstáculos de la entrada (tarima y fila de sillas, con margen) y pose final con DESPLAZ_IZQ_M / MIRAR_TARIMA.
+ *  Se calcula solo en el instante del salto (y al probar), no por frame. */
+const _obst: RectXZ[] = [{ x0: 0, z0: 0, x1: 0, z1: 0 }, { x0: 0, z0: 0, x1: 0, z1: 0 }];
+const _s = { x: 0, z: 0 };
+export function calcularPoseEntrada(): typeof POSE_ENTRADA {
+  const t = _obst[0], m = 0.6;
+  t.x0 = TARIMA_CENTRO.x - TARIMA_W / 2 - m; t.x1 = TARIMA_CENTRO.x + TARIMA_W / 2 + m;
+  t.z0 = TARIMA_CENTRO.z - TARIMA_D / 2 - m; t.z1 = TARIMA_CENTRO.z + TARIMA_D / 2 + m;
+  sillaEn(0, DBG_LAYOUT, _s); const x0 = _s.x, z = _s.z; sillaEn(N_SILLAS - 1, DBG_LAYOUT, _s);
+  const sl = _obst[1]; sl.x0 = Math.min(x0, _s.x) - 0.8; sl.x1 = Math.max(x0, _s.x) + 0.8; sl.z0 = z - 0.9; sl.z1 = z + 0.9;
+  return poseEntrada(DBG_ENTRADA, DBG_LUZ.SALA_MEDIA_M - DBG_LUZ.SALA_MARGEN_M, _obst, TARIMA_CENTRO, POSE_ENTRADA);
+}
 
 export default function EntradaTelon() {
   const { camera } = useThree();
@@ -64,9 +79,10 @@ export default function EntradaTelon() {
     if (ENTRADA.fase === "inactiva") return;
     const camera = state.camera;   // la cámara del frame (no la del hook: react-hooks/immutability)
     if (tickEntrada(ENTRADA, DBG_ENTRADA, FLASH_STATE.fase, performance.now(), CK_STATE.fase === "aplicando")) {
-      camera.position.set(DBG_ENTRADA.POS_X, INICIO_BASE.y, DBG_ENTRADA.POS_Z);   // altura de ojos de siempre
+      const P = calcularPoseEntrada();   // Z65: + DESPLAZ_IZQ_M a la izquierda de la mirada (y MIRAR_TARIMA)
+      camera.position.set(P.x, INICIO_BASE.y, P.z);   // altura de ojos de siempre
       camera.rotation.order = "YXZ";   // como PointerLockControls y aplicarSpawn
-      camera.rotation.set((DBG_ENTRADA.PITCH_DEG * Math.PI) / 180, (DBG_ENTRADA.YAW_DEG * Math.PI) / 180, 0);
+      camera.rotation.set((P.pitchDeg * Math.PI) / 180, (P.yawDeg * Math.PI) / 180, 0);
     }
   });
 

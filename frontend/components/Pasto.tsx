@@ -12,19 +12,21 @@
 // textura, se descarta lo que no está en el cuarto, lo que está en la tarima o las sillas y lo que todavía no creció
 // (p ≤ u). Sin luces reales (la sala es oscura: el brillo sale del propio shader y cae con la distancia a su luz y con
 // el ciclo del día). Sin allocations por frame; textura y geometría se crean una vez y se liberan al desmontar.
-// También: los monolitos de esta etapa (DBG_PASTO.MONOLITOS_ACTIVO) y el evento alight:pasto-cuarto.
+// También: los monolitos de esta etapa (DBG_PASTO.MONOLITOS_ACTIVO; Z65: aparecen con los 4 cuartos completos) y los
+// eventos alight:pasto-cuarto y (Z65) alight:pasto-completo.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_PASTO, DBG_SILLAS, DBG_LAYOUT, DEBUG_ENABLED } from "@/lib/debugConfig";
-import { PASTO, avanzarPasto, reiniciarPasto, completarCuarto, rectPasto, distMaxCuarto, NOMBRES_EV } from "@/lib/pasto";
+import { PASTO, avanzarPasto, reiniciarPasto, completarCuarto, rectPasto, distMaxCuarto, NOMBRES_EV, chequearTodoCompleto } from "@/lib/pasto";
+import { MONO_PASTO, monolitosMontados, monolitosObjetivo, posMonolitosPasto, avanzarAparicion } from "@/lib/monolitosPasto"; // Z65
 import { hazPosXZEn, getHazBandOn } from "@/lib/haz";
 import { hexARgb, DIA } from "@/lib/cicloDia";
 import { RELOJ } from "@/lib/relojExperiencia";
-import { sillaEn, N_SILLAS } from "@/lib/layoutSala";
+import { sillaEn, N_SILLAS, TARIMA_CENTRO } from "@/lib/layoutSala";
 import { TARIMA_W, TARIMA_D } from "./Tarima";
-import Monoliths from "./Monoliths";
+import Monoliths, { MONOLITO_ANCHO_M } from "./Monoliths";
 
 const MAX_CAPAS = 40;
 const TEX = 256;
@@ -180,12 +182,28 @@ const FRAG = /* glsl */`
   }
 `;
 
-/** Monolitos de esta etapa: solo con DBG_PASTO.MONOLITOS_ACTIVO (se revisa por frame, re-render solo al cambiar). */
+/** Monolitos de esta etapa. Z64: solo con DBG_PASTO.MONOLITOS_ACTIVO. Z65: se montan con el visualizador (como antes
+ *  de Z64: así la cantidad de luces y los materiales ya están listos y no hay tirón al aparecer) pero quedan bajo el
+ *  suelo, invisibles y sin efecto de audio hasta que los 4 cuartos están completos (MONOLITOS_MODO "pasto"); entonces
+ *  suben en MONOLITOS_APARICION_S con el reloj de la experiencia. Posición en la línea de la tarima, a MONOLITO_SEP_M del
+ *  borde del pasto (lib/monolitosPasto.ts), recalculada cada frame. Se revisa por frame; re-render solo al cambiar. */
 export function MonolitosPasto() {
-  const [on, setOn] = useState(DBG_PASTO.MONOLITOS_ACTIVO);
+  const [on, setOn] = useState(() => monolitosMontados(DBG_PASTO));
   const ref = useRef(on);
-  useFrame(() => { if (DBG_PASTO.MONOLITOS_ACTIVO !== ref.current) { ref.current = DBG_PASTO.MONOLITOS_ACTIVO; setOn(ref.current); } });
-  return on ? <Monoliths /> : null;
+  const T = useRef({ p: { x: 0, z: 0 }, lx: [0, 0, 0, 0], lz: [0, 0, 0, 0], rect: [0, 0, 0, 0] });
+  useEffect(() => () => { MONO_PASTO.k = 0; MONO_PASTO.objetivo = false; }, []);   // al desmontar: ocultos (el próximo montaje arranca abajo)
+  useFrame(() => {
+    const m = monolitosMontados(DBG_PASTO);
+    if (m !== ref.current) { ref.current = m; setOn(m); }
+    if (!m) { MONO_PASTO.k = 0; MONO_PASTO.objetivo = false; return; }
+    const t = T.current;
+    for (let i = 0; i < 4; i++) { hazPosXZEn(i, t.p); t.lx[i] = t.p.x; t.lz[i] = t.p.z; }
+    rectPasto(t.lx, t.lz, DBG_PASTO.MARGEN_M, t.rect);
+    posMonolitosPasto(t.rect, DBG_PASTO.MONOLITO_SEP_M, MONOLITO_ANCHO_M, TARIMA_CENTRO.z, MONO_PASTO);
+    MONO_PASTO.objetivo = monolitosObjetivo(DBG_PASTO, PASTO.completo);
+    MONO_PASTO.k = avanzarAparicion(MONO_PASTO.k, MONO_PASTO.objetivo, RELOJ.dtExp, DBG_PASTO);
+  });
+  return on ? <Monoliths pasto /> : null;
 }
 
 export default function Pasto() {
@@ -229,6 +247,8 @@ export default function Pasto() {
     // estado (reloj de la experiencia: quieto en pausa; dt acotado en lib/pasto.ts)
     avanzarPasto(PASTO, D, RELOJ.dtExp, state.camera.position.x, state.camera.position.z, T.lx, T.lz, T.on);
     for (let i = 0; i < 4; i++) if (PASTO.ev[i]) window.dispatchEvent(new CustomEvent("alight:pasto-cuarto", { detail: { cuarto: i, estado: NOMBRES_EV[PASTO.ev[i]] } }));
+    // Z65: los 4 cuartos completos → una sola vez (se rearma al reiniciar el pasto)
+    if (chequearTodoCompleto(PASTO)) window.dispatchEvent(new CustomEvent("alight:pasto-completo"));
     // geometría de los cuartos: solo cuando cambian las luces o el margen (no por frame)
     rectPasto(T.lx, T.lz, D.MARGEN_M, T.rect);
     const clave = `${T.rect.join(",")}`;

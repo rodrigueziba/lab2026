@@ -19,9 +19,10 @@ export type EvPasto = 0 | 1 | 2 | 3;
 export interface EstadoPasto {
   p: number[]; dentro: boolean[]; completo: boolean[]; tendencia: number[];   // tendencia: 1 crece, −1 decae, 0 quieto
   ev: EvPasto[];
+  todoEmitido: boolean;   // Z65: alight:pasto-completo ya salió (una vez hasta el próximo reinicio)
 }
 export function crearEstadoPasto(): EstadoPasto {
-  return { p: [0, 0, 0, 0], dentro: [false, false, false, false], completo: [false, false, false, false], tendencia: [0, 0, 0, 0], ev: [0, 0, 0, 0] };
+  return { p: [0, 0, 0, 0], dentro: [false, false, false, false], completo: [false, false, false, false], tendencia: [0, 0, 0, 0], ev: [0, 0, 0, 0], todoEmitido: false };
 }
 /** Estado compartido (lo avanza Pasto.tsx; lo lee el menú debug y cualquier sistema que quiera el progreso). */
 export const PASTO = crearEstadoPasto();
@@ -35,6 +36,14 @@ const sat = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
 /** Reinicia (checkpoints, "Reiniciar pasto"). */
 export function reiniciarPasto(s: EstadoPasto): void {
   for (let i = 0; i < 4; i++) { s.p[i] = 0; s.dentro[i] = false; s.completo[i] = false; s.tendencia[i] = 0; s.ev[i] = 0; }
+  s.todoEmitido = false;
+}
+/** Z65: true UNA sola vez cuando los 4 cuartos quedan completos (para alight:pasto-completo); se rearma al reiniciar. */
+export function chequearTodoCompleto(s: EstadoPasto): boolean {
+  if (s.todoEmitido) return false;
+  for (let i = 0; i < 4; i++) if (!s.completo[i]) return false;
+  s.todoEmitido = true;
+  return true;
 }
 /** Lleva el cuarto i a completo (botones de debug). */
 export function completarCuarto(s: EstadoPasto, i: number): void {

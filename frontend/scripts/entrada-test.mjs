@@ -1,7 +1,7 @@
 // Z59: prueba de la línea de tiempo de la entrada tras el telón (lib/entradaTelon.ts) contra la máquina del destello
 // (fases de lib/curtainFlash.ts con los tiempos de DBG_FLASH). Uso: node scripts/entrada-test.mjs
 import fs from 'node:fs';
-import { BLOQUEO_MOV, iniciarEntrada, tickEntrada, cancelarEntrada, movimientoBloqueado, bloquearMovimiento, liberarMovimiento, crearEstadoEntrada } from '../lib/entradaTelon.ts';
+import { BLOQUEO_MOV, iniciarEntrada, tickEntrada, cancelarEntrada, movimientoBloqueado, bloquearMovimiento, liberarMovimiento, crearEstadoEntrada, poseEntrada, crearPoseEntrada } from '../lib/entradaTelon.ts';
 
 const src = fs.readFileSync(new URL('../lib/debugConfig.ts', import.meta.url), 'utf8');
 const obj = n => Function(`return (${new RegExp(`export const ${n} = (\\{[\\s\\S]*?\\n\\});`).exec(src)[1].replace(/ as string/g, '')});`)();
@@ -66,5 +66,29 @@ check(d.teleportT.length === 0 && d.estado.fase === 'inactiva' && d.razonesFinal
   console.log(`    pose: (${x}, 1,6, ${z}) · ${f(dT, 2)} m del centro de la tarima · yaw ${C.YAW_DEG}° (el que mira al centro: ${f(yawMira, 1)}°) · pitch ${C.PITCH_DEG}°`);
   check(Math.abs(x) < 39.5 && Math.abs(z) < 39.5 && (Math.abs(x) > 1.6 + 0.4 || Math.abs(z) > 1.6 + 0.4) && !(z > -7.6 && z < -6.4 && x > -3.1 && x < 3.1), 'dentro de la sala, fuera de la tarima y de las sillas');
   check(dT >= 6 && dT <= 7.5 && Math.abs(yawMira - C.YAW_DEG) < 0.5, 'a 6–7,5 m de la tarima, mirando a su centro'); }
+
+// ── Z65: pose final = pose de Z59 + DESPLAZ_IZQ_M a la izquierda de la mirada (perpendicular al yaw, en el suelo) ──
+console.log('\nZ65: desplazamiento a la izquierda');
+{ const OBST = [{ x0: -1.596 - 0.6, z0: -1.596 - 0.6, x1: 1.596 + 0.6, z1: 1.596 + 0.6 }, { x0: -3.3, z0: -7.9, x1: 3.3, z1: -6.1 }];   // = calcularPoseEntrada
+  const P = poseEntrada(C, 39.5, OBST, { x: 0, z: 0 }, crearPoseEntrada());
+  const yaw = C.YAW_DEG * Math.PI / 180, fwd = [-Math.sin(yaw), -Math.cos(yaw)], izq = [-Math.cos(yaw), Math.sin(yaw)];
+  const d = [P.x - C.POS_X, P.z - C.POS_Z];
+  console.log(`    mirada (${f(fwd[0], 3)}, ${f(fwd[1], 3)}) · izquierda (${f(izq[0], 3)}, ${f(izq[1], 3)}) · pose final x ${f(P.x, 2)} · z ${f(P.z, 2)} · yaw ${f(P.yawDeg, 1)}° · pitch ${f(P.pitchDeg, 1)}°${P.ajustada ? ' · AJUSTADA' : ''}`);
+  check(Math.abs(Math.hypot(...d) - C.DESPLAZ_IZQ_M) < 1e-9 && Math.abs(d[0] * fwd[0] + d[1] * fwd[1]) < 1e-9, `se movió ${C.DESPLAZ_IZQ_M} m, perpendicular a la mirada`);
+  check(fwd[0] * izq[1] - fwd[1] * izq[0] < 0 && d[0] * izq[0] + d[1] * izq[1] > 0, 'hacia la izquierda (en three, con +Y arriba, girar la mirada 90° antihorario visto desde arriba)');
+  check(!P.ajustada && P.yawDeg === C.YAW_DEG && P.pitchDeg === C.PITCH_DEG, 'MIRAR_TARIMA false: mismo yaw y pitch, sin ajustes (no cae en la tarima, las sillas ni fuera de la sala)');
+  const Q = poseEntrada({ ...C, MIRAR_TARIMA: true }, 39.5, OBST, { x: 0, z: 0 }, crearPoseEntrada());
+  const fq = [-Math.sin(Q.yawDeg * Math.PI / 180), -Math.cos(Q.yawDeg * Math.PI / 180)], aT = [-Q.x, -Q.z], nT = Math.hypot(...aT);
+  check(Math.abs(fq[0] * aT[0] / nT + fq[1] * aT[1] / nT - 1) < 1e-9 && Q.x === P.x && Q.z === P.z, `MIRAR_TARIMA true: misma posición, yaw ${f(Q.yawDeg, 1)}° apunta al centro de la tarima`);
+  const Z = poseEntrada({ ...C, DESPLAZ_IZQ_M: 0 }, 39.5, OBST, { x: 0, z: 0 }, crearPoseEntrada());
+  check(Z.x === C.POS_X && Z.z === C.POS_Z, 'DESPLAZ_IZQ_M 0 = pose de Z59');
+  const T = poseEntrada({ ...C, POS_X: -1, POS_Z: 0.5, DESPLAZ_IZQ_M: 1 }, 39.5, OBST, { x: 0, z: 0 }, crearPoseEntrada());
+  check(T.ajustada && !(Math.abs(T.x) < 2.196 && Math.abs(T.z) < 2.196), `si cae en la tarima se lo empuja afuera por el lado más cercano (${f(T.x, 2)}, ${f(T.z, 2)})`);
+  const S = poseEntrada({ ...C, POS_X: 0, POS_Z: 0, YAW_DEG: 0, DESPLAZ_IZQ_M: 60 }, 39.5, [], { x: 0, z: 0 }, crearPoseEntrada());
+  check(S.ajustada && S.x === -39.5, 'fuera de la sala: se recorta al límite');
+  // el telón (ancla (−10, −7) + EJE × curtainDistM): se oculta en el destello y se desmonta, pero informamos la distancia
+  const L = Math.hypot(10, 7), ej = [10 / L, 7 / L], tc = [-10 + ej[0] * 3, -7 + ej[1] * 3];
+  console.log(`    centro del telón (${f(tc[0], 2)}, ${f(tc[1], 2)}): la entrada queda a ${f(Math.hypot(P.x - tc[0], P.z - tc[1]), 2)} m de su centro y a ${f((P.x - tc[0]) * ej[0] + (P.z - tc[1]) * ej[1], 2)} m de su plano (del lado de la tarima)`); }
+
 console.log(`\n${ok} OK · ${fallas} fallas`);
 process.exit(fallas ? 1 : 0);

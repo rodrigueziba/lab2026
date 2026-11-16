@@ -949,7 +949,7 @@ export default function ExperienceDome() {
       {vizActive && <EjeOverlay />}{/* Z55: overlay del eje de la composición (DBG_PORTAL.OVERLAY_EJE, oculto por defecto) */}
       {vizActive && <SymbolSystem />}
       {/* N5: monoliths flanking tarima path */}
-      {/* Z64: sin monolitos en la etapa de las luces (DBG_PASTO.MONOLITOS_ACTIVO); el pasto crece bajo cada luz */}
+      {/* Z64: el pasto crece bajo cada luz · Z65: los monolitos aparecen al completar los 4 cuartos (DBG_PASTO.MONOLITOS_MODO) */}
       {vizActive && <MonolitosPasto />}
       {vizActive && <Pasto />}
 

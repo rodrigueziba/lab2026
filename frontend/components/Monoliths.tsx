@@ -11,6 +11,7 @@ import { DBG_SILLAS, DBG_AMANECER, DBG_LAYOUT } from "@/lib/debugConfig"; // Z38
 import { monolitoEn, monolitoDistM } from "@/lib/layoutSala"; // Z41
 import { setMonolithProximity } from "@/lib/vizAudio";
 import { createBasePlateTex } from "@/lib/retro/decals";
+import { MONO_PASTO, hundimientoM, suaveAparicion } from "@/lib/monolitosPasto"; // Z65
 
 // ── V2/V3: obsidian shader via onBeforeCompile ────────────────────────────────
 // • Purple-brown fresnel rim
@@ -61,6 +62,10 @@ const BASE_H    = H * 0.094;      // base height  ≈ 0.30 m
 const COL_H     = H - BASE_H;     // column height ≈ 2.90 m
 const COL_SIDE  = 0.58;           // V3: square column side (m)
 const BASE_SIDE = COL_SIDE * 2.3; // V3: base width/depth ≈ 1.33 m
+/** Z65: ancho total del monolito en planta = la base (la columna torcida, 0,58 m de lado, nunca la excede: su media
+ *  diagonal es 0,41 m < 0,667 m). Lo usa la posición de los monolitos del pasto (lib/monolitosPasto.ts). */
+export const MONOLITO_ANCHO_M = BASE_SIDE;
+export const MONOLITO_ALTO_M = H;
 
 // V2 conchoidal constants (kept behind monolithUseConchoidal flag)
 const W = 0.9, D = 0.35;
@@ -349,7 +354,8 @@ const PLATE_H_PLATE = 0.025;
 const PLATE_D_DEPTH = BASE_SIDE * 0.50;
 const R5_MONOLITH_RETRO = true;
 
-export default function Monoliths() {
+/** Z65: pasto = true → posición, subida desde el suelo y visibilidad desde MONO_PASTO (monolitos del pasto). */
+export default function Monoliths({ pasto = false }: { pasto?: boolean }) {
   const { camera, gl, scene } = useThree();
 
   const leftBodyRef    = useRef<THREE.Mesh>(null);
@@ -476,10 +482,17 @@ export default function Monoliths() {
     }
 
     // Z41: posición radial desde el centro de la tarima (monolithDistM + DBG_LAYOUT.MONOLITOS_OFFSET_M), en vivo
-    monolitoEn(-1, DBG_SILLAS.monolithDistM, DBG_LAYOUT, posL);
-    monolitoEn( 1, DBG_SILLAS.monolithDistM, DBG_LAYOUT, posR);
-    if (leftGroupRef.current)  leftGroupRef.current.position.set(posL.x, 0, posL.z);
-    if (rightGroupRef.current) rightGroupRef.current.position.set(posR.x, 0, posR.z);
+    // Z65: con pasto, en la línea de la tarima a MONOLITO_SEP_M del borde del pasto, subiendo desde el suelo
+    let yPasto = 0, visPasto = 1;
+    if (pasto) {
+      posL.x = MONO_PASTO.xL; posL.z = MONO_PASTO.z; posR.x = MONO_PASTO.xR; posR.z = MONO_PASTO.z;
+      yPasto = hundimientoM(MONO_PASTO.k, H); visPasto = suaveAparicion(MONO_PASTO.k);
+    } else {
+      monolitoEn(-1, DBG_SILLAS.monolithDistM, DBG_LAYOUT, posL);
+      monolitoEn( 1, DBG_SILLAS.monolithDistM, DBG_LAYOUT, posR);
+    }
+    if (leftGroupRef.current)  leftGroupRef.current.position.set(posL.x, yPasto, posL.z);
+    if (rightGroupRef.current) rightGroupRef.current.position.set(posR.x, yPasto, posR.z);
     if (leftTarget.position.x !== posL.x || leftTarget.position.z !== posL.z) {
       leftTarget.position.set(posL.x, 0, posL.z); leftTarget.updateMatrixWorld();
     }
@@ -495,7 +508,7 @@ export default function Monoliths() {
       opacityRef.current + (target - opacityRef.current) * Math.min(1, dt * speed),
       0, 1,
     );
-    const op = opacityRef.current;
+    const op = opacityRef.current * visPasto;   // Z65: × aparición (luces, brillo, pantallas y cercanía en 0 mientras están ocultos)
 
     const setOp = (mesh: THREE.Mesh | null, mat: THREE.Material, o: number) => {
       if (!mesh) return;

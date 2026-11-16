@@ -131,6 +131,8 @@ uniform vec2  uFlLum;          // Z63: luminancia media de cada bloque en la tex
 uniform vec2  uFlDet;          // Z63: límites del detalle (luminancia del píxel / media del bloque)
 uniform float uFlEscY;         // Z63: estiramiento vertical del ruido (el bloque es bajo y ancho)
 uniform float uFlTope;         // Z63: tope del color fluido (bajo el umbral del bloom 0,92: sin quemar a blanco)
+uniform float uFlTopeModo;     // Z65: 1 = el tope escala el color entero (conserva el tono) · 0 = min por canal (Z63)
+uniform float uFlDiaAt;        // Z65: atenuación de día de los tonos claros del fluido (× uLuzDia; 0 = como Z63)
 
 // ---- geometria del portal, medida sobre la referencia (espacio p: x der, y arriba, imagen = [-1,1]) ----
 const vec2  PORTAL_C = vec2(0.0461, -0.0609);
@@ -239,7 +241,20 @@ vec3 fluTenir(vec3 base, vec3 pal, float f, float e, float mezcla, float lumMedi
   float lb = dot(base, vec3(0.2126, 0.7152, 0.0722));
   float detalle = clamp(lb / max(lumMedia, 0.02), uFlDet.x, uFlDet.y);
   float luz = (1.0 + uFlLuz * (f - 0.5) * 2.0) * (1.0 + uFlPulso * e);
-  return mix(base, min(pal * detalle * luz, vec3(uFlTope)), clamp(mezcla, 0.0, 1.0));
+  vec3 c = pal * detalle * luz;
+  // Z65: tope que conserva el tono: escala el color hasta que su canal mayor toque uFlTope. El min por canal de Z63
+  // dejaba el rojo de toda la paleta naranja fijo en el tope (el naranja casi no cambiaba) y volvía gris el celeste pálido.
+  float cMax = max(c.r, max(c.g, c.b));
+  c = uFlTopeModo > 0.5 ? c * min(1.0, uFlTope / max(cMax, 1e-3)) : min(c, vec3(uFlTope));
+  // Z65: de día los tonos claros (relativos al tope) bajan hacia los medios y recuperan saturación; los oscuros no cambian
+  float kDia = clamp(uFlDiaAt, 0.0, 1.0) * clamp(uLuzDia, 0.0, 1.0);
+  if (kDia > 0.0) {
+    float w = smoothstep(0.45 * uFlTope, 0.9 * uFlTope, dot(c, vec3(0.2126, 0.7152, 0.0722))) * kDia;
+    c *= 1.0 - 0.5 * w;
+    float lc = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    c = max(vec3(lc) + (c - vec3(lc)) * (1.0 + 0.8 * w), vec3(0.0));
+  }
+  return mix(base, c, clamp(mezcla, 0.0, 1.0));
 }
 float h31(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123); }
 vec3  h33(vec3 p) {

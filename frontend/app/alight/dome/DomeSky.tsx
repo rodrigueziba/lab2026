@@ -224,6 +224,8 @@ export default function DomeSky({
           uFlDet:   { value: new THREE.Vector2(0.3, 1.5) },     // Z63
           uFlEscY:  { value: 4 },                               // Z63
           uFlTope:  { value: 0.85 },                            // Z63
+          uFlTopeModo: { value: 1 },                            // Z65
+          uFlDiaAt: { value: 0.5 },                             // Z65
           uFlPalA:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
           uFlPalN:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
           uOndaEngrosar:    { value: 0 },   // Z58
@@ -316,6 +318,8 @@ export default function DomeSky({
       u.uFlDet.value.set(DBG_FLUIDO.DETALLE_MIN, DBG_FLUIDO.DETALLE_MAX);
       u.uFlEscY.value = Math.max(0.2, DBG_FLUIDO.ESCALA_Y);
       u.uFlTope.value = DBG_FLUIDO.TOPE;
+      u.uFlTopeModo.value = DBG_FLUIDO.TOPE_MODO === "canal" ? 0 : 1;   // Z65
+      u.uFlDiaAt.value = Math.max(0, Math.min(1, DBG_FLUIDO.DIA_ATENUA));  // Z65
       const pa = u.uFlPalA.value as THREE.Vector3[], pn = u.uFlPalN.value as THREE.Vector3[];
       for (let i = 0; i < 5; i++) {   // hexARgb tiene caché por texto: sin allocations por frame
         let c = hexARgb(DBG_FLUIDO.PALETA_AZUL[i] ?? "#FFFFFF"); pa[i].set(c[0], c[1], c[2]);

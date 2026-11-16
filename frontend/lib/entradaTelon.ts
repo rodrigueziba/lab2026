@@ -65,3 +65,45 @@ export function tickEntrada(e: EstadoEntrada, c: CfgEntrada, destello: FaseDeste
   if (teleport) e.teletransportes++;
   return teleport;
 }
+
+// ── Z65: pose final de la entrada = pose de DBG_ENTRADA + DESPLAZ_IZQ_M hacia la izquierda de la mirada ──
+// Convención de three (rotación YXZ, como PointerLockControls): mirada = (−sin yaw, −cos yaw) en XZ; derecha =
+// (cos yaw, −sin yaw); izquierda = (−cos yaw, sin yaw). MIRAR_TARIMA: después del desplazamiento, el yaw apunta al
+// centro de la tarima (el pitch se conserva). Límites: se recorta a la sala y, si cae dentro de un obstáculo
+// (tarima, sillas), se lo empuja afuera por el lado más cercano (el mínimo); `ajustada` lo avisa.
+export interface CfgPoseEntrada {
+  POS_X: number; POS_Z: number; YAW_DEG: number; PITCH_DEG: number; DESPLAZ_IZQ_M?: number; MIRAR_TARIMA?: boolean;
+}
+/** Rectángulo en XZ (x0 < x1, z0 < z1). */
+export interface RectXZ { x0: number; z0: number; x1: number; z1: number }
+export interface PoseEntrada { x: number; z: number; yawDeg: number; pitchDeg: number; ajustada: boolean }
+export function crearPoseEntrada(): PoseEntrada { return { x: 0, z: 0, yawDeg: 0, pitchDeg: 0, ajustada: false }; }
+/** Última pose calculada (la lee el menú debug). */
+export const POSE_ENTRADA = crearPoseEntrada();
+
+/** Escribe en out la pose final. salaMedia: medio lado caminable de la sala; tarima: centro hacia donde mirar. */
+export function poseEntrada(c: CfgPoseEntrada, salaMedia: number, obstaculos: readonly RectXZ[],
+  tarima: { x: number; z: number }, out: PoseEntrada): PoseEntrada {
+  const yaw = (fin(c.YAW_DEG, 0) * Math.PI) / 180, d = fin(c.DESPLAZ_IZQ_M ?? 0, 0);
+  let x = fin(c.POS_X, 0) - Math.cos(yaw) * d, z = fin(c.POS_Z, 0) + Math.sin(yaw) * d;
+  let ajustada = false;
+  const m = Math.max(0, fin(salaMedia, 39.5));
+  if (Math.abs(x) > m || Math.abs(z) > m) { x = Math.max(-m, Math.min(m, x)); z = Math.max(-m, Math.min(m, z)); ajustada = true; }
+  for (let pasada = 0; pasada < 3; pasada++) {   // un obstáculo puede empujar dentro de otro: unas pocas pasadas
+    let dentro = false;
+    for (const r of obstaculos) {
+      if (x <= r.x0 || x >= r.x1 || z <= r.z0 || z >= r.z1) continue;
+      dentro = true; ajustada = true;
+      const dx0 = x - r.x0, dx1 = r.x1 - x, dz0 = z - r.z0, dz1 = r.z1 - z, mn = Math.min(dx0, dx1, dz0, dz1);
+      if (mn === dx0) x = r.x0 - 0.01; else if (mn === dx1) x = r.x1 + 0.01; else if (mn === dz0) z = r.z0 - 0.01; else z = r.z1 + 0.01;
+    }
+    if (!dentro) break;
+  }
+  let yawDeg = fin(c.YAW_DEG, 0);
+  if (c.MIRAR_TARIMA) {
+    const dx = tarima.x - x, dz = tarima.z - z;
+    if (dx * dx + dz * dz > 1e-6) yawDeg = (Math.atan2(-dx, -dz) * 180) / Math.PI;   // mirada (−sin, −cos) = dirección a la tarima
+  }
+  out.x = x; out.z = z; out.yawDeg = yawDeg; out.pitchDeg = fin(c.PITCH_DEG, 0); out.ajustada = ajustada;
+  return out;
+}

@@ -928,7 +928,9 @@ export const DBG_FLUIDO = {
   LUM_MEDIA_NARANJA: 0.328,// medida en portal-color.png (olas cálidas) — live
   DETALLE_MIN:     0.3,    // las líneas oscuras siguen oscuras — live
   DETALLE_MAX:     1.2,    // — live
-  TOPE:            0.7,    // tope del color fluido: con el tonemapping ACES y la exposición de día (1,19), 0,85 ya se veía blanco — live
+  TOPE:            0.55,   // Z65 (Z63 0,7): tope del color fluido: con el tonemapping ACES y la exposición de día (1,19), 0,85 ya se veía blanco — live
+  TOPE_MODO:       "tono" as string,   // Z65: "tono" = escala el color entero hasta que su canal mayor toque TOPE (conserva tono y variación) · "canal" = min(color, TOPE) por canal, como Z63 (fijaba el rojo del naranja en TOPE y volvía gris el celeste pálido) — live
+  DIA_ATENUA:      0.5,    // Z65: con luz de día (uLuzDia) comprime la luminosidad de la paleta hacia los medios: los pálidos bajan (×0,6·k) más de lo que suben los oscuros (×0,25·k). 0 = como Z63; de noche no actúa — live
   // Z63: energía: banda de cada bloque y ganancia automática
   BANDA_AZUL:      "auto" as string,   // "auto" (la más activa) · "grupo" (la de MONTAÑAS, al azar en cada carga, como Z61) · "0"…"3" — live
   BANDA_NARANJA:   "auto" as string,   // "auto" (la más activa que no use el azul) · "grupo" (la de LÍNEAS) · "0"…"3" — live
@@ -937,7 +939,7 @@ export const DBG_FLUIDO = {
   SIMULAR_AZUL:    false,  // música simulada (pulsos tipo bombo) para el bloque azul — live
   SIMULAR_NARANJA: false,  // ídem bloque naranja — live
   PALETA_AZUL:     ["#16294A", "#1F4E8C", "#2A9D9A", "#7CC6E0", "#D2E8F0"] as string[],   // marino, azul profundo, turquesa, celeste, azul pálido — live
-  PALETA_NARANJA:  ["#C8402A", "#F0742A", "#F4A23A", "#F4CE4A", "#F3E6C8"] as string[],   // naranja rojizo, naranja, ámbar, amarillo, crema — live
+  PALETA_NARANJA:  ["#6A1209", "#B8361A", "#E8781E", "#F2BC32", "#F4E3BC"] as string[],   // Z65: rojo profundo, naranja, ámbar, amarillo, crema (Z63: #C8402A #F0742A #F4A23A #F4CE4A #F3E6C8) — live
 };
 
 // ── Z64: pasto que crece bajo las 4 luces del escenario (lib/pasto.ts, components/Pasto.tsx). Técnica de capas
@@ -945,7 +947,11 @@ export const DBG_FLUIDO = {
 // asumida; ver CREDITOS.md). ──
 export const DBG_PASTO = {
   ACTIVO:           true,   // false = sin pasto — live
-  MONOLITOS_ACTIVO: false,  // false = sin monolitos en esta etapa (vuelven cuando el usuario decida; gancho alight:pasto-cuarto) — live
+  MONOLITOS_ACTIVO: true,   // Z65 (Z64 false): interruptor maestro: false = nunca aparecen (ni se montan, como Z64) — live
+  MONOLITOS_MODO:   "pasto" as string,   // Z65: "pasto" = aparecen al completar los 4 cuartos (alight:pasto-completo) · "siempre" · "nunca" — live
+  MONOLITOS_APARICION_S: 3, // Z65: suben desde el suelo (y se funden) en estos segundos, con el reloj de la experiencia — live
+  MONOLITOS_BAJADA_S: 0,    // Z65: al reiniciarse el pasto (checkpoint) se hunden en estos segundos; 0 = desaparecen junto con él — live
+  MONOLITO_SEP_M:   1.0,    // Z65: metros libres entre el borde del pasto y la cara más cercana de cada monolito (base 1,334 m) — live
   MARGEN_M:         2.0,    // el área = rectángulo de las 4 luces + este margen; cuartos = celdas de Voronoi — live
   RADIO_LUZ_M:      1.2,    // "bajo la luz" (histéresis +0,3 m al salir) — live
   CRECE_S:          14,     // segundos bajo la luz para llenar el cuarto — live
@@ -978,12 +984,14 @@ export const DBG_ENTRADA = {
   BLOQUEO_EXTRA_S:        0.3,    // WASD sigue bloqueado esto después del fin del destello — live
   TOPE_S:                 12,     // seguridad: pase lo que pase, libera el movimiento a los TOPE_S del cruce — live
   DESTELLO_EN_REPETICION: true,   // si se cruza otra vez (telón repuesto desde debug), un destello de debug tapa el salto — live
+  DESPLAZ_IZQ_M:          5,      // Z65: se suma a la pose: metros hacia la izquierda de la mirada (perpendicular al yaw, en el suelo); 0 = pose de Z59 — live
+  MIRAR_TARIMA:           false,  // Z65: true = después del desplazamiento el yaw apunta al centro de la tarima (pitch igual); false = mismo yaw y pitch — live
 };
 
 export const DBG_LAYOUT = {
   POSICIONES_NUEVAS:  true,   // false = exactamente las posiciones anteriores (offsets ignorados) — live
   SILLAS_OFFSET_M:    4,      // sillas + ZONA_SILLAS + público se alejan de la tarima (dirección tarima → sillas) — live
-  MONOLITOS_OFFSET_M: 3,      // cada monolito se aleja de la tarima en dirección radial (sobre monolithDistM) — live
+  MONOLITOS_OFFSET_M: 3,      // cada monolito se aleja de la tarima en dirección radial (sobre monolithDistM). Z65: ya no se usa con los monolitos del pasto (DBG_PASTO.MONOLITO_SEP_M) — live
 };
 
 // ── Z42: diseño de las 4 luces del visualizador (components/LucesHaz.tsx), estilo luz de la narrativa ──

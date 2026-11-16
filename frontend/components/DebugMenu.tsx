@@ -77,12 +77,13 @@ import { SECUENCIA } from "@/lib/secuenciaSillas"; // Z39
 import { CHECKPOINTS, CK_STATE, irACheckpoint } from "@/lib/checkpoints"; // Z40
 import { DIA, PORTAL_GEOM, posicionarDia } from "@/lib/cicloDia"; // Z48 · Z50 · Z54
 import { EJE_PANT } from "@/components/EjeOverlay"; // Z55
-import { ENTRADA_POSE } from "@/components/EntradaTelon"; // Z59
+import { ENTRADA_POSE, calcularPoseEntrada } from "@/components/EntradaTelon"; // Z59 · Z65
 import { ENTRADA } from "@/lib/entradaTelon"; // Z59
 import { FLUIDO } from "@/lib/fluidoBloques"; // Z63
 import { PASTO } from "@/lib/pasto"; // Z64
 const FLUIDO_DEFAULTS = { MEZCLA_AZUL: DBG_FLUIDO.MEZCLA_AZUL, MEZCLA_NARANJA: DBG_FLUIDO.MEZCLA_NARANJA, WARP: DBG_FLUIDO.WARP, VEL_BASE: DBG_FLUIDO.VEL_BASE, PULSO_LUZ: DBG_FLUIDO.PULSO_LUZ };   // Z63: para "Volver a defaults"
 import { FLOR } from "@/lib/prismaFlor"; // Z54
+import { MONO_PASTO } from "@/lib/monolitosPasto"; // Z65
 import { duracionTemaViz, idTemaViz } from "@/lib/vizAudio"; // Z54
 import { EFECTOS_STATE, leerPremio, borrarPremio, probarEfecto } from "@/lib/dialogo/efectosEstado"; // Z29
 
@@ -1684,6 +1685,7 @@ export default function DebugMenu() {
             ["ALTURA_M", 0.05, 1.2, 0.01, "m"], ["DENSIDAD", 20, 300, 1, "texels/m"], ["VIENTO_AMP", 0, 3, 0.05, ""], ["VIENTO_VEL", 0, 2, 0.01, ""],
             ["DARKNESS", 0, 1, 0.01, ""], ["PUNTAS_TINTE", 0, 1, 0.01, ""], ["BRILLO", 0, 3, 0.05, ""], ["TINTE_LUZ", 0, 1, 0.01, ""],
             ["CAIDA_LUZ_M", 0.5, 30, 0.5, "m"], ["DIST_MAX_M", 5, 80, 1, "m"],
+            ["MONOLITO_SEP_M", 0, 6, 0.05, "m libres (Z65)"], ["MONOLITOS_APARICION_S", 0.1, 10, 0.1, "s subida (Z65)"], ["MONOLITOS_BAJADA_S", 0, 10, 0.1, "s · 0 = con el pasto (Z65)"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{DBG_PASTO[k].toFixed(st < 0.1 ? 2 : 1)} {nota}</span></span>
@@ -1699,6 +1701,14 @@ export default function DebugMenu() {
           <div style={ROW}>
             <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:pasto-completar"))}>Completar todo</button>
             <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:pasto-reiniciar"))}>Reiniciar pasto</button>
+          </div>
+          {/* Z65: monolitos que aparecen al completar los 4 cuartos */}
+          <div style={ROW}>
+            <span>MONOLITOS_MODO <span style={NOTE}>x ±{Math.abs(MONO_PASTO.xR).toFixed(2)} · z {MONO_PASTO.z.toFixed(2)} · aparición {MONO_PASTO.k.toFixed(2)}</span></span>
+            {(["pasto", "siempre", "nunca"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, width: "auto", padding: "0 4px", opacity: DBG_PASTO.MONOLITOS_MODO === m ? 1 : 0.45 }}
+                onClick={() => { DBG_PASTO.MONOLITOS_MODO = m; tocarDia(); }}>{m}</button>
+            ))}
           </div>
           <div style={ROW}>
             <span>Simular presencia</span>
@@ -1719,7 +1729,7 @@ export default function DebugMenu() {
             ["ACELERA", 0, 8, 0.1, "× energía"], ["WARP", 0, 4, 0.05, ""], ["LUZ_FLUJO", 0, 1, 0.01, ""], ["PULSO_LUZ", 0, 1.5, 0.01, "música"],
             ["MUSICA_AZUL", 0, 3, 0.05, "ganancia"], ["MUSICA_NARANJA", 0, 3, 0.05, "ganancia"], ["SUAVIZADO_S", 0.02, 2, 0.02, "s"], ["CALIDAD", 2, 4, 1, "octavas"],
             ["ESCALA_Y", 0.5, 8, 0.1, "Z63"], ["RANGO_MIN", 0, 0.6, 0.01, "Z63 fbm"], ["RANGO_MAX", 0.4, 1, 0.01, "Z63 fbm"], ["DETALLE_MIN", 0, 1, 0.01, "Z63"],
-            ["DETALLE_MAX", 1, 3, 0.05, "Z63"], ["TOPE", 0.5, 1, 0.01, "Z63 bloom 0,92"], ["LUM_MEDIA_AZUL", 0.05, 0.6, 0.005, "Z63"], ["LUM_MEDIA_NARANJA", 0.05, 0.6, 0.005, "Z63"], ["MAX_S", 1, 30, 0.5, "Z63 s"], ["ATAQUE_S", 0.01, 0.5, 0.01, "Z63 s"], ["PISO", 0.001, 0.2, 0.001, "Z63"],
+            ["DETALLE_MAX", 1, 3, 0.05, "Z63"], ["TOPE", 0.3, 1, 0.01, "Z65 0,55 · bloom 0,92"], ["DIA_ATENUA", 0, 1, 0.01, "Z65 claros de día"], ["LUM_MEDIA_AZUL", 0.05, 0.6, 0.005, "Z63"], ["LUM_MEDIA_NARANJA", 0.05, 0.6, 0.005, "Z63"], ["MAX_S", 1, 30, 0.5, "Z63 s"], ["ATAQUE_S", 0.01, 0.5, 0.01, "Z63 s"], ["PISO", 0.001, 0.2, 0.001, "Z63"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{DBG_FLUIDO[k].toFixed(st < 0.01 ? 3 : 2)} {nota}</span></span>
@@ -1727,6 +1737,14 @@ export default function DebugMenu() {
                 onChange={e => { DBG_FLUIDO[k] = parseFloat(e.target.value); tocarDia(); }} />
             </div>
           ))}
+          {/* Z65: modo del tope del color fluido */}
+          <div style={ROW}>
+            <span>TOPE_MODO <span style={NOTE}>tono = conserva el color · canal = Z63</span></span>
+            {(["tono", "canal"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, width: "auto", padding: "0 4px", opacity: DBG_FLUIDO.TOPE_MODO === m ? 1 : 0.45 }}
+                onClick={() => { DBG_FLUIDO.TOPE_MODO = m; tocarDia(); }}>{m}</button>
+            ))}
+          </div>
           {/* Z63: energía que llega a cada bloque (barra), banda de cada uno y prueba rápida */}
           {([["azul", fluLive.a, fluLive.ba, "BANDA_AZUL"], ["naranja", fluLive.n, fluLive.bn, "BANDA_NARANJA"]] as const).map(([nom, e, b, k]) => (
             <div key={nom} style={ROW}>
@@ -2642,7 +2660,7 @@ export default function DebugMenu() {
           </div>
           {([
             ["POS_X", -39, 39, 0.1, "m"], ["POS_Z", -39, 39, 0.1, "m"], ["YAW_DEG", -180, 180, 0.5, "°"], ["PITCH_DEG", -45, 45, 0.5, "°"],
-            ["BLOQUEO_EXTRA_S", 0, 3, 0.05, "s tras el destello"], ["TOPE_S", 2, 30, 0.5, "s seguridad"],
+            ["BLOQUEO_EXTRA_S", 0, 3, 0.05, "s tras el destello"], ["TOPE_S", 2, 30, 0.5, "s seguridad"], ["DESPLAZ_IZQ_M", -10, 10, 0.1, "m a la izq. (Z65)"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{DBG_ENTRADA[k].toFixed(st < 0.1 ? 2 : 1)} {nota}</span></span>
@@ -2655,6 +2673,14 @@ export default function DebugMenu() {
             <button style={INPUT} onClick={() => { window.dispatchEvent(new CustomEvent("alight:entrada-probar")); tocarDia(); }}>Probar entrada</button>
           </div>
           {ENTRADA_POSE.texto && <div style={ROW}><span style={NOTE}>{ENTRADA_POSE.texto}</span></div>}
+          {/* Z65: mirar a la tarima tras el desplazamiento y pose final calculada */}
+          <div style={ROW}>
+            <span>MIRAR_TARIMA <span style={NOTE}>off = mismo yaw y pitch</span></span>
+            <button style={INPUT} onClick={() => { DBG_ENTRADA.MIRAR_TARIMA = !DBG_ENTRADA.MIRAR_TARIMA; tocarDia(); }}>{DBG_ENTRADA.MIRAR_TARIMA ? "ON" : "off"}</button>
+          </div>
+          {(() => { const P = calcularPoseEntrada(); return (
+            <div style={ROW}><span style={NOTE}>pose final: x {P.x.toFixed(2)} · z {P.z.toFixed(2)} · yaw {P.yawDeg.toFixed(1)}° · pitch {P.pitchDeg.toFixed(1)}°{P.ajustada ? " · AJUSTADA (caía en un obstáculo o fuera de la sala)" : ""}</span></div>
+          ); })()}
           <div style={ROW}><span style={NOTE}>entrada: {ENTRADA.fase} · saltos {ENTRADA.teletransportes}</span></div>
 
           <div style={DIVIDER} />
