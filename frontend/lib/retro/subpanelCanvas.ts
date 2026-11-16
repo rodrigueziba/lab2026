@@ -4,6 +4,7 @@
 // Marca ficticia AUSTRAL ELECTRIC / KX-07M; sin marcas reales.
 
 import type { ProyectoDetalle } from "@/lib/proyectoDetalle";
+import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca"; // Z68
 
 export interface Rect { x: number; y: number; w: number; h: number }
 
@@ -182,7 +183,7 @@ export function dibujarGaleria(ctx: CanvasRenderingContext2D, indice: number, to
   ctx.font = `16px ${MONO}`;
   espaciado(ctx, 3);
   ctx.textAlign = "right";
-  ctx.fillText("AUSTRAL ELECTRIC · KX-07M · VIDEO MONITOR", w - 30, h - 14);
+  ctx.fillText(`${NOMBRE_EMPRESA_MAYUS} · KX-07M · VIDEO MONITOR`, w - 30, h - 14);
   ctx.textAlign = "left";
   espaciado(ctx, 0);
 }
@@ -292,7 +293,7 @@ export function dibujarFicha(ctx: CanvasRenderingContext2D, d: ProyectoDetalle, 
   ctx.font = `14px ${MONO}`;
   espaciado(ctx, 3);
   ctx.textAlign = "right";
-  ctx.fillText("UNIT-07 · PROPERTY OF AUSTRAL ELECTRIC", w - 30, h - 10);
+  ctx.fillText(`UNIT-07 · PROPERTY OF ${NOMBRE_EMPRESA_MAYUS}`, w - 30, h - 10);
   ctx.textAlign = "left";
   // Etapa 1 video: botón para abrir el video del proyecto en el reproductor aparte
   if (verVideo) {

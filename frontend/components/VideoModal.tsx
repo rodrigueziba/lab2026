@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DBG_VIDEO } from "@/lib/debugConfig";
+import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca"; // Z68
 
 // ── tipos mínimos de la YouTube IFrame Player API ──
 interface YTPlayer { destroy(): void }
@@ -148,7 +149,7 @@ export default function VideoModal() {
             VIDEO · {abierto.titulo.toUpperCase()}
           </span>
           <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.2em", color: C.ambar, whiteSpace: "nowrap" }}>
-            AUSTRAL ELECTRIC · VTR-07
+            {NOMBRE_EMPRESA_MAYUS} · VTR-07
           </span>
         </div>
         {/* guarda de franjas */}

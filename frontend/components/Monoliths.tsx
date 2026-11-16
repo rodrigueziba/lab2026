@@ -11,6 +11,7 @@ import { DBG_SILLAS, DBG_AMANECER, DBG_LAYOUT } from "@/lib/debugConfig"; // Z38
 import { monolitoEn, monolitoDistM } from "@/lib/layoutSala"; // Z41
 import { setMonolithProximity } from "@/lib/vizAudio";
 import { createBasePlateTex } from "@/lib/retro/decals";
+import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca"; // Z68
 import { MONO_PASTO, hundimientoM, suaveAparicion } from "@/lib/monolitosPasto"; // Z65
 
 // ── V2/V3: obsidian shader via onBeforeCompile ────────────────────────────────
@@ -585,7 +586,7 @@ export default function Monoliths({ pasto = false }: { pasto?: boolean }) {
 
   const plateTex = useMemo(() => {
     if (!R5_MONOLITH_RETRO) return null;
-    try { return createBasePlateTex("AUSTRAL ELECTRIC / KX-07M", "UNIT-07", 512, 64); }
+    try { return createBasePlateTex(`${NOMBRE_EMPRESA_MAYUS} / KX-07M`, "UNIT-07", 512, 64); }
     catch { return null; }
   }, []);
 

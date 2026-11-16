@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca"; // Z68
 
 // Z1: tarjeta placeholder retro para paneles de proyecto sin foto (o con carga fallida).
 // Beige #E8DCC4, guarda de franjas en orden de espectro, bloque de marca ficticia
@@ -51,7 +52,7 @@ export function createPanelPlaceholder(titulo: string, indice: number): THREE.Ca
   // bloque de marca ficticia + serigrafía
   ctx.fillStyle = "#3A3B3C";
   ctx.font = "bold 22px ui-monospace, Menlo, monospace";
-  ctx.fillText("AUSTRAL ELECTRIC", 22, 40);
+  ctx.fillText(NOMBRE_EMPRESA_MAYUS, 22, 40);
   ctx.font = "13px ui-monospace, Menlo, monospace";
   ctx.fillText("SIN SEÑAL DE IMAGEN · NO SIGNAL", 22, 62);
   ctx.fillStyle = "#C0552F";

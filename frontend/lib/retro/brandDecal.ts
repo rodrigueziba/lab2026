@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca"; // Z68
 
 // J5: fictional brand decals (TS port of decalAtlas.js / brand.config.js).
 // Never real brands — only their grammar: stripes + wordmark + model code.
@@ -31,7 +32,7 @@ const BASE: Omit<Brand, "modelCode" | "descriptor" | "spec" | "checks"> = {
 
 // R5: AUSTRAL ELECTRIC — fictional brand for physical set equipment
 const AUSTRAL_BASE: Omit<Brand, "modelCode" | "descriptor" | "spec" | "checks" | "unitId"> = {
-  brandName: "AUSTRAL ELECTRIC",
+  brandName: NOMBRE_EMPRESA_MAYUS, // Z68 (antes "AUSTRAL ELECTRIC")
   secondary: "INSTALACIÓN INTERACTIVA",
   owner:     "PROPERTY OF ECHO-BASE",
   stripes:   ["#E5322B", "#F0742A", "#F4B62E", "#2E9E5B", "#1F7FB8"],

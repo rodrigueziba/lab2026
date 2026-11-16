@@ -22,6 +22,7 @@ import type { DialogoInk, OpcionDialogo, PasoDialogo, Segmento } from "@/lib/dia
 import { planDePaso, lineaEco, largoSegmentos, accionTecla } from "@/lib/dialogo/terminalFlujo";
 import type { Linea, PlanPaso, FaseTerminal } from "@/lib/dialogo/terminalFlujo";
 import { DIALOGO_STATE } from "@/lib/dialogo/dialogoEstado";
+import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca"; // Z68
 
 const C = { beige: "#E8DCC4", carbon: "#3A3B3C", negro: "#12101A", ambar: "#FF9A1F", ambarFondo: "#2A1400", oxido: "#C0552F" };
 const FRANJAS = ["#E5322B", "#F0742A", "#F4B62E", "#2E9E5B", "#1F7FB8"];
@@ -293,7 +294,7 @@ export default function DialogoTerminal() {
       {/* cabecera: bloque de marca ficticia + serigrafía técnica */}
       <div style={{ background: C.negro, padding: "7px 12px 5px", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
         <span style={{ fontWeight: 700, fontSize: 13, letterSpacing: "0.32em", color: C.beige, whiteSpace: "nowrap" }}>
-          AUSTRAL ELECTRIC
+          {NOMBRE_EMPRESA_MAYUS}
         </span>
         <span style={{ fontSize: 10, letterSpacing: "0.18em", color: "#8A8478", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           ENLACE DE VOZ · 9600 BD · CANAL {nodo || "--"}
