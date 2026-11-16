@@ -11,12 +11,13 @@ import SectorAudioFX from "./SectorAudioFX";
 import HazSystem from "./HazSystem";
 import HazRings from "./HazRings";
 import LucesHaz from "./LucesHaz"; // Z42
+import Pasto, { MonolitosPasto } from "./Pasto"; // Z64
 import CicloDiaEscena from "./CicloDiaEscena"; // Z48
 import SolFlare from "./SolFlare"; // Z51
 import FlorCiclo from "./FlorCiclo"; // Z54
 import EjeOverlay from "./EjeOverlay"; // Z55
 import SymbolSystem from "./SymbolSystem";
-import Monoliths from "./Monoliths";
+// Z64: Monoliths se monta desde ./Pasto (MonolitosPasto, según DBG_PASTO.MONOLITOS_ACTIVO)
 import { DBG_SILLAS, DBG_PANELES, DBG_ORBITAS, DBG_SECUENCIA, DBG_DIA } from "@/lib/debugConfig";
 import { RELOJ, ahoraExp } from "@/lib/relojExperiencia"; // Z39
 import { SECUENCIA, iniciarRevelado, revelarFinal } from "@/lib/secuenciaSillas"; // Z39
@@ -948,7 +949,9 @@ export default function ExperienceDome() {
       {vizActive && <EjeOverlay />}{/* Z55: overlay del eje de la composición (DBG_PORTAL.OVERLAY_EJE, oculto por defecto) */}
       {vizActive && <SymbolSystem />}
       {/* N5: monoliths flanking tarima path */}
-      {vizActive && <Monoliths />}
+      {/* Z64: sin monolitos en la etapa de las luces (DBG_PASTO.MONOLITOS_ACTIVO); el pasto crece bajo cada luz */}
+      {vizActive && <MonolitosPasto />}
+      {vizActive && <Pasto />}
 
       {/* Dome shell — upper hemisphere, BackSide.
           thetaLength=0.52π puts the open rim at y≈-2 (below floor level) so

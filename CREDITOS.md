@@ -71,3 +71,10 @@ Z45: cálculo en una textura compartida por las 3 caras; port a TypeScript del r
 - NestJS — MIT
 - Prisma — Apache 2.0
 - sharp — Apache 2.0
+
+## Pasto bajo las luces (Z64) — PENDIENTE DE CONFIRMAR
+- Archivo: `frontend/components/Pasto.tsx` (y la lógica propia en `frontend/lib/pasto.ts`).
+- Adaptado del **pasto** de un shader de Shadertoy aportado por el usuario. **Autor y URL: pendientes** (el usuario los va a pasar).
+- Licencia asumida: CC BY-NC-SA 3.0 (la de Shadertoy por defecto). Uso académico no comercial (TIF, UNTDF); si la obra se vuelve comercial, revisar.
+- Se adaptó: la técnica de capas apiladas (acá como planos 3D en lugar de capas por píxel de pantalla), la textura de briznas (máximos locales de un campo aleatorio, altura con raíz cuadrada, tres verdes), el viento proporcional a la altura, el oscurecimiento por altura y la punta rojiza. No se usaron las nubes (que el original acredita a "drift", https://www.shadertoy.com/view/4tdSWr), el cielo ni la cámara libre ("Free fly by Tempally").
+- Propio de este proyecto: el crecimiento por cuartos, el umbral irregular y su ruido, la iluminación y la integración con las luces.

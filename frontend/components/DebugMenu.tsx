@@ -54,6 +54,7 @@ import {
   DBG_FLOR, // Z54
   DBG_ENTRADA, // Z59
   DBG_FLUIDO, // Z61
+  DBG_PASTO, // Z64
   DEBUG_MENU_ESTADO,
 } from "@/lib/debugConfig";
 import { FLASH_STATE, estimarLuminanciaPico, FLASH_MEDICION, pedirMedicionFlash } from "@/lib/curtainFlash";
@@ -79,6 +80,7 @@ import { EJE_PANT } from "@/components/EjeOverlay"; // Z55
 import { ENTRADA_POSE } from "@/components/EntradaTelon"; // Z59
 import { ENTRADA } from "@/lib/entradaTelon"; // Z59
 import { FLUIDO } from "@/lib/fluidoBloques"; // Z63
+import { PASTO } from "@/lib/pasto"; // Z64
 const FLUIDO_DEFAULTS = { MEZCLA_AZUL: DBG_FLUIDO.MEZCLA_AZUL, MEZCLA_NARANJA: DBG_FLUIDO.MEZCLA_NARANJA, WARP: DBG_FLUIDO.WARP, VEL_BASE: DBG_FLUIDO.VEL_BASE, PULSO_LUZ: DBG_FLUIDO.PULSO_LUZ };   // Z63: para "Volver a defaults"
 import { FLOR } from "@/lib/prismaFlor"; // Z54
 import { duracionTemaViz, idTemaViz } from "@/lib/vizAudio"; // Z54
@@ -347,6 +349,11 @@ export default function DebugMenu() {
   const [diaLive, setDiaLive] = useState("");
   const [ejeLive, setEjeLive] = useState("");   // Z50: indicador del eje del sol (OVERLAY_EJE)
   const [fluLive, setFluLive] = useState({ a: 0, n: 0, ba: 0, bn: 0 });   // Z63: energía de cada bloque
+  const [pastoLive, setPastoLive] = useState("");   // Z64: progreso de cada cuarto
+  useEffect(() => {
+    const id = setInterval(() => setPastoLive(PASTO.p.map((p, i) => `${i + 1}: ${p.toFixed(2)}${PASTO.completo[i] ? " ✓" : PASTO.dentro[i] ? " bajo la luz" : ""}`).join(" · ")), 200);
+    return () => clearInterval(id);
+  }, []);
   useEffect(() => {
     const id = setInterval(() => setFluLive({ a: FLUIDO.eA, n: FLUIDO.eN, ba: FLUIDO.bandaA, bn: FLUIDO.bandaN }), 150);
     return () => clearInterval(id);
@@ -1661,6 +1668,43 @@ export default function DebugMenu() {
               tocarDia();
             }}>Probar flor</button>
             <button style={INPUT} onClick={() => { DBG_DIA.VELOCIDAD = 1; tocarDia(); }}>velocidad 1</button>
+          </div>
+          {/* Z64: pasto bajo las luces */}
+          <span style={LABEL}>Pasto Z64 <span style={NOTE}>(bajo las 4 luces · live)</span></span>
+          <div style={ROW}><span style={NOTE}>p {pastoLive}</span></div>
+          {(["ACTIVO", "MONOLITOS_ACTIVO", "OVERLAY"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k}</span>
+              <button style={INPUT} onClick={() => { DBG_PASTO[k] = !DBG_PASTO[k]; tocarDia(); }}>{DBG_PASTO[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["MARGEN_M", 0, 8, 0.1, "m"], ["RADIO_LUZ_M", 0.3, 4, 0.05, "m"], ["CRECE_S", 1, 60, 0.5, "s"], ["DECAE_S", 1, 60, 0.5, "s"],
+            ["IRREGULARIDAD", 0, 1, 0.01, ""], ["ESCALA_MANCHA_M", 0.2, 6, 0.05, "m"], ["FRENTE_ANCHO", 0.02, 0.6, 0.01, ""], ["CAPAS", 8, 40, 1, ""],
+            ["ALTURA_M", 0.05, 1.2, 0.01, "m"], ["DENSIDAD", 20, 300, 1, "texels/m"], ["VIENTO_AMP", 0, 3, 0.05, ""], ["VIENTO_VEL", 0, 2, 0.01, ""],
+            ["DARKNESS", 0, 1, 0.01, ""], ["PUNTAS_TINTE", 0, 1, 0.01, ""], ["BRILLO", 0, 3, 0.05, ""], ["TINTE_LUZ", 0, 1, 0.01, ""],
+            ["CAIDA_LUZ_M", 0.5, 30, 0.5, "m"], ["DIST_MAX_M", 5, 80, 1, "m"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{DBG_PASTO[k].toFixed(st < 0.1 ? 2 : 1)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_PASTO[k]}
+                onChange={e => { DBG_PASTO[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            {[0, 1, 2, 3].map(i => (
+              <button key={i} style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:pasto-crecer", { detail: { cuarto: i } }))}>Crecer cuarto {i + 1}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:pasto-completar"))}>Completar todo</button>
+            <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:pasto-reiniciar"))}>Reiniciar pasto</button>
+          </div>
+          <div style={ROW}>
+            <span>Simular presencia</span>
+            {[-1, 0, 1, 2, 3].map(i => (
+              <button key={i} style={{ ...INPUT, opacity: DBG_PASTO.SIMULAR === i ? 1 : 0.45 }} onClick={() => { DBG_PASTO.SIMULAR = i; tocarDia(); }}>{i < 0 ? "no" : `luz ${i + 1}`}</button>
+            ))}
           </div>
           {/* Z61: fluir de color de los bloques de la composición */}
           <span style={LABEL}>Fluir de color Z61 <span style={NOTE}>(azul = cordilleras / MONTAÑAS · naranja = olas cálidas / LÍNEAS · live)</span></span>

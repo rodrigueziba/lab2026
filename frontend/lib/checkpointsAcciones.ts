@@ -28,6 +28,7 @@ import {
   resetDawn, resetDomeDawnState,
 } from "@/lib/alightStore";
 import { resetHaz } from "@/lib/haz";
+import { PASTO, reiniciarPasto } from "@/lib/pasto"; // Z64
 import { stopVizAudio, prepareVizAudio, duracionTemaViz, idTemaViz } from "@/lib/vizAudio";
 import { togglePlayPause } from "@/lib/audioEngine";
 import { resetLinterna } from "@/lib/linternaPaneles";
@@ -100,6 +101,7 @@ function limpiezaBase(): void {
   PANELES_SILLAS.alpha = 0;
   resetVizActivated();
   resetHaz();
+  reiniciarPasto(PASTO);   // Z64: todo checkpoint arranca sin pasto (ninguno lo restaura todavía)
   // uniforms de módulo del prisma: Prism no los actualiza hasta volver a activarse (arcoíris en el domo)
   PRISM_RAINBOW_UNIFORM.value = 0;
   PRISM_POS_UNIFORM.value.set(0, 22, 0);

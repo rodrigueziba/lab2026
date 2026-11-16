@@ -940,6 +940,34 @@ export const DBG_FLUIDO = {
   PALETA_NARANJA:  ["#C8402A", "#F0742A", "#F4A23A", "#F4CE4A", "#F3E6C8"] as string[],   // naranja rojizo, naranja, ámbar, amarillo, crema — live
 };
 
+// ── Z64: pasto que crece bajo las 4 luces del escenario (lib/pasto.ts, components/Pasto.tsx). Técnica de capas
+// ("shells"), textura de briznas y viento adaptadas del pasto de un Shadertoy (autor y URL pendientes; CC BY-NC-SA 3.0
+// asumida; ver CREDITOS.md). ──
+export const DBG_PASTO = {
+  ACTIVO:           true,   // false = sin pasto — live
+  MONOLITOS_ACTIVO: false,  // false = sin monolitos en esta etapa (vuelven cuando el usuario decida; gancho alight:pasto-cuarto) — live
+  MARGEN_M:         2.0,    // el área = rectángulo de las 4 luces + este margen; cuartos = celdas de Voronoi — live
+  RADIO_LUZ_M:      1.2,    // "bajo la luz" (histéresis +0,3 m al salir) — live
+  CRECE_S:          14,     // segundos bajo la luz para llenar el cuarto — live
+  DECAE_S:          7,      // segundos fuera de la luz para que se retire del todo — live
+  IRREGULARIDAD:    0.6,    // 0 = círculo desde la luz · 1 = solo manchones — live
+  ESCALA_MANCHA_M:  1.2,    // tamaño de los manchones (m) — live
+  FRENTE_ANCHO:     0.25,   // franja del frente donde las briznas crecen desde el suelo (en unidades de p) — live
+  CAPAS:            20,     // capas apiladas (8…40) — live
+  ALTURA_M:         0.35,   // altura máxima de las briznas — live
+  DENSIDAD:         110,    // texels de la textura de briznas por metro (más = briznas más finas y juntas) — live
+  VIENTO_AMP:       0.65,   // desplazamiento de la punta (texels × 3) — live
+  VIENTO_VEL:       0.35,   // velocidad del viento — live
+  DARKNESS:         0.15,   // oscurecimiento abajo (falsa oclusión, como el original) — live
+  PUNTAS_TINTE:     0.8,    // punta rojiza (× vec3(16; 1,5; 2,8) del original) — live
+  BRILLO:           1.0,    // — live
+  TINTE_LUZ:        0,      // 0 = verdes originales · 1 = teñido del color de la luz de su cuarto — live
+  CAIDA_LUZ_M:      6,      // el brillo cae con la distancia a la luz de su cuarto (m) — live
+  DIST_MAX_M:       28,     // desvanecimiento con la distancia a la cámara (m) — live
+  OVERLAY:          false,  // celdas de cada cuarto, radios de las luces y p en el menú — live
+  SIMULAR:          -1,     // −1 o 0…3: como si el usuario estuviera bajo esa luz (pruebas) — live
+};
+
 // ── Z59: entrada fija después de cruzar el telón (lib/entradaTelon.ts, components/EntradaTelon.tsx) ──
 export const DBG_ENTRADA = {
   ACTIVO:                 true,   // false = como antes de Z59 (el usuario queda donde cruzó el telón) — live
