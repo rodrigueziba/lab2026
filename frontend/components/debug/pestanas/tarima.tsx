@@ -319,12 +319,19 @@ export function SecPlayTarimaZ79() {
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); playTarima(); toca(); }}>Play</button>
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); pausaTarima(); toca(); }}>Pausa</button>
           </div>
-          {([["AUTOPLAY", "arranque automático anterior · vale al aparecer los atriles"], ["MOSTRAR_SLOTS", "marcadores de los slots"], ["APARECER_TRAS_PLAY", "los atriles de instrumentos saldrán al apretar play (pendiente)"]] as const).map(([k, nota]) => (
+          {([["AUTOPLAY", "arranque automático anterior · vale al aparecer los atriles"], ["MOSTRAR_SLOTS", "marcadores de los slots"], ["APARECER_TRAS_PLAY", "los atriles de instrumentos salen al apretar play"],
+            ["CLICK_UNICO", "Z81: botones una vez por pulsación (off = doble disparo anterior)"], ["SLOTS_PEDESTAL", "Z81: base bajo los atriles de instrumentos"]] as const).map(([k, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{nota}</span></span>
               <button style={INPUT} onClick={() => { P[k] = !P[k]; toca(); }}>{P[k] ? "ON" : "off"}</button>
             </div>
           ))}
+          <div style={ROW}>
+            <span>SLOTS_PEDESTAL_ALTURA_M <span style={NOTE}>{P.SLOTS_PEDESTAL_ALTURA_M === "auto" ? "auto = alto de la tarima" : `${Number(P.SLOTS_PEDESTAL_ALTURA_M).toFixed(3)} m`}</span></span>
+            <button style={{ ...INPUT, opacity: P.SLOTS_PEDESTAL_ALTURA_M === "auto" ? 1 : 0.5 }} onClick={() => { P.SLOTS_PEDESTAL_ALTURA_M = P.SLOTS_PEDESTAL_ALTURA_M === "auto" ? 0.267 : "auto"; toca(); }}>auto</button>
+            {P.SLOTS_PEDESTAL_ALTURA_M !== "auto" && <input type="range" min={0} max={1} step={0.005} style={{ flex: 1 }} value={Number(P.SLOTS_PEDESTAL_ALTURA_M)}
+              onChange={ev => { P.SLOTS_PEDESTAL_ALTURA_M = parseFloat(ev.target.value); toca(); }} />}
+          </div>
           {([
             ["BOTON_ESCALA", 0.4, 2.5, 0.05, "× (1 = 16 × 4,5 cm)"], ["BOTON_U", -0.6, 0.6, 0.005, "m (derecha)"], ["BOTON_V", -0.3, 0.3, 0.005, "m (0 = franja central)"],
             ["BOTON_ELEV", 0.002, 0.05, 0.001, "m (alto de la base)"],

@@ -79,3 +79,17 @@ export function slotsInstrumentos(c: CfgSlots, atrilX: number, tarimaMedia: numb
   }
   return out;
 }
+
+// ── Z81: pedestal de los atriles de instrumentos ──
+export interface CfgPedestal { SLOTS_PEDESTAL: boolean; SLOTS_PEDESTAL_ALTURA_M: string | number }
+/**
+ * Altura (m) de la base bajo un atril de instrumentos para que quede a la misma altura de uso que el atril de sonido
+ * (que está sobre la tarima): "auto" = tarimaH − slotY (0 si el slot ya está sobre la tarima). La cámara del jugador
+ * va siempre a la misma altura, esté o no sobre la tarima, así que un atril en el piso queda tarimaH más bajo a la vista.
+ */
+export function alturaPedestal(c: CfgPedestal, slotY: number, tarimaH: number): number {
+  if (!c.SLOTS_PEDESTAL) return 0;
+  const v = c.SLOTS_PEDESTAL_ALTURA_M;
+  if (v === "auto" || typeof v !== "number" || !Number.isFinite(v)) return Math.max(0, (Number.isFinite(tarimaH) ? tarimaH : 0) - (Number.isFinite(slotY) ? slotY : 0));
+  return Math.max(0, Math.min(1.5, v));
+}

@@ -15,7 +15,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_RITMOS, DBG_PLAY, DEBUG_ENABLED, DBG_RENDIMIENTO } from "@/lib/debugConfig";
 import { INTERACT_STATE } from "@/lib/alightStore";
-import { PLAY_TARIMA, slotsInstrumentos, type Slot } from "@/lib/playTarima";
+import { PLAY_TARIMA, slotsInstrumentos, alturaPedestal, type Slot } from "@/lib/playTarima";
 import {
   ATRIL_RITMOS, puntoACelda, centroCelda, pistasValidas, posicionActual, textoPosicion, pasosDesde, escalaSalto,
   NOMBRE_VOZ, type Celda, type GeoDisco, type Posicion, type VozId,
@@ -120,6 +120,7 @@ export default function CajaRitmos({ atrilX, tarimaMedia, tarimaH }: { atrilX: n
   const playRef = useRef<THREE.Mesh>(null);
   const ledPlayRef = useRef<THREE.MeshStandardMaterial>(null);
   const spotRef = useRef<THREE.SpotLight>(null);
+  const pedestalRef = useRef<THREE.Group>(null);   // Z81
 
   const res = useMemo(() => {
     const geoCelda = new THREE.BoxGeometry(1, 1, 1);
@@ -209,7 +210,11 @@ export default function CajaRitmos({ atrilX, tarimaMedia, tarimaH }: { atrilX: n
     if (!CR.aparecio || !slot) { if (spotRef.current) spotRef.current.intensity = 0; return; }
     CR.prog = Math.min(1, (Date.now() - CR.t0) / APARICION_MS);
     const ease = 1 - Math.pow(1 - CR.prog, 3);
-    raiz.position.set(slot.x, slot.y + THREE.MathUtils.lerp(-1.6, 0, ease), slot.z);
+    // Z81: pedestal bajo el atril (sale del piso con él): el atril sube su altura para quedar como el de sonido
+    const ped = alturaPedestal(DBG_PLAY, slot.y, tarimaH);
+    const pg = pedestalRef.current;
+    if (pg) { pg.visible = ped > 0.001; pg.scale.set(1, Math.max(0.001, ped), 1); }
+    raiz.position.set(slot.x, slot.y + ped + THREE.MathUtils.lerp(-1.6 - ped, 0, ease), slot.z);
     raiz.rotation.set(0, slot.yaw, 0);
     if (spotRef.current) spotRef.current.intensity = Math.max(0, DBG_RITMOS.LUZ) * ease;   // luz tenue propia (la de los atriles satura de cerca)
 
@@ -352,6 +357,21 @@ export default function CajaRitmos({ atrilX, tarimaMedia, tarimaH }: { atrilX: n
         angle={0.5} penumbra={0.85} distance={2.6} castShadow={false} />
       <object3D ref={blancoRef} position={[0, ALTO, 0]} />
       <group ref={cuerpoRef} visible={false}>
+      {/* Z81: pedestal (alto 1 escalado en y a la altura calculada; su techo coincide con el piso del atril) */}
+      <group ref={pedestalRef} visible={false}>
+        <mesh position={[0, -0.5, 0]}>
+          <boxGeometry args={[CAJA_W + 0.1, 1, CAJA_D + 0.1]} />
+          <meshStandardMaterial color="#3A3B3C" roughness={0.9} metalness={0.05} />
+        </mesh>
+        <mesh position={[0, -0.5, (CAJA_D + 0.1) / 2 + 0.001]} scale={[1, 0.28, 1]}>
+          <planeGeometry args={[CAJA_W + 0.1, 1]} />
+          <meshBasicMaterial map={res.texFranja} />
+        </mesh>
+        <mesh position={[0, -0.97, 0]}>
+          <boxGeometry args={[CAJA_W + 0.14, 0.06, CAJA_D + 0.14]} />
+          <meshStandardMaterial color="#C0552F" roughness={0.85} metalness={0} />
+        </mesh>
+      </group>
       {/* gabinete beige con frente de marca y franjas */}
       <mesh position={[0, ALTO / 2, 0]}>
         <boxGeometry args={[CAJA_W, ALTO, CAJA_D]} />

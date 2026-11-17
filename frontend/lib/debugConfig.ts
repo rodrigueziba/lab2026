@@ -1471,6 +1471,9 @@ export const DBG_PLAY = {
   SLOTS_DIST_M:        2.0,     // distancia detrás del atril de sonido (m) — live (Z80: 1,4 → 2,0: con 1,4 quedaba un pasillo de 0,5 m entre atriles)
   SLOTS_SEP_M:         1.7,     // separación entre slots (m) — live
   SLOTS_ARCO_GRADOS:   0,       // 0 = en línea; > 0 = en arco alrededor del atril de sonido — live
+  SLOTS_PEDESTAL:      true,    // Z81: base bajo los atriles de instrumentos (los slots caen en el piso, fuera de la tarima) — live
+  SLOTS_PEDESTAL_ALTURA_M: "auto" as string | number,   // Z81: "auto" = altura de la tarima − altura del slot (0,267 m en el piso) — live
+  CLICK_UNICO:         true,    // Z81: los botones de los atriles actúan una vez por pulsación (false = doble disparo anterior) — live
 };
 
 // ── Z80: caja de ritmos circular (lib/ritmos.ts, lib/ritmosMotor.ts, lib/audio/ritmosVoces.ts, components/CajaRitmos.tsx) ──

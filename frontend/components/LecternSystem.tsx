@@ -26,6 +26,7 @@ import { TARIMA_W } from "./Tarima";                                            
 import CajaRitmos from "./CajaRitmos";                                                       // Z80
 import SistemaPerf from "./SistemaPerf";                                                     // Z80: benchmark
 import { ATRIL_RITMOS } from "@/lib/ritmos";                                                  // Z80: tecla E
+import { activaAccion } from "@/lib/atrilesClick";                                             // Z81
 import { DBG_DOME_MAT } from "./FaceDome";
 import { registerLecternMats, lecternPalette } from "@/lib/retro/lecternMaterials";
 import { createCrtScreenMaterial, setScreenMap, RETRO_CRT } from "@/lib/retro/crtScreen";
@@ -768,7 +769,8 @@ function ctrlVal(id: string, def: number): number { return ctrlState[id] ?? def;
 export function sincronizarCtrlExterno(id: string, v: number): void { ctrlState[id] = v; }
 function setCtrl(id: string, v: number, def: CtrlDef) {
   ctrlState[id] = Math.max(def.min, Math.min(def.max, v));
-  def.onActivate(ctrlState[id]);
+  // Z81: en los botones solo la subida (apretar) ejecuta la acción; la vuelta a 0 es solo visual (lib/atrilesClick.ts)
+  if (activaAccion(def.type, ctrlState[id], DBG_PLAY.CLICK_UNICO)) def.onActivate(ctrlState[id]);
   // K3: update value HUD for knobs/sliders
   if (def.type === "knob" || def.type === "slider") {
     const val = ctrlState[id];

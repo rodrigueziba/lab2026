@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_PLAY, DEBUG_ENABLED } from "@/lib/debugConfig";
-import { PLAY_TARIMA, slotsInstrumentos, type Slot } from "@/lib/playTarima";
+import { PLAY_TARIMA, slotsInstrumentos, alturaPedestal, type Slot } from "@/lib/playTarima";
 import { alternarPlay, playTarima, pausaTarima, estadoContextoTarima } from "@/lib/playTarimaAcciones";
 import { createStripeBandTex } from "@/lib/retro/decals";
 import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
@@ -181,10 +181,13 @@ export function SlotsAtriles({ atrilX, tarimaMedia, tarimaH, anchoM, profM }: {
       const sl = s[i];
       o.visible = !!sl;
       if (!sl) continue;
-      o.position.set(sl.x, sl.y, sl.z);
+      const ped = alturaPedestal(DBG_PLAY, sl.y, tarimaH);   // Z81: el atril queda sobre su pedestal
+      o.position.set(sl.x, sl.y + ped, sl.z);
       o.rotation.set(0, sl.yaw, 0);
       const caja = o.children[0] as THREE.Mesh;
       caja.material = sl.sobreTarima ? r.mat : r.matFuera;
+      const pd = o.children[2] as THREE.Mesh;
+      pd.visible = ped > 0.001; pd.scale.set(1.08, Math.max(0.001, ped), 1.08); pd.position.y = -ped / 2;
     }
   });
 
@@ -195,6 +198,8 @@ export function SlotsAtriles({ atrilX, tarimaMedia, tarimaH, anchoM, profM }: {
           <mesh geometry={r.geoCaja} material={r.mat} position={[0, 0.5, 0]} renderOrder={11} />
           {/* flecha hacia el frente del atril (local +Z) */}
           <mesh geometry={r.geoFlecha} material={r.matFlecha} position={[0, 1.15, profM / 2 + 0.1]} rotation={[Math.PI / 2, 0, 0]} />
+          {/* Z81: pedestal (caja de alto 1 escalada) */}
+          <mesh geometry={r.geoCaja} material={r.matFuera} visible={false} />
         </group>
       ))}
     </group>
