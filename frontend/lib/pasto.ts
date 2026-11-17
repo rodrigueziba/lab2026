@@ -6,7 +6,8 @@
 // Voronoi de su luz (los puntos más cerca de esa luz que de las otras), recortada al rectángulo.
 // Progreso p (0…1) por cuarto:
 //   bajo la luz (distancia < RADIO_LUZ_M para entrar, < RADIO_LUZ_M + 0,3 para seguir adentro: histéresis)
-//   y la luz encendida → p sube 1/CRECE_S por segundo; si no y p < 1 → baja 1/DECAE_S; en 1 queda COMPLETO.
+//   → p sube 1/CRECE_S por segundo; si no y p < 1 → baja 1/DECAE_S; en 1 queda COMPLETO.
+//   Z74: ya no exige la luz encendida (REQUIERE_LUZ_ENCENDIDA = true vuelve a Z64).
 // Forma: cada punto del suelo tiene un umbral u (umbralPasto) y se ve cuando p > u; al decaer usa el MISMO umbral,
 // así se retira en el orden exactamente inverso. La réplica en GLSL está en components/Pasto.tsx.
 // Eventos (para el gancho alight:pasto-cuarto): ev[i] = 0 nada · 1 "crece" · 2 "decae" · 3 "completo" (este frame).
@@ -14,15 +15,19 @@
 export interface CfgPasto {
   ACTIVO: boolean; RADIO_LUZ_M: number; CRECE_S: number; DECAE_S: number;
   IRREGULARIDAD: number; ESCALA_MANCHA_M: number; FRENTE_ANCHO: number; SIMULAR: number;   // SIMULAR: −1 o 0…3
+  REQUIERE_LUZ_ENCENDIDA?: boolean;   // Z74: false (default) = basta con estar bajo la luz; true = como Z64
 }
 export type EvPasto = 0 | 1 | 2 | 3;
 export interface EstadoPasto {
   p: number[]; dentro: boolean[]; completo: boolean[]; tendencia: number[];   // tendencia: 1 crece, −1 decae, 0 quieto
   ev: EvPasto[];
   todoEmitido: boolean;   // Z65: alight:pasto-completo ya salió (una vez hasta el próximo reinicio)
+  // Z74: extensión hasta el borde del círculo del piso (lib/pastoExt.ts). ext = progreso 0…1
+  ext: number; extFase: "espera" | "arranque" | "crece" | "completo"; extT: number;
 }
 export function crearEstadoPasto(): EstadoPasto {
-  return { p: [0, 0, 0, 0], dentro: [false, false, false, false], completo: [false, false, false, false], tendencia: [0, 0, 0, 0], ev: [0, 0, 0, 0], todoEmitido: false };
+  return { p: [0, 0, 0, 0], dentro: [false, false, false, false], completo: [false, false, false, false], tendencia: [0, 0, 0, 0], ev: [0, 0, 0, 0], todoEmitido: false,
+    ext: 0, extFase: "espera", extT: 0 };
 }
 /** Estado compartido (lo avanza Pasto.tsx; lo lee el menú debug y cualquier sistema que quiera el progreso). */
 export const PASTO = crearEstadoPasto();
@@ -37,6 +42,7 @@ const sat = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
 export function reiniciarPasto(s: EstadoPasto): void {
   for (let i = 0; i < 4; i++) { s.p[i] = 0; s.dentro[i] = false; s.completo[i] = false; s.tendencia[i] = 0; s.ev[i] = 0; }
   s.todoEmitido = false;
+  s.ext = 0; s.extFase = "espera"; s.extT = 0;   // Z74: la extensión vuelve a 0 con el pasto (checkpoints, botón)
 }
 /** Z65: true UNA sola vez cuando los 4 cuartos quedan completos (para alight:pasto-completo); se rearma al reiniciar. */
 export function chequearTodoCompleto(s: EstadoPasto): boolean {
@@ -65,7 +71,8 @@ export function avanzarPasto(s: EstadoPasto, c: CfgPasto, dt: number, ux: number
     const dist = Math.hypot(fin(ux) - fin(lucesX[i]), fin(uz) - fin(lucesZ[i]));
     s.dentro[i] = s.dentro[i] ? dist < R + HISTERESIS_M : dist < R;
     if (!c.ACTIVO || s.completo[i]) { s.tendencia[i] = 0; continue; }
-    const presente = sim === i || (s.dentro[i] && !!on[i]);
+    // Z74: la presencia alcanza (on[i] solo cuenta con REQUIERE_LUZ_ENCENDIDA, como en Z64)
+    const presente = sim === i || (s.dentro[i] && (!c.REQUIERE_LUZ_ENCENDIDA || !!on[i]));
     let tend = 0;
     if (presente) { s.p[i] = sat(s.p[i] + vC * d); tend = d > 0 ? 1 : s.tendencia[i]; }
     else if (s.p[i] > 0) { s.p[i] = sat(s.p[i] - vD * d); tend = d > 0 ? -1 : s.tendencia[i]; }

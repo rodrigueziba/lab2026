@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { cuartoDe, rectPasto, distMaxCuarto, umbralPasto, manchaPasto } from '../lib/pasto.ts';
 import { armarChunks, umbralMinChunk, chunkConPasto, distOjoChunk, capasObjetivo, capasLod, ordenCapas } from '../lib/pastoChunks.ts';
 const src = fs.readFileSync(new URL('../lib/debugConfig.ts', import.meta.url), 'utf8');
-const obj = n => Function(`return (${new RegExp(`export const ${n} = (\\{[\\s\\S]*?\\n\\});`).exec(src)[1].replace(/ as string/g, '').replace(/ as Record<string, boolean>/g, '')});`)();
+const obj = n => Function(`return (${new RegExp(`export const ${n} = (\\{[\\s\\S]*?\\n\\});`).exec(src)[1].replace(/ as string \| number/g, '').replace(/ as string/g, '').replace(/ as Record<string, boolean>/g, '')});`)();
 const C = obj('DBG_PASTO'), R = obj('DBG_RENDIMIENTO');
 let ok = 0, fallas = 0;
 const check = (c, m) => { if (c) { ok++; console.log('  ✓ ' + m); } else { fallas++; console.log('  ✗ ' + m); } };

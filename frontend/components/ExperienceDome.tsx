@@ -12,6 +12,7 @@ import HazSystem from "./HazSystem";
 import HazRings from "./HazRings";
 import LucesHaz from "./LucesHaz"; // Z42
 import Pasto, { MonolitosPasto } from "./Pasto"; // Z64
+import PastoExtension from "./PastoExtension"; // Z74
 import SistemaPerf from "./SistemaPerf"; // Z66
 import BaseFlor from "./BaseFlor"; // Z67
 import { aplicarEscalaDomo, liberarEscalaDomo } from "@/lib/domoEscala"; // Z72
@@ -956,6 +957,8 @@ export default function ExperienceDome() {
       {/* Z64: el pasto crece bajo cada luz · Z65: los monolitos aparecen al completar los 4 cuartos (DBG_PASTO.MONOLITOS_MODO) */}
       {vizActive && <SistemaPerf id="monolitos"><MonolitosPasto /></SistemaPerf>}
       {vizActive && <Pasto />}
+      {/* Z74: extensión del pasto hasta el borde del círculo del piso (tras los monolitos) */}
+      {vizActive && <PastoExtension />}
 
       {/* Dome shell — upper hemisphere, BackSide.
           thetaLength=0.52π puts the open rim at y≈-2 (below floor level) so

@@ -972,6 +972,19 @@ export const DBG_PASTO = {
   DIST_MAX_M:       28,     // desvanecimiento con la distancia a la cámara (m) — live
   OVERLAY:          false,  // celdas de cada cuarto, radios de las luces y p en el menú — live
   SIMULAR:          -1,     // −1 o 0…3: como si el usuario estuviera bajo esa luz (pruebas) — live
+  // Z74: el pasto crece siempre que el usuario esté bajo la luz. Antes (Z64) además exigía la luz encendida, y como entrar
+  // a la luz la enciende o la apaga (interruptor de las bandas, R3), crecía una vez sí y otra no
+  REQUIERE_LUZ_ENCENDIDA: false,   // true = como antes (presencia Y luz encendida) — live
+  // Z74: extensión hasta el borde del círculo del piso (lib/pastoExt.ts, components/PastoExtension.tsx)
+  EXT_ACTIVO:       true,   // false = no hay extensión — live
+  EXT_MODO:         "auto" as string,   // "auto" = arranca sola tras los monolitos · "manual" = solo con el botón — live
+  EXT_RADIO_M:      "auto" as string | number,   // "auto" = radio del disco del piso (28 m) · o un número — live
+  EXT_ARRANQUE_S:   2,      // s después de terminar la aparición de los monolitos — live
+  EXT_DURACION_S:   25,     // s que tarda el frente en llegar al borde — live
+  EXT_IRREGULARIDAD: 0.6,   // 0 = frente parejo · 1 = solo manchones — live
+  EXT_BRILLO_MIN:   0.45,   // brillo ambiente de la extensión (× luz del día), lejos de las luces — live
+  EXT_MAX_BLOQUES:  60,     // tope de bloques con capas dibujados a la vez (los más cercanos) — live
+  EXT_OVERLAY:      false,  // radio, bloques activos y progreso (debug) — live
 };
 
 // ── Z66: rendimiento (lib/rendimiento.ts, components/RendimientoHost.tsx, components/RendimientoPanel.tsx,

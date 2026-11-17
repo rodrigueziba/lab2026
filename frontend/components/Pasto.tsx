@@ -42,7 +42,7 @@ import { sillaEn, N_SILLAS, TARIMA_CENTRO } from "@/lib/layoutSala";
 import { TARIMA_W, TARIMA_D } from "./Tarima";
 import Monoliths, { MONOLITO_ANCHO_M } from "./Monoliths";
 
-const MAX_CAPAS = 40;
+export const MAX_CAPAS = 40;
 const TEX = 256;
 const COLOR_KEYS = ["hazColor0", "hazColor1", "hazColor2", "hazColor3"] as const;
 
@@ -118,7 +118,7 @@ export function crearTexturaBriznas(): TexturasBriznas {
 }
 
 // uniforms compartidos por los 4 materiales (mismos objetos; cada material tiene su uCuarto)
-const COMUN = {
+export const COMUN = {
   uP:       { value: new THREE.Vector4() },
   uLuzX:    { value: new THREE.Vector4() },
   uLuzZ:    { value: new THREE.Vector4() },
@@ -166,7 +166,7 @@ export const RUIDO_GLSL = /* glsl */`
   }
 `;
 
-const VERT = /* glsl */`
+export const VERT_PASTO = /* glsl */`
   attribute float aH;          // altura relativa de la capa (0…1)
   uniform float uAlto;
   uniform float uVientoT;
@@ -189,7 +189,11 @@ const VERT = /* glsl */`
   }
 `;
 
-const FRAG = /* glsl */`
+// Z74: el mismo shader dibuja la extensión (define EXT, components/PastoExtension.tsx): cambia solo la región (fuera del
+// rectángulo y dentro del círculo, sin la base de los monolitos), el progreso (uPExt), la distancia normalizada (dnExt de
+// lib/pastoExt.ts) y el brillo (ambiente EXT_BRILLO_MIN × luz del día, que entra de a poco desde el borde para no dejar
+// costura); sin TINTE_LUZ. Textura, viento, capas, color y desvanecimiento son los mismos. Sin EXT, idéntico a Z66.
+export const FRAG_PASTO = /* glsl */`
   uniform sampler2D uBriznas;
   uniform vec4  uP, uLuzX, uLuzZ, uDmax, uRect, uSillas;
   uniform vec3  uCol[4];
@@ -197,6 +201,10 @@ const FRAG = /* glsl */`
   uniform float uCuarto, uCapas, uIrr, uMancha, uFrente, uDens, uVientoA, uVientoT, uDark, uPuntas, uBrillo, uTinte,
                 uCaida, uDistMax, uLuzDia, uOverlay, uRadio, uLejano, uLejanoBrillo;
   uniform vec3  uColLejano;
+  #ifdef EXT
+  uniform float uPExt, uExtR, uExtBrillo, uExtOverlay, uMonoR;
+  uniform vec4  uMono;          // xL, z, xR, z de los monolitos (recorte)
+  #endif
   varying vec2  vXZ;
   varying float vH;
   varying float vDist;
@@ -208,6 +216,23 @@ const FRAG = /* glsl */`
     return uBrillo * (0.35 + 0.65 * uLuzDia) * (0.25 + 0.75 * exp(-max(dist - uRadio, 0.0) / max(uCaida, 0.1)));
   }
   void main() {
+  #ifdef EXT
+    // Z74: extensión. 1) fuera del rectángulo, dentro del círculo, sin la base de los monolitos
+    float rr = length(vXZ);
+    if (rr > uExtR) discard;
+    vec2 qR = max(max(uRect.xy - vXZ, vXZ - uRect.zw), vec2(0.0));
+    float dR = length(qR);
+    if (dR <= 0.0) discard;                                  // adentro del rectángulo: lo dibujan los cuartos
+    if (distance(vXZ, uMono.xy) < uMonoR || distance(vXZ, uMono.zw) < uMonoR) discard;
+    vec4 dx = vec4(vXZ.x) - uLuzX, dz = vec4(vXZ.y) - uLuzZ;
+    vec4 d2 = dx * dx + dz * dz;
+    float dist = sqrt(min(min(d2.x, d2.y), min(d2.z, d2.w)));   // a la luz más cercana (solo para el brillo)
+    if (uExtOverlay > 0.5 && vH < 0.001) {                   // debug: borde del círculo y del rectángulo
+      if (abs(rr - uExtR) < 0.12 || dR < 0.08) { gl_FragColor = vec4(1.0, 0.85, 0.2, 1.0); return; }
+    }
+    float p = uPExt;
+    float dn = clamp(dR / max(dR + max(uExtR - rr, 0.0), 1e-3), 0.0, 1.0);
+  #else
   #ifdef LEJANO
     if (vDist < uDistMax * 0.55) discard;                 // Z66: de cerca lo tapa el pasto (descarte barato primero)
   #endif
@@ -233,6 +258,7 @@ const FRAG = /* glsl */`
     // 3) umbral (descarte temprano, antes de leer la textura): visible cuando p > u
     float p = elegir(uP, uCuarto);
     float dn = clamp(dist / max(elegir(uDmax, uCuarto), 0.01), 0.0, 1.0);
+  #endif
     float irr = clamp(uIrr, 0.0, 1.0) * min(1.0, dn / 0.25);
     float kF = 1.0 - clamp(uFrente, 0.0, 1.0);
     float g;
@@ -253,8 +279,16 @@ const FRAG = /* glsl */`
   #endif
     if (g <= 0.0) discard;
     float luz = luzPasto(dist);
+  #ifdef EXT
+    // Z74: brillo ambiente lejos de las luces; entra en 3 m desde el borde del rectángulo (ahí vale lo mismo que el
+    // pasto de los cuartos: sin costura)
+    luz = max(luz, uBrillo * uExtBrillo * uLuzDia * smoothstep(0.0, 3.0, dR));
+  #endif
     vec3 lejanoCol = pow(uColLejano, vec3(2.2)) * luz * uLejanoBrillo;
   #ifdef LEJANO
+  #ifdef EXT
+    lejanoCol *= 0.8 + 0.4 * ruidoP(vXZ * 0.9);              // Z74: ruido barato para que el suelo lejano no se vea plano
+  #endif
     gl_FragColor = vec4(min(lejanoCol, vec3(0.9)), 1.0);   // Z66: suelo lejano: sin capas ni textura
     return;
   #endif
@@ -283,7 +317,9 @@ const FRAG = /* glsl */`
       col = s.rgb * mix(hh, 1.0, uDark);                   // oscurece abajo (falsa oclusión)
     }
     // 5) luz y desvanecimiento con la distancia a la cámara (Z66: hacia el color lejano en vez de a negro)
-    col = mix(col, col * uCol[int(uCuarto)] * 1.6, clamp(uTinte, 0.0, 1.0));
+  #ifndef EXT
+    col = mix(col, col * uCol[int(uCuarto)] * 1.6, clamp(uTinte, 0.0, 1.0));   // Z74: la extensión no se tiñe
+  #endif
     col = pow(col, vec3(2.2)) * luz;                       // sRGB → lineal (el compositor vuelve a sRGB al final)
     col = uLejano > 0.5 ? mix(lejanoCol, col, lejos) : col * lejos;
     gl_FragColor = vec4(min(col, vec3(0.9)), 1.0);
@@ -315,11 +351,12 @@ export function MonolitosPasto() {
 }
 
 // Z66: geometría subdividida (viento por vértice cada ~0,4 m): bloque ~4 m → 10 segmentos; rectángulo de Z64 → 64
-const SEG_CHUNK = 10, SEG_RECT = 64;
-const Y_PASTO = 0.006, Y_LEJANO = 0.0035;   // el suelo lejano queda debajo de la capa de suelo del pasto
+export const SEG_CHUNK = 10;
+const SEG_RECT = 64;
+export const Y_PASTO = 0.006, Y_LEJANO = 0.0035;   // el suelo lejano queda debajo de la capa de suelo del pasto
 const ALTO_MAX_ESFERA = 1.2;                // altura máxima de las briznas (tope del menú) para la bounding sphere
 
-function definesPasto(lejano: boolean): Record<string, string> {
+export function definesPasto(lejano: boolean): Record<string, string> {
   const R = DBG_RENDIMIENTO, d: Record<string, string> = {};
   if (R.PASTO_VIENTO_BARATO) d.VIENTO_VERTICE = "";
   if (R.PASTO_DESCARTE_TEMPRANO) d.DESCARTE_TEMPRANO = "";
@@ -342,7 +379,7 @@ function marcarCapas(aH: THREE.InstancedBufferAttribute, capas: number): void {
   aH.needsUpdate = true;
 }
 /** Bounding sphere en coordenadas locales de una malla escalada (w, 1, d): three la escala por el mayor eje. */
-function esferaBloque(m: THREE.InstancedMesh, w: number, d: number): void {
+export function esferaBloque(m: THREE.InstancedMesh, w: number, d: number): void {
   const R = Math.hypot(w / 2, d / 2, ALTO_MAX_ESFERA / 2), esc = Math.max(w, d, 1);
   if (!m.boundingSphere) m.boundingSphere = new THREE.Sphere();
   m.boundingSphere.center.set(0, ALTO_MAX_ESFERA / 2, 0);
@@ -375,7 +412,7 @@ export default function Pasto() {
     };
     const geo = plano(SEG_RECT), geoChunk = plano(SEG_CHUNK);
     const mk = (i: number, lejano: boolean) => new THREE.ShaderMaterial({
-      vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide, defines: definesPasto(lejano),
+      vertexShader: VERT_PASTO, fragmentShader: FRAG_PASTO, side: THREE.DoubleSide, defines: definesPasto(lejano),
       uniforms: { ...COMUN, uBriznas: { value: tex.conMip }, uCuarto: { value: i } },
     });
     const mats = [0, 1, 2, 3].map(i => mk(i, false));

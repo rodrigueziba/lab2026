@@ -5,6 +5,8 @@ import { DBG_SILLAS, DBG_PASTO } from "@/lib/debugConfig";
 import { MONO_PASTO } from "@/lib/monolitosPasto";
 import { LABEL, ROW, INPUT, NOTE, NumField, N5ProximityOverlay } from "../comun";
 import { useDbg } from "../contexto";
+import { PASTO } from "@/lib/pasto";   // Z74
+import { PASTO_EXT_RENDER } from "@/components/PastoExtension";   // Z74
 
 // sección: monolitos-n5-v1-v2-v3
 export function SecMonolitosN5V1V2V3() {
@@ -102,7 +104,7 @@ export function SecPastoZ64() {
           {/* Z64: pasto bajo las luces */}
           <span style={LABEL}>Pasto Z64 <span style={NOTE}>(bajo las 4 luces · live)</span></span>
           <div style={ROW}><span style={NOTE}>p {pastoLive}</span></div>
-          {(["ACTIVO", "MONOLITOS_ACTIVO", "OVERLAY"] as const).map(k => (
+          {(["ACTIVO", "MONOLITOS_ACTIVO", "OVERLAY", "REQUIERE_LUZ_ENCENDIDA"] as const).map(k => (
             <div key={k} style={ROW}>
               <span>{k}</span>
               <button style={INPUT} onClick={() => { DBG_PASTO[k] = !DBG_PASTO[k]; tocarDia(); }}>{DBG_PASTO[k] ? "ON" : "off"}</button>
@@ -144,6 +146,54 @@ export function SecPastoZ64() {
             {[-1, 0, 1, 2, 3].map(i => (
               <button key={i} style={{ ...INPUT, opacity: DBG_PASTO.SIMULAR === i ? 1 : 0.45 }} onClick={() => { DBG_PASTO.SIMULAR = i; tocarDia(); }}>{i < 0 ? "no" : `luz ${i + 1}`}</button>
             ))}
+          </div>
+    </>
+  );
+}
+
+// sección: pasto-extension-z74
+export function SecPastoExtensionZ74() {
+  const { tocarDia } = useDbg();
+  const E = PASTO_EXT_RENDER;
+  return (
+    <>
+          {/* Z74: extensión del pasto hasta el borde del círculo del piso (lib/pastoExt.ts, components/PastoExtension.tsx) */}
+          <span style={LABEL}>Extensión del pasto Z74 <span style={NOTE}>(hasta el borde del círculo · tras los monolitos · live)</span></span>
+          <div style={ROW}><span style={NOTE}>extensión {PASTO.ext.toFixed(2)} · {PASTO.extFase} · radio {E.radio.toFixed(1)} m · bloques {E.dibujados}/{E.elegibles}/{E.bloques} (dibujados/elegibles/total) · capas {E.instancias}{E.lejano ? " · suelo lejano" : ""}</span></div>
+          {(["EXT_ACTIVO", "EXT_OVERLAY"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{k === "EXT_ACTIVO" ? "off = sin extensión" : "radio, borde y bloques"}</span></span>
+              <button style={INPUT} onClick={() => { DBG_PASTO[k] = !DBG_PASTO[k]; tocarDia(); }}>{DBG_PASTO[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          <div style={ROW}>
+            <span>EXT_MODO <span style={NOTE}>auto = tras los monolitos · manual = solo con el botón</span></span>
+            {(["auto", "manual"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, width: "auto", padding: "0 4px", opacity: DBG_PASTO.EXT_MODO === m ? 1 : 0.45 }}
+                onClick={() => { DBG_PASTO.EXT_MODO = m; tocarDia(); }}>{m}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <span>EXT_RADIO_M <span style={NOTE}>{String(DBG_PASTO.EXT_RADIO_M)} (auto = disco del piso, 28 m)</span></span>
+            <button style={{ ...INPUT, width: "auto", padding: "0 4px", opacity: DBG_PASTO.EXT_RADIO_M === "auto" ? 1 : 0.45 }}
+              onClick={() => { DBG_PASTO.EXT_RADIO_M = "auto"; tocarDia(); }}>auto</button>
+            <input type="range" min={14} max={28} step={0.5} style={{ flex: 1 }} value={typeof DBG_PASTO.EXT_RADIO_M === "number" ? DBG_PASTO.EXT_RADIO_M : 28}
+              onChange={e => { DBG_PASTO.EXT_RADIO_M = parseFloat(e.target.value); tocarDia(); }} />
+          </div>
+          {([
+            ["EXT_ARRANQUE_S", 0, 20, 0.5, "s tras los monolitos"], ["EXT_DURACION_S", 2, 120, 1, "s"], ["EXT_IRREGULARIDAD", 0, 1, 0.01, ""],
+            ["EXT_BRILLO_MIN", 0, 1.5, 0.01, "× luz del día"], ["EXT_MAX_BLOQUES", 4, 200, 1, "bloques con capas"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{DBG_PASTO[k].toFixed(st < 0.1 ? 2 : st < 1 ? 1 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_PASTO[k]}
+                onChange={e => { DBG_PASTO[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:pasto-extender"))}>Extender pasto ahora</button>
+            <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:pasto-ext-reiniciar"))}>Reiniciar extensión</button>
+            <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:pasto-completar-extender"))}>Completar todo y extender</button>
           </div>
     </>
   );

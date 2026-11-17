@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import { crearEstadoPasto, avanzarPasto, cuartoDe, rectPasto, distMaxCuarto, umbralPasto, manchaPasto, alturaPasto, HISTERESIS_M } from '../lib/pasto.ts';
 const src = fs.readFileSync(new URL('../lib/debugConfig.ts', import.meta.url), 'utf8');
-const C = Function(`return (${/export const DBG_PASTO = (\{[\s\S]*?\n\});/.exec(src)[1].replace(/ as string/g, "")});`)();
+const C = Function(`return (${/export const DBG_PASTO = (\{[\s\S]*?\n\});/.exec(src)[1].replace(/ as string \| number/g, "").replace(/ as string/g, "")});`)();
 let ok = 0, fallas = 0;
 const check = (c, m) => { if (c) { ok++; console.log('  ✓ ' + m); } else { fallas++; console.log('  ✗ ' + m); } };
 const f = (n, d = 3) => n.toFixed(d);
@@ -32,7 +32,9 @@ console.log('\ncrecimiento');
   const ev3 = correr(s, 20, LX[0], LZ[0]);
   check(s.p[0] === 1 && s.completo[0] && ev3.filter(e => e[1] === 3).length === 1, 'llega a 1: completo, evento "completo" una sola vez');
   correr(s, 30, 0, 0); check(s.p[0] === 1, 'completo: no decae más al salir'); }
-{ const s = crearEstadoPasto(); correr(s, 5, LX[1], LZ[1], [true, false, true, true]); check(s.p[1] === 0, 'luz apagada: no crece'); }
+// Z74: por defecto alcanza con estar bajo la luz (antes "luz apagada: no crece"); con REQUIERE_LUZ_ENCENDIDA, como Z64
+{ const s = crearEstadoPasto(); correr(s, 5, LX[1], LZ[1], [true, false, true, true]); check(s.p[1] > 0, 'luz apagada: igual crece (Z74)'); }
+{ const s = crearEstadoPasto(); correr(s, 5, LX[1], LZ[1], [true, false, true, true], { ...C, REQUIERE_LUZ_ENCENDIDA: true }); check(s.p[1] === 0, 'con REQUIERE_LUZ_ENCENDIDA (como Z64): luz apagada no crece'); }
 { const s = crearEstadoPasto(); correr(s, 5, 0, 0, ON, { ...C, SIMULAR: 2 }); check(s.p[2] > 0.3 && s.p[0] === 0, 'SIMULAR 2: crece el cuarto 3 sin caminar'); }
 
 console.log('\nhistéresis, pausa, NaN');

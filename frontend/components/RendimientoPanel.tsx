@@ -7,6 +7,7 @@ import { aplicarPerfil, guardarPerfil, aplicarCalidadBloom, PERFILES, PRESETS_BL
 import { SISTEMAS } from "@/lib/rendimiento";
 import { PASTO_RENDER } from "@/lib/pastoChunks";
 import { RENDIMIENTO, POSES_BENCH } from "./RendimientoHost";
+import { PASTO_EXT_RENDER } from "./PastoExtension";   // Z74
 
 const LABEL: CSSProperties = { display: "block", marginBottom: 5, color: "#8899bb" };
 const ROW: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 };
@@ -54,6 +55,7 @@ export default function RendimientoPanel() {
         {`GPU: ${E.gpuNombre}\n`}
         {`tiempo de GPU: ${E.timer === "disponible" ? `${E.gpuMs.toFixed(2)} ms/cuadro` : E.timer}\n`}
         {`pasto (${P.montado ? P.modo : "no montado"}): mallas ${P.chunks} · dibujadas ${P.mallasVisibles} · en cuadro ${P.enCuadro} · capas dibujadas ${P.instancias} · suelo lejano ${P.lejanas}\n`}
+        {`extensión del pasto (Z74): ${PASTO_EXT_RENDER.montado ? `${PASTO_EXT_RENDER.dibujados} bloques con capas de ${PASTO_EXT_RENDER.elegibles} elegibles (${PASTO_EXT_RENDER.bloques} en total) · ${PASTO_EXT_RENDER.instancias} capas · suelo lejano ${PASTO_EXT_RENDER.lejano ? "sí" : "no"}` : "no montada"}\n`}
         {`refresco estimado: ${E.hzTexto}\n`}
         {`fractal: ${E.fractal}`}
         {E.gpuPases && `\nGPU por pase (ms/cuadro): ${E.gpuPases}`}
@@ -147,6 +149,7 @@ export default function RendimientoPanel() {
       <span style={{ ...LABEL, marginTop: 8 }}>Benchmark <span style={NOTE}>(cámara quieta; cada condición dos veces, ida y vuelta; ~4 min)</span></span>
       <div style={ROW}>
         <button style={BTN} onClick={() => emitir("alight:rend-estres")}>Escena de estrés</button>
+        <button style={BTN} title="Z74: 4 cuartos completos y el pasto extendido hasta el borde del círculo (peor caso)" onClick={() => emitir("alight:rend-estres", { extender: true })}>Estrés + extensión</button>
         <span style={NOTE}>{E.estres}</span>
       </div>
       <div style={ROW}>

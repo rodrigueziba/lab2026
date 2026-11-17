@@ -62,6 +62,7 @@ export default function RendimientoHost() {
     // Z72: pose original (se restaura al terminar), configuración efectiva del DPR adaptativo y escalón guardado
     camPosOrig: new THREE.Vector3(), camQOrig: new THREE.Quaternion(), pose: "", xz: { x: 0, z: 0 },
     cfgEf: { ...DBG_RENDIMIENTO } as CfgDpr, obj: { objetivo: 50, subir: 58 }, escGuardado: 0,
+    estresExtender: false,   // Z74
   });
   const terminarRef = useRef<(cancelado: boolean) => void>(() => {});
 
@@ -139,7 +140,7 @@ export default function RendimientoHost() {
         pose: R.pose,
         gpuPases: R.gpuPasesBase || undefined,
         config: `perfil ${RENDIMIENTO.perfil || "sin guardar"} · bloom ${RD.BLOOM_OPTIMIZADO ? `liviano ${RD.BLOOM_CALIDAD} (escala ${RD.BLOOM_ESCALA}, ${RD.BLOOM_NIVELES} niveles)` : "Unreal (como estaba)"} · pases ${RD.PASES_FUSIONADOS ? "fusionados" : "separados"} · AA ${RD.ANTIALIAS_MODO} · fractal ${DBG_FRACTAL.TEX_RES}/${DBG_FRACTAL.TEX_RES_CERCA} a ${DBG_FRACTAL.TEX_FPS} FPS en ≤ ${DBG_FRACTAL.TEX_REPARTIR} franjas · GPU ${RD.GPU_POR_PASE ? "por pase" : "por cuadro"}`,
-        escena: `cámara (${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}) · pasto p [${PASTO.p.map(v => v.toFixed(2)).join(", ")}] (${PASTO_RENDER.montado ? PASTO_RENDER.modo : "no montado"}) · tDia ${DIA.dia.toFixed(2)} (${DIA.fase}) · flags pasto: chunks ${on(DBG_RENDIMIENTO.PASTO_CHUNKS)} cull ${on(DBG_RENDIMIENTO.PASTO_CULL_PROGRESO)} lod ${on(DBG_RENDIMIENTO.PASTO_LOD)} lejano ${on(DBG_RENDIMIENTO.PASTO_LEJANO)} viento ${on(DBG_RENDIMIENTO.PASTO_VIENTO_BARATO)} descarte ${on(DBG_RENDIMIENTO.PASTO_DESCARTE_TEMPRANO)} mip ${on(DBG_RENDIMIENTO.PASTO_MIPMAPS)} · DIST_MAX_M ${DBG_PASTO.DIST_MAX_M} · CAPAS ${DBG_PASTO.CAPAS}`,
+        escena: `cámara (${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}) · pasto p [${PASTO.p.map(v => v.toFixed(2)).join(", ")}] (${PASTO_RENDER.montado ? PASTO_RENDER.modo : "no montado"}) · tDia ${DIA.dia.toFixed(2)} (${DIA.fase}) · flags pasto: chunks ${on(DBG_RENDIMIENTO.PASTO_CHUNKS)} cull ${on(DBG_RENDIMIENTO.PASTO_CULL_PROGRESO)} lod ${on(DBG_RENDIMIENTO.PASTO_LOD)} lejano ${on(DBG_RENDIMIENTO.PASTO_LEJANO)} viento ${on(DBG_RENDIMIENTO.PASTO_VIENTO_BARATO)} descarte ${on(DBG_RENDIMIENTO.PASTO_DESCARTE_TEMPRANO)} mip ${on(DBG_RENDIMIENTO.PASTO_MIPMAPS)} · DIST_MAX_M ${DBG_PASTO.DIST_MAX_M} · CAPAS ${DBG_PASTO.CAPAS} · extensión ${PASTO.ext.toFixed(2)} (${PASTO.extFase})`,
       });
       RENDIMIENTO.bench = "benchmark terminado";
     };
@@ -148,8 +149,11 @@ export default function RendimientoHost() {
       const v = Number((e as CustomEvent).detail?.dpr ?? 0);
       R.dpr.forzado = Number.isFinite(v) && v > 0 ? v : 0;
     };
-    const onEstres = () => {
-      if (PASTO_RENDER.montado) { window.dispatchEvent(new CustomEvent("alight:pasto-completar")); RENDIMIENTO.estres = "4 cuartos completos"; return; }
+    const onEstres = (e: Event) => {
+      // Z74: con detail.extender, además extiende el pasto hasta el borde del círculo (peor caso de la extensión)
+      R.estresExtender = !!(e as CustomEvent).detail?.extender;
+      const ev = R.estresExtender ? "alight:pasto-completar-extender" : "alight:pasto-completar";
+      if (PASTO_RENDER.montado) { window.dispatchEvent(new CustomEvent(ev)); RENDIMIENTO.estres = R.estresExtender ? "4 cuartos completos + extensión" : "4 cuartos completos"; return; }
       // el pasto vive con el visualizador: saltar al checkpoint y completar cuando esté montado
       if (irACheckpoint("visualizador")) { R.estresPendiente = 1; RENDIMIENTO.estres = "yendo al checkpoint 'visualizador'…"; }
       else RENDIMIENTO.estres = "el pasto no está montado y los checkpoints están deshabilitados: activá el visualizador primero";
@@ -184,8 +188,8 @@ export default function RendimientoHost() {
     if (R.estresPendiente > 0 && CK_STATE.fase !== "aplicando" && PASTO_RENDER.montado) {
       if (++R.estresPendiente > 30) {
         R.estresPendiente = 0;
-        window.dispatchEvent(new CustomEvent("alight:pasto-completar"));
-        RENDIMIENTO.estres = "4 cuartos completos (checkpoint 'visualizador')";
+        window.dispatchEvent(new CustomEvent(R.estresExtender ? "alight:pasto-completar-extender" : "alight:pasto-completar"));
+        RENDIMIENTO.estres = `4 cuartos completos${R.estresExtender ? " + extensión" : ""} (checkpoint 'visualizador')`;
       }
     }
 

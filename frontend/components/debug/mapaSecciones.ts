@@ -9,7 +9,7 @@ import { SecDiagonalspot, SecHacesN3R2V1, SecLucesDelVisualizadorZ42, SecU6aAnil
 import { SecCheckpointsZ40, SecEfectosDelDialogoZ29, SecCaminoLuzZ28, SecDialogoZ27 } from "./pestanas/narrativa";
 import { SecDebugOverlays } from "./pestanas/otros";
 import { SecPanelesSillas, SecAcercamientoZ8, SecPrioridadZ10ProyectoAbiertoSobreLas, SecVideoEtapa1, SecFocoZ19SubpanelAgrandado, SecSubpanelesZ4HistoriaGaleriaFicha } from "./pestanas/paneles";
-import { SecMonolitosN5V1V2V3, SecPastoZ64 } from "./pestanas/pasto";
+import { SecMonolitosN5V1V2V3, SecPastoZ64, SecPastoExtensionZ74 } from "./pestanas/pasto";
 import { SecRendimientoZ66, SecPostProcesoR4 } from "./pestanas/rendimiento";
 import { SecSecuenciaSillas, SecIconosDelPisoZ23, SecLayoutZ41, SecRelojDeLaExperienciaZ39, SecMovimientoZ34 } from "./pestanas/sala";
 import { SecSolN3, SecOndasPorKickZ52, SecSolNuevoZ51 } from "./pestanas/sol";
@@ -49,6 +49,7 @@ export const COMPONENTES_SECCION: Record<string, ComponentType> = {
   "subpaneles-z4-historia-galeria-ficha": SecSubpanelesZ4HistoriaGaleriaFicha,
   "monolitos-n5-v1-v2-v3": SecMonolitosN5V1V2V3,
   "pasto-z64": SecPastoZ64,
+  "pasto-extension-z74": SecPastoExtensionZ74,
   "rendimiento-z66": SecRendimientoZ66,
   "post-proceso-r4": SecPostProcesoR4,
   "secuencia-sillas": SecSecuenciaSillas,

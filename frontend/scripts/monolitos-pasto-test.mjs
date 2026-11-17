@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { crearEstadoPasto, avanzarPasto, completarCuarto, reiniciarPasto, rectPasto, chequearTodoCompleto } from '../lib/pasto.ts';
 import { todosCompletos, monolitosMontados, monolitosObjetivo, posMonolitosPasto, avanzarAparicion, suaveAparicion, hundimientoM } from '../lib/monolitosPasto.ts';
 const src = fs.readFileSync(new URL('../lib/debugConfig.ts', import.meta.url), 'utf8');
-const C = Function(`return (${/export const DBG_PASTO = (\{[\s\S]*?\n\});/.exec(src)[1].replace(/ as string/g, '')});`)();
+const C = Function(`return (${/export const DBG_PASTO = (\{[\s\S]*?\n\});/.exec(src)[1].replace(/ as string \| number/g, '').replace(/ as string/g, '')});`)();
 const S = Function(`return (${/export const DBG_SILLAS = (\{[\s\S]*?\n\});/.exec(src)[1].replace(/ as [A-Za-z\[\]"|' ]+(?=,)/g, '')});`)();
 let ok = 0, fallas = 0;
 const check = (c, m) => { if (c) { ok++; console.log('  ✓ ' + m); } else { fallas++; console.log('  ✗ ' + m); } };
