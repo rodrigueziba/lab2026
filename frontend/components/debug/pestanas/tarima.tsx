@@ -2,11 +2,13 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY } from "@/lib/debugConfig";
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { STORE } from "@/lib/alightStore";
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
 import { useDbg } from "../contexto";
+import { PLAY_TARIMA } from "@/lib/playTarima";                                             // Z79
+import { playTarima, pausaTarima, estadoContextoTarima } from "@/lib/playTarimaAcciones";      // Z79
 import { aplicarConfigNucleo, iniciarReloj, detenerReloj, setMetronomo, setRuidoPrueba, setOverlayNivel, actualizarEstadoNucleo } from "@/lib/audio/nucleo"; // Z78
 
 // sección: stars
@@ -294,6 +296,44 @@ export function SecAudioNucleoZ78() {
             <span>OVERLAY_NIVEL <span style={NOTE}>medidor del analizador maestro</span></span>
             <button style={INPUT} onClick={() => { setOverlayNivel(!N.OVERLAY_NIVEL); toca(); }}>{N.OVERLAY_NIVEL ? "ON" : "off"}</button>
           </div>
+    </>
+  );
+}
+
+// sección: play-tarima-z79
+export function SecPlayTarimaZ79() {
+  // Z79: botón grande de PLAY del atril de sonido (sin autoplay) y slots de los atriles de instrumentos.
+  const P = DBG_PLAY;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  return (
+    <>
+          <span style={LABEL}>Play del atril de sonido Z79 <span style={NOTE}>(live)</span></span>
+          <div style={{ ...ROW, ...NOTE }}>
+            <span>{PLAY_TARIMA.sonando ? "SONANDO" : "en silencio"} · {PLAY_TARIMA.iniciado ? `pista ${STORE.audio.trackIndex + 1}/${STORE.audio.tracks.length}` : "sin pista puesta"} · contexto {estadoContextoTarima()} · cambios {PLAY_TARIMA.cambios}</span>
+          </div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); playTarima(); toca(); }}>Play</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); pausaTarima(); toca(); }}>Pausa</button>
+          </div>
+          {([["AUTOPLAY", "arranque automático anterior · vale al aparecer los atriles"], ["MOSTRAR_SLOTS", "marcadores de los slots"], ["APARECER_TRAS_PLAY", "los atriles de instrumentos saldrán al apretar play (pendiente)"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={() => { P[k] = !P[k]; toca(); }}>{P[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["BOTON_ESCALA", 0.4, 2.5, 0.05, "× (1 = 16 × 4,5 cm)"], ["BOTON_U", -0.6, 0.6, 0.005, "m (derecha)"], ["BOTON_V", -0.3, 0.3, 0.005, "m (0 = franja central)"],
+            ["BOTON_ELEV", 0.002, 0.05, 0.001, "m (alto de la base)"],
+            ["SLOTS_N", 0, 12, 1, "atriles"], ["SLOTS_DIST_M", 0.5, 4, 0.05, "m detrás"], ["SLOTS_SEP_M", 0.8, 3, 0.05, "m entre slots"], ["SLOTS_ARCO_GRADOS", 0, 180, 1, "° (0 = en línea)"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{P[k].toFixed(st < 0.01 ? 3 : st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={P[k]}
+                onChange={ev => { P[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
     </>
   );
 }

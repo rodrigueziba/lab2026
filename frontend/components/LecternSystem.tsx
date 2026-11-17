@@ -15,10 +15,14 @@ import type { OscType } from "@/lib/alightStore";
 import {
   setVolume, setLP, setHP, setDistortion, setDelay, setReverb, setLFO,
   setPhaser, setPitch, setSamplerLoop,
-  nextTrack, prevTrack, togglePlayPause, initAudio, loadPlaylist, playTrack,
+  nextTrack, prevTrack, initAudio, loadPlaylist, playTrack,   // Z79: togglePlayPause ahora va por lib/playTarimaAcciones
   playUIClick,
 } from "@/lib/audioEngine";
-import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M } from "@/lib/debugConfig";
+import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY } from "@/lib/debugConfig";
+import { PLAY_TARIMA } from "@/lib/playTarima";                                              // Z79
+import { alternarPlay, instalarEstadoPlay, prepararSinAutoplay } from "@/lib/playTarimaAcciones"; // Z79
+import { PlayGrande, SlotsAtriles } from "./PlayTarima";                                       // Z79
+import { TARIMA_W } from "./Tarima";                                                         // Z79: slots
 import { DBG_DOME_MAT } from "./FaceDome";
 import { registerLecternMats, lecternPalette } from "@/lib/retro/lecternMaterials";
 import { createCrtScreenMaterial, setScreenMap, RETRO_CRT } from "@/lib/retro/crtScreen";
@@ -210,7 +214,7 @@ function keycapTex(letter: string): THREE.CanvasTexture {
 
 // ── Icon textures (J3) ────────────────────────────────────────────────────────
 const _iconCache = new Map<string, THREE.CanvasTexture>();
-let _isPlaying = false;  // track playback for PLAY/PAUSA icon alternation
+// Z79: el ícono y el LED de PLAY/PAUSA leen PLAY_TARIMA.sonando (estado real del <audio>), no un booleano propio
 
 // J4: LFO cycling state
 let _lfoWfIdx = 0;
@@ -923,7 +927,8 @@ const SOUND_CONTROLS: CtrlDef[] = [
     px: -0.555, py: ROW1_V_A, min: 0, max: 1, initial: 0, onActivate: () => prevTrack() },
   { id: "s_play",    type: "button", label: "PLAY/PAUSA", icon: "play",
     px: -0.435, py: ROW1_V_A, min: 0, max: 1, initial: 0,
-    onActivate: () => { _isPlaying = !_isPlaying; togglePlayPause(); } },
+    // Z79: alterna una vez por pulsación (antes alternaba en onActivate(1) y otra vez en onActivate(0) al soltar)
+    onActivate: (v) => { if (v > 0.5) alternarPlay(); } },
   { id: "s_next",    type: "button", label: "SIG.",       icon: "next",
     px: -0.315, py: ROW1_V_A, min: 0, max: 1, initial: 0, onActivate: () => nextTrack() },
   // col 3 (u=-0.195 row1) = empty
@@ -1182,14 +1187,14 @@ function CtrlMesh({
         if (pressMs < 200) {
           ledMatRef.current.emissiveIntensity = 0.9 * (1 - pressMs / 200);
         } else if (def.id === "s_play") {
-          ledMatRef.current.emissiveIntensity = _isPlaying ? 2.5 : 0;
+          ledMatRef.current.emissiveIntensity = PLAY_TARIMA.sonando ? 2.5 : 0;
         } else {
           ledMatRef.current.emissiveIntensity = on ? 2.5 : 0;
         }
       }
       // J3: alternate PLAY/PAUSA icon
       if (def.id === "s_play" && playIconMatRef.current) {
-        const tex = _isPlaying ? iconTex("pause") : iconTex("play");
+        const tex = PLAY_TARIMA.sonando ? iconTex("pause") : iconTex("play");
         if (playIconMatRef.current.map !== tex) { playIconMatRef.current.map = tex; playIconMatRef.current.needsUpdate = true; }
       }
       // L1: cycle ONDA waveform icon
@@ -1943,6 +1948,8 @@ function Lectern({
                 )
               )
             }
+            {/* Z79: botón grande de PLAY en la franja libre del centro del atril de sonido */}
+            {side === "right" && <PlayGrande />}
             {controls.map(def => (
               <CtrlMesh
                 key={def.id}
@@ -2258,11 +2265,15 @@ export default function LecternSystem() {
     audioStarted.current = true;
     (async () => {
       await initAudio();
+      // Z79: sin autoplay el motor queda listo (efectos y pistas) pero en silencio hasta el botón de PLAY
+      if (DBG_PLAY.AUTOPLAY) instalarEstadoPlay(); else prepararSinAutoplay();
       try {
         const res  = await fetch("/api/music");
         const data = await res.json() as { tracks: string[] };
         loadPlaylist(data.tracks);
-        if (data.tracks.length) await playTrack(0);
+        if (DBG_PLAY.AUTOPLAY) {   // Z79: comportamiento anterior (arranque automático), detrás de la bandera
+          if (data.tracks.length) await playTrack(0);
+        }
       } catch { /* audio optional */ }
     })();
   }, [visible]);
@@ -2417,6 +2428,8 @@ export default function LecternSystem() {
       <Lectern side="left"  controls={IMAGE_CONTROLS} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} />
       <Lectern side="right" controls={SOUND_CONTROLS}  appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} />
       <InteractionHandler />
+      {/* Z79: slots de los atriles de instrumentos (detrás del atril de sonido; marcadores con DBG_PLAY.MOSTRAR_SLOTS) */}
+      <SlotsAtriles atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} anchoM={OUTER_W} profM={OUTER_D} />
     </>
   );
 }

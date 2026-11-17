@@ -1454,3 +1454,21 @@ export const DBG_AUDIO_NUCLEO = {
   RUIDO_GANANCIA:    0.15,    // — live
   OVERLAY_NIVEL:     false,   // medidor del analizador maestro (abajo a la derecha) — live
 };
+
+// ── Z79: PLAY del atril de sonido (lib/playTarima.ts, lib/playTarimaAcciones.ts, components/PlayTarima.tsx) ──
+// La música del atril de sonido no arranca sola: hay que apretar el botón grande del centro del atril (o el PLAY/PAUSA
+// chico de REPRODUCCIÓN). AUTOPLAY = true restaura el arranque automático anterior (código viejo intacto).
+// Botón: posición en coordenadas del panel (u = derecha, v como los controles del atril: −v = hacia el frente), m.
+export const DBG_PLAY = {
+  AUTOPLAY:            false,   // se lee al aparecer los atriles (cambiarlo antes de entrar a la tarima) — live
+  BOTON_ESCALA:        1.0,     // tamaño del botón grande (1 = 16 × 4,5 cm) — live
+  BOTON_U:             0.0,     // posición sobre el panel (m) — live
+  BOTON_V:             0.0,     // 0 = franja libre entre las dos bandas de controles — live
+  BOTON_ELEV:          0.012,   // alto de la base sobre el panel (m) — live
+  MOSTRAR_SLOTS:       false,   // marcadores de debug de los slots de los atriles de instrumentos — live
+  APARECER_TRAS_PLAY:  true,    // los atriles de instrumentos saldrán del piso al apretar play (todavía sin implementar)
+  SLOTS_N:             4,       // cantidad de slots — live
+  SLOTS_DIST_M:        1.4,     // distancia detrás del atril de sonido (m) — live
+  SLOTS_SEP_M:         1.7,     // separación entre slots (m) — live
+  SLOTS_ARCO_GRADOS:   0,       // 0 = en línea; > 0 = en arco alrededor del atril de sonido — live
+};

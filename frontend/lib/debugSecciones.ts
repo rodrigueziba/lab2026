@@ -104,6 +104,7 @@ export const SECCIONES_DEBUG: SeccionDebug[] = [
   { id: "lecterns", titulo: "Lecterns", pestana: "tarima", desdeZ: 0, ultimoZ: 0, avanzada: false, clase: "frecuente", descripcion: "Atriles: posiciones, cámaras, overlays de atriles (T7)" },
   { id: "retro-atriles", titulo: "Retro atriles", pestana: "tarima", desdeZ: 0, ultimoZ: 0, avanzada: false, clase: "frecuente", descripcion: "Estilo retro de los atriles (J5)" },
   { id: "face-capture", titulo: "Face capture", pestana: "tarima", desdeZ: 0, ultimoZ: 0, avanzada: false, clase: "tecnica", descripcion: "Captura de caras (recargar)" },
+  { id: "play-tarima-z79", titulo: "Play del atril de sonido Z79", pestana: "tarima", desdeZ: 79, ultimoZ: 79, avanzada: false, clase: "frecuente", descripcion: "Sin autoplay: botón grande de PLAY del atril de sonido, estado, slots de los atriles de instrumentos" },
   { id: "audio-nucleo-z78", titulo: "Núcleo de audio Z78", pestana: "tarima", desdeZ: 78, ultimoZ: 78, avanzada: false, clase: "frecuente", descripcion: "Contexto único de la tarima: bus maestro, limitador, reloj (BPM), metrónomo, ruido de prueba, medidor" },
   { id: "audio", titulo: "Audio (T7 — read-only live)", pestana: "tarima", desdeZ: 0, ultimoZ: 0, avanzada: false, clase: "tecnica", descripcion: "Audio de los atriles (solo lectura)" },
   { id: "extra-lights", titulo: "Extra lights", pestana: "tarima", desdeZ: 0, ultimoZ: 0, avanzada: false, clase: "tecnica", descripcion: "Luces extra del panel T5 (solo lectura)" },
