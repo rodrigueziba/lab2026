@@ -1,7 +1,10 @@
 // T4 / T6 / J4: Web Audio engine.
 // Chain: source → LP → HP → distortion(dry+wet) → phaser → pitch-shifter → delay → reverb → master → analyser → dest
+// Z78: con DBG_AUDIO_NUCLEO.ACTIVO, "dest" = bus maestro del núcleo (lib/audio/nucleo.ts), en su contexto único.
 
 import { STORE, storeNotify } from "./alightStore";
+import { DBG_AUDIO_NUCLEO } from "./debugConfig";                              // Z78
+import { obtenerContexto, entradaBus, marcarAtrilesEnBus } from "./audio/nucleo"; // Z78
 
 // ── Filter nodes ────────────────────────────────────────────────────────────────
 let ctx:         AudioContext | null = null;
@@ -105,7 +108,9 @@ export async function initAudio(existingEl?: HTMLAudioElement): Promise<void> {
     document.body.appendChild(audioEl);
   }
 
-  ctx = new AudioContext();
+  // Z78: con el núcleo activo, el contexto es el único de la tarima (lib/audio/nucleo.ts); si no, uno propio como antes
+  const enNucleo = DBG_AUDIO_NUCLEO.ACTIVO;
+  ctx = enNucleo ? obtenerContexto() : new AudioContext();
 
   sourceNode   = ctx.createMediaElementSource(audioEl);
   lpFilter     = ctx.createBiquadFilter();
@@ -247,7 +252,9 @@ export async function initAudio(existingEl?: HTMLAudioElement): Promise<void> {
   reverbConv.connect(reverbWet);
   reverbWet.connect(masterGain);
   masterGain.connect(analyserNode);
-  analyserNode.connect(ctx.destination);
+  // Z78: entra al bus maestro del núcleo (ganancia 1 + limitador identidad bajo el umbral = misma salida que antes)
+  if (enNucleo) { analyserNode.connect(entradaBus()); marcarAtrilesEnBus(); }
+  else analyserNode.connect(ctx.destination);
 
   phaserLFO.start();
   pitchLFO.start();

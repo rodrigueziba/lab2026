@@ -6,6 +6,7 @@
 //
 // Qué pausa:
 //  - Música del visualizador (vizAudio): pausa el elemento y suspende el AudioContext.
+//  - Z78: reloj de los instrumentos (lib/audio/nucleo.ts): pausarNucleo/reanudarNucleo (el contexto no se suspende).
 //  - Audio de los atriles (audioEngine): con su propio togglePlayPause (STORE.audio.paused),
 //    solo si estaba sonando; al volver se reanuda solo si lo pausó esta pausa.
 //  - Amaneceres U9 (HazSystem/VizPanorama) y W3 (domo): congelados con congelarAmaneceres(dt) en el modo
@@ -21,6 +22,7 @@
 import { pausarVizAudio, reanudarVizAudio } from "@/lib/vizAudio";
 import { togglePlayPause } from "@/lib/audioEngine";
 import { STORE, congelarAmaneceres } from "@/lib/alightStore";
+import { pausarNucleo, reanudarNucleo } from "@/lib/audio/nucleo";   // Z78: el reloj de los instrumentos se pausa
 
 export const PAUSA = {
   activa: false,
@@ -35,6 +37,7 @@ export function pausarExperiencia(): void {
   PAUSA.activa = true;
   PAUSA.desdeMs = performance.now();
   pausarVizAudio();
+  pausarNucleo();   // Z78
   PAUSA.audioAtrilPausado = false;
   if (!atrilPausado()) {
     // togglePlayPause no hace nada si el motor no se inicializó: solo cuenta si cambió el estado
@@ -47,6 +50,7 @@ export function reanudarExperiencia(): void {
   if (!PAUSA.activa) return;
   PAUSA.activa = false;
   reanudarVizAudio();
+  reanudarNucleo();   // Z78
   if (PAUSA.audioAtrilPausado && atrilPausado()) togglePlayPause();
   PAUSA.audioAtrilPausado = false;
 }

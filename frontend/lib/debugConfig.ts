@@ -1431,3 +1431,26 @@ export const DBG_BASE_FLOR = {
   SEMILLA:         7,      // grietas y astillas siempre iguales para la misma semilla — live
   OVERLAY:         false,  // anillos del radio del hueco y de las grietas — live
 };
+
+// ── Z78: núcleo de audio de la tarima (lib/audio/nucleo.ts: contexto único, bus maestro, reloj, ruido) ──
+// ACTIVO lo lee audioEngine al crear su contexto (recargar para cambiar): true = el audio de los atriles usa el
+// contexto del núcleo y sale por su bus maestro (ganancia → limitador suave → analizador → salida); false = como antes.
+// El resto se aplica en vivo desde el menú (sección audio-nucleo-z78).
+export const DBG_AUDIO_NUCLEO = {
+  ACTIVO:            true,    // se lee al arrancar el audio de los atriles (initAudio): cambiarlo antes, o acá y recargar
+  SILLAS_EN_NUCLEO:  false,   // PENDIENTE (tarea aparte): vizAudio usaría el contexto del núcleo. Hoy no hace nada
+  GANANCIA_MAESTRA:  1.0,     // 0…2 (1 = igual que antes) — live
+  LIMITADOR:         true,    // limitador suave del bus (identidad bajo el umbral) — live
+  LIMITADOR_UMBRAL:  0.9,     // 0,5…0,99 de escala completa — live
+  BPM:               120,     // 20…300 — live
+  PASOS_POR_COMPAS:  16,      // al iniciar el reloj
+  PASOS_POR_PULSO:   4,       // 4 = semicorcheas — al iniciar el reloj
+  ANTICIPO_S:        0.1,     // lookahead del programador — live
+  INTERVALO_MS:      25,      // cada cuánto despierta el programador — al iniciar el reloj
+  METRONOMO:         false,   // clic corto en cada paso (prueba) — live
+  METRONOMO_VOL:     0.3,     // — live
+  RUIDO:             false,   // "Probar ruido" (fuente de lib/audio/ruido.ts en el bus) — live
+  RUIDO_TIPO:        "rosa" as string,   // "rosa" | "blanco" — live (recrea la fuente)
+  RUIDO_GANANCIA:    0.15,    // — live
+  OVERLAY_NIVEL:     false,   // medidor del analizador maestro (abajo a la derecha) — live
+};

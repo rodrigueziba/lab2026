@@ -83,3 +83,8 @@ Z45: cálculo en una textura compartida por las 3 caras; port a TypeScript del r
 - Archivo: `frontend/lib/retro/paseFinal.ts` (función `correccionAA`, dentro del pase final fusionado).
 - FXAA: versión simplificada del algoritmo **NVIDIA FXAA de Timothy Lottes** (2009–2011), en la forma del `FXAAShader` clásico de **three.js** (MIT). Se adaptó para calcularse una vez por píxel, sobre la escena HDR (luma con compresión l/(1+l)), y sumarse como corrección a las tres lecturas de la aberración cromática del CRT.
 - SMAA (opción `ANTIALIAS_MODO: "smaa"`): `SMAAPass` de three.js (MIT), basado en SMAA de Jorge Jimenez et al. (MIT). Se usa sin cambios.
+
+## Núcleo de audio de la tarima (Z78)
+- Archivos: `frontend/lib/audio/reloj.ts` y `frontend/lib/audio/ruido.ts`.
+- Reloj: patrón de programación con anticipo descrito por **Chris Wilson** en "A Tale of Two Clocks – Scheduling Web Audio with Precision" (web.dev / HTML5 Rocks, 2013): un temporizador del navegador despierta al programador y los tiempos salen del reloj de audio. Se reimplementó (sin copiar código), con pausa, cortes y oyentes sin allocations.
+- Ruido rosa: filtro "refined" de **Paul Kellet** (coeficientes publicados en la lista music-dsp; sin licencia declarada, de uso muy difundido: se acredita al autor).

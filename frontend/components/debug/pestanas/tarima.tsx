@@ -1,11 +1,13 @@
 "use client";
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE } from "@/lib/debugConfig";
+import { useEffect, useState } from "react";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO } from "@/lib/debugConfig";
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { STORE } from "@/lib/alightStore";
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
 import { useDbg } from "../contexto";
+import { aplicarConfigNucleo, iniciarReloj, detenerReloj, setMetronomo, setRuidoPrueba, setOverlayNivel, actualizarEstadoNucleo } from "@/lib/audio/nucleo"; // Z78
 
 // sección: stars
 export function SecStars() {
@@ -226,6 +228,72 @@ export function SecExtraLights() {
           <span style={LABEL}>Extra lights <span style={NOTE}>(added by T5 panel)</span></span>
           <NumField label="count" value={STORE.lights.extras.length} step={1} />
           <NumField label="globalIntensity" value={STORE.lights.globalIntensity} step={0.1} />
+    </>
+  );
+}
+
+// sección: audio-nucleo-z78
+export function SecAudioNucleoZ78() {
+  // Z78: núcleo de audio de la tarima (lib/audio/nucleo.ts). Estado refrescado 4 veces por segundo.
+  const N = DBG_AUDIO_NUCLEO;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const e = actualizarEstadoNucleo();
+  return (
+    <>
+          <span style={LABEL}>Núcleo de audio Z78 <span style={NOTE}>(contexto único de la tarima · live salvo ACTIVO)</span></span>
+          <div style={{ ...ROW, ...NOTE }}>
+            <span>contexto {e.contexto}{e.sampleRate ? ` · ${e.sampleRate} Hz` : ""} · lat. base {e.latenciaBaseMs.toFixed(1)} ms · lat. salida {e.latenciaSalidaMs.toFixed(1)} ms · reloj {e.reloj} (compás {e.compas}, paso {e.paso}) · cortes {e.cortes}{e.atrilesEnBus ? " · atriles en el bus" : ""}{e.transmisible ? " · salida transmisible" : ""}</span>
+          </div>
+          <div style={ROW}>
+            <span>ACTIVO <span style={NOTE}>vale si los atriles aún no arrancaron su audio (si no, se pierde al recargar: cambiar en debugConfig) · off = contexto propio como antes</span></span>
+            <button style={INPUT} onClick={() => { N.ACTIVO = !N.ACTIVO; toca(); }}>{N.ACTIVO ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>SILLAS_EN_NUCLEO <span style={NOTE}>pendiente: sin efecto</span></span>
+            <button style={{ ...INPUT, opacity: 0.5 }} disabled>{N.SILLAS_EN_NUCLEO ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>LIMITADOR <span style={NOTE}>suave, identidad bajo el umbral</span></span>
+            <button style={INPUT} onClick={() => { N.LIMITADOR = !N.LIMITADOR; aplicarConfigNucleo(); toca(); }}>{N.LIMITADOR ? "ON" : "off"}</button>
+          </div>
+          {([["GANANCIA_MAESTRA", 0, 2, 0.01, "1 = como antes"], ["LIMITADOR_UMBRAL", 0.5, 0.99, 0.01, "escala completa"], ["BPM", 20, 300, 1, "bpm"], ["ANTICIPO_S", 0.03, 0.3, 0.01, "s"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{N[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={N[k]}
+                onChange={ev => { N[k] = parseFloat(ev.target.value); aplicarConfigNucleo(); toca(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); iniciarReloj(); toca(); }}>Iniciar reloj</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); detenerReloj(); toca(); }}>Detener reloj</button>
+          </div>
+          <div style={ROW}>
+            <span>METRÓNOMO <span style={NOTE}>clic en cada paso (fuerte en el 1)</span></span>
+            <button style={INPUT} onClick={() => { setMetronomo(!N.METRONOMO); toca(); }}>{N.METRONOMO ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>METRONOMO_VOL <span style={NOTE}>{N.METRONOMO_VOL.toFixed(2)}</span></span>
+            <input type="range" min={0} max={1} step={0.01} style={{ flex: 1 }} value={N.METRONOMO_VOL}
+              onChange={ev => { N.METRONOMO_VOL = parseFloat(ev.target.value); toca(); }} />
+          </div>
+          <div style={ROW}>
+            <span>Probar ruido</span>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); setRuidoPrueba(!N.RUIDO); toca(); }}>{N.RUIDO ? "ON" : "off"}</button>
+            {(["rosa", "blanco"] as const).map(v => (
+              <button key={v} style={{ ...INPUT, opacity: N.RUIDO_TIPO === v ? 1 : 0.5 }} onClick={() => { N.RUIDO_TIPO = v; if (N.RUIDO) setRuidoPrueba(true); toca(); }}>{v}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <span>RUIDO_GANANCIA <span style={NOTE}>{N.RUIDO_GANANCIA.toFixed(2)}</span></span>
+            <input type="range" min={0} max={1} step={0.01} style={{ flex: 1 }} value={N.RUIDO_GANANCIA}
+              onChange={ev => { N.RUIDO_GANANCIA = parseFloat(ev.target.value); if (N.RUIDO) setRuidoPrueba(true); toca(); }} />
+          </div>
+          <div style={ROW}>
+            <span>OVERLAY_NIVEL <span style={NOTE}>medidor del analizador maestro</span></span>
+            <button style={INPUT} onClick={() => { setOverlayNivel(!N.OVERLAY_NIVEL); toca(); }}>{N.OVERLAY_NIVEL ? "ON" : "off"}</button>
+          </div>
     </>
   );
 }

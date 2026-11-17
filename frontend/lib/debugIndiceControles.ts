@@ -6,6 +6,7 @@ export const INDICE_CONTROLES: Record<string, readonly string[]> = {
   "amanecer-z38": ["AMANECER_DUR_S","UNIFICADO","MONOLITOS_CAPTURA","Reiniciar amanecer","Saltar al final"],
   "audio": ["volume","trackIndex","distortion","reverb","delay.amount","delay.feedback"],
   "audio-bandas-n4": ["gateAttackMs","gateReleaseMs","showBandOverlay","Resortear bandas"],
+  "audio-nucleo-z78": ["rosa","blanco","contexto","ACTIVO","SILLAS_EN_NUCLEO","LIMITADOR","METRONOMO_VOL","Probar ruido","RUIDO_GANANCIA","OVERLAY_NIVEL","Iniciar reloj","Detener reloj","GANANCIA_MAESTRA","LIMITADOR_UMBRAL","BPM","ANTICIPO_S"],
   "base-de-la-flor-z67": ["ACTIVO","PASTO_ACTIVO","OVERLAY","Mostrar base con flor","Animar nacimiento","Reiniciar","RADIO_HUECO_M","PROFUNDIDAD_M","BRILLO_BORDE","N_GRIETAS","RADIO_GRIETAS_M","ANCHO_GRIETA","IRREGULARIDAD","ASTILLAS","PASTO_RADIO_M","PASTO_ALTURA_M","PASTO_CAPAS","SEMILLA"],
   "camino-luz-z28": ["LUZ_DISTANCIA_M","LUZ_POS_X","LUZ_POS_Z","LUZ_ALTURA_M","LUZ_HALO_M","LUZ_INT_LEJOS","LUZ_INT_CERCA","LUZ_D_LEJOS_M","LUZ_D_CERCA_M","LUZ_CURVA","CONO_RADIO_M","CONO_OPACIDAD","CONO_D_INICIO_M","POZO_OPACIDAD","ESTRELLAS_MAX","ESTRELLAS_D_LEJOS_M","ESTRELLAS_D_CERCA_M","ESTRELLAS_TAM_PX","EXTERIOR_RADIO_M","AREA_HIST_M","ACTIVACION_M","ACTIVACION_SALIDA_M","GIRO_MS","PITCH_MAX_DEG","CIERRE_DIALOGO_MS","TELEPORT_DIST_M","LUZ_COLOR","CAMINO_LUZ","LUZ_POS_MANUAL","PAREDES_ABIERTAS","LIMITES","PAUSA","Teletransportar a la luz"],
   "checkpoints-z40": ["ADELANTO_S","HABILITADOS"],
