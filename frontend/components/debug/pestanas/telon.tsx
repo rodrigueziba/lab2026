@@ -261,7 +261,7 @@ export function SecEntradaTrasElTelonZ59() {
           </div>
           {([
             ["POS_X", -39, 39, 0.1, "m"], ["POS_Z", -39, 39, 0.1, "m"], ["YAW_DEG", -180, 180, 0.5, "°"], ["PITCH_DEG", -45, 45, 0.5, "°"],
-            ["BLOQUEO_EXTRA_S", 0, 3, 0.05, "s tras el destello"], ["TOPE_S", 2, 30, 0.5, "s seguridad"], ["DESPLAZ_IZQ_M", -10, 10, 0.1, "m a la izq. (Z65)"],
+            ["BLOQUEO_EXTRA_S", 0, 3, 0.05, "s tras el destello"], ["TOPE_S", 2, 30, 0.5, "s seguridad"], ["DESPLAZ_IZQ_M", -10, 10, 0.1, "m a la izq. (Z65, modo desplazamiento)"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{DBG_ENTRADA[k].toFixed(st < 0.1 ? 2 : 1)} {nota}</span></span>
@@ -279,8 +279,22 @@ export function SecEntradaTrasElTelonZ59() {
             <span>MIRAR_TARIMA <span style={NOTE}>off = mismo yaw y pitch</span></span>
             <button style={INPUT} onClick={() => { DBG_ENTRADA.MIRAR_TARIMA = !DBG_ENTRADA.MIRAR_TARIMA; tocarDia(); }}>{DBG_ENTRADA.MIRAR_TARIMA ? "ON" : "off"}</button>
           </div>
+          {/* Z75: modo de la pose y regla "línea de las sillas" */}
+          <div style={ROW}>
+            <span>MODO <span style={NOTE}>Z75</span></span>
+            {(["linea_sillas", "desplazamiento", "manual"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, opacity: DBG_ENTRADA.MODO === m ? 1 : 0.5 }} onClick={() => { DBG_ENTRADA.MODO = m; tocarDia(); }}>{m}</button>
+            ))}
+          </div>
+          {([["MARGEN_LINEA_SILLAS_M", -1, 5, 0.05, "m más allá de la fila (linea_sillas)"], ["DIST_MIN_OBJETOS_M", 0, 2, 0.05, "m a tarima, sillas y zonas"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{DBG_ENTRADA[k].toFixed(2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_ENTRADA[k]}
+                onChange={e => { DBG_ENTRADA[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
           {(() => { const P = calcularPoseEntrada(); return (
-            <div style={ROW}><span style={NOTE}>pose final: x {P.x.toFixed(2)} · z {P.z.toFixed(2)} · yaw {P.yawDeg.toFixed(1)}° · pitch {P.pitchDeg.toFixed(1)}°{P.ajustada ? " · AJUSTADA (caía en un obstáculo o fuera de la sala)" : ""}</span></div>
+            <div style={ROW}><span style={NOTE}>pose final ({P.modo}): x {P.x.toFixed(2)} · z {P.z.toFixed(2)} · yaw {P.yawDeg.toFixed(1)}° · pitch {P.pitchDeg.toFixed(1)}°{P.modo !== "manual" ? ` · ${P.desplazM.toFixed(2)} m a la izq.` : ""}{P.modo === "linea_sillas" ? ` · borde de la fila ${P.lateralBordeM.toFixed(2)} m (lateral)` : ""}{P.ajustada ? " · AJUSTADA (caía en un obstáculo, una zona o fuera de la sala)" : ""}</span></div>
           ); })()}
           <div style={ROW}><span style={NOTE}>entrada: {ENTRADA.fase} · saltos {ENTRADA.teletransportes}</span></div>
     </>

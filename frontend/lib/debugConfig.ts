@@ -1059,6 +1059,12 @@ export const DBG_ENTRADA = {
   DESTELLO_EN_REPETICION: true,   // si se cruza otra vez (telón repuesto desde debug), un destello de debug tapa el salto — live
   DESPLAZ_IZQ_M:          5,      // Z65: se suma a la pose: metros hacia la izquierda de la mirada (perpendicular al yaw, en el suelo); 0 = pose de Z59 — live
   MIRAR_TARIMA:           false,  // Z65: true = después del desplazamiento el yaw apunta al centro de la tarima (pitch igual); false = mismo yaw y pitch — live
+  // Z75: modo de la pose. "linea_sillas" = POS_X/POS_Z/YAW como base y se corre a la izquierda de la mirada hasta el borde
+  // exterior de la fila de sillas + MARGEN_LINEA_SILLAS_M (calculado desde layoutSala) · "desplazamiento" = Z65
+  // (DESPLAZ_IZQ_M) · "manual" = POS_X, POS_Z y YAW tal cual (como los deja "Guardar pose actual como entrada") — live
+  MODO:                   "linea_sillas" as string,
+  MARGEN_LINEA_SILLAS_M:  1.0,    // Z75: metros más allá del borde exterior de la fila (hacia la izquierda de la mirada) — live
+  DIST_MIN_OBJETOS_M:     0.6,    // Z75: distancia mínima a la tarima, a las sillas y a las zonas SILLAS/TARIMA (si no, se ajusta lo mínimo) — live
 };
 
 export const DBG_LAYOUT = {

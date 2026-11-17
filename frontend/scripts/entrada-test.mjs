@@ -1,10 +1,11 @@
 // Z59: prueba de la línea de tiempo de la entrada tras el telón (lib/entradaTelon.ts) contra la máquina del destello
 // (fases de lib/curtainFlash.ts con los tiempos de DBG_FLASH). Uso: node scripts/entrada-test.mjs
 import fs from 'node:fs';
-import { BLOQUEO_MOV, iniciarEntrada, tickEntrada, cancelarEntrada, movimientoBloqueado, bloquearMovimiento, liberarMovimiento, crearEstadoEntrada, poseEntrada, crearPoseEntrada } from '../lib/entradaTelon.ts';
+import { BLOQUEO_MOV, iniciarEntrada, tickEntrada, cancelarEntrada, movimientoBloqueado, bloquearMovimiento, liberarMovimiento, crearEstadoEntrada, poseEntrada, crearPoseEntrada, lateralDe, bordeLateralSillas, distARect } from '../lib/entradaTelon.ts';
+import { sillaEn, N_SILLAS, ASIENTO_MEDIO, zonaSillasEn, ZONA_SILLAS_BASE, ZONA_TARIMA, SILLAS_BASE } from '../lib/layoutSala.ts';
 
 const src = fs.readFileSync(new URL('../lib/debugConfig.ts', import.meta.url), 'utf8');
-const obj = n => Function(`return (${new RegExp(`export const ${n} = (\\{[\\s\\S]*?\\n\\});`).exec(src)[1].replace(/ as string/g, '')});`)();
+const obj = n => Function(`return (${new RegExp(`export const ${n} = (\\{[\\s\\S]*?\\n\\});`).exec(src)[1].replace(/ as string \| number/g, '').replace(/ as string/g, '')});`)();
 const C = obj('DBG_ENTRADA'), FL = obj('DBG_FLASH');
 let ok = 0, fallas = 0;
 const check = (c, m) => { if (c) { ok++; console.log('  ✓ ' + m); } else { fallas++; console.log('  ✗ ' + m); } };
@@ -69,7 +70,8 @@ check(d.teleportT.length === 0 && d.estado.fase === 'inactiva' && d.razonesFinal
 
 // ── Z65: pose final = pose de Z59 + DESPLAZ_IZQ_M a la izquierda de la mirada (perpendicular al yaw, en el suelo) ──
 console.log('\nZ65: desplazamiento a la izquierda');
-{ const OBST = [{ x0: -1.596 - 0.6, z0: -1.596 - 0.6, x1: 1.596 + 0.6, z1: 1.596 + 0.6 }, { x0: -3.3, z0: -7.9, x1: 3.3, z1: -6.1 }];   // = calcularPoseEntrada
+{ const C = { ...obj('DBG_ENTRADA'), MODO: 'desplazamiento' };   // Z75: el default es linea_sillas; acá, el modo de Z65
+  const OBST = [{ x0: -1.596 - 0.6, z0: -1.596 - 0.6, x1: 1.596 + 0.6, z1: 1.596 + 0.6 }, { x0: -3.3, z0: -7.9, x1: 3.3, z1: -6.1 }];   // = calcularPoseEntrada
   const P = poseEntrada(C, 39.5, OBST, { x: 0, z: 0 }, crearPoseEntrada());
   const yaw = C.YAW_DEG * Math.PI / 180, fwd = [-Math.sin(yaw), -Math.cos(yaw)], izq = [-Math.cos(yaw), Math.sin(yaw)];
   const d = [P.x - C.POS_X, P.z - C.POS_Z];
@@ -89,6 +91,60 @@ console.log('\nZ65: desplazamiento a la izquierda');
   // el telón (ancla (−10, −7) + EJE × curtainDistM): se oculta en el destello y se desmonta, pero informamos la distancia
   const L = Math.hypot(10, 7), ej = [10 / L, 7 / L], tc = [-10 + ej[0] * 3, -7 + ej[1] * 3];
   console.log(`    centro del telón (${f(tc[0], 2)}, ${f(tc[1], 2)}): la entrada queda a ${f(Math.hypot(P.x - tc[0], P.z - tc[1]), 2)} m de su centro y a ${f((P.x - tc[0]) * ej[0] + (P.z - tc[1]) * ej[1], 2)} m de su plano (del lado de la tarima)`); }
+
+// ── Z75: regla "linea_sillas" desde la geometría real (layoutSala), modos y seguridad ──
+console.log('\nZ75: línea de las sillas');
+const LAY = obj('DBG_LAYOUT');
+const TW = 4.2 * 0.76;   // TARIMA_W = TARIMA_D (Tarima.tsx: 4,2 × TARIMA_SCALE_XZ)
+const armar = (lay = LAY, m = C.DIST_MIN_OBJETOS_M) => {   // réplica de calcularPoseEntrada (EntradaTelon.tsx)
+  const s = { x: 0, z: 0 }, sillas = [], fila = { x0: Infinity, z0: Infinity, x1: -Infinity, z1: -Infinity };
+  for (let i = 0; i < N_SILLAS; i++) { sillaEn(i, lay, s); const r = { x0: s.x - ASIENTO_MEDIO.x, x1: s.x + ASIENTO_MEDIO.x, z0: s.z - ASIENTO_MEDIO.z, z1: s.z + ASIENTO_MEDIO.z }; sillas.push(r);
+    fila.x0 = Math.min(fila.x0, r.x0 - m); fila.x1 = Math.max(fila.x1, r.x1 + m); fila.z0 = Math.min(fila.z0, r.z0 - m); fila.z1 = Math.max(fila.z1, r.z1 + m); }
+  zonaSillasEn(lay, s);
+  return { sillas, obst: [{ x0: -TW / 2 - m, x1: TW / 2 + m, z0: -TW / 2 - m, z1: TW / 2 + m }, fila],
+    zonas: [{ x: s.x, z: s.z, radio: ZONA_SILLAS_BASE.radio + m }, { x: ZONA_TARIMA.x, z: ZONA_TARIMA.z, radio: ZONA_TARIMA.radio + m }] };
+};
+const pose = (cfg, g = armar()) => poseEntrada(cfg, 39.5, g.obst, { x: 0, z: 0 }, crearPoseEntrada(), g.sillas, g.zonas);
+{ const g = armar(), s0 = g.sillas[0], sN = g.sillas[N_SILLAS - 1];
+  console.log(`    sillas: ${N_SILLAS} en z = ${f(s0.z0 + ASIENTO_MEDIO.z, 2)}, x ${f(s0.x0 + ASIENTO_MEDIO.x, 2)}…${f(sN.x0 + ASIENTO_MEDIO.x, 2)} cada 1 m · huella ${f(ASIENTO_MEDIO.x * 2, 2)} × ${f(ASIENTO_MEDIO.z * 2, 2)} m · fila x ${f(s0.x0, 2)}…${f(sN.x1, 2)}, z ${f(s0.z0, 2)}…${f(s0.z1, 2)} (largo ${f(sN.x1 - s0.x0, 2)} m)`);
+  const yaw = C.YAW_DEG, izq = [-Math.cos(yaw * Math.PI / 180), Math.sin(yaw * Math.PI / 180)], borde = bordeLateralSillas(g.sillas, yaw);
+  const P = pose(C, g), Z65 = pose({ ...C, MODO: 'desplazamiento' }, g);
+  const latP = lateralDe(P.x, P.z, yaw), latZ65 = lateralDe(Z65.x, Z65.z, yaw);
+  console.log(`    izquierda de la mirada (${f(izq[0], 3)}, ${f(izq[1], 3)}) · borde exterior de la fila: lateral ${f(borde, 3)} m · Z65 (${f(Z65.x, 2)}, ${f(Z65.z, 2)}) lateral ${f(latZ65, 2)} · nueva (${f(P.x, 2)}, ${f(P.z, 2)}) lateral ${f(latP, 2)} · yaw ${f(P.yawDeg, 1)}° · ${f(P.desplazM, 2)} m a la izq. desde (POS_X, POS_Z)`);
+  const minD = Math.min(...g.sillas.map(r => distARect(P.x, P.z, r)));
+  console.log(`    distancias de la nueva: a la silla más cercana ${f(minD, 2)} m · a la tarima ${f(distARect(P.x, P.z, { x0: -TW / 2, x1: TW / 2, z0: -TW / 2, z1: TW / 2 }), 2)} m · a ZONA_SILLAS ${f(Math.hypot(P.x - g.zonas[0].x, P.z - g.zonas[0].z) - ZONA_SILLAS_BASE.radio, 2)} m del borde · al borde de la sala ${f(39.5 - Math.max(Math.abs(P.x), Math.abs(P.z)), 2)} m`);
+  check(P.modo === 'linea_sillas' && C.MODO === 'linea_sillas', 'MODO por defecto: linea_sillas');
+  check(Math.abs(latP - (borde + C.MARGEN_LINEA_SILLAS_M)) < 1e-9 && !P.ajustada, `lateral = borde exterior + MARGEN_LINEA_SILLAS_M (${C.MARGEN_LINEA_SILLAS_M} m), sin ajustes`);
+  check(latZ65 < borde && latP > borde, 'hoy (Z65) la cámara queda del lado de la tarima de la línea de las sillas; la nueva, del otro lado (más a la izquierda)');
+  const fw = (x, z) => -Math.sin(yaw * Math.PI / 180) * x - Math.cos(yaw * Math.PI / 180) * z;
+  check(Math.abs(fw(P.x, P.z) - fw(C.POS_X, C.POS_Z)) < 1e-9 && P.yawDeg === C.YAW_DEG && P.pitchDeg === C.PITCH_DEG, 'conserva la coordenada sobre la mirada de (POS_X, POS_Z), el yaw y el pitch');
+  check(minD >= C.DIST_MIN_OBJETOS_M && Math.max(Math.abs(P.x), Math.abs(P.z)) <= 39.5 && Math.hypot(P.x - g.zonas[0].x, P.z - g.zonas[0].z) >= g.zonas[0].radio && Math.hypot(P.x, P.z) >= g.zonas[1].radio,
+    `seguridad: ≥ ${C.DIST_MIN_OBJETOS_M} m de las sillas, fuera de la tarima, de las zonas SILLAS/TARIMA y dentro de la sala`);
+  // margen: cada metro de margen = un metro más a la izquierda
+  const P2 = pose({ ...C, MARGEN_LINEA_SILLAS_M: 2 }, g);
+  check(Math.abs(lateralDe(P2.x, P2.z, yaw) - latP - 1) < 1e-9, 'MARGEN +1 m → 1 m más a la izquierda');
+  // acompaña a DBG_LAYOUT: con las sillas 2 m más lejos, la entrada se corre lo mismo
+  const g6 = armar({ ...LAY, SILLAS_OFFSET_M: 6 }), P6 = pose(C, g6);
+  check(Math.abs(lateralDe(P6.x, P6.z, yaw) - latP - 2 * Math.abs(Math.sin(yaw * Math.PI / 180))) < 1e-6 || Math.abs(lateralDe(P6.x, P6.z, yaw) - bordeLateralSillas(g6.sillas, yaw) - C.MARGEN_LINEA_SILLAS_M) < 1e-9, `acompaña a DBG_LAYOUT (SILLAS_OFFSET_M 6 → (${f(P6.x, 2)}, ${f(P6.z, 2)}))`);
+  const gV = armar({ ...LAY, POSICIONES_NUEVAS: false }), PV = pose(C, gV);
+  check(Math.abs(lateralDe(PV.x, PV.z, yaw) - bordeLateralSillas(gV.sillas, yaw) - C.MARGEN_LINEA_SILLAS_M) < 1e-9, `con las posiciones anteriores a Z41 (sillas en z = ${SILLAS_BASE.z}) → (${f(PV.x, 2)}, ${f(PV.z, 2)})`);
+  // posición inválida → se ajusta lo mínimo: base sobre el eje de la fila con margen 0 (cae a 0 m de la última silla)
+  const PI = pose({ ...C, POS_X: 0, POS_Z: 0, YAW_DEG: 90, MARGEN_LINEA_SILLAS_M: 0.1 }, g);   // izquierda = +Z: el borde (z = −6,77) + 0,1 cae dentro de DIST_MIN de la fila
+  const dI = Math.min(...g.sillas.map(r => distARect(PI.x, PI.z, r)));
+  check(PI.ajustada && dI >= C.DIST_MIN_OBJETOS_M - 0.02 && dI < C.DIST_MIN_OBJETOS_M + 0.1, `margen chico pegado a una silla: AJUSTADA a ${f(dI, 2)} m (el mínimo para cumplir DIST_MIN)`);
+  const PZ2 = pose({ ...C, POS_X: 0, POS_Z: -11, YAW_DEG: 0, MODO: 'manual' }, g);
+  check(PZ2.ajustada && Math.hypot(PZ2.x - g.zonas[0].x, PZ2.z - g.zonas[0].z) >= g.zonas[0].radio - 1e-9, `pose manual dentro de ZONA_SILLAS → AJUSTADA a (${f(PZ2.x, 2)}, ${f(PZ2.z, 2)})`);
+  // los tres modos
+  const PM = pose({ ...C, MODO: 'manual', MIRAR_TARIMA: true }, g);
+  check(PM.x === C.POS_X && PM.z === C.POS_Z && PM.yawDeg === C.YAW_DEG && PM.modo === 'manual', 'manual: POS_X, POS_Z y YAW tal cual (MIRAR_TARIMA no lo cambia)');
+  check(Math.abs(Z65.x - (-7.74)) < 0.01 && Math.abs(Z65.z - (-4.49)) < 0.01, `desplazamiento: la pose de Z65 (${f(Z65.x, 2)}, ${f(Z65.z, 2)})`);
+  const PT = pose({ ...C, MIRAR_TARIMA: true }, g), ft = [-Math.sin(PT.yawDeg * Math.PI / 180), -Math.cos(PT.yawDeg * Math.PI / 180)], nt = Math.hypot(PT.x, PT.z);
+  check(PT.x === P.x && PT.z === P.z && Math.abs((ft[0] * -PT.x + ft[1] * -PT.z) / nt - 1) < 1e-9, `linea_sillas + MIRAR_TARIMA: misma posición, yaw ${f(PT.yawDeg, 1)}° al centro de la tarima`);
+  check(pose({ ...C, MODO: 'cualquiera' }, g).modo === 'desplazamiento' && pose({ ...C, MODO: undefined }, g).modo === 'desplazamiento', 'un MODO desconocido o ausente = desplazamiento (Z65)');
+  // el telón ya no está (se oculta en el destello y se desmonta con curtain-done); informativo
+  const L = Math.hypot(10, 7), ej = [10 / L, 7 / L], tc = [-10 + ej[0] * 3, -7 + ej[1] * 3];
+  console.log(`    telón (ya desmontado al llegar): la nueva queda a ${f(Math.hypot(P.x - tc[0], P.z - tc[1]), 2)} m de su centro, ${f((P.x - tc[0]) * ej[0] + (P.z - tc[1]) * ej[1], 2)} m de su plano (negativo = lado del spawn; el cruce se detecta una sola vez)`);
+}
 
 console.log(`\n${ok} OK · ${fallas} fallas`);
 process.exit(fallas ? 1 : 0);

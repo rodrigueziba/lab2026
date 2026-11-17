@@ -73,20 +73,34 @@ export function tickEntrada(e: EstadoEntrada, c: CfgEntrada, destello: FaseDeste
 // (tarima, sillas), se lo empuja afuera por el lado más cercano (el mínimo); `ajustada` lo avisa.
 export interface CfgPoseEntrada {
   POS_X: number; POS_Z: number; YAW_DEG: number; PITCH_DEG: number; DESPLAZ_IZQ_M?: number; MIRAR_TARIMA?: boolean;
+  // Z75: modo de la pose ("linea_sillas" | "desplazamiento" | "manual"; sin MODO = "desplazamiento", como Z65)
+  MODO?: string; MARGEN_LINEA_SILLAS_M?: number; DIST_MIN_OBJETOS_M?: number;
 }
 /** Rectángulo en XZ (x0 < x1, z0 < z1). */
 export interface RectXZ { x0: number; z0: number; x1: number; z1: number }
-export interface PoseEntrada { x: number; z: number; yawDeg: number; pitchDeg: number; ajustada: boolean }
-export function crearPoseEntrada(): PoseEntrada { return { x: 0, z: 0, yawDeg: 0, pitchDeg: 0, ajustada: false }; }
+export interface PoseEntrada { x: number; z: number; yawDeg: number; pitchDeg: number; ajustada: boolean; modo: string; desplazM: number; lateralBordeM: number }
+export function crearPoseEntrada(): PoseEntrada { return { x: 0, z: 0, yawDeg: 0, pitchDeg: 0, ajustada: false, modo: "desplazamiento", desplazM: 0, lateralBordeM: 0 }; }
 /** Última pose calculada (la lee el menú debug). */
 export const POSE_ENTRADA = crearPoseEntrada();
 
 /** Escribe en out la pose final. salaMedia: medio lado caminable de la sala; tarima: centro hacia donde mirar. */
 export function poseEntrada(c: CfgPoseEntrada, salaMedia: number, obstaculos: readonly RectXZ[],
-  tarima: { x: number; z: number }, out: PoseEntrada): PoseEntrada {
-  const yaw = (fin(c.YAW_DEG, 0) * Math.PI) / 180, d = fin(c.DESPLAZ_IZQ_M ?? 0, 0);
+  tarima: { x: number; z: number }, out: PoseEntrada, sillas: readonly RectXZ[] = [], zonas: readonly ZonaXZ[] = []): PoseEntrada {
+  const yaw = (fin(c.YAW_DEG, 0) * Math.PI) / 180, modo = modoEntrada(c.MODO);
+  let d = modo === "desplazamiento" ? fin(c.DESPLAZ_IZQ_M ?? 0, 0) : 0, borde = 0;
+  if (modo === "linea_sillas" && sillas.length) {   // Z75: lateral = borde exterior de la fila + margen
+    borde = bordeLateralSillas(sillas, c.YAW_DEG);
+    d = borde + Math.max(0, fin(c.MARGEN_LINEA_SILLAS_M ?? 1, 1)) - lateralDe(fin(c.POS_X, 0), fin(c.POS_Z, 0), c.YAW_DEG);
+  }
   let x = fin(c.POS_X, 0) - Math.cos(yaw) * d, z = fin(c.POS_Z, 0) + Math.sin(yaw) * d;
   let ajustada = false;
+  // Z75: zonas que disparan algo (ZONA_SILLAS, ZONA_TARIMA): si la pose cae adentro, se la saca radialmente (el mínimo)
+  for (const q of zonas) {
+    const dx = x - q.x, dz = z - q.z, r = Math.hypot(dx, dz), R = Math.max(0, q.radio);
+    if (r >= R) continue;
+    ajustada = true;
+    if (r < 1e-6) { x = q.x + R + 0.01; } else { x = q.x + (dx / r) * (R + 0.01); z = q.z + (dz / r) * (R + 0.01); }
+  }
   const m = Math.max(0, fin(salaMedia, 39.5));
   if (Math.abs(x) > m || Math.abs(z) > m) { x = Math.max(-m, Math.min(m, x)); z = Math.max(-m, Math.min(m, z)); ajustada = true; }
   for (let pasada = 0; pasada < 3; pasada++) {   // un obstáculo puede empujar dentro de otro: unas pocas pasadas
@@ -100,10 +114,41 @@ export function poseEntrada(c: CfgPoseEntrada, salaMedia: number, obstaculos: re
     if (!dentro) break;
   }
   let yawDeg = fin(c.YAW_DEG, 0);
-  if (c.MIRAR_TARIMA) {
+  if (c.MIRAR_TARIMA && modo !== "manual") {   // Z75: en manual el yaw va tal cual
     const dx = tarima.x - x, dz = tarima.z - z;
     if (dx * dx + dz * dz > 1e-6) yawDeg = (Math.atan2(-dx, -dz) * 180) / Math.PI;   // mirada (−sin, −cos) = dirección a la tarima
   }
   out.x = x; out.z = z; out.yawDeg = yawDeg; out.pitchDeg = fin(c.PITCH_DEG, 0); out.ajustada = ajustada;
+  out.modo = modo; out.desplazM = d; out.lateralBordeM = borde;
   return out;
+}
+
+// ── Z75: modos de la pose y regla "linea_sillas" ──
+// Coordenada lateral de un punto = su proyección sobre la izquierda de la mirada (−cos yaw, sin yaw). Borde exterior de
+// la fila = la mayor lateral de las esquinas de las sillas (el punto de la fila más a la izquierda de la mirada).
+// linea_sillas: desde (POS_X, POS_Z) se corre sobre la izquierda hasta lateral = borde + MARGEN_LINEA_SILLAS_M; se
+// conserva la coordenada sobre la mirada (la "profundidad"), el yaw y el pitch. Mismo mecanismo que Z65 (DESPLAZ_IZQ_M),
+// pero con el desplazamiento calculado desde la geometría de las sillas (acompaña a DBG_LAYOUT).
+export type ModoEntrada = "linea_sillas" | "desplazamiento" | "manual";
+/** Círculo en XZ (zona que dispara algo al entrar). */
+export interface ZonaXZ { x: number; z: number; radio: number }
+export function modoEntrada(v: string | undefined): ModoEntrada {
+  return v === "linea_sillas" || v === "manual" ? v : "desplazamiento";
+}
+/** Coordenada lateral (m) del punto (x, z) hacia la izquierda de la mirada con ese yaw (grados). */
+export function lateralDe(x: number, z: number, yawDeg: number): number {
+  const y = (fin(yawDeg, 0) * Math.PI) / 180;
+  return -Math.cos(y) * x + Math.sin(y) * z;
+}
+/** Borde exterior de la fila: la mayor coordenada lateral de las esquinas de las sillas (huellas en el piso). */
+export function bordeLateralSillas(sillas: readonly RectXZ[], yawDeg: number): number {
+  let b = -Infinity;
+  for (const r of sillas) {
+    b = Math.max(b, lateralDe(r.x0, r.z0, yawDeg), lateralDe(r.x1, r.z0, yawDeg), lateralDe(r.x0, r.z1, yawDeg), lateralDe(r.x1, r.z1, yawDeg));
+  }
+  return Number.isFinite(b) ? b : 0;
+}
+/** Distancia (XZ) del punto al rectángulo (0 adentro). */
+export function distARect(x: number, z: number, r: RectXZ): number {
+  return Math.hypot(Math.max(r.x0 - x, 0, x - r.x1), Math.max(r.z0 - z, 0, z - r.z1));
 }
