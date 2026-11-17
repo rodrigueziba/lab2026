@@ -9,7 +9,7 @@ import { SecDiagonalspot, SecHacesN3R2V1, SecLucesDelVisualizadorZ42, SecU6aAnil
 import { SecCheckpointsZ40, SecEfectosDelDialogoZ29, SecCaminoLuzZ28, SecDialogoZ27, SecLuzHuidaZ76 } from "./pestanas/narrativa";
 import { SecDebugOverlays } from "./pestanas/otros";
 import { SecPanelesSillas, SecAcercamientoZ8, SecPrioridadZ10ProyectoAbiertoSobreLas, SecVideoEtapa1, SecFocoZ19SubpanelAgrandado, SecSubpanelesZ4HistoriaGaleriaFicha } from "./pestanas/paneles";
-import { SecMonolitosN5V1V2V3, SecPastoZ64, SecPastoExtensionZ74 } from "./pestanas/pasto";
+import { SecMonolitosN5V1V2V3, SecPastoZ64, SecPastoExtensionZ74, SecMonolitosVivoZ82 } from "./pestanas/pasto";
 import { SecRendimientoZ66, SecPostProcesoR4 } from "./pestanas/rendimiento";
 import { SecSecuenciaSillas, SecIconosDelPisoZ23, SecLayoutZ41, SecRelojDeLaExperienciaZ39, SecMovimientoZ34 } from "./pestanas/sala";
 import { SecSolN3, SecOndasPorKickZ52, SecSolNuevoZ51 } from "./pestanas/sol";
@@ -70,6 +70,7 @@ export const COMPONENTES_SECCION: Record<string, ComponentType> = {
   "audio": SecAudio,
   "audio-nucleo-z78": SecAudioNucleoZ78,
   "play-tarima-z79": SecPlayTarimaZ79,
+  "monolitos-vivo-z82": SecMonolitosVivoZ82,
   "caja-ritmos-z80": SecCajaRitmosZ80,
   "extra-lights": SecExtraLights,
   "telon-n6": SecTelonN6,

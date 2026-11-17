@@ -1,7 +1,9 @@
 "use client";
 // Z70: pestaña "Pasto y monolitos" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
-import { DBG_SILLAS, DBG_PASTO } from "@/lib/debugConfig";
+import { useEffect, useState } from "react";
+import { DBG_SILLAS, DBG_PASTO, DBG_MONO_VIVO } from "@/lib/debugConfig";
+import { simularSesionEnVivo, quitarSesion, forzarCerca, reiniciarMonolitosVivo, aceptarTransmision, textoEstadoMonolitos, MONO_VIVO } from "@/lib/monolitosVivoAcciones";   // Z82
 import { MONO_PASTO } from "@/lib/monolitosPasto";
 import { LABEL, ROW, INPUT, NOTE, NumField, N5ProximityOverlay } from "../comun";
 import { useDbg } from "../contexto";
@@ -195,6 +197,46 @@ export function SecPastoExtensionZ74() {
             <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:pasto-ext-reiniciar"))}>Reiniciar extensión</button>
             <button style={INPUT} onClick={() => window.dispatchEvent(new CustomEvent("alight:pasto-completar-extender"))}>Completar todo y extender</button>
           </div>
+    </>
+  );
+}
+
+// sección: monolitos-vivo-z82
+export function SecMonolitosVivoZ82() {
+  // Z82: monolitos frente a la sesión en vivo de la tarima, solo local (lib/monolitosVivo.ts). Estado 4 veces por segundo.
+  const M = DBG_MONO_VIVO;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const boton = (txt: string, fn: () => void) => <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); fn(); toca(); }}>{txt}</button>;
+  return (
+    <>
+          <span style={LABEL}>Monolitos y sesión en vivo Z82 <span style={NOTE}>(live · solo local · sonido = derecho, video = izquierdo)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoMonolitos()}</span></div>
+          <div style={ROW}>{boton("Simular sesión en vivo", simularSesionEnVivo)}{boton("Quitar sesión", quitarSesion)}</div>
+          <div style={ROW}>{boton("Forzar cerca de sonido", () => forzarCerca("sonido"))}{boton("Forzar cerca de video", () => forzarCerca("video"))}{boton("Reiniciar", reiniciarMonolitosVivo)}</div>
+          {([["ACTIVO", "off = prototipo N5 como estaba"], ["REQUIERE_ACEPTACION", "sin mezcla remota hasta aceptar"], ["OVERLAY", "estados y pesos en pantalla"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={() => { M[k] = !M[k]; toca(); }}>{M[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {M.REQUIERE_ACEPTACION && <div style={ROW}>{boton(MONO_VIVO.aceptada ? "Retirar aceptación" : "Aceptar transmisión", () => aceptarTransmision(!MONO_VIVO.aceptada))}</div>}
+          <div style={ROW}>
+            <span>RUIDO_TIPO</span>
+            {(["blanco", "rosa"] as const).map(v => (
+              <button key={v} style={{ ...INPUT, opacity: M.RUIDO_TIPO === v ? 1 : 0.5 }} onClick={() => { M.RUIDO_TIPO = v; toca(); }}>{v}</button>
+            ))}
+          </div>
+          {([
+            ["RADIO_INICIO_M", 0.5, 8, 0.05, "m"], ["RADIO_TOTAL_M", 0.1, 4, 0.05, "m"], ["SOSTENER_S", 0, 60, 0.5, "s"], ["RETORNO_S", 0.1, 20, 0.1, "s"],
+            ["CANCELAR_S", 0.05, 3, 0.05, "s"], ["UMBRAL_VEL_MS", 0, 1, 0.01, "m/s"], ["RUIDO_GANANCIA", 0, 1.5, 0.01, ""], ["SESION_GANANCIA", 0, 2, 0.01, ""],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{M[k].toFixed(st < 0.1 ? 2 : 1)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={M[k]} onChange={ev => { M[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
     </>
   );
 }

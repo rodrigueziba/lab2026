@@ -7,9 +7,10 @@
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_SILLAS, DBG_AMANECER, DBG_LAYOUT, DBG_RENDIMIENTO } from "@/lib/debugConfig"; // Z38, Z69
+import { DBG_SILLAS, DBG_AMANECER, DBG_LAYOUT, DBG_RENDIMIENTO, DBG_MONO_VIVO } from "@/lib/debugConfig"; // Z38, Z69, Z82
 import { monolitoEn, monolitoDistM } from "@/lib/layoutSala"; // Z41
 import { setMonolithProximity } from "@/lib/vizAudio";
+import { tickMonolitosVivo, soltarMonolitosVivo, modoN5 } from "@/lib/monolitosVivoAcciones";   // Z82
 import { createBasePlateTex } from "@/lib/retro/decals";
 import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca"; // Z68
 import { MONO_PASTO, hundimientoM, suaveAparicion } from "@/lib/monolitosPasto"; // Z65
@@ -438,6 +439,7 @@ export default function Monoliths({ pasto = false }: { pasto?: boolean }) {
     return () => {
       window.removeEventListener("alight:visualizer-deactivate", onOff);
       setMonolithProximity(0, 0);
+      soltarMonolitosVivo();   // Z82
     };
   }, []);
 
@@ -589,7 +591,9 @@ export default function Monoliths({ pasto = false }: { pasto?: boolean }) {
     rightUniforms.uReveal.value = op;
 
     if (!activeRef.current && !DBG_SILLAS.monolithForceShow && op < 0.001) {
-      setMonolithProximity(0, 0);
+      // Z82: con la sesión en vivo, los monolitos fuera de la escena = lejos (los sostenes vuelven al audio propio)
+      if (DBG_MONO_VIVO.ACTIVO) tickMonolitosVivo(Infinity, Infinity, 0, dt);
+      else { modoN5(); setMonolithProximity(0, 0); }
       return;
     }
 
@@ -604,7 +608,9 @@ export default function Monoliths({ pasto = false }: { pasto?: boolean }) {
     const proxL = THREE.MathUtils.clamp((start - dL) / (start - full), 0, 1);
     const proxR = THREE.MathUtils.clamp((start - dR) / (start - full), 0, 1);
 
-    setMonolithProximity(proxL * op, proxR * op);
+    // Z82: máquina de estados de los monolitos (sonido = derecho, video = izquierdo); false = N5 como estaba
+    if (DBG_MONO_VIVO.ACTIVO) tickMonolitosVivo(dR, dL, op, dt);
+    else { modoN5(); setMonolithProximity(proxL * op, proxR * op); }
     rightUniforms.uAudio.value = proxR * 0.6;
   });
 

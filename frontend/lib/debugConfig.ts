@@ -1504,3 +1504,20 @@ export const DBG_RITMOS = {
   OVERLAY_CELDA:     false,    // depuración: celda bajo el mouse — live
   PERSISTENCIA:      true,     // patrón, PASOS, BPM y swing en sessionStorage (alight:ritmos)
 };
+
+// ── Z82: monolitos frente a la sesión en vivo de la tarima, solo local (lib/monolitosVivo.ts, lib/monolitosVivoAcciones.ts) ──
+// ACTIVO = false → prototipo N5 como estaba (monolito derecho baja la música 85 % y sube ruido blanco).
+export const DBG_MONO_VIVO = {
+  ACTIVO:              true,    // — live
+  RADIO_INICIO_M:      3.0,     // empieza el reemplazo (= monolithProxStartM de N5) — live
+  RADIO_TOTAL_M:       1.0,     // reemplazo total (N5: 0,5) — live
+  SOSTENER_S:          15,      // sostén al alejarse — live
+  RETORNO_S:           6,       // vuelta progresiva al audio propio — live
+  CANCELAR_S:          0.6,     // alejarse de los dos durante esto cancela el sostén — live
+  UMBRAL_VEL_MS:       0.15,    // m/s mínimos para contar "acercarse" o "alejarse" (quieto no cuenta) — live
+  RUIDO_GANANCIA:      0.5,     // nivel de la estática con peso 1 (= noiseGain de N5) — live
+  RUIDO_TIPO:          "blanco" as string,   // "blanco" | "rosa" (se recrea al cambiar) — live
+  SESION_GANANCIA:     1.0,     // nivel del audio de la sesión con peso 1 — live
+  REQUIERE_ACEPTACION: false,   // true: sin mezcla remota hasta que el espectador acepte (aceptarTransmision()) — live
+  OVERLAY:             false,   // estados, pesos y contadores (abajo a la izquierda) — live
+};

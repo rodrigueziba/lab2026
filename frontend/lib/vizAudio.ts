@@ -3,6 +3,7 @@
 // from ThreeScene's keydown handler (preserving the browser's user-gesture context).
 // /login source: /music.mp3 via /api/music-list — we use the same track.
 
+import { crearRuido, type FuenteRuido, type TipoRuido } from "@/lib/audio/ruido";   // Z82
 import { DBG_SILLAS } from "./debugConfig";
 
 // ── N4 constants ──────────────────────────────────────────────────────────────
@@ -71,6 +72,10 @@ let _playStarted  = false;
 // N5: white noise cross-fade nodes
 let _noiseSource:    AudioBufferSourceNode | null = null;
 let _noiseGain:      GainNode | null = null;
+// Z82: punto de mezcla de la fuente remota de los monolitos (sesión de la tarima o estática) → masterGain
+let _remotoGain:     GainNode | null = null;
+let _estatica:       FuenteRuido | null = null;
+let _nodoRemoto:     AudioNode | null = null;   // nodo conectado hoy a _remotoGain (estática o sesión)
 let _musicFadeGain:  GainNode | null = null;
 
 // N4: band chain nodes
@@ -334,6 +339,10 @@ async function _buildChain(): Promise<void> {
   _noiseGain.connect(_masterGain);
   _noiseSource.start();
 
+  // Z82: fuente remota de los monolitos (sesión o estática), cerrada hasta que haya mezcla
+  _remotoGain = _vizCtx.createGain(); _remotoGain.gain.value = 0;
+  _remotoGain.connect(_masterGain);
+
   _masterGain.connect(_vizAnalyser);
   _vizAnalyser.connect(_vizCtx.destination);
 
@@ -423,6 +432,8 @@ export function stopVizAudio(): void {
   try { _noiseSource?.stop(); } catch { /* already stopped */ }
   _noiseSource = null; _noiseGain = null; _musicFadeGain = null;
   N5_STATE.leftProximity = 0; N5_STATE.rightProximity = 0;
+  // Z82: fuente remota de los monolitos
+  _estatica?.liberar(); _estatica = null; _nodoRemoto = null; _remotoGain = null;
   _bandEnergySmooth.fill(0); _kickBandPrev = 0; _kickBandLast = 0; _lastBandTime = 0;
   _agcFloor.fill(0); _agcCeil.fill(0.1); _agcNormSmo.fill(0);
   _playStarted = false;
@@ -597,4 +608,42 @@ export function setMonolithProximity(left: number, right: number): void {
   const tau = 0.12;
   if (_musicFadeGain) _musicFadeGain.gain.setTargetAtTime(1 - right * 0.85, t, tau);
   if (_noiseGain)     _noiseGain.gain.setTargetAtTime(right * DBG_SILLAS.noiseGain, t, tau);
+}
+
+// ── Z82: mezcla de los monolitos con la sesión en vivo (lib/monolitosVivoAcciones.ts) ──────────────────────────
+/** Contexto de SILLAS (null si la música del visualizador no arrancó). */
+export function contextoViz(): AudioContext | null { return _vizCtx; }
+
+/**
+ * Mezcla de potencia constante entre el audio propio (gOrig) y el remoto (gRem). nodoSesion = audio de la sesión de
+ * la tarima (null = estática: crearRuido en este contexto, creada la primera vez que hace falta). nivelRemoto multiplica
+ * a gRem (RUIDO_GANANCIA o SESION_GANANCIA). Con gRem = 0 la fuente remota queda conectada pero en silencio.
+ */
+export function setMezclaRemota(gOrig: number, gRem: number, nodoSesion: AudioNode | null, nivelRemoto: number, tipoRuido: TipoRuido = "blanco"): void {
+  if (!_vizCtx || !_remotoGain || !_musicFadeGain) return;
+  const t = _vizCtx.currentTime, tau = 0.08;
+  let fuente: AudioNode | null = nodoSesion;
+  if (!fuente && gRem > 0.0005) {
+    if (_estatica && _estatica.tipo !== tipoRuido) { if (_nodoRemoto === _estatica.salida) _nodoRemoto = null; _estatica.liberar(); _estatica = null; }
+    if (!_estatica) _estatica = crearRuido(_vizCtx, { tipo: tipoRuido, ganancia: 1 });
+    fuente = _estatica.salida;
+  } else if (!fuente) fuente = _estatica && _nodoRemoto === _estatica.salida ? _nodoRemoto : null;   // sin peso: deja la estática; suelta una sesión que ya no está
+  if (fuente !== _nodoRemoto) {
+    try { _nodoRemoto?.disconnect(_remotoGain); } catch { /* ya desconectado */ }
+    if (fuente) fuente.connect(_remotoGain);
+    _nodoRemoto = fuente;
+  }
+  _musicFadeGain.gain.setTargetAtTime(Math.max(0, gOrig), t, tau);
+  _remotoGain.gain.setTargetAtTime(Math.max(0, gRem * nivelRemoto), t, tau);
+  if (_noiseGain) _noiseGain.gain.setTargetAtTime(0, t, tau);   // el ruido de N5 no se usa en este modo
+}
+
+/** Z82: lectura de diagnóstico de la mezcla (menú, pruebas en el navegador). */
+export function leerMezclaRemota(): { ctx: string; orig: number; rem: number; fuente: string } {
+  return {
+    ctx: _vizCtx?.state ?? "sin crear",
+    orig: _musicFadeGain?.gain.value ?? -1,
+    rem: _remotoGain?.gain.value ?? -1,
+    fuente: !_nodoRemoto ? "ninguna" : _estatica && _nodoRemoto === _estatica.salida ? `estática (${_estatica.tipo})` : "sesión",
+  };
 }
