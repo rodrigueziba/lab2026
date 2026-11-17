@@ -6,7 +6,7 @@ import { SecControlDelDia, SecCicloDeDiaZ48, SecCieloEstrelladoZ30, SecAmanecerZ
 import { SecDomeVisualizer, SecFluirDeColorZ61, SecComposicionDelDomoZ49, SecShaderDelDomo } from "./pestanas/composicion";
 import { SecPrismProximity, SecPrismaYFlorZ54, SecBaseDeLaFlorZ67, SecFractalDelPrismaZ43 } from "./pestanas/flor";
 import { SecDiagonalspot, SecHacesN3R2V1, SecLucesDelVisualizadorZ42, SecU6aAnillosEnPiso, SecU6bDestelloDelHaz } from "./pestanas/luces";
-import { SecCheckpointsZ40, SecEfectosDelDialogoZ29, SecCaminoLuzZ28, SecDialogoZ27 } from "./pestanas/narrativa";
+import { SecCheckpointsZ40, SecEfectosDelDialogoZ29, SecCaminoLuzZ28, SecDialogoZ27, SecLuzHuidaZ76 } from "./pestanas/narrativa";
 import { SecDebugOverlays } from "./pestanas/otros";
 import { SecPanelesSillas, SecAcercamientoZ8, SecPrioridadZ10ProyectoAbiertoSobreLas, SecVideoEtapa1, SecFocoZ19SubpanelAgrandado, SecSubpanelesZ4HistoriaGaleriaFicha } from "./pestanas/paneles";
 import { SecMonolitosN5V1V2V3, SecPastoZ64, SecPastoExtensionZ74 } from "./pestanas/pasto";
@@ -39,6 +39,7 @@ export const COMPONENTES_SECCION: Record<string, ComponentType> = {
   "checkpoints-z40": SecCheckpointsZ40,
   "efectos-del-dialogo-z29": SecEfectosDelDialogoZ29,
   "camino-luz-z28": SecCaminoLuzZ28,
+  "luz-huida-z76": SecLuzHuidaZ76,
   "dialogo-z27": SecDialogoZ27,
   "debug-overlays": SecDebugOverlays,
   "paneles-sillas": SecPanelesSillas,

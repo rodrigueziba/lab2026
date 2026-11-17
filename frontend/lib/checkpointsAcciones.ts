@@ -34,6 +34,7 @@ import { togglePlayPause } from "@/lib/audioEngine";
 import { resetLinterna } from "@/lib/linternaPaneles";
 import { resetFoco } from "@/lib/focoSubpanel";
 import { LUZ_STATE, actualizarPosLuz } from "@/lib/caminoLuz";
+import { consumirHuidaVisita } from "@/lib/luzMovimiento"; // Z76
 import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
 import { ZONA_TARIMA, zonaSillasEn, centroSillasEn } from "@/lib/layoutSala"; // Z41
 
@@ -197,6 +198,7 @@ export const ACCIONES_CHECKPOINT: Record<string, Accion> = {
   // a 1 m de la luz, del lado del spawn, mirándola: LuzLejana dispara giro + diálogo (n_1)
   irALuz: () => {
     if (!_camara) return false;
+    consumirHuidaVisita();   // Z76: decide el checkpoint: va a donde esté la luz y la terminal se abre sin huida pendiente
     actualizarPosLuz();
     const x = LUZ_STATE.x + EJE_TELON.fx * 1.0, z = LUZ_STATE.z + EJE_TELON.fz * 1.0;
     _camara.position.set(x, 1.6, z);

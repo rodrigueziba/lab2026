@@ -1048,6 +1048,27 @@ export const DBG_RENDIMIENTO = {
 };
 
 // ── Z59: entrada fija después de cruzar el telón (lib/entradaTelon.ts, components/EntradaTelon.tsx) ──
+// ── Z76: la luz del camino LUZ huye cuando el usuario vuelve (lib/luzHuida.ts, lib/luzMovimiento.ts, LuzHuida.tsx) ──
+// Visita = apertura de la terminal bajo la luz. En la visita k la luz se mueve k − 1 veces, una celda (tablero de
+// celdas = diámetro del haz, centrado en su origen) cada vez que el usuario se acerca a menos de DIST_HUIDA_M.
+export const DBG_LUZ_MOV = {
+  ACTIVO:           true,   // false = como antes de Z76 (la luz no se mueve; vuelve al origen) — live
+  DIST_HUIDA_M:     5,      // huye si el usuario está a menos de esto (ACTIVACION_M 2 + 3) — live
+  MOVER_S:          0.4,    // duración del deslizamiento (s) — live
+  ANTICIPO_S:       0.12,   // temblor antes de moverse (s; 0 = sin anticipo) — live
+  TEMBLOR_M:        0.15,   // amplitud del temblor del anticipo (m) — live
+  ESPERA_S:         0.8,    // espera entre movimientos (s) — live
+  RADIO_CELDAS:     3,      // nunca más de esto del origen (distancia de tablero: max(|col|, |fila|)) — live
+  DIAGONALES:       true,   // movimientos al azar también en diagonal — live
+  SEMILLA:          "auto" as string | number, // "auto" = aleatoria por sesión; un número = reproducible (aplica al reiniciar visitas)
+  RESET_POR_VISITA: false,  // true = la luz vuelve al origen al empezar cada visita (al rearmar); false = acumulativa — live
+  PERSISTENCIA:     "sesion" as string, // "sesion" = sessionStorage (sobrevive a recargar) · "memoria" = se pierde al recargar — live
+  TAM_CELDA_M:      "auto" as string | number, // "auto" = diámetro total del haz (2 × 1,5 × CONO_RADIO_M = 7,2 m) — live
+  REARME_M:         8,      // después de una visita, hay que alejarse más que esto para que vuelva a huir — live
+  CORREDOR_M:       4,      // la celda solo vale si el disco caminable de la luz sigue tocando la sala con este margen — live
+  OVERLAY:          false,  // dibuja la grilla, la celda actual y los contadores — live
+};
+
 export const DBG_ENTRADA = {
   ACTIVO:                 true,   // false = como antes de Z59 (el usuario queda donde cruzó el telón) — live
   POS_X:                  -7.4,   // pose de entrada (m); la altura de ojos es la de siempre (1,6) — live

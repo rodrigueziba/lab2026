@@ -24,6 +24,8 @@ import EfectosDialogo from "@/components/EfectosDialogo";     // Z29
 import AmanecerReloj from "@/components/AmanecerReloj";       // Z38
 import CheckpointsHost from "@/components/CheckpointsHost";   // Z40
 import { CONO_VERT, CONO_FRAG, POZO_VERT, POZO_FRAG, crearHalo } from "@/lib/luz/luzVisual"; // Z42
+import LuzHuida from "@/components/LuzHuida";                 // Z76
+import { registrarVisitaLuz, huidaBloqueaActivacion } from "@/lib/luzMovimiento"; // Z76
 
 const ESTRELLAS_R = 400;   // radio de la esfera de estrellas (sigue a la cámara)
 const DOMO_EXT_R  = 30;    // caparazón del domo (DOME_R + 2 en ExperienceDome)
@@ -245,7 +247,8 @@ export default function LuzLejana() {
     // ── activación bajo la luz ──
     const s = sec.current;
     if (LUZ_STATE.fase === "libre") {
-      if (d <= DBG_LUZ.ACTIVACION_M && INTERACT_STATE.mode === "none" && !INTERACT_STATE.camAnimActive) {
+      // Z76: mientras la luz huye (o le quedan huidas a esta visita) no se abre la terminal
+      if (d <= DBG_LUZ.ACTIVACION_M && INTERACT_STATE.mode === "none" && !INTERACT_STATE.camAnimActive && !huidaBloqueaActivacion()) {
         LUZ_STATE.fase = "girando";
         INTERACT_STATE.movementLocked = true;
         s.t0 = performance.now();
@@ -265,6 +268,7 @@ export default function LuzLejana() {
       if (t >= 1) {
         LUZ_STATE.fase = "dialogo";
         abrirDialogo();                           // iniciar() → reset + knot n_1
+        registrarVisitaLuz();                     // Z76: abrir la terminal bajo la luz = una visita
       }
     } else if (LUZ_STATE.fase === "dialogo") {
       INTERACT_STATE.movementLocked = true;
@@ -276,6 +280,7 @@ export default function LuzLejana() {
 
   return (
     <>
+      <LuzHuida />{/* Z76: huida de la luz (antes que el resto: escribe LUZ_DESPLAZ) */}
       <group ref={raizRef}>
         {/* fuente: un solo sprite aditivo con halo (sin luces reales) */}
         <sprite ref={spriteRef} name="luz-sprite" renderOrder={10}>

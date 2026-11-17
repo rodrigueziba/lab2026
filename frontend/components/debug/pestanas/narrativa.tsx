@@ -2,7 +2,9 @@
 // Z70: pestaña "Narrativa y checkpoints" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { CK_STATE, CHECKPOINTS, irACheckpoint } from "@/lib/checkpoints";
-import { DBG_CHECKPOINTS, DBG_EFECTOS, DBG_LUZ, DBG_DIALOGO } from "@/lib/debugConfig";
+import { DBG_CHECKPOINTS, DBG_EFECTOS, DBG_LUZ, DBG_DIALOGO, DBG_LUZ_MOV } from "@/lib/debugConfig";
+import { HUIDA, tamCeldaLuz } from "@/lib/luzMovimiento"; // Z76
+import { movimientosRestantes } from "@/lib/luzHuida"; // Z76
 import { EFECTOS_STATE, probarEfecto, borrarPremio } from "@/lib/dialogo/efectosEstado";
 import { LUZ_STATE } from "@/lib/caminoLuz";
 import { PAUSA } from "@/lib/pausaExperiencia";
@@ -102,6 +104,61 @@ export function SecEfectosDelDialogoZ29() {
             onChange={v => { DBG_EFECTOS.PREMIO_DURACION_S = v; setEfx(o => ({ ...o, PREMIO_DURACION_S: v })); }} />
           <NumField label="ATRILES_DELAY_MS" value={efx.ATRILES_DELAY_MS} step={100} min={0} max={10000} note="ms"
             onChange={v => { DBG_EFECTOS.ATRILES_DELAY_MS = v; setEfx(o => ({ ...o, ATRILES_DELAY_MS: v })); }} />
+    </>
+  );
+}
+
+// sección: luz-huida-z76
+export function SecLuzHuidaZ76() {
+  const { tocarDia } = useDbg();
+  const M = DBG_LUZ_MOV;
+  const emitir = (n: string) => { window.dispatchEvent(new CustomEvent(n)); tocarDia(); };
+  const tamAuto = M.TAM_CELDA_M === "auto";
+  return (
+    <>
+          {/* Z76: la luz del camino LUZ huye cuando el usuario vuelve */}
+          <span style={LABEL}>Huida de la luz Z76 <span style={NOTE}>(visita k → k − 1 huidas · live)</span></span>
+          <div style={{ ...ROW, ...NOTE }}>
+            <span>visitas {HUIDA.visitas} · pendientes {movimientosRestantes(HUIDA)} · celda ({HUIDA.col}, {HUIDA.fila}) · total {HUIDA.movsTotal} · {HUIDA.fase}{HUIDA.armada ? "" : " · sin armar"} · celda {tamCeldaLuz().toFixed(2)} m · d={LUZ_STATE.dLuz.toFixed(1)} m</span>
+          </div>
+          {([["ACTIVO", "off = como antes"], ["DIAGONALES", "azar en diagonal"], ["RESET_POR_VISITA", "vuelve al origen cada visita"], ["OVERLAY", "grilla + contadores"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={() => { M[k] = !M[k]; tocarDia(); }}>{M[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          <div style={ROW}>
+            <span>PERSISTENCIA</span>
+            {(["sesion", "memoria"] as const).map(v => (
+              <button key={v} style={{ ...INPUT, opacity: M.PERSISTENCIA === v ? 1 : 0.5 }} onClick={() => { M.PERSISTENCIA = v; tocarDia(); }}>{v}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <span>TAM_CELDA_M <span style={NOTE}>{tamAuto ? "auto = diámetro del haz" : "m"}</span></span>
+            <button style={{ ...INPUT, opacity: tamAuto ? 1 : 0.5 }} onClick={() => { M.TAM_CELDA_M = tamAuto ? +tamCeldaLuz().toFixed(1) : "auto"; tocarDia(); }}>auto</button>
+            {!tamAuto && <input type="range" min={2} max={15} step={0.1} style={{ flex: 1 }} value={Number(M.TAM_CELDA_M)}
+              onChange={e => { M.TAM_CELDA_M = parseFloat(e.target.value); tocarDia(); }} />}
+          </div>
+          {([
+            ["DIST_HUIDA_M", 1, 20, 0.25, "m"], ["MOVER_S", 0.05, 3, 0.05, "s"], ["ANTICIPO_S", 0, 1, 0.01, "s (0 = sin)"], ["TEMBLOR_M", 0, 1, 0.01, "m"],
+            ["ESPERA_S", 0, 5, 0.05, "s"], ["RADIO_CELDAS", 0, 6, 1, "celdas"], ["REARME_M", 2, 40, 0.5, "m"], ["CORREDOR_M", 0, 20, 0.5, "m"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{M[k].toFixed(st < 0.1 ? 2 : st < 1 ? 1 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={M[k]}
+                onChange={e => { M[k] = parseFloat(e.target.value); tocarDia(); }} />
+            </div>
+          ))}
+          <NumField label="SEMILLA" value={M.SEMILLA === "auto" ? -1 : Number(M.SEMILLA)} step={1} min={-1} max={999999} note="−1 = auto · aplica al reiniciar visitas"
+            onChange={v => { M.SEMILLA = v < 0 ? "auto" : Math.floor(v); tocarDia(); }} />
+          <div style={ROW}>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); emitir("alight:luz-simular-visita"); }}>Simular visita +1</button>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); emitir("alight:luz-reiniciar-visitas"); }}>Reiniciar visitas</button>
+          </div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); emitir("alight:luz-mover-ahora"); }}>Mover luz ahora</button>
+            <button style={INPUT} onClick={e => { e.currentTarget.blur(); emitir("alight:luz-volver-origen"); }}>Volver al origen</button>
+          </div>
     </>
   );
 }

@@ -15,7 +15,8 @@ const _spawn = { x: 0, y: 0, z: 0 };
 export type FaseLuz = "libre" | "girando" | "dialogo" | "rearmar";
 
 export const LUZ_STATE = {
-  x: 0, z: 0, y: 4.5,      // posición actual de la luz (recalculada cada frame desde DBG_LUZ)
+  x: 0, z: 0, y: 4.5,      // posición actual de la luz (recalculada cada frame desde DBG_LUZ) = origen + LUZ_DESPLAZ (Z76)
+  xBase: 0, zBase: 0,      // Z76: origen de la luz (desde DBG_LUZ, sin la huida)
   dLuz: 999,               // distancia horizontal cámara → luz (m)
   dSpawn: 40,              // Z31: distancia horizontal spawn → luz (m), recalculada con la posición
   cercania: 0,             // 0 lejos … 1 debajo (curva aplicada)
@@ -26,15 +27,22 @@ export const LUZ_STATE = {
 /** Z30: estado del cielo estrellado (lo escribe CieloEstrellado, lo lee el menú de debug). */
 export const CIELO_STATE = { reveal: 0, aten: 1, objetivo: 0 };
 
+/** Z76: desplazamiento de la luz respecto de su origen (m), lo escribe la huida (components/LuzHuida.tsx). 0 = como antes.
+ *  ÚNICO origen de la posición: todo lo ligado a la luz (visual, activación, giro de cámara, teletransporte, suelo y
+ *  disco caminable exterior, cielo, checkpoint luz_dialogo) lee LUZ_STATE.x/z después de actualizarPosLuz(). */
+export const LUZ_DESPLAZ = { x: 0, z: 0 };
+
 /** Recalcula la posición de la luz desde las constantes (barato, sin allocations). */
 export function actualizarPosLuz(): void {
   LUZ_STATE.y = DBG_LUZ.LUZ_ALTURA_M;
   posicionInicialEn(_spawn);
-  if (DBG_LUZ.LUZ_POS_MANUAL) { LUZ_STATE.x = DBG_LUZ.LUZ_POS_X; LUZ_STATE.z = DBG_LUZ.LUZ_POS_Z; }
+  if (DBG_LUZ.LUZ_POS_MANUAL) { LUZ_STATE.xBase = DBG_LUZ.LUZ_POS_X; LUZ_STATE.zBase = DBG_LUZ.LUZ_POS_Z; }
   else {
-    LUZ_STATE.x = _spawn.x - EJE_TELON.fx * DBG_LUZ.LUZ_DISTANCIA_M;
-    LUZ_STATE.z = _spawn.z - EJE_TELON.fz * DBG_LUZ.LUZ_DISTANCIA_M;
+    LUZ_STATE.xBase = _spawn.x - EJE_TELON.fx * DBG_LUZ.LUZ_DISTANCIA_M;
+    LUZ_STATE.zBase = _spawn.z - EJE_TELON.fz * DBG_LUZ.LUZ_DISTANCIA_M;
   }
+  LUZ_STATE.x = LUZ_STATE.xBase + LUZ_DESPLAZ.x;   // Z76
+  LUZ_STATE.z = LUZ_STATE.zBase + LUZ_DESPLAZ.z;
   LUZ_STATE.dSpawn = Math.hypot(LUZ_STATE.x - _spawn.x, LUZ_STATE.z - _spawn.z);   // Z31
 }
 

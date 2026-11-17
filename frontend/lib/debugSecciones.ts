@@ -78,6 +78,7 @@ export const SECCIONES_DEBUG: SeccionDebug[] = [
   { id: "movimiento-z34", titulo: "Movimiento Z34", pestana: "sala", desdeZ: 34, ultimoZ: 34, avanzada: false, clase: "frecuente", descripcion: "Velocidad y movimiento WASD" },
   { id: "efectos-del-dialogo-z29", titulo: "Efectos del diálogo Z29", pestana: "narrativa", desdeZ: 29, ultimoZ: 40, avanzada: false, clase: "ocasional", descripcion: "Efectos del diálogo: alarma, premio, pruebas" },
   { id: "camino-luz-z28", titulo: "Camino LUZ Z28", pestana: "narrativa", desdeZ: 28, ultimoZ: 28, avanzada: false, clase: "frecuente", descripcion: "Luz lejana del camino LUZ" },
+  { id: "luz-huida-z76", titulo: "Huida de la luz Z76", pestana: "narrativa", desdeZ: 76, ultimoZ: 76, avanzada: false, clase: "frecuente", descripcion: "La luz del camino LUZ se aleja cuando el usuario vuelve: visitas, tablero, overlay" },
   { id: "cielo-estrellado-z30", titulo: "Cielo estrellado Z30", pestana: "cielo", desdeZ: 30, ultimoZ: 33, avanzada: false, clase: "frecuente", descripcion: "Cielo estrellado del camino LUZ y límites del exterior" },
   { id: "dialogo-z27", titulo: "Diálogo Z27 (terminal)", pestana: "narrativa", desdeZ: 27, ultimoZ: 35, avanzada: false, clase: "ocasional", descripcion: "Terminal de diálogo ink: probar, cerrar, tiempos" },
   { id: "video-etapa-1", titulo: "Video — etapa 1 (reproductor aparte)", pestana: "paneles", desdeZ: 23, ultimoZ: 23, avanzada: false, clase: "ocasional", descripcion: "Reproductor de video aparte" },
