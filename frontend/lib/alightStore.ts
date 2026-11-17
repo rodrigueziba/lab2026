@@ -144,7 +144,7 @@ export function congelarAmaneceres(dt: number): void {
 
 // Interaction mode — shared between Player (ThreeScene) and LecternSystem
 export const INTERACT_STATE = {
-  mode:         "none" as "none" | "image" | "sound",
+  mode:         "none" as "none" | "image" | "sound" | "ritmos",   // Z80: "ritmos" = atril de la caja de ritmos
   mouseNDC:     { x: 0, y: 0 },
   mouseDown:    false,
   dragId:       null as string | null,

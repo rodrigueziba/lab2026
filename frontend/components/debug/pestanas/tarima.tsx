@@ -2,11 +2,13 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS } from "@/lib/debugConfig";
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { STORE } from "@/lib/alightStore";
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
 import { useDbg } from "../contexto";
+import { RITMOS, playRitmos, pausaRitmos, borrarRitmos, cargarEjemploHouse, setBpmRitmos, setSwingRitmos, setPasosRitmos, probarVoz, guardarRitmos } from "@/lib/ritmosMotor"; // Z80
+import { pistasValidas, NOMBRE_VOZ, PASOS_VALIDOS, VOCES_IDS, type VozId } from "@/lib/ritmos";   // Z80
 import { PLAY_TARIMA } from "@/lib/playTarima";                                             // Z79
 import { playTarima, pausaTarima, estadoContextoTarima } from "@/lib/playTarimaAcciones";      // Z79
 import { aplicarConfigNucleo, iniciarReloj, detenerReloj, setMetronomo, setRuidoPrueba, setOverlayNivel, actualizarEstadoNucleo } from "@/lib/audio/nucleo"; // Z78
@@ -334,6 +336,95 @@ export function SecPlayTarimaZ79() {
                 onChange={ev => { P[k] = parseFloat(ev.target.value); toca(); }} />
             </div>
           ))}
+    </>
+  );
+}
+
+// sección: caja-ritmos-z80
+export function SecCajaRitmosZ80() {
+  // Z80: caja de ritmos circular (lib/ritmos.ts, lib/ritmosMotor.ts, components/CajaRitmos.tsx). Estado 4 veces por segundo.
+  const R = DBG_RITMOS;
+  const [, setTick] = useState(0);
+  const [vozSel, setVozSel] = useState<VozId>("kick");
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const pistas = pistasValidas(R.PISTAS);
+  const v = R.VOZ[vozSel];
+  return (
+    <>
+          <span style={LABEL}>Caja de ritmos Z80 <span style={NOTE}>(live · anillos de adentro hacia afuera)</span></span>
+          <div style={{ ...ROW, ...NOTE }}>
+            <span>{RITMOS.sonando ? "SONANDO" : "detenida"} · {R.BPM} BPM · swing {R.SWING} % · {RITMOS.pasos} pasos · golpes {RITMOS.golpes}{RITMOS.cargado ? " · patrón restaurado de la sesión" : ""}</span>
+          </div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); playRitmos(); toca(); }}>Play</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); pausaRitmos(); toca(); }}>Pausa</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); cargarEjemploHouse(); toca(); }}>Cargar ejemplo house</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); borrarRitmos(); toca(); }}>Borrar</button>
+          </div>
+          {([["ACTIVO", "off = no se monta ni suena"], ["SEGUIR_PLAY_ATRIL", "el play del atril de sonido la arranca"], ["MOSTRAR_BARRA", "barra de posición"], ["OVERLAY_CELDA", "celda bajo el mouse (modo atril)"], ["PERSISTENCIA", "sessionStorage"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={() => { R[k] = !R[k]; toca(); }}>{R[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          <div style={ROW}>
+            <span>MOSTRAR</span>
+            {(["tras_play", "siempre"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, opacity: R.MOSTRAR === m ? 1 : 0.5 }} onClick={() => { R.MOSTRAR = m; toca(); }}>{m}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <span>PASOS</span>
+            {PASOS_VALIDOS.map(n => (
+              <button key={n} style={{ ...INPUT, opacity: RITMOS.pasos === n ? 1 : 0.5 }} onClick={() => { setPasosRitmos(n); toca(); }}>{n}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <span>BPM <span style={NOTE}>{R.BPM}</span></span>
+            <input type="range" min={60} max={180} step={1} style={{ flex: 1 }} value={R.BPM} onChange={ev => { setBpmRitmos(parseFloat(ev.target.value)); toca(); }} />
+          </div>
+          <div style={ROW}>
+            <span>SWING <span style={NOTE}>{R.SWING} %</span></span>
+            <input type="range" min={0} max={60} step={1} style={{ flex: 1 }} value={R.SWING} onChange={ev => { setSwingRitmos(parseFloat(ev.target.value)); toca(); }} />
+          </div>
+          {([["VOLUMEN", 0, 1.5, 0.01, ""], ["LUZ", 0, 20, 0.1, "reflector"], ["SLOT", 0, 11, 1, "slot de Z79"], ["SALTO_AMP", 0, 2, 0.05, "×"], ["SALTO_TAU_S", 0.02, 0.4, 0.01, "s"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{R[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={R[k]} onChange={ev => { R[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
+          <span style={{ ...NOTE, display: "block", marginTop: 4 }}>PISTAS (orden de los anillos): {pistas.map(id => NOMBRE_VOZ[id]).join(" · ")}</span>
+          <div style={ROW}>
+            {VOCES_IDS.map(id => {
+              const en = R.PISTAS.includes(id);
+              return <button key={id} style={{ ...INPUT, opacity: en ? 1 : 0.4 }} title="quitar o agregar al final"
+                onClick={() => { R.PISTAS = en ? R.PISTAS.filter(x => x !== id) : [...R.PISTAS, id]; if (!R.PISTAS.length) R.PISTAS = [id]; RITMOS.version++; toca(); }}>{id}</button>;
+            })}
+          </div>
+          <div style={ROW}>
+            <span>Voz</span>
+            {VOCES_IDS.map(id => (
+              <button key={id} style={{ ...INPUT, opacity: vozSel === id ? 1 : 0.5 }} onClick={() => setVozSel(id)}>{id}{R.VOZ[id].MUTE ? " (m)" : ""}</button>
+            ))}
+          </div>
+          {v && (
+            <>
+              <div style={ROW}>
+                <span>{NOMBRE_VOZ[vozSel]}</span>
+                <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); probarVoz(vozSel); }}>Probar</button>
+                <button style={INPUT} onClick={() => { v.MUTE = !v.MUTE; toca(); }}>{v.MUTE ? "MUTE" : "suena"}</button>
+                <button style={INPUT} onClick={() => { v.SWING = !v.SWING; toca(); }}>swing {v.SWING ? "ON" : "off"}</button>
+              </div>
+              {([["TONO", 20, 12000, 1, "Hz"], ["DECAY", 0.01, 1.5, 0.01, "s"], ["VOL", 0, 1.5, 0.01, ""]] as const).map(([k, mn, mx, st, nota]) => (
+                <div key={k} style={ROW}>
+                  <span>{k} <span style={NOTE}>{v[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+                  <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={v[k]} onChange={ev => { v[k] = parseFloat(ev.target.value); toca(); }} />
+                </div>
+              ))}
+            </>
+          )}
+          <div style={ROW}><button style={INPUT} onClick={() => { guardarRitmos(); toca(); }}>Guardar en la sesión</button></div>
     </>
   );
 }

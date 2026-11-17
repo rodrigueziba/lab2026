@@ -1468,7 +1468,36 @@ export const DBG_PLAY = {
   MOSTRAR_SLOTS:       false,   // marcadores de debug de los slots de los atriles de instrumentos — live
   APARECER_TRAS_PLAY:  true,    // los atriles de instrumentos saldrán del piso al apretar play (todavía sin implementar)
   SLOTS_N:             4,       // cantidad de slots — live
-  SLOTS_DIST_M:        1.4,     // distancia detrás del atril de sonido (m) — live
+  SLOTS_DIST_M:        2.0,     // distancia detrás del atril de sonido (m) — live (Z80: 1,4 → 2,0: con 1,4 quedaba un pasillo de 0,5 m entre atriles)
   SLOTS_SEP_M:         1.7,     // separación entre slots (m) — live
   SLOTS_ARCO_GRADOS:   0,       // 0 = en línea; > 0 = en arco alrededor del atril de sonido — live
+};
+
+// ── Z80: caja de ritmos circular (lib/ritmos.ts, lib/ritmosMotor.ts, lib/audio/ritmosVoces.ts, components/CajaRitmos.tsx) ──
+// Primer instrumento propio de la tarima: anillos = instrumentos (de adentro hacia afuera, PISTAS), ángulo = tiempo
+// (una vuelta = un compás de 4/4 en PASOS pasos). Sale del piso en el slot SLOT de Z79 al apretar play del atril de sonido.
+export const DBG_RITMOS = {
+  ACTIVO:            true,     // false = no se monta ni suena — live
+  MOSTRAR:           "tras_play" as string,   // "tras_play" (con DBG_PLAY.APARECER_TRAS_PLAY) | "siempre" — live
+  SLOT:              1,        // slot de Z79 (0…SLOTS_N − 1) — live
+  PASOS:             16,       // 8 | 12 | 16 | 32 por vuelta (= un compás) — live (reinicia el reloj)
+  PISTAS:            ["kick", "clap", "hatC", "hatA", "shaker", "perc"] as string[],   // anillos de adentro hacia afuera
+  BPM:               120,      // 60…180 (parámetro ritmos.bpm de Z78) — live
+  SWING:             0,        // 0…60 % (parámetro ritmos.swing) — live
+  SEGUIR_PLAY_ATRIL: true,     // el play/pausa del atril de sonido arranca y detiene la caja (además de su botón propio)
+  VOLUMEN:           0.9,      // ganancia general de la caja — live
+  VOZ: {                       // por voz: TONO (Hz), DECAY (s), VOL (0…1), MUTE, SWING (si le aplica el swing) — live
+    kick:   { TONO: 50,   DECAY: 0.45, VOL: 0.9,  MUTE: false, SWING: false },
+    clap:   { TONO: 1200, DECAY: 0.2,  VOL: 0.55, MUTE: false, SWING: false },
+    hatC:   { TONO: 7500, DECAY: 0.05, VOL: 0.35, MUTE: false, SWING: true },
+    hatA:   { TONO: 7000, DECAY: 0.4,  VOL: 0.3,  MUTE: false, SWING: true },
+    shaker: { TONO: 5500, DECAY: 0.09, VOL: 0.3,  MUTE: false, SWING: true },
+    perc:   { TONO: 140,  DECAY: 0.3,  VOL: 0.6,  MUTE: false, SWING: false },
+  } as Record<string, { TONO: number; DECAY: number; VOL: number; MUTE: boolean; SWING: boolean }>,
+  LUZ:               2,        // intensidad del reflector propio (tenue; con 6 el bloom ya encandila) — live
+  SALTO_AMP:         0.7,      // salto de los cubitos al pasar la línea (escala extra) — live
+  SALTO_TAU_S:       0.09,     // vuelta del salto (s) — live
+  MOSTRAR_BARRA:     true,     // barra de posición (play · BPM · 4/4 · compás.pulso.sub) — live
+  OVERLAY_CELDA:     false,    // depuración: celda bajo el mouse — live
+  PERSISTENCIA:      true,     // patrón, PASOS, BPM y swing en sessionStorage (alight:ritmos)
 };

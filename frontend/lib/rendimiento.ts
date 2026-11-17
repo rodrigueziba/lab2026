@@ -144,6 +144,7 @@ export const SISTEMAS = [
   { id: "monolitos",  etiqueta: "monolitos",        como: "MonolitosPasto dentro de un grupo invisible (con sus 8 luces: recompila)" },
   { id: "telonTexto", etiqueta: "texto del telón",  como: "TelonTexto dentro de un grupo invisible" },
   { id: "estrellas",  etiqueta: "estrellas",        como: "CieloEstrellado dentro de un grupo invisible" },
+  { id: "ritmos",     etiqueta: "caja de ritmos",   como: "CajaRitmos (Z80) dentro de un grupo invisible (con su SpotLight: recompila)" },
   // Z72: partes del shader del domo (uniforms uPerf* de dome.frag.glsl: ramas por uniform, como uPerfAnillos)
   { id: "domoFluido",    etiqueta: "domo: fluir de color",  como: "dome.frag.glsl: uPerfFluido salta el fluido de los bloques azul y naranja (Z61/Z63)" },
   { id: "domoSol",       etiqueta: "domo: sol",             como: "dome.frag.glsl: uPerfSol salta solMundo (núcleo, rayos y resplandor; también dentro del portal)" },

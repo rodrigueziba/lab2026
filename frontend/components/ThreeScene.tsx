@@ -15,6 +15,7 @@ import WatcherEye from "./WatcherEye";
 import Curtain from "./Curtain";
 import TelonTexto from "./TelonTexto"; // Z46: texto proyectado sobre el telón
 import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from "./LecternSystem";
+import { ATRIL_RITMOS } from "@/lib/ritmos";   // Z80: aviso "Tocar E" del atril de la caja de ritmos
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import CurtainFlash from "./CurtainFlash"; // F1: destello al atravesar el telón
@@ -459,6 +460,7 @@ function Player() {
       let near: "none" | "image" | "sound" = "none";
       if (dL < LECTERN_PROMPT_M) near = "image";
       else if (dR < LECTERN_PROMPT_M) near = "sound";
+      else if (ATRIL_RITMOS.visible && Math.hypot(cam.position.x - ATRIL_RITMOS.x, cam.position.z - ATRIL_RITMOS.z) < LECTERN_PROMPT_M) near = "sound";   // Z80: caja de ritmos
       if (near !== nearLectern.current) {
         nearLectern.current = near;
         window.dispatchEvent(new CustomEvent("alight:near-lectern", { detail: { which: near } }));

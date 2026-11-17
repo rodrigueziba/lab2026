@@ -88,3 +88,8 @@ Z45: cálculo en una textura compartida por las 3 caras; port a TypeScript del r
 - Archivos: `frontend/lib/audio/reloj.ts` y `frontend/lib/audio/ruido.ts`.
 - Reloj: patrón de programación con anticipo descrito por **Chris Wilson** en "A Tale of Two Clocks – Scheduling Web Audio with Precision" (web.dev / HTML5 Rocks, 2013): un temporizador del navegador despierta al programador y los tiempos salen del reloj de audio. Se reimplementó (sin copiar código), con pausa, cortes y oyentes sin allocations.
 - Ruido rosa: filtro "refined" de **Paul Kellet** (coeficientes publicados en la lista music-dsp; sin licencia declarada, de uso muy difundido: se acredita al autor).
+
+## Caja de ritmos circular (Z80) — referencia visual
+- Archivos: `frontend/components/CajaRitmos.tsx`, `frontend/lib/ritmos.ts`, `frontend/lib/ritmosMotor.ts`, `frontend/lib/audio/ritmosVoces.ts`.
+- Inspiración visual (solo referencia, sin código reutilizado): video de **@thetokenwise** de un secuenciador circular en 3D (anillos = instrumentos, ángulo = tiempo, línea radial que gira, cubitos que saltan, disco de vinilo central, barra con BPM, 4/4 y posición). Captura guardada en `docs/referencias/ritmos_referencia.png`.
+- El código, la síntesis de las voces y el diseño de la interacción son propios de este proyecto.

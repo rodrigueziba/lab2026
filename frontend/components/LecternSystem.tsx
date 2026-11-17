@@ -18,11 +18,14 @@ import {
   nextTrack, prevTrack, initAudio, loadPlaylist, playTrack,   // Z79: togglePlayPause ahora va por lib/playTarimaAcciones
   playUIClick,
 } from "@/lib/audioEngine";
-import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY } from "@/lib/debugConfig";
+import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS } from "@/lib/debugConfig";
 import { PLAY_TARIMA } from "@/lib/playTarima";                                              // Z79
 import { alternarPlay, instalarEstadoPlay, prepararSinAutoplay } from "@/lib/playTarimaAcciones"; // Z79
 import { PlayGrande, SlotsAtriles } from "./PlayTarima";                                       // Z79
 import { TARIMA_W } from "./Tarima";                                                         // Z79: slots
+import CajaRitmos from "./CajaRitmos";                                                       // Z80
+import SistemaPerf from "./SistemaPerf";                                                     // Z80: benchmark
+import { ATRIL_RITMOS } from "@/lib/ritmos";                                                  // Z80: tecla E
 import { DBG_DOME_MAT } from "./FaceDome";
 import { registerLecternMats, lecternPalette } from "@/lib/retro/lecternMaterials";
 import { createCrtScreenMaterial, setScreenMap, RETRO_CRT } from "@/lib/retro/crtScreen";
@@ -523,7 +526,7 @@ function getCursorStyle(
   type: CtrlDef["type"] | "press" | "slide_h" | "slide_v" | "rotate",
 ): string {
   const P = "/cursors/";
-  if (type === "button" || type === "toggle")
+  if (type === "button" || type === "toggle" || (type as string) === "superficie")   // Z80: superficie = disco de ritmos
     return `url('${P}cursor-hand.svg') 8 2, pointer`;
   if (type === "slider")
     return `url('${P}cursor-hand-slider.svg') 8 2, pointer`;
@@ -761,6 +764,8 @@ interface CtrlDef {
 
 const ctrlState: Record<string, number> = {};
 function ctrlVal(id: string, def: number): number { return ctrlState[id] ?? def; }
+/** Z80: controles de otros componentes (CajaRitmos) cuyo valor cambia por fuera del arrastre (menú, sesión). */
+export function sincronizarCtrlExterno(id: string, v: number): void { ctrlState[id] = v; }
 function setCtrl(id: string, v: number, def: CtrlDef) {
   ctrlState[id] = Math.max(def.min, Math.min(def.max, v));
   def.onActivate(ctrlState[id]);
@@ -2083,6 +2088,12 @@ function InteractionHandler() {
       if (!hit) return;
       const { mesh, def, point } = hit;
 
+      // Z80: control "superficie" (disco de la caja de ritmos): recibe el punto de impacto y decide la celda él mismo
+      if ((def.type as string) === "superficie") {
+        (def as unknown as { onPunto?: (p: THREE.Vector3) => void }).onPunto?.(point);
+        return;
+      }
+
       canvas.setPointerCapture(e.pointerId);
       _drag.pointerId = e.pointerId;
       _drag.def = def;
@@ -2316,7 +2327,7 @@ export default function LecternSystem() {
     const onResize = () => {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        if (INTERACT_STATE.mode === "none") return;
+        if (INTERACT_STATE.mode === "none" || INTERACT_STATE.mode === "ritmos") return;   // Z80: la caja de ritmos tiene pose fija
         const side   = INTERACT_STATE.mode === "image" ? "left" : "right";
         const aspect = window.innerWidth / window.innerHeight;
         const result = fitLecternCamera(side, aspect);
@@ -2347,6 +2358,26 @@ export default function LecternSystem() {
         const rightPos = new THREE.Vector3( LECTERN_PLACE_X, camera.position.y, 0);
         const dLeft    = camera.position.distanceTo(leftPos);
         const dRight   = camera.position.distanceTo(rightPos);
+        // Z80: atril de la caja de ritmos (slot de Z79), si salió del piso y es el más cercano
+        const dRitmos  = ATRIL_RITMOS.visible ? Math.hypot(camera.position.x - ATRIL_RITMOS.x, camera.position.z - ATRIL_RITMOS.z) : Infinity;
+        if (dRitmos < INTERACT_RANGE && dRitmos < Math.min(dLeft, dRight)) {
+          INTERACT_STATE.mode = "ritmos";
+          const cam = camera as THREE.PerspectiveCamera;
+          INTERACT_STATE.camSaved = {
+            pos:  [cam.position.x, cam.position.y, cam.position.z],
+            quat: [cam.quaternion.x, cam.quaternion.y, cam.quaternion.z, cam.quaternion.w],
+          };
+          INTERACT_STATE.camFovSaved = cam.fov;
+          STORE.cam.fov = ATRIL_RITMOS.fov;
+          INTERACT_STATE.camTarget      = { pos: [...ATRIL_RITMOS.camPos], quat: [...ATRIL_RITMOS.camQuat] };
+          INTERACT_STATE.camAnimStart   = Date.now();
+          INTERACT_STATE.camAnimDur     = LECTERN_CAM_MS;
+          INTERACT_STATE.camAnimReverse = false;
+          INTERACT_STATE.camAnimActive  = true;
+          document.exitPointerLock();
+          window.dispatchEvent(new CustomEvent("alight:lectern-mode", { detail: { mode: INTERACT_STATE.mode } }));
+          return;
+        }
         let side: "left" | "right" | null = null;
         if (dLeft  < INTERACT_RANGE) side = "left";
         else if (dRight < INTERACT_RANGE) side = "right";
@@ -2395,7 +2426,7 @@ export default function LecternSystem() {
       }
 
       // ── Keyboard shortcuts Z–M (only inside lectern mode) ─────────────────
-      if (INTERACT_STATE.mode === "none") return;
+      if (INTERACT_STATE.mode === "none" || INTERACT_STATE.mode === "ritmos") return;   // Z80: sin atajos Z–M en la caja de ritmos
       if (!KEY_LETTERS.includes(key as KeyLetter)) return;
       const id = _keyMap.get(key as KeyLetter);
       if (!id) return;
@@ -2430,6 +2461,8 @@ export default function LecternSystem() {
       <InteractionHandler />
       {/* Z79: slots de los atriles de instrumentos (detrás del atril de sonido; marcadores con DBG_PLAY.MOSTRAR_SLOTS) */}
       <SlotsAtriles atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} anchoM={OUTER_W} profM={OUTER_D} />
+      {/* Z80: caja de ritmos en su slot (sale del piso al apretar play del atril de sonido) */}
+      {DBG_RITMOS.ACTIVO && <SistemaPerf id="ritmos"><CajaRitmos atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} /></SistemaPerf>}
     </>
   );
 }
