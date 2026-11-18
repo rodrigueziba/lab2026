@@ -58,7 +58,7 @@ export class SesionPrueba implements RemoteSession {
 
   private lienzo: HTMLCanvasElement | null = null;
   /** Z83: video de prueba = canvas 640×360 (lo dibuja dibujarVideo; el domo lo sube a la GPU solo si se ve). */
-  getImage(): HTMLCanvasElement | null {
+  getImage(): HTMLCanvasElement | HTMLVideoElement | HTMLImageElement | null {   // Z93: tipo de la interfaz (SesionLiveKit da un <video>)
     if (this.status !== "active" || typeof document === "undefined") return null;
     if (!this.lienzo) { this.lienzo = document.createElement("canvas"); this.lienzo.width = 640; this.lienzo.height = 360; dibujarPatronVideo(this.lienzo, 0); }
     return this.lienzo;

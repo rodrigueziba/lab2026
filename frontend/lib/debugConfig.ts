@@ -1048,6 +1048,7 @@ export const DBG_RENDIMIENTO = {
     tiempoDetenido: true,            // Z86: historial, estela y efecto del tiempo detenido
     ondasTarima: true,               // Z87: dibujo del canvas de ondas de la tarima
     transmisionTarima: true,         // Z92: subida a LiveKit (false = pauseUpstream: sin codificar ni enviar)
+    recepcionTarima:   true,         // Z93: recepción en SILLAS (false = des-suscribe audio y video sin desconectar)
   } as Record<string, boolean>,
 };
 
@@ -1535,7 +1536,9 @@ export const DBG_MONO_VIVO = {
 // Sin medios: solo "hay alguien en la tarima". FUENTE "mock" = Z82–Z86 tal cual; "supabase" = MONO_VIVO.haySesion sale
 // de la presencia (audio y video = patrones de prueba mientras no haya medios). Canal público con la clave anónima.
 export const DBG_VIVO = {
-  FUENTE:           "mock" as string,   // "mock" | "supabase" — live
+  // Z93 (antes "mock"): "auto" = "livekit" si hay variables de Supabase (presencia); si el token de LiveKit da 503, cae a
+  // "mock" por el resto de la página. "livekit" = presencia + audio y video REALES de la tarima (lib/vivo/recibirLiveKit.ts).
+  FUENTE:           "auto" as string,   // "auto" | "livekit" | "supabase" | "mock" — live
   CANAL:            "alight-tarima-v1" as string,   // nombre del canal de Realtime (vale al conectar) — live
   LATIDO_S:         5,       // el publicador sube su contador cada esto — live
   TIMEOUT_S:        15,      // el oyente deja de contar una sesión sin cambio de latido durante esto (reloj local) — live
@@ -1608,6 +1611,18 @@ export const DBG_TIEMPO = {
 
 // ── Z85: aviso al espectador antes de recibir la transmisión en vivo (lib/avisoVivo.ts, lib/avisoVivoAcciones.ts) ──
 // Texto: docs/dialogos/aviso-vivo.ink (npm run ink:build). Usa la terminal de diálogo de la narrativa.
+// ── Z93: recepción de la tarima en SILLAS por LiveKit (lib/vivo/recibirCiclo.ts, lib/vivo/recibirLiveKit.ts) ──
+// Conecta solo con aviso aceptado + sesión viva (presencia) + fuente real, y con algún monolito pidiendo medios.
+export const DBG_LIVEKIT_RECIBIR = {
+  ESPERA_DESUSCRIBIR_S:    2,      // peso en 0 durante esto → des-suscribe la pista (y sin ninguna, desconecta) — live
+  SENAL_DEBIL_S:           5,      // suscrito sin medios durante esto → "señal débil" — live
+  DEBIL_MEZCLA:            0.3,    // en señal débil: estática a este nivel sobre lo propio (audio y domo), sin cortar lo propio — live
+  CONTORNO_ELEMENTO_AUDIO: true,   // Chrome: la pista remota también en un <audio> SILENCIADO para que fluya por Web Audio (vale al suscribir) — live
+  REINTENTO_BASE_S:        1,      // primera espera tras perder la conexión; se duplica en cada intento — live
+  REINTENTO_MAX_S:         15,     // tope de la espera — live
+  MAX_REINTENTOS:          6,      // después → "error" hasta que la sesión o la aceptación cambien — live
+};
+
 export const DBG_AVISO_VIVO = {
   ACTIVO:            true,    // false = como antes, sin aviso — live
   SOLO_UNA_VEZ:      true,    // una vez por sesión del navegador (sessionStorage alight:aviso-vivo) — live

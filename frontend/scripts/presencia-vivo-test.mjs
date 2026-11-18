@@ -60,7 +60,7 @@ const cfg = (o = {}) => ({ ...CFG, ...o });
 const ID = n => `sesion-${n}-abcdef`;
 
 console.log('\nconfiguración');
-check(CFG.FUENTE === 'mock' && CFG.CANAL === 'alight-tarima-v1' && CFG.LATIDO_S === 5 && CFG.TIMEOUT_S === 15, 'DBG_VIVO: FUENTE mock (Z82–Z86 sin cambios), canal alight-tarima-v1, latido 5 s, timeout 15 s');
+check(CFG.FUENTE === 'auto' && CFG.CANAL === 'alight-tarima-v1' && CFG.LATIDO_S === 5 && CFG.TIMEOUT_S === 15, 'DBG_VIVO: FUENTE auto (Z93: livekit si hay variables; mock sigue disponible), canal alight-tarima-v1, latido 5 s, timeout 15 s');
 
 console.log('\nvalidación (presencias inválidas se ignoran)');
 const P = (o = {}) => ({ sesionId: ID(1), inicioMs: T0, modo: 'privado', latido: 0, ...o });
@@ -169,7 +169,7 @@ console.log('\nintegración (lectura del código)');
   check(/tickFuenteVivo\(op > 0\.001\);[^\n]*\n\s*M\.haySesion = SESSION\.status === "active";/.test(MV), 'tickMonolitosVivo actualiza la fuente ANTES de calcular haySesion = status "active"');
   check(/soltarFuenteVivo\(\)/.test(MV), 'al soltar los monolitos (desmontaje / N5) se cierra el canal del oyente');
   check(/tickTiempo\(TIEMPO, MONO_VIVO\.sonido, MONO_VIVO\.video, MONO_VIVO\.haySesion/.test(TD), 'tiempo detenido usa MONO_VIVO.haySesion: con "error" o "idle" (falla de red incluida) = sin sesión → se dispara');
-  check(/else if \(SESSION instanceof SesionPresencia\)/.test(VA) && /if \(DBG_VIVO\.FUENTE === "supabase"\)/.test(VA), 'FUENTE "mock": la sesión solo se toca si era la de Supabase (el mock y "Simular sesión en vivo" quedan como Z82–Z86)');
+  check(/else if \(SESSION instanceof SesionPresencia\)/.test(VA) && /else if \(f === "supabase"\)/.test(VA) && /if \(f === "supabase" \|\| f === "livekit" \|\| f === "mock"\) return f;/.test(VA), 'FUENTE "mock": la sesión solo se toca si era la de Supabase o LiveKit (el mock y "Simular sesión en vivo" quedan como Z82–Z86)');
   check(/NEXT_PUBLIC_SUPABASE_URL/.test(CS) && /NEXT_PUBLIC_SUPABASE_ANON_KEY/.test(CS) && !/SERVICE_ROLE/.test(CS), 'mismas variables que el sitio (URL y clave anónima), sin claves de servicio');
   check(/consentimiento !== true/.test(VA), 'publicarPresencia exige consentimiento: true'); }
 

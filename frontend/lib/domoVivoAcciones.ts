@@ -9,7 +9,7 @@
 // - Rendimiento: con DBG_RENDIMIENTO.SIS.videoDomo = false se fuerza uRemoteMix = 0 (fila "videoDomo" del benchmark).
 
 import * as THREE from "three";
-import { DBG_DOMO_VIVO, DBG_MONO_VIVO, DBG_RENDIMIENTO, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { DBG_DOMO_VIVO, DBG_MONO_VIVO, DBG_RENDIMIENTO, DBG_LIVEKIT_RECIBIR, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { RELOJ as RELOJ_EXP } from "@/lib/relojExperiencia";
 import { SESSION, type RemoteSession } from "@/lib/remoteSession";
 import { dibujarPatronVideo } from "@/lib/sesionPrueba";
@@ -101,6 +101,13 @@ export function aplicarDomoVivo(u: U): void {
   if (SESSION.status === "active" && DBG_MONO_VIVO.REQUIERE_ACEPTACION && !MONO_VIVO.aceptada) _ent.pesoVideo = 0;
   _ent.haySesion = SESSION.status === "active";
   const p = pesosDomo(_ent, D.pesos);
+  // Z93: sesión real (SesionLiveKit) sin video que llegue → estática como sin sesión; señal débil → estática al
+  // DEBIL_MEZCLA sobre el visualizador propio (sin cortarlo). Con el mock/prueba no hay `senal`: igual que antes.
+  const sn = SESSION.senal;
+  if (_ent.haySesion && sn && !sn.video && _ent.forzar === "ninguno") {
+    if (sn.debil) p.mix *= Math.max(0, Math.min(1, DBG_LIVEKIT_RECIBIR.DEBIL_MEZCLA));
+    p.staticMix = 1; p.remoteOn = 0; p.necesitaVideo = false;
+  }
   u.uRemoteMix.value = p.mix;
   if (p.mix <= 0) return;   // nada más que hacer: el shader saltea la rama y no se sube ninguna textura
 
