@@ -3,6 +3,8 @@
 // Node con un cliente simulado (scripts/livekit-test.mjs).
 // Estados: inactivo → pidiendo (token) → conectando → publicando ⇄ reconectando (el SDK reintenta solo)
 //          → sin_conexion (token rechazado, sin variables, sin red, o el SDK se rindió) · detenido (corte).
+// Z92b: `diagnostico` distingue servidor sin claves (503), pedido rechazado (400/429), sin red, token ok pero falló la
+// conexión (con el motivo breve del SDK) y conectado.
 // Solo arranca con consentimiento === true (lo da la elección "Compartir mi sesión." de Z91). Uno solo por pestaña.
 // detener() es inmediato y libera TODO: pistas (clon de la webcam o captureStream del canvas), la salida transmisible
 // del núcleo de audio y la conexión; si se llama a mitad de la conexión, lo que llegue después se suelta al llegar.
@@ -32,6 +34,33 @@ export interface DepsLK {
 export interface PedidoLK { consentimiento: boolean; modo: ModoLK; sesionId: string }
 export type ResultadoLK = { ok: true } | { ok: false; motivo: string };
 const RE_ID = /^[A-Za-z0-9_-]{8,64}$/;
+
+// ── Z92b: diagnóstico (sin datos sensibles: nunca el token, la clave ni el secreto) ──
+export const MOTIVO_TOKEN = {
+  sinClaves: "servidor sin claves (503)",
+  sinRed: "sin red al pedir el token",
+  invalida: "respuesta del token inválida",
+} as const;
+export const PREFIJO_RECHAZO = "pedido de token rechazado";
+export const PREFIJO_CONEXION = "token ok, falló la conexión a LiveKit";
+export const PREFIJO_PUBLICAR = "conectado, falló publicar las pistas";
+/** Estado HTTP de /api/livekit/token → motivo. 503 = el servidor no tiene las variables (o la URL no es ws/wss). */
+export function motivoPorEstado(estado: number): string {
+  return estado === 503 ? MOTIVO_TOKEN.sinClaves : `${PREFIJO_RECHAZO} (${estado})`;
+}
+const RE_URL = /^wss?:\/\/[^\s"'<>]{1,240}$/i;
+/** Cuerpo 200 de la ruta → token + url (la url la da el SERVIDOR; debe ser ws:// o wss://). */
+export function leerRespuestaToken(j: unknown): RespuestaToken {
+  const o = (j && typeof j === "object" ? j : {}) as { token?: unknown; url?: unknown };
+  if (typeof o.token !== "string" || !o.token || typeof o.url !== "string" || !RE_URL.test(o.url)) return { ok: false, motivo: MOTIVO_TOKEN.invalida };
+  return { ok: true, token: o.token, url: o.url };
+}
+/** Motivo breve del SDK: primera línea, sin nada con forma de JWT, máx. 80 caracteres. */
+export function motivoBreve(e: unknown): string {
+  const m = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+  const limpio = m.split("\n")[0].replace(/eyJ[\w-]*\.[\w-]*\.[\w-]*/g, "[token]").replace(/(access_token|token)=[^&\s]+/gi, "$1=[token]").trim();
+  return limpio.length > 80 ? limpio.slice(0, 79) + "…" : limpio;
+}
 
 export class PublicadorLiveKit {
   estado: EstadoLK = "inactivo";
@@ -75,16 +104,19 @@ export class PublicadorLiveKit {
       if (g !== this.gen) return;
       if (e === "reconectando") { this.estado = "reconectando"; this.reconexiones++; }
       else if (e === "reconectado" || e === "conectado") { if (this.estado === "reconectando") this.estado = "publicando"; }
-      else if (e === "desconectado") this.falla("conexión perdida");
+      else if (e === "desconectado" && this.estado !== "conectando") this.falla("se perdió la conexión con LiveKit");   // Z92b: al conectar manda el rechazo de connect (trae el motivo)
     });
-    await sala.conectar(r.url, r.token);
+    try { await sala.conectar(r.url, r.token); }
+    catch (e) { if (g === this.gen) { const m = motivoBreve(e); this.falla(m ? `${PREFIJO_CONEXION}: ${m}` : PREFIJO_CONEXION); } return; }
     if (g !== this.gen) { this.liberar(); return; }
     const v = this.deps.video(p.modo, this.cfg);
     this.video = v;
-    if (v) { await sala.publicarVideo(v, this.cfg); if (g !== this.gen) return; this.pistas.video = true; }
-    const a = this.deps.audio();
-    this.audio = a;
-    if (a) { await sala.publicarAudio(a, this.cfg); if (g !== this.gen) return; this.pistas.audio = true; }
+    try {
+      if (v) { await sala.publicarVideo(v, this.cfg); if (g !== this.gen) return; this.pistas.video = true; }
+      const a = this.deps.audio();
+      this.audio = a;
+      if (a) { await sala.publicarAudio(a, this.cfg); if (g !== this.gen) return; this.pistas.audio = true; }
+    } catch (e) { if (g === this.gen) { const m = motivoBreve(e); this.falla(m ? `${PREFIJO_PUBLICAR}: ${m}` : PREFIJO_PUBLICAR); } return; }
     this.estado = "publicando";
   }
 
@@ -109,6 +141,19 @@ export class PublicadorLiveKit {
     this.gen++;
     this.liberar();
     if (this.estado !== "inactivo") this.estado = "detenido";
+  }
+
+  /** Z92b: diagnóstico para el menú (sin datos sensibles). */
+  get diagnostico(): string {
+    switch (this.estado) {
+      case "inactivo": return "sin pedir";
+      case "pidiendo": return "pidiendo token…";
+      case "conectando": return "token ok, conectando a LiveKit…";
+      case "publicando": return "conectado";
+      case "reconectando": return "conectado · el SDK está reconectando";
+      case "detenido": return "detenido (corte)";
+      default: return this.ultimoError || "sin conexión";
+    }
   }
 
   pausar(p: boolean): void { try { this.sala?.pausar(p); } catch { /* ok */ } }

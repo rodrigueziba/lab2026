@@ -14,21 +14,20 @@ import { DBG_LIVEKIT, DBG_RENDIMIENTO, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { obtenerSalidaTransmisible, liberarSalidaTransmisible } from "@/lib/audio/nucleo";
 import { LIVE_TEX_REF } from "@/lib/faceShared";
 import { FUENTE_TARIMA, texturaTarima } from "@/lib/fuenteVideoTarima";
-import { PublicadorLiveKit, type DepsLK, type SalaLK, type PistaLK, type CfgLK, type ModoLK, type RespuestaToken, type ResultadoLK } from "./liveKitCiclo";
+import { PublicadorLiveKit, MOTIVO_TOKEN, motivoPorEstado, leerRespuestaToken, type DepsLK, type SalaLK, type PistaLK, type CfgLK, type ModoLK, type RespuestaToken, type ResultadoLK } from "./liveKitCiclo";
 
+// Z92b: el cliente NO lee ninguna variable: pide el token primero y conecta con la url que devuelve el servidor.
+// Motivos de falla para el diagnóstico (sin datos sensibles): MOTIVO_TOKEN en liveKitCiclo.ts.
 async function pedirToken(sesionId: string): Promise<RespuestaToken> {
+  let r: Response;
   try {
-    const r = await fetch("/api/livekit/token", {
+    r = await fetch("/api/livekit/token", {
       method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
       body: JSON.stringify({ rol: "publicar", sesionId }),
     });
-    if (r.status === 503) return { ok: false, motivo: "sin configuración de LiveKit" };
-    if (r.status === 429) return { ok: false, motivo: "demasiados pedidos" };
-    if (!r.ok) return { ok: false, motivo: `token rechazado (${r.status})` };
-    const j = await r.json() as { token?: unknown; url?: unknown };
-    if (typeof j.token !== "string" || typeof j.url !== "string") return { ok: false, motivo: "respuesta inválida" };
-    return { ok: true, token: j.token, url: j.url };
-  } catch { return { ok: false, motivo: "sin red" }; }
+  } catch { return { ok: false, motivo: MOTIVO_TOKEN.sinRed }; }
+  if (!r.ok) return { ok: false, motivo: motivoPorEstado(r.status) };
+  try { return leerRespuestaToken(await r.json()); } catch { return { ok: false, motivo: MOTIVO_TOKEN.invalida }; }
 }
 
 function pistaWebcam(cfg: CfgLK): PistaLK | null {
@@ -126,9 +125,9 @@ export function detenerLiveKit(): void {
 export function estadoLiveKit(): PublicadorLiveKit { return PUB; }
 export function textoEstadoLiveKit(): string {
   const p = PUB;
-  return `LiveKit: ${p.estado}${p.modo ? ` · modo ${p.modo}` : ""} · pistas ${p.pistas.video ? "video" : "—"}/${p.pistas.audio ? "audio" : "—"}`
+  return `Diagnóstico: ${p.diagnostico}\nLiveKit: ${p.estado}${p.modo ? ` · modo ${p.modo}` : ""} · pistas ${p.pistas.video ? "video" : "—"}/${p.pistas.audio ? "audio" : "—"}`
     + `${p.estado === "publicando" ? ` · ${p.kbps().toFixed(0)} kbps salientes` : ""} · reconexiones ${p.reconexiones} · errores ${p.errores}`
-    + `${p.ultimoError ? ` (${p.ultimoError})` : ""}${_pausado ? " · subida PAUSADA (benchmark)" : ""}`;
+    + `${_pausado ? " · subida PAUSADA (benchmark)" : ""}`;
 }
 
 if (DEBUG_ENABLED && typeof window !== "undefined") {

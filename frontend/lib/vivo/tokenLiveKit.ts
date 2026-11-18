@@ -15,6 +15,8 @@
 //    sesionId de otra persona; LiveKit desconecta al participante anterior con la misma identidad. Se acota con el TTL y
 //    el límite, y la tarima lo ve como "SIN CONEXIÓN" (no se rompe).
 //  - El secreto (LIVEKIT_API_SECRET) y la clave nunca salen del servidor; solo la URL es pública (NEXT_PUBLIC_LIVEKIT_URL).
+//  - Z92b: la URL también la da el servidor, leída AL MOMENTO DEL PEDIDO (LIVEKIT_URL o, si falta, NEXT_PUBLIC_LIVEKIT_URL),
+//    y viaja en la respuesta { token, url }. El cliente no depende de variables públicas grabadas en el build (Docker).
 
 export const SALA_POR_DEFECTO = "alight-tarima-v1";
 export const DURACION_MAX_SERVIDOR_S = 300;          // = DBG_CONSENT.DURACION_MAX_S por defecto (Z91)
@@ -80,4 +82,43 @@ export class LimitePorIp {
     return true;
   }
   get tamano(): number { return this.mapa.size; }
+}
+
+// ── Z92b: URL del servidor y atención del pedido (pura; la ruta solo inyecta process.env, la IP, el reloj y la firma) ──
+const RE_URL_LK = /^wss?:\/\/[^\s"'<>]{1,240}$/i;
+/** URL de LiveKit del SERVIDOR: LIVEKIT_URL si existe; si no, NEXT_PUBLIC_LIVEKIT_URL. Debe empezar con wss:// o ws://
+ *  (si no, null → 503 genérico). */
+export function urlLiveKitServidor(env: { LIVEKIT_URL?: string; NEXT_PUBLIC_LIVEKIT_URL?: string }): string | null {
+  const a = (env.LIVEKIT_URL ?? "").trim();
+  const u = a || (env.NEXT_PUBLIC_LIVEKIT_URL ?? "").trim();
+  return RE_URL_LK.test(u) ? u : null;
+}
+
+export interface EnvToken {
+  LIVEKIT_API_KEY?: string; LIVEKIT_API_SECRET?: string; LIVEKIT_URL?: string; NEXT_PUBLIC_LIVEKIT_URL?: string; LIVEKIT_SALA?: string;
+}
+export interface PedidoHttpToken { ip: string; ahora: number; largo: number; texto(): Promise<string> }
+/** Firma el JWT (la ruta usa livekit-server-sdk). Nunca devuelve la clave ni el secreto. */
+export type FirmarToken = (clave: string, secreto: string, identidad: string, ttlS: number, p: Permisos) => Promise<string>;
+export type RespuestaHttpToken = { estado: 200; cuerpo: { token: string; url: string } } | { estado: 400 | 429 | 500 | 503; cuerpo: { error: string } };
+const err = (estado: 400 | 429 | 500 | 503, error: string): RespuestaHttpToken => ({ estado, cuerpo: { error } });
+
+/** POST /api/livekit/token: límite → variables (clave, secreto, URL válida) → cuerpo ≤ 512 B → validación → firma.
+ *  Errores genéricos: 429 "demasiados pedidos", 503 "no disponible", 400 "solicitud inválida", 500 "no disponible". */
+export async function atenderToken(env: EnvToken, req: PedidoHttpToken, limite: LimitePorIp, firmar: FirmarToken): Promise<RespuestaHttpToken> {
+  if (!limite.permitir(req.ip, req.ahora)) return err(429, "demasiados pedidos");
+  const clave = env.LIVEKIT_API_KEY, secreto = env.LIVEKIT_API_SECRET, url = urlLiveKitServidor(env);
+  if (!clave || !secreto || !url) return err(503, "no disponible");
+  if (req.largo > 512) return err(400, "solicitud inválida");
+  let cuerpo: unknown = null;
+  try { cuerpo = JSON.parse((await req.texto()).slice(0, 512)); } catch { return err(400, "solicitud inválida"); }
+  const s = validarSolicitud(cuerpo);
+  if (!s.ok) return err(400, "solicitud inválida");
+  try {
+    const token = await firmar(clave, secreto, s.sesionId, ttlPorRol(s.rol), permisosPorRol(s.rol, salaServidor(env.LIVEKIT_SALA)));
+    if (typeof token !== "string" || !token || token.includes(secreto)) return err(500, "no disponible");
+    return { estado: 200, cuerpo: { token, url } };
+  } catch {
+    return err(500, "no disponible");
+  }
 }

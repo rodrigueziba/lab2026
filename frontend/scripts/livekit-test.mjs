@@ -5,8 +5,10 @@
 import fs from 'node:fs';
 import {
   validarSolicitud, permisosPorRol, ttlPorRol, salaServidor, ipDe, LimitePorIp, SALA_POR_DEFECTO, TTL_PUBLICAR_S, TTL_ESCUCHAR_S, DURACION_MAX_SERVIDOR_S,
+  urlLiveKitServidor, atenderToken,
 } from '../lib/vivo/tokenLiveKit.ts';
-import { PublicadorLiveKit } from '../lib/vivo/liveKitCiclo.ts';
+import { PublicadorLiveKit, MOTIVO_TOKEN, motivoPorEstado, leerRespuestaToken, motivoBreve } from '../lib/vivo/liveKitCiclo.ts';
+import { AccessToken, TrackSource } from 'livekit-server-sdk';
 
 const leer = f => fs.readFileSync(new URL(f, import.meta.url), 'utf8');
 const src = leer('../lib/debugConfig.ts');
@@ -101,7 +103,7 @@ console.log('\npublicador (cliente simulado)');
   M.salas[0].cbs.forEach(f => f('desconectado'));
   check(P.estado === 'sin_conexion' && P.recursosVivos === 0 && M.pistas.every(p => p.lib), 'el SDK se rinde (desconectado): "sin conexión" y libera todo');
   check(P.iniciar({ consentimiento: true, modo: 'privado', sesionId: ID }).ok && P.estado === 'pidiendo', 'se puede volver a intentar con un nuevo consentimiento'); P.detener(); }
-for (const [m, motivo] of [['sin variables (503)', 'sin configuración de LiveKit'], ['token rechazado', 'token rechazado (429)'], ['sin red', 'sin red']]) {
+for (const [m, motivo] of [['sin variables (503)', MOTIVO_TOKEN.sinClaves], ['token rechazado', motivoPorEstado(429)], ['sin red', MOTIVO_TOKEN.sinRed]]) {
   const M = crearMundo({ token: { ok: false, motivo } }), P = new PublicadorLiveKit(M.deps, L);
   P.iniciar({ consentimiento: true, modo: 'cara', sesionId: ID }); await tick(8);
   check(P.estado === 'sin_conexion' && P.ultimoError === motivo && M.salas.length === 0 && M.pistas.length === 0, `${m}: "sin conexión", sin sala ni pistas (no se toca nada local)`);
@@ -115,10 +117,94 @@ for (const [m, motivo] of [['sin variables (503)', 'sin configuración de LiveKi
   P.iniciar({ consentimiento: true, modo: 'cara', sesionId: ID }); await tick(12);
   check(P.estado === 'sin_conexion' && P.recursosVivos === 0, 'falla al conectar: "sin conexión" sin excepciones'); }
 
+console.log('\nZ92b: URL del servidor (LIVEKIT_URL o NEXT_PUBLIC_LIVEKIT_URL)');
+check(urlLiveKitServidor({ LIVEKIT_URL: 'wss://a.livekit.cloud' }) === 'wss://a.livekit.cloud', 'LIVEKIT_URL (wss) se usa');
+check(urlLiveKitServidor({ NEXT_PUBLIC_LIVEKIT_URL: 'wss://b.livekit.cloud' }) === 'wss://b.livekit.cloud', 'sin LIVEKIT_URL: NEXT_PUBLIC_LIVEKIT_URL');
+check(urlLiveKitServidor({ LIVEKIT_URL: 'wss://a', NEXT_PUBLIC_LIVEKIT_URL: 'wss://b' }) === 'wss://a', 'con las dos: gana LIVEKIT_URL');
+check(urlLiveKitServidor({ LIVEKIT_URL: '  ', NEXT_PUBLIC_LIVEKIT_URL: 'ws://localhost:7880' }) === 'ws://localhost:7880', 'LIVEKIT_URL vacía cuenta como ausente; acepta ws:// (servidor local)');
+for (const u of ['https://a.livekit.cloud', 'http://x', 'a.livekit.cloud', 'wss://', 'javascript:alert(1)', 'wss://a b', 'ftp://x'])
+  check(urlLiveKitServidor({ LIVEKIT_URL: u }) === null, `rechaza la URL ${JSON.stringify(u)}`);
+check(urlLiveKitServidor({}) === null, 'sin ninguna URL: null');
+
+console.log('\nZ92b: respuesta de la ruta del token (firma REAL con livekit-server-sdk)');
+const CLAVE = 'APIclavePrueba123', SECRETO = 'secretoDePrueba-0123456789abcdefghijklmnop';
+const firmarReal = async (clave, secreto, id, ttl, p) => {
+  const at = new AccessToken(clave, secreto, { identity: id, ttl });
+  at.addGrant({ room: p.room, roomJoin: p.roomJoin, canPublish: p.canPublish, canSubscribe: p.canSubscribe, canPublishData: p.canPublishData,
+    canPublishSources: p.fuentes.map(f => (f === 'camera' ? TrackSource.CAMERA : TrackSource.MICROPHONE)) });
+  return at.toJwt();
+};
+const pedido = (cuerpo = { rol: 'publicar', sesionId: ID }, ip = '1.1.1.1') => { const t = JSON.stringify(cuerpo); return { ip, ahora: 1000, largo: t.length, texto: async () => t }; };
+const base = { LIVEKIT_API_KEY: CLAVE, LIVEKIT_API_SECRET: SECRETO };
+const sinSecretos = r => { const j = JSON.stringify(r.cuerpo); return !j.includes(SECRETO) && !j.includes(CLAVE); };
+const payload = tok => JSON.parse(Buffer.from(tok.split('.')[1], 'base64url').toString());
+{ const r = await atenderToken({ ...base, LIVEKIT_URL: 'wss://a.livekit.cloud' }, pedido(), new LimitePorIp(), firmarReal);
+  check(r.estado === 200 && r.cuerpo.url === 'wss://a.livekit.cloud' && typeof r.cuerpo.token === 'string' && Object.keys(r.cuerpo).sort().join() === 'token,url', 'con LIVEKIT_URL: 200 { token, url } con esa url (y nada más)');
+  check(sinSecretos(r), '…la respuesta no contiene la clave ni el secreto');
+  const pl = payload(r.cuerpo.token);
+  check(pl.sub === ID && pl.video?.room === SALA_POR_DEFECTO && pl.video?.canPublish === true && pl.video?.canSubscribe === false, '…JWT real: identidad, sala fija y permisos de publicar');
+  check(!JSON.stringify(pl).includes(SECRETO), '…el JWT no lleva el secreto'); }
+{ const r = await atenderToken({ ...base, NEXT_PUBLIC_LIVEKIT_URL: 'wss://b.livekit.cloud' }, pedido(), new LimitePorIp(), firmarReal);
+  check(r.estado === 200 && r.cuerpo.url === 'wss://b.livekit.cloud' && sinSecretos(r), 'solo NEXT_PUBLIC_LIVEKIT_URL: 200 con esa url, sin secretos'); }
+{ const r = await atenderToken({ ...base, LIVEKIT_URL: 'ws://localhost:7880' }, pedido(), new LimitePorIp(), firmarReal);
+  check(r.estado === 200 && r.cuerpo.url === 'ws://localhost:7880', 'ws:// aceptada'); }
+for (const [m, env] of [['sin ninguna variable', {}], ['sin URL', base], ['sin clave', { LIVEKIT_API_SECRET: SECRETO, LIVEKIT_URL: 'wss://a' }],
+  ['sin secreto', { LIVEKIT_API_KEY: CLAVE, LIVEKIT_URL: 'wss://a' }], ['URL https', { ...base, LIVEKIT_URL: 'https://a.livekit.cloud' }],
+  ['LIVEKIT_URL inválida aunque NEXT_PUBLIC sea válida', { ...base, LIVEKIT_URL: 'https://a', NEXT_PUBLIC_LIVEKIT_URL: 'wss://b' }]]) {
+  const r = await atenderToken(env, pedido(), new LimitePorIp(), firmarReal);
+  check(r.estado === 503 && r.cuerpo.error === 'no disponible' && sinSecretos(r) && !('url' in r.cuerpo), `${m}: 503 genérico, sin url ni secretos`);
+}
+{ const r = await atenderToken({ ...base, LIVEKIT_URL: 'wss://a' }, pedido({ rol: 'publicar', sesionId: ID, sala: 'x' }), new LimitePorIp(), firmarReal);
+  check(r.estado === 400 && r.cuerpo.error === 'solicitud inválida' && sinSecretos(r), 'cuerpo inválido: 400 genérico');
+  const g = { ...pedido(), largo: 9999 };
+  check((await atenderToken({ ...base, LIVEKIT_URL: 'wss://a' }, g, new LimitePorIp(), firmarReal)).estado === 400, 'cuerpo > 512 B: 400');
+  const lim = new LimitePorIp(2, 60000); let ult;
+  for (let i = 0; i < 3; i++) ult = await atenderToken({ ...base, LIVEKIT_URL: 'wss://a' }, pedido(), lim, firmarReal);
+  check(ult.estado === 429 && ult.cuerpo.error === 'demasiados pedidos', 'límite por IP: 429');
+  const r5 = await atenderToken({ ...base, LIVEKIT_URL: 'wss://a' }, pedido(), new LimitePorIp(), async () => { throw new Error('fallo interno con ' + SECRETO); });
+  check(r5.estado === 500 && sinSecretos(r5), 'falla al firmar: 500 genérico, sin el mensaje interno'); }
+
+console.log('\nZ92b: cliente (motivos y conexión con la url devuelta)');
+check(motivoPorEstado(503) === 'servidor sin claves (503)' && motivoPorEstado(400) === 'pedido de token rechazado (400)' && motivoPorEstado(429) === 'pedido de token rechazado (429)', 'motivos por estado HTTP: 503 sin claves; 400/429 rechazado');
+check(leerRespuestaToken({ token: 't', url: 'wss://s' }).ok && !leerRespuestaToken({ token: 't', url: 'https://s' }).ok && !leerRespuestaToken({ token: 't' }).ok && !leerRespuestaToken(null).ok, 'respuesta: exige token y url ws/wss');
+check(motivoBreve(new Error('could not establish signal connection: eyJhbGc.eyJzdWIi.firma\notra')) === 'could not establish signal connection: [token]' && motivoBreve(new Error('x'.repeat(200))).length === 80 && motivoBreve(new Error('wss://s/rtc?access_token=abc')).includes('access_token=[token]'), 'motivo del SDK: breve, una línea y sin el token');
+{ const urls = []; const M = crearMundo({ token: { ok: true, token: 'jwt', url: 'wss://servidor-dio-esta.livekit.cloud' } });
+  const crear = M.deps.crearSala; M.deps.crearSala = async () => { const s = await crear(); const c = s.conectar; s.conectar = async (u, t) => { urls.push([u, t]); return c(u, t); }; return s; };
+  const P = new PublicadorLiveKit(M.deps, L);
+  check(P.diagnostico === 'sin pedir', 'diagnóstico inicial: sin pedir');
+  P.iniciar({ consentimiento: true, modo: 'cara', sesionId: ID });
+  check(P.diagnostico === 'pidiendo token…', 'diagnóstico: pidiendo token…');
+  await tick(12);
+  check(urls.length === 1 && urls[0][0] === 'wss://servidor-dio-esta.livekit.cloud' && urls[0][1] === 'jwt', 'conecta con la url que devolvió el servidor (no con una variable del navegador)');
+  check(P.diagnostico === 'conectado', 'diagnóstico: conectado'); P.detener(); }
+for (const [m, motivo] of [['servidor sin claves', MOTIVO_TOKEN.sinClaves], ['rechazado 400', motivoPorEstado(400)], ['rechazado 429', motivoPorEstado(429)], ['sin red', MOTIVO_TOKEN.sinRed]]) {
+  const M = crearMundo({ token: { ok: false, motivo } }), P = new PublicadorLiveKit(M.deps, L);
+  P.iniciar({ consentimiento: true, modo: 'cara', sesionId: ID }); await tick(8);
+  check(P.diagnostico === motivo && M.salas.length === 0, `diagnóstico "${motivo}" (${m}), sin abrir sala`);
+}
+{ const M = crearMundo({ conectar: () => Promise.reject(new Error('could not establish pc connection')) }), P = new PublicadorLiveKit(M.deps, L);
+  P.iniciar({ consentimiento: true, modo: 'cara', sesionId: ID }); await tick(12);
+  M.salas[0].cbs.forEach(f => f('desconectado'));
+  check(P.estado === 'sin_conexion' && P.diagnostico === 'token ok, falló la conexión a LiveKit: could not establish pc connection' && P.recursosVivos === 0, 'token ok y falla al conectar: diagnóstico con el motivo breve del SDK; libera todo'); }
+{ let rechazar; const M = crearMundo({ conectar: () => new Promise((_, r) => { rechazar = r; }) }), P = new PublicadorLiveKit(M.deps, L);
+  P.iniciar({ consentimiento: true, modo: 'cara', sesionId: ID }); await tick(8);
+  M.salas[0].cbs.forEach(f => f('desconectado'));   // el SDK avisa Disconnected antes de rechazar connect
+  rechazar(new Error('signal timeout')); await tick(8);
+  check(P.diagnostico === 'token ok, falló la conexión a LiveKit: signal timeout', 'un Disconnected durante la conexión no tapa el motivo del rechazo'); }
+{ const M = crearMundo(); const crear = M.deps.crearSala;
+  M.deps.crearSala = async () => { const s = await crear(); s.publicarVideo = async () => { throw new Error('publishing rejected'); }; return s; };
+  const P = new PublicadorLiveKit(M.deps, L);
+  P.iniciar({ consentimiento: true, modo: 'cara', sesionId: ID }); await tick(12);
+  check(P.estado === 'sin_conexion' && P.diagnostico.startsWith('conectado, falló publicar las pistas') && P.recursosVivos === 0 && M.pistas.every(p => p.lib), 'falla al publicar: diagnóstico propio y libera las pistas'); }
+{ const G = leer('../lib/vivo/publicarLiveKit.ts');
+  check(!/process\.env/.test(G) && /r\.json\(\)/.test(G) && /leerRespuestaToken/.test(G), 'el cliente no lee variables: pide el token y usa la url de la respuesta');
+  check(/export const dynamic = "force-dynamic"/.test(leer('../app/api/livekit/token/route.ts')), 'la ruta es dinámica (no se evalúa en el build)'); }
+
 console.log('\nintegración (lectura del código)');
 { const R = leer('../app/api/livekit/token/route.ts'), G = leer('../lib/vivo/publicarLiveKit.ts'), A = leer('../lib/consentTarimaAcciones.ts');
-  check(/process\.env\.LIVEKIT_API_SECRET/.test(R) && !/NEXT_PUBLIC_LIVEKIT_API|NEXT_PUBLIC_LIVEKIT_SECRET/.test(R + G) && !/LIVEKIT_API_SECRET|LIVEKIT_API_KEY/.test(G), 'clave y secreto solo en el servidor; el cliente solo recibe la URL');
-  check(/error\(503, "no disponible"\)/.test(R) && /error\(429/.test(R) && !/err\.message|String\(e/.test(R), 'sin variables: 503 genérico; errores sin información interna');
+  const T = leer('../lib/vivo/tokenLiveKit.ts');
+  check(/"LIVEKIT_API_SECRET"/.test(R) && /process\.env\[k\]/.test(R) && !/NEXT_PUBLIC_LIVEKIT_API|NEXT_PUBLIC_LIVEKIT_SECRET/.test(R + G) && !/LIVEKIT_API_SECRET|LIVEKIT_API_KEY/.test(G), 'clave y secreto solo en el servidor; el cliente solo recibe la URL');
+  check(/err\(503, "no disponible"\)/.test(T) && /err\(429/.test(T) && !/\.message|String\(e/.test(R + T), 'sin variables: 503 genérico; errores sin información interna');
   check(/await import\("livekit-client"\)/.test(G) && !/^import .* from "livekit-client"/m.test(G), 'livekit-client se carga con import() dinámico');
   check(/orig\.clone\(\)/.test(G) && /liberarSalidaTransmisible/.test(G), 'webcam clonada (no se apaga la cámara local) y salida del núcleo liberada al cortar');
   check(/addEventListener\("pagehide", _alSalir\)/.test(G), 'pagehide detiene la publicación');

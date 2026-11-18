@@ -537,7 +537,8 @@ export function SecLiveKitZ92() {
   return (
     <>
           <span style={LABEL}>Transmisión LiveKit Z92 <span style={NOTE}>(video y audio de la tarima · token firmado en /api/livekit/token)</span></span>
-          <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoLiveKit()}</span></div>
+          <div style={{ ...ROW, ...NOTE, whiteSpace: "pre-line" }}><span>{textoEstadoLiveKit()}</span></div>
+          <div style={{ ...ROW, ...NOTE }}><span>Z92b: la URL de LiveKit la da el servidor en cada pedido (LIVEKIT_URL o NEXT_PUBLIC_LIVEKIT_URL); el navegador no lee variables</span></div>
           <div style={ROW}>
             <span>ACTIVO <span style={NOTE}>off = como Z91 (solo presencia)</span></span>
             <button style={INPUT} onClick={() => { L.ACTIVO = !L.ACTIVO; toca(); }}>{L.ACTIVO ? "ON" : "off"}</button>
