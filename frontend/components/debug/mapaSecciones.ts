@@ -15,7 +15,7 @@ import { SecSecuenciaSillas, SecIconosDelPisoZ23, SecLayoutZ41, SecRelojDeLaExpe
 import { SecSolN3, SecOndasPorKickZ52, SecSolNuevoZ51 } from "./pestanas/sol";
 import { SecStars, SecDome, SecSectorEffects, SecLecterns, SecRetroAtriles, SecFaceCapture, SecAudio, SecExtraLights, SecAudioNucleoZ78, SecPlayTarimaZ79, SecCajaRitmosZ80 } from "./pestanas/tarima";
 import { SecTelonN6, SecInicioZ24, SecTextoDelTelonZ46, SecDestelloDeCortinaF1, SecEntradaTrasElTelonZ59 } from "./pestanas/telon";
-import { SecSimbolosN3, SecAudioBandasN4, SecReaccionT3Audio, SecU10bReaccionAlSonido, SecU11CameraFeedback, SecU2AgcAmplitudes } from "./pestanas/visualizador";
+import { SecSimbolosN3, SecAudioBandasN4, SecReaccionT3Audio, SecU10bReaccionAlSonido, SecU11CameraFeedback, SecU2AgcAmplitudes, SecDomoVivoZ83 } from "./pestanas/visualizador";
 import { SecPanoramaSvg, SecAmanecerViejo, SecLegado, SecPrism, SecControlesSinEfecto } from "./pestanas/obsoletos";
 
 export const COMPONENTES_SECCION: Record<string, ComponentType> = {
@@ -71,6 +71,7 @@ export const COMPONENTES_SECCION: Record<string, ComponentType> = {
   "audio-nucleo-z78": SecAudioNucleoZ78,
   "play-tarima-z79": SecPlayTarimaZ79,
   "monolitos-vivo-z82": SecMonolitosVivoZ82,
+  "domo-vivo-z83": SecDomoVivoZ83,
   "caja-ritmos-z80": SecCajaRitmosZ80,
   "extra-lights": SecExtraLights,
   "telon-n6": SecTelonN6,

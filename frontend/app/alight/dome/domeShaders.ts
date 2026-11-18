@@ -216,6 +216,33 @@ float warpField(vec2 q, float t, float amt) {
 // ------------------------------------------------------------------ hash
 float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
 
+// ---- Z83: sesión en vivo de la tarima en la franja del domo (lib/domoVivo.ts replica la geometría) ----
+uniform sampler2D uRemoteTex;  // video de la sesión (CanvasTexture de prueba hoy; VideoTexture de LiveKit después), NoColorSpace
+uniform float uRemoteMix;      // 0..1 peso del monolito de video (0 = visualizador intacto: la rama no se ejecuta)
+uniform float uStaticMix;      // 0..1 estática sobre el video (1 sin sesión)
+uniform float uRemoteOn;       // 1 = hay sesión (se muestrea uRemoteTex)
+uniform vec4  uVivoGeo;        // x = repeticiones, y = ancho de cada imagen (vueltas), z = alto (tan elev), w = centro (tan elev)
+uniform vec3  uVivoCob;        // x = 0 banda / 1 sector, y = azimut del centro (vueltas), z = medio ancho del sector (vueltas)
+uniform float uVivoBorde;      // borde suave entre repeticiones (fracción del ancho de la imagen)
+uniform float uVivoFondo;      // cuánto se apaga el visualizador fuera de la imagen (con uRemoteMix)
+uniform float uVivoT;          // tiempo de la estática (s; quieto en la pausa central)
+uniform vec3  uEstatica;       // x = intensidad, y = grano (filas por imagen), z = velocidad (cuadros de ruido por s)
+
+// Estática de televisión sin señal: grano por celdas que cambia uEstatica.z veces por segundo, líneas de barrido,
+// una banda de brillo que rueda hacia arriba y un parpadeo leve. Sin texturas.
+vec3 estaticaTV(vec2 uv, float t, float asp) {
+  float filas = max(uEstatica.y, 8.0);
+  vec2 g = floor(uv * vec2(filas * asp, filas));
+  float f = floor(t * max(uEstatica.z, 1.0));
+  float n = h21(g + vec2(f * 13.17, f * 7.31));
+  float scan = 0.80 + 0.20 * sin(uv.y * filas * 3.14159265);
+  float r = fract(uv.y * 0.9 + t * 0.21);
+  float barra = smoothstep(0.0, 0.08, r) * (1.0 - smoothstep(0.08, 0.30, r));
+  float parp = 0.88 + 0.12 * h21(vec2(f, 1.7));
+  float v = (n * scan + 0.28 * barra) * parp;
+  return vec3(v) * vec3(0.94, 0.97, 1.0) * uEstatica.x;
+}
+
 // ------------------------------------------------------------------ Z61: fluir de color
 // Implementación PROPIA de la técnica general de "domain warping" (distorsionar las coordenadas de un ruido fractal
 // con otro ruido, en dos capas). Hash, ruido de valor, suma de octavas, constantes, estructura y paletas son propios
@@ -710,6 +737,25 @@ void main() {
   }
 
   // AA2: alpha=0 bajo el horizonte — el piso real del escenario es visible a traves del domo
+  // Z83: proyección de la sesión en vivo (o estática) en la franja. Con uRemoteMix = 0 no entra: resultado idéntico.
+  if (uRemoteMix > 0.0) {
+    float azV = atan(d.x, -d.z) / TAU;
+    float rel = fract(azV - uVivoCob.y + 0.5) - 0.5;                       // vueltas desde el centro (−0,5…0,5)
+    float uu = uVivoCob.x < 0.5 ? fract(rel / uVivoGeo.y + 0.5) : rel / (2.0 * uVivoCob.z) + 0.5;
+    float te = d.y / max(length(d.xz), 1e-4);                               // tan(elevación): imagen sin deformar
+    float vv = (te - (uVivoGeo.w - 0.5 * uVivoGeo.z)) / uVivoGeo.z;
+    float asp = uVivoGeo.y * TAU / uVivoGeo.z;
+    float dentro = step(0.0, uu) * step(uu, 1.0) * step(0.0, vv) * step(vv, 1.0);
+    float bu = max(uVivoBorde, 1e-4), bv = bu * asp;
+    float masc = dentro * smoothstep(0.0, bu, uu) * smoothstep(0.0, bu, 1.0 - uu) * smoothstep(0.0, bv, vv) * smoothstep(0.0, bv, 1.0 - vv);
+    vec2 uvV = clamp(vec2(uu, vv), 0.0, 1.0);
+    vec3 est = estaticaTV(uvV, uVivoT, asp);
+    vec3 cont = est;
+    if (uRemoteOn > 0.5) cont = mix(texture2D(uRemoteTex, uvV).rgb, est, uStaticMix);
+    col = mix(col, vec3(0.020, 0.017, 0.028), uRemoteMix * uVivoFondo * (1.0 - masc));   // el visualizador se apaga alrededor
+    col = mix(col, cont, uRemoteMix * masc);
+  }
+
   float a = smoothstep(-0.015, 0.015, d.y);
   // Z50: DEBUG_CAPAS — cada capa de la composición en un color plano (cielo del mundo gris oscuro)
   if (uDebugCapas > 0.5) {

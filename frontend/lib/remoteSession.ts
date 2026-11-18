@@ -5,8 +5,9 @@ export type RemoteSessionStatus = 'idle' | 'connecting' | 'active' | 'error';
 
 export interface RemoteSession {
   status: RemoteSessionStatus;
-  /** Returns a <video> element (live stream) or <img> (still), or null if no image available. */
-  getImage(): HTMLVideoElement | HTMLImageElement | null;
+  /** Returns a <video> element (live stream) or <img> (still), or null if no image available.
+   *  Z83: también un <canvas> (sesión de prueba local, lib/sesionPrueba.ts). */
+  getImage(): HTMLVideoElement | HTMLImageElement | HTMLCanvasElement | null;
   /** Returns the remote audio source node connected to the given AudioContext, or null. */
   getAudio(ctx: AudioContext): AudioNode | null;
   /** Notify the session whether this client is currently watching (connected). */

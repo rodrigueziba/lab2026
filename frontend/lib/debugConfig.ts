@@ -1044,6 +1044,7 @@ export const DBG_RENDIMIENTO = {
     luces: true, flor: true, monolitos: true, telonTexto: true, estrellas: true,
     // Z72: sub-sistemas del shader del domo (uniforms uPerf* de dome.frag.glsl)
     domoFluido: true, domoSol: true, domoOndas: true, domoEstrellas: true, domoPortal: true, domoSiluetas: true,
+    ritmos: true, videoDomo: true,   // Z80 caja de ritmos · Z83 video en el domo
   } as Record<string, boolean>,
 };
 
@@ -1520,4 +1521,23 @@ export const DBG_MONO_VIVO = {
   SESION_GANANCIA:     1.0,     // nivel del audio de la sesión con peso 1 — live
   REQUIERE_ACEPTACION: false,   // true: sin mezcla remota hasta que el espectador acepte (aceptarTransmision()) — live
   OVERLAY:             false,   // estados, pesos y contadores (abajo a la izquierda) — live
+};
+
+// ── Z83: el domo de SILLAS muestra la sesión en vivo de la tarima o estática (lib/domoVivo.ts, lib/domoVivoAcciones.ts) ──
+// uRemoteMix = peso del monolito de video (Z82). ACTIVO = false → domo como estaba (la rama del shader no se ejecuta).
+export const DBG_DOMO_VIVO = {
+  ACTIVO:              true,    // — live
+  REPETICIONES:        6,       // imágenes alrededor de la franja (modo banda) — live
+  COBERTURA:           "banda" as string,   // "banda" (toda la franja de 360°) | "sector" — live
+  SECTOR_ANCHO_DEG:    70,      // ancho del sector (modo sector) — live
+  SECTOR_DESPLAZ_DEG:  0,       // giro del centro respecto del azimut del portal — live
+  ASPECTO:             16 / 9,  // proporción del video — live
+  ELEV_CENTRO_DEG:     18,      // elevación del centro de la franja — live
+  BORDE:               0.04,    // borde suave entre repeticiones (fracción del ancho) — live
+  FONDO:               0.9,     // cuánto se apaga el visualizador alrededor de la imagen (× peso) — live
+  FPS:                 15,      // cuadros por segundo del video de prueba — live
+  ESTATICA_INTENSIDAD: 0.85,    // — live
+  ESTATICA_GRANO:      140,     // filas de grano por imagen — live
+  ESTATICA_VELOCIDAD:  24,      // cuadros de ruido por segundo — live
+  FORZAR:              "ninguno" as string,   // "ninguno" (monolito) | "video" | "estatica" | "apagar" — live
 };

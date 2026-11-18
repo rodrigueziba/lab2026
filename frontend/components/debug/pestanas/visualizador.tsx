@@ -1,7 +1,10 @@
 "use client";
 // Z70: pestaña "Visualizador y música" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
-import { DBG_SILLAS } from "@/lib/debugConfig";
+import { useEffect, useState } from "react";
+import { DBG_SILLAS, DBG_DOMO_VIVO, DBG_RENDIMIENTO } from "@/lib/debugConfig";
+import { textoEstadoDomoVivo } from "@/lib/domoVivoAcciones";   // Z83
+import { simularSesionEnVivo, quitarSesion } from "@/lib/monolitosVivoAcciones";   // Z82
 import { BAND_STATE, reshuffleAssignment } from "@/lib/vizAudio";
 import { LABEL, ROW, INPUT, NOTE, NumField, BandEnergyOverlay, AudioU2Meters } from "../comun";
 import { useDbg } from "../contexto";
@@ -222,6 +225,56 @@ export function SecU2AgcAmplitudes() {
             }}>{sillas.showU2Meters ? "ON" : "off"}</button>
           </div>
           {sillas.showU2Meters && <AudioU2Meters />}
+    </>
+  );
+}
+
+// sección: domo-vivo-z83
+export function SecDomoVivoZ83() {
+  // Z83: el domo muestra la sesión en vivo de la tarima (o estática) según el peso del monolito de video (Z82).
+  const D = DBG_DOMO_VIVO;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const forzar = (m: string) => { D.FORZAR = m; toca(); };
+  return (
+    <>
+          <span style={LABEL}>Domo con la sesión en vivo Z83 <span style={NOTE}>(live · mezcla = peso del monolito de video)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoDomoVivo()}</span></div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); forzar("video"); }}>Forzar video 100 %</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); forzar("estatica"); }}>Forzar estática 100 %</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); forzar("apagar"); }}>Apagar</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); forzar("ninguno"); }}>Normal (monolito)</button>
+          </div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); simularSesionEnVivo(); toca(); }}>Simular sesión en vivo</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); quitarSesion(); toca(); }}>Quitar sesión</button>
+          </div>
+          <div style={ROW}>
+            <span>ACTIVO <span style={NOTE}>off = domo como estaba</span></span>
+            <button style={INPUT} onClick={() => { D.ACTIVO = !D.ACTIVO; toca(); }}>{D.ACTIVO ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>videoDomo (benchmark) <span style={NOTE}>off = mezcla 0</span></span>
+            <button style={INPUT} onClick={() => { DBG_RENDIMIENTO.SIS.videoDomo = DBG_RENDIMIENTO.SIS.videoDomo === false; toca(); }}>{DBG_RENDIMIENTO.SIS.videoDomo !== false ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <span>COBERTURA</span>
+            {(["banda", "sector"] as const).map(v => (
+              <button key={v} style={{ ...INPUT, opacity: D.COBERTURA === v ? 1 : 0.5 }} onClick={() => { D.COBERTURA = v; toca(); }}>{v}</button>
+            ))}
+          </div>
+          {([
+            ["REPETICIONES", 1, 12, 1, "imágenes (banda)"], ["SECTOR_ANCHO_DEG", 10, 180, 1, "° (sector)"], ["SECTOR_DESPLAZ_DEG", -180, 180, 1, "°"],
+            ["ELEV_CENTRO_DEG", 0, 60, 0.5, "°"], ["ASPECTO", 1, 2.4, 0.01, "(16:9 = 1,78)"], ["BORDE", 0, 0.3, 0.005, ""], ["FONDO", 0, 1, 0.01, "visualizador apagado alrededor"],
+            ["FPS", 1, 30, 1, "video de prueba"], ["ESTATICA_INTENSIDAD", 0, 1.5, 0.01, ""], ["ESTATICA_GRANO", 16, 400, 1, "filas"], ["ESTATICA_VELOCIDAD", 1, 60, 1, "cuadros/s"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{D[k].toFixed(st < 0.1 ? 2 : st < 1 ? 1 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={D[k]} onChange={ev => { D[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
     </>
   );
 }

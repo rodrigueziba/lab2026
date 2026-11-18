@@ -84,6 +84,25 @@ Z49: la escala de la composición (`DBG_PORTAL.ESCALA`) no es un uniform propio:
 
 No incluyas `colorspace_fragment`: los colores ya están en sRGB y las texturas no deben convertirse.
 
+### 3.Z83. Sesión en vivo de la tarima en la franja (lib/domoVivo.ts, lib/domoVivoAcciones.ts)
+
+Rama al final del `main`, antes del alfa: **con `uRemoteMix = 0` no se ejecuta** y el domo queda idéntico al de antes.
+
+| Uniform | Tipo | Valor inicial | Notas |
+|---|---|---|---|
+| `uRemoteTex` | sampler2D | 1×1 negro | Video de la sesión (`NoColorSpace`): hoy un canvas de prueba 640×360; mañana un `VideoTexture` de LiveKit |
+| `uRemoteMix` | float | 0 | Peso del monolito de video (Z82): 0 = visualizador intacto, 1 = proyección completa |
+| `uStaticMix` | float | 1 | Estática sobre el video (1 sin sesión) |
+| `uRemoteOn` | float | 0 | 1 = hay sesión: se muestrea `uRemoteTex`; 0 = solo estática |
+| `uVivoGeo` | vec4 | (6, 1/6, 0,59, 0,32) | x = repeticiones · y = ancho de cada imagen (vueltas) · z = alto (tan elev.) · w = centro (tan elev.) |
+| `uVivoCob` | vec3 | (0, 0, 0,1) | x = 0 banda / 1 sector · y = azimut del centro (vueltas; el del portal + desplazamiento) · z = medio ancho del sector (vueltas) |
+| `uVivoBorde` | float | 0,04 | Borde suave entre repeticiones (fracción del ancho; en vertical, la misma medida física) |
+| `uVivoFondo` | float | 0,9 | Cuánto se apaga el visualizador alrededor de la imagen (× `uRemoteMix`) |
+| `uVivoT` | float | 0 | Tiempo de la estática (s; quieto en la pausa central) |
+| `uEstatica` | vec3 | (0,85, 140, 24) | Estática de TV: intensidad · grano (filas por imagen) · velocidad (cuadros de ruido por s) |
+
+Mapeo: proyección cilíndrica alrededor del espectador (azimut en horizontal, `tan(elevación)` en vertical), así una imagen de ancho W rad mide W/ASPECTO de alto y no se deforma desde el centro. Modo banda: `REPETICIONES` imágenes en los 360°; modo sector: una imagen de `SECTOR_ANCHO_DEG`.
+
 ## 4. Qué banda mueve qué
 
 | Banda | Elemento |

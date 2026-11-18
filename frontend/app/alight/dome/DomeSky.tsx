@@ -19,6 +19,7 @@ import { ONDAS, MAX_ONDAS, edad, evidenciaOndas } from "@/lib/ondasKick"; // Z52
 
 const EVID = { amp: 0, brillo: 0, tinte: 0, contraste: 0, engrosar: 0 };   // Z58: valores efectivos (se reescriben, sin allocations)
 import { RELOJ } from "@/lib/relojExperiencia"; // Z52
+import { aplicarDomoVivo, liberarDomoVivo, texturaVacia } from "@/lib/domoVivoAcciones"; // Z83
 import { hexARgb } from "@/lib/cicloDia"; // Z52
 import { DIA, PORTAL_GEOM } from "@/lib/cicloDia"; // Z48 · Z49
 import { escalaPortal, centroPortal, PORTAL_C_SHADER, SUN_C_SHADER } from "@/lib/portalEscala"; // Z49 · Z50 · Z55
@@ -240,6 +241,17 @@ export default function DomeSky({
           uFlPalA:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
           uFlPalN:  { value: Array.from({ length: 5 }, () => new THREE.Vector3(1, 1, 1)) },
           uOndaEngrosar:    { value: 0 },   // Z58
+          // Z83: sesión en vivo de la tarima en la franja (lib/domoVivoAcciones.ts); uRemoteMix = 0 → rama apagada
+          uRemoteTex:  { value: texturaVacia() },
+          uRemoteMix:  { value: 0 },
+          uStaticMix:  { value: 1 },
+          uRemoteOn:   { value: 0 },
+          uVivoGeo:    { value: new THREE.Vector4(6, 1 / 6, 0.59, 0.32) },
+          uVivoCob:    { value: new THREE.Vector3(0, 0, 0.1) },
+          uVivoBorde:  { value: 0.04 },
+          uVivoFondo:  { value: 0.9 },
+          uVivoT:      { value: 0 },
+          uEstatica:   { value: new THREE.Vector3(0.85, 140, 24) },
         },
       }),
     // los uniformes sueltos se actualizan en useFrame; el material solo se recrea si cambia la calidad
@@ -252,7 +264,10 @@ export default function DomeSky({
   // AA2: exponer el material para que ExperienceDome lo aplique al mesh del domo
   useEffect(() => {
     DOME_SKY_MAT_EXPORT.mat = material;
-    return () => { if (DOME_SKY_MAT_EXPORT.mat === material) DOME_SKY_MAT_EXPORT.mat = null; };
+    return () => {
+      if (DOME_SKY_MAT_EXPORT.mat === material) DOME_SKY_MAT_EXPORT.mat = null;
+      liberarDomoVivo();   // Z83
+    };
   }, [material]);
 
   useFrame((state, dt) => {
@@ -498,6 +513,7 @@ export default function DomeSky({
       DBG_DOME_LIVE.colorH  = ci.naturalHeight ?? ci.height ?? 0;
       DBG_DOME_LIVE.colorCS = color.colorSpace;
     }
+    aplicarDomoVivo(material.uniforms);   // Z83: al final (uPortalF ya está al día)
   });
 
   // AA2: renderSphere=false → solo actualiza uniforms; ExperienceDome aplica al mesh del domo.

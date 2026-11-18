@@ -22,6 +22,32 @@ export function llenarPatronPrueba(d: Float32Array, sr: number): void {
   }
 }
 
+/**
+ * Z83: patrón de video de prueba (canvas 2D): barras de color, un reloj que gira, un disco que va y viene y el texto
+ * "SESION EN VIVO (PRUEBA)". Solo la ventana de tiempo cambia de un cuadro a otro (nada de red ni archivos).
+ */
+export function dibujarPatronVideo(cv: HTMLCanvasElement, t: number): void {
+  const c = cv.getContext("2d");
+  if (!c) return;
+  const w = cv.width, h = cv.height;
+  const barras = ["#F2EBDD", "#F4B62E", "#2E9E5B", "#1F7FB8", "#E5322B", "#F27FA5", "#3A3B3C"];
+  const bw = w / barras.length;
+  for (let i = 0; i < barras.length; i++) { c.fillStyle = barras[i]; c.fillRect(i * bw, 0, bw + 1, h * 0.62); }
+  c.fillStyle = "#12101A"; c.fillRect(0, h * 0.62, w, h * 0.38);
+  // disco en movimiento
+  const x = w * (0.5 + 0.38 * Math.sin(t * 1.3));
+  c.fillStyle = "#FF9A1F"; c.beginPath(); c.arc(x, h * 0.31, h * 0.09, 0, Math.PI * 2); c.fill();
+  // reloj
+  const cx = w * 0.12, cy = h * 0.81, r = h * 0.13, a = t * 1.0;
+  c.strokeStyle = "#F2EBDD"; c.lineWidth = 4; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.stroke();
+  c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.sin(a) * r * 0.85, cy - Math.cos(a) * r * 0.85); c.stroke();
+  c.fillStyle = "#FF9A1F"; c.font = "bold 34px monospace"; c.textBaseline = "middle";
+  c.fillText("SESION EN VIVO (PRUEBA)", w * 0.25, h * 0.76);
+  c.font = "22px monospace"; c.fillStyle = "#F2EBDD";
+  const s = Math.floor(t);
+  c.fillText(`${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}  ·  TARIMA → SILLAS  ·  640×360`, w * 0.25, h * 0.88);
+}
+
 export class SesionPrueba implements RemoteSession {
   status: RemoteSessionStatus = "active";
   readonly inicioMs = Date.now();     // "la más reciente": hay una sola SESSION a la vez (setSession reemplaza)
@@ -30,7 +56,15 @@ export class SesionPrueba implements RemoteSession {
   private salida: GainNode | null = null;
   private cbs = new Set<(n: number) => void>();
 
-  getImage() { return null; }
+  private lienzo: HTMLCanvasElement | null = null;
+  /** Z83: video de prueba = canvas 640×360 (lo dibuja dibujarVideo; el domo lo sube a la GPU solo si se ve). */
+  getImage(): HTMLCanvasElement | null {
+    if (this.status !== "active" || typeof document === "undefined") return null;
+    if (!this.lienzo) { this.lienzo = document.createElement("canvas"); this.lienzo.width = 640; this.lienzo.height = 360; dibujarPatronVideo(this.lienzo, 0); }
+    return this.lienzo;
+  }
+  /** Z83: dibuja el cuadro del tiempo t (s). */
+  dibujarVideo(t: number): void { if (this.lienzo) dibujarPatronVideo(this.lienzo, t); }
   getAudio(ctx: AudioContext): AudioNode | null {
     if (this.status !== "active") return null;
     if (this.ctx !== ctx || !this.salida) {
@@ -52,5 +86,5 @@ export class SesionPrueba implements RemoteSession {
     this.src?.disconnect(); this.salida?.disconnect();
     this.src = null; this.salida = null; this.ctx = null;
   }
-  dispose() { this.status = "idle"; this.soltar(); this.cbs.clear(); }
+  dispose() { this.status = "idle"; this.soltar(); this.cbs.clear(); this.lienzo = null; }
 }
