@@ -2,7 +2,8 @@
 // Z70: pestaña "Pasto y monolitos" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_SILLAS, DBG_PASTO, DBG_MONO_VIVO } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_PASTO, DBG_MONO_VIVO, DBG_AVISO_VIVO } from "@/lib/debugConfig";
+import { mostrarAvisoAhora, reiniciarDecisionAviso, textoEstadoAviso } from "@/lib/avisoVivoAcciones";   // Z85
 import { simularSesionEnVivo, quitarSesion, forzarCerca, reiniciarMonolitosVivo, aceptarTransmision, textoEstadoMonolitos, MONO_VIVO } from "@/lib/monolitosVivoAcciones";   // Z82
 import { MONO_PASTO } from "@/lib/monolitosPasto";
 import { LABEL, ROW, INPUT, NOTE, NumField, N5ProximityOverlay } from "../comun";
@@ -235,6 +236,37 @@ export function SecMonolitosVivoZ82() {
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{M[k].toFixed(st < 0.1 ? 2 : 1)} {nota}</span></span>
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={M[k]} onChange={ev => { M[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
+    </>
+  );
+}
+
+// sección: aviso-vivo-z85
+export function SecAvisoVivoZ85() {
+  // Z85: aviso al espectador antes de recibir la transmisión en vivo (docs/dialogos/aviso-vivo.ink).
+  const A = DBG_AVISO_VIVO;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  return (
+    <>
+          <span style={LABEL}>Aviso de la sesión en vivo Z85 <span style={NOTE}>(live · usa la terminal de la narrativa)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoAviso()}</span></div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); mostrarAvisoAhora(); toca(); }}>Mostrar aviso ahora</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); reiniciarDecisionAviso(); toca(); }}>Reiniciar decisión</button>
+          </div>
+          {([["ACTIVO", "off = como antes, sin aviso"], ["SOLO_UNA_VEZ", "una vez por sesión del navegador"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={() => { A[k] = !A[k]; toca(); }}>{A[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([["CIERRE_MS", 0, 3000, 50], ["ESPERA_CIERRE_MS", 0, 2000, 50]] as const).map(([k, mn, mx, st]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{A[k]} ms</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={A[k]} onChange={ev => { A[k] = parseFloat(ev.target.value); toca(); }} />
             </div>
           ))}
     </>

@@ -193,6 +193,10 @@ const ACCIONES: Record<string, Accion> = {
   juego_alarma: juegoAlarma,
   premio_otorgado: () => { /* el tag lo emite la terminal al entrar al knot: el juego ya premió */ },
   ir_tarima_sin_publico: irTarimaSinPublico,
+  // Z85: aviso de la sesión en vivo (docs/dialogos/aviso-vivo.ink): la decisión la aplica lib/avisoVivoAcciones.ts
+  aviso_vivo_si:    () => { window.dispatchEvent(new CustomEvent("alight:aviso-vivo-decision", { detail: { decision: "si" } })); },
+  aviso_vivo_no:    () => { window.dispatchEvent(new CustomEvent("alight:aviso-vivo-decision", { detail: { decision: "no" } })); },
+  aviso_vivo_salir: () => { window.dispatchEvent(new CustomEvent("alight:aviso-vivo-decision", { detail: { decision: "salir" } })); },
 };
 
 // ── instalación ────────────────────────────────────────────────────────────────

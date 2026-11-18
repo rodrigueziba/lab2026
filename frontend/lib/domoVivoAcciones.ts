@@ -14,6 +14,7 @@ import { RELOJ as RELOJ_EXP } from "@/lib/relojExperiencia";
 import { SESSION, type RemoteSession } from "@/lib/remoteSession";
 import { dibujarPatronVideo } from "@/lib/sesionPrueba";
 import { N5_STATE } from "@/lib/vizAudio";
+import { MONO_VIVO } from "@/lib/monolitosVivoAcciones";   // Z85: aceptación de la transmisión
 import { geometriaFranja, pesosDomo, TAU, type GeoFranja, type PesosDomo } from "@/lib/domoVivo";
 import { RENDIMIENTO } from "@/components/RendimientoHost";   // solo para el diagnóstico (window.__domoVivo)
 
@@ -96,6 +97,8 @@ export function aplicarDomoVivo(u: U): void {
   _ent.benchOn = DBG_RENDIMIENTO.SIS.videoDomo !== false;
   _ent.forzar = DBG_DOMO_VIVO.FORZAR;
   _ent.pesoVideo = DBG_MONO_VIVO.ACTIVO ? N5_STATE.leftProximity : 0;
+  // Z85: con sesión sin aceptar (aviso pendiente o "No"), el domo sigue con su visual propio
+  if (SESSION.status === "active" && DBG_MONO_VIVO.REQUIERE_ACEPTACION && !MONO_VIVO.aceptada) _ent.pesoVideo = 0;
   _ent.haySesion = SESSION.status === "active";
   const p = pesosDomo(_ent, D.pesos);
   u.uRemoteMix.value = p.mix;

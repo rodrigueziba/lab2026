@@ -27,6 +27,15 @@ if (errors.length) { console.error('Errores de ink:\n' + errors.join('\n')); pro
 fs.mkdirSync(path.dirname(jsonOut), { recursive: true });
 fs.writeFileSync(jsonOut, story.ToJson());
 
+// Z85: diálogos aparte (mismo compilador; no entran en el mapa del camino LUZ)
+for (const [nombre] of [['aviso-vivo']]) {
+  const extra = fs.readFileSync(path.join(repo, `docs/dialogos/${nombre}.ink`), 'utf8');
+  const errs = [];
+  const st = new Compiler(extra, { errorHandler: (m, t) => errs.push(`[${t}] ${m}`) }).Compile();
+  if (errs.length) { console.error(`Errores de ink (${nombre}):\n` + errs.join('\n')); process.exit(1); }
+  fs.writeFileSync(path.join(root, `public/alight/dialogo/${nombre}.json`), st.ToJson());
+}
+
 // ---- 2) analizar knots ----
 const knots = new Map();
 let cur = null;

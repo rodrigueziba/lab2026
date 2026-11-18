@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { DBG_DIALOGO, DEBUG_MENU_ESTADO } from "@/lib/debugConfig";
-import { cargarDialogo } from "@/lib/dialogo/dialogoInk";
+import { cargarDialogo, RUTA_DIALOGO_LUZ } from "@/lib/dialogo/dialogoInk";
 import type { DialogoInk, OpcionDialogo, PasoDialogo, Segmento } from "@/lib/dialogo/dialogoInk";
 import { planDePaso, lineaEco, largoSegmentos, accionTecla } from "@/lib/dialogo/terminalFlujo";
 import type { Linea, PlanPaso, FaseTerminal } from "@/lib/dialogo/terminalFlujo";
@@ -69,7 +69,7 @@ export default function DialogoTerminal() {
   // React para lo que no se pinta). Se registra una vez; los listeners salen al desmontar.
   useEffect(() => {
     let dlg: DialogoInk | null = null;
-    let cargaPend: Promise<DialogoInk> | null = null;
+    const cargas = new Map<string, Promise<DialogoInk>>();   // Z85: una carga por fuente (JSON de ink)
     let activo = false;
     let faseL: Fase = "cerrado";
     let cola: Linea[] = [];
@@ -170,22 +170,25 @@ export default function DialogoTerminal() {
       cola = []; plan = null; lineaAct = null;
       DIALOGO_STATE.activo = false;
       DIALOGO_STATE.nodo = "";
+      DIALOGO_STATE.fuente = "";
       ponerFase("cerrado");
       setHist([]); setActual(null); setOpciones([]); setNodo("");
       window.dispatchEvent(new CustomEvent("alight:dialogo-cerrado"));
     };
 
-    const abrir = (knot?: string) => {
+    const abrir = (knot?: string, fuente: string = RUTA_DIALOGO_LUZ) => {
       sesion++;
       limpiarTimers();
       const s = sesion;
       activo = true;
       DIALOGO_STATE.activo = true;
+      DIALOGO_STATE.fuente = fuente;   // Z85
       cola = []; plan = null; lineaAct = null;
       setHist([]); setActual(null); setOpciones([]); setMostrados(0);
       setCfg({ ...DBG_DIALOGO });
       ponerFase("cargando");
-      if (!cargaPend) cargaPend = cargarDialogo();
+      let cargaPend = cargas.get(fuente);
+      if (!cargaPend) { cargaPend = cargarDialogo(fuente); cargas.set(fuente, cargaPend); }
       cargaPend.then(d => {
         if (s !== sesion || !activo) return;
         dlg = d;
@@ -196,13 +199,16 @@ export default function DialogoTerminal() {
           ponerFase("error");
         }
       }).catch(err => {
-        cargaPend = null;                                 // permitir reintentar
+        cargas.delete(fuente);                            // permitir reintentar
         console.error("[DialogoTerminal]", err);
         if (s === sesion) ponerFase("error");
       });
     };
 
-    const onAbrir = (e: Event) => abrir((e as CustomEvent<{ knot?: string } | undefined>).detail?.knot);
+    const onAbrir = (e: Event) => {
+      const d = (e as CustomEvent<{ knot?: string; fuente?: string } | undefined>).detail;
+      abrir(d?.knot, d?.fuente || RUTA_DIALOGO_LUZ);   // Z85: fuente = otro JSON de ink (aviso de la sesión en vivo)
+    };
     const onCerrar = () => cerrar();
     const onConfig = () => setCfg({ ...DBG_DIALOGO });
 

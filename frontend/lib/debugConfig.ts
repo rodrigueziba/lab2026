@@ -1585,3 +1585,12 @@ export const DBG_TIEMPO = {
   DESARMAR_S:        2,       // se desarma esto después de que k llega a 0 — live
   LIBERAR_AL_DESARMAR: false, // true = libera la memoria del historial al desarmar (al rearmar se reserva otra vez) — live
 };
+
+// ── Z85: aviso al espectador antes de recibir la transmisión en vivo (lib/avisoVivo.ts, lib/avisoVivoAcciones.ts) ──
+// Texto: docs/dialogos/aviso-vivo.ink (npm run ink:build). Usa la terminal de diálogo de la narrativa.
+export const DBG_AVISO_VIVO = {
+  ACTIVO:            true,    // false = como antes, sin aviso — live
+  SOLO_UNA_VEZ:      true,    // una vez por sesión del navegador (sessionStorage alight:aviso-vivo) — live
+  CIERRE_MS:         600,     // tras elegir, la terminal se cierra — live
+  ESPERA_CIERRE_MS:  300,     // "Prefiero salir de acá": si la pestaña no se cerró en este tiempo, pantalla final — live
+};

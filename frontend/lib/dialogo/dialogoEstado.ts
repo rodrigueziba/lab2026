@@ -8,10 +8,12 @@
 export const DIALOGO_STATE = {
   activo: false,  // la terminal está en pantalla
   nodo: "",       // tag id del nodo actual (ej. "1.b")
+  fuente: "",     // Z85: JSON de ink abierto (vacío = cerrado); el del camino LUZ o el del aviso de la sesión en vivo
 };
 
-export function abrirDialogo(knot?: string) {
-  window.dispatchEvent(new CustomEvent("alight:dialogo-abrir", { detail: { knot } }));
+/** fuente (Z85): URL de otro JSON de ink (sin ella, el diálogo del camino LUZ). */
+export function abrirDialogo(knot?: string, fuente?: string) {
+  window.dispatchEvent(new CustomEvent("alight:dialogo-abrir", { detail: { knot, fuente } }));
 }
 export function cerrarDialogo() {
   window.dispatchEvent(new CustomEvent("alight:dialogo-cerrar"));
