@@ -7,7 +7,7 @@ import { crearMono, tickPar } from '../lib/monolitosVivo.ts';
 
 const leer = f => fs.readFileSync(new URL(f, import.meta.url), 'utf8');
 const src = leer('../lib/debugConfig.ts');
-const obj = n => Function(`return (${new RegExp(`export const ${n} = (\\{[\\s\\S]*?\\n\\});`).exec(src)[1].replace(/ as string/g, '')});`)();
+const obj = n => Function(`return (${new RegExp(`export const ${n} = (\\{[\\s\\S]*?\\n\\});`).exec(src)[1].replace(/ as string \| number/g, '').replace(/ as string/g, '')});`)();
 const T = obj('DBG_TIEMPO'), M = obj('DBG_MONO_VIVO');
 let ok = 0, fallas = 0;
 const check = (c, m) => { if (c) { ok++; console.log('  ✓ ' + m); } else { fallas++; console.log('  ✗ ' + m); } };
@@ -131,7 +131,7 @@ console.log('\nsolo el audio propio y la cámara propia; k = 0 sin cambios');
   check(/_vizAudioEl\.playbackRate/.test(fn) && !/_remotoGain|_estatica|_nodoRemoto/.test(fn.slice(0, fn.indexOf('export function tasaTiempoActual'))), 'setTasaTiempo solo toca el <audio> propio (no la sesión remota ni la estática de Z82)');
   check(/_vizAudioEl\.playbackRate = Math\.max\(0\.25, Math\.min\(4, _rateCur \* _rateTiempo\)\);/.test(viz), 'applyEffects multiplica por el factor del tiempo detenido (no lo pisa)');
   const pf = leer('../lib/retro/paseFinal.ts');
-  check(/if \(uTiempoK > 0\.0\) c\.rgb = efectoTiempoDetenido\(vUv, c\.rgb, uTiempoK, uTiempoT\);/.test(pf), 'pase final: rama por uniform (sin pase extra); con k = 0 no se ejecuta y la imagen es idéntica');
+  check(/if \(uTiempoK > 0\.0( && uTiempoSlit < 0\.5)?\) c\.rgb = efectoTiempoDetenido\(vUv, c\.rgb, uTiempoK, uTiempoT\);/.test(pf), 'pase final: rama por uniform (sin pase extra); con k = 0 no se ejecuta y la imagen es idéntica');
   const glsl = leer('../lib/retro/tiempoDetenido.ts');
   check(/vec3 efectoTiempoDetenido\(vec2 uv, vec3 color, float k, float tiempo\)/.test(glsl) && /firma/.test(glsl), 'función de enganche con la firma documentada para el shader del usuario');
 }

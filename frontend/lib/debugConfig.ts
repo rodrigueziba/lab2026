@@ -1045,6 +1045,7 @@ export const DBG_RENDIMIENTO = {
     // Z72: sub-sistemas del shader del domo (uniforms uPerf* de dome.frag.glsl)
     domoFluido: true, domoSol: true, domoOndas: true, domoEstrellas: true, domoPortal: true, domoSiluetas: true,
     ritmos: true, videoDomo: true,   // Z80 caja de ritmos · Z83 video en el domo
+    tiempoDetenido: true,            // Z86: historial, estela y efecto del tiempo detenido
   } as Record<string, boolean>,
 };
 
@@ -1554,4 +1555,33 @@ export const DBG_TIEMPO = {
   INTENSIDAD_AUDIO:  1,       // × k para el audio — live
   INTENSIDAD_VISUAL: 1,       // × k para el shader (uTiempoK) — live
   DISPARO_PARCIAL:   false,   // también al alejarse sin haber llegado a "cerca" (k = acercamiento máximo) — live
+  // ── Z86: efecto visual de retraso por filas (slit-scan) con estela de luces (lib/tiempoHistorial.ts, lib/retro/historialTiempo.ts) ──
+  ESTILO:            "slitscan" as string,   // "slitscan" (Z86) | "provisorio" (CRT de Z84) — live
+  RETRASO:           true,    // 1) retraso por filas — live
+  RETRASO_MAX_S:     1.2,     // retraso de la última fila con k = 1 (s) — live (el anillo se recalcula al rearmar)
+  DIRECCION:         "abajo_mas_viejo" as string,   // "abajo_mas_viejo" (arriba lo más reciente) | "arriba_mas_viejo" — live
+  CURVA:             "lineal" as string,   // "lineal" | "suave" — live
+  EXPONENTE:         1,       // ^ sobre la curva (> 1: el retraso se concentra abajo) — live
+  ONDA_AMP:          0.06,    // ondulación lenta del retraso (fracción) — live
+  ONDA_VEL:          0.5,     // rad/s — live
+  ESTELA:            true,    // 2) estela de luces (persistencia de cámara vieja) — live
+  PERSISTENCIA_S:    0.35,    // vida de la cola — live
+  ESTELA_UMBRAL:     0.7,     // brillo (luminancia HDR) desde el que deja cola — live
+  ESTELA_MEZCLA:     0.8,     // cuánto de la cola se suma — live
+  ESTELA_TINTE:      "#FFB36B" as string,   // color de la cola (cámara vieja: cálido) — live
+  ESTELA_TINTE_MEZCLA: 0.35,  // 0 = color original de la luz, 1 = tinte — live
+  DESFASE:           true,    // 3) desfase de color en el tiempo — live
+  DESFASE_RGB_S:     0.05,    // R y B leen ± esto respecto de G (× k) — live
+  BANDA:             true,    // 4) banda de error de seguimiento tipo VHS — live
+  BANDA_ALTO:        0.05,    // alto de la franja (fracción de la pantalla) — live
+  BANDA_VEL:         0.04,    // vueltas por segundo (baja despacio) — live
+  BANDA_SALTO_S:     0.25,    // retraso extra dentro de la franja — live
+  BANDA_TEMBLOR:     0.003,   // temblor horizontal (fracción del ancho) — live
+  HIST_HZ:           20,      // capturas por segundo del historial — al rearmar
+  HIST_ESCALA:       0.5,     // resolución del historial y de la estela (× la del render) — al rearmar
+  HIST_MAX_ANCHO:    1280,    // tope de ancho del historial (px) — al rearmar
+  HIST_N:            "auto" as string | number,   // capas del anillo; "auto" = ceil(RETRASO_MAX_S · HIST_HZ) + 2 — al rearmar
+  PRE_ROLL:          "al_acercarse" as string,    // "al_acercarse" (se arma al entrar al radio sin sesión) | "al_disparar" — live
+  DESARMAR_S:        2,       // se desarma esto después de que k llega a 0 — live
+  LIBERAR_AL_DESARMAR: false, // true = libera la memoria del historial al desarmar (al rearmar se reserva otra vez) — live
 };

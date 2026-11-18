@@ -3,7 +3,7 @@
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
 import { DBG_SILLAS, DBG_DOMO_VIVO, DBG_RENDIMIENTO, DBG_TIEMPO } from "@/lib/debugConfig";
-import { dispararTiempoAhora, pararTiempoAhora, textoEstadoTiempo } from "@/lib/tiempoDetenidoAcciones";   // Z84
+import { dispararTiempoAhora, pararTiempoAhora, textoEstadoTiempo } from "@/lib/tiempoDetenidoAcciones";   // Z84 · Z86
 import { textoEstadoDomoVivo } from "@/lib/domoVivoAcciones";   // Z83
 import { simularSesionEnVivo, quitarSesion } from "@/lib/monolitosVivoAcciones";   // Z82
 import { BAND_STATE, reshuffleAssignment } from "@/lib/vizAudio";
@@ -310,6 +310,40 @@ export function SecTiempoDetenidoZ84() {
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={T[k]} onChange={ev => { T[k] = parseFloat(ev.target.value); toca(); }} />
             </div>
           ))}
+          {/* Z86: retraso por filas (slit-scan), estela de luces, desfase de color y banda VHS */}
+          <span style={{ ...NOTE, display: "block", marginTop: 6 }}>Z86 · efecto visual (cada efecto con su interruptor)</span>
+          {([
+            ["ESTILO", ["slitscan", "provisorio"]], ["DIRECCION", ["abajo_mas_viejo", "arriba_mas_viejo"]], ["CURVA", ["lineal", "suave"]], ["PRE_ROLL", ["al_acercarse", "al_disparar"]],
+          ] as const).map(([k, ops]) => (
+            <div key={k} style={ROW}>
+              <span>{k}</span>
+              {ops.map(v => <button key={v} style={{ ...INPUT, opacity: T[k] === v ? 1 : 0.5 }} onClick={() => { T[k] = v; toca(); }}>{v}</button>)}
+            </div>
+          ))}
+          {([["RETRASO", "1) filas atrasadas"], ["ESTELA", "2) estela de luces"], ["DESFASE", "3) desfase de color"], ["BANDA", "4) banda VHS"], ["LIBERAR_AL_DESARMAR", "libera la memoria del historial"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={() => { T[k] = !T[k]; toca(); }}>{T[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["RETRASO_MAX_S", 0.1, 3, 0.05, "s"], ["EXPONENTE", 0.3, 4, 0.05, ""], ["ONDA_AMP", 0, 0.5, 0.01, ""], ["ONDA_VEL", 0, 4, 0.05, "rad/s"],
+            ["PERSISTENCIA_S", 0.05, 2, 0.01, "s"], ["ESTELA_UMBRAL", 0.05, 3, 0.01, "lum"], ["ESTELA_MEZCLA", 0, 2, 0.01, ""], ["ESTELA_TINTE_MEZCLA", 0, 1, 0.01, ""],
+            ["DESFASE_RGB_S", 0, 0.3, 0.005, "s"], ["BANDA_ALTO", 0.005, 0.3, 0.005, ""], ["BANDA_VEL", 0, 0.5, 0.005, "vueltas/s"], ["BANDA_SALTO_S", 0, 1, 0.01, "s"],
+            ["BANDA_TEMBLOR", 0, 0.03, 0.0005, ""], ["HIST_HZ", 5, 60, 1, "Hz (al rearmar)"], ["HIST_ESCALA", 0.2, 1, 0.05, "(al rearmar)"], ["HIST_MAX_ANCHO", 320, 1920, 32, "px"],
+            ["DESARMAR_S", 0, 10, 0.1, "s"],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{T[k].toFixed(st < 0.01 ? 4 : st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={T[k]} onChange={ev => { T[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <span>ESTELA_TINTE</span>
+            <input type="color" value={T.ESTELA_TINTE} onChange={ev => { T.ESTELA_TINTE = ev.target.value; toca(); }} />
+            <span style={NOTE}>HIST_N {String(T.HIST_N)}</span>
+            <button style={INPUT} onClick={() => { T.HIST_N = "auto"; toca(); }}>auto</button>
+          </div>
     </>
   );
 }

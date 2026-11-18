@@ -11,7 +11,8 @@ import * as THREE from "three";
 import { Pass, FullScreenQuad } from "three/addons/postprocessing/Pass.js";
 import { RetroCRTShader } from "@/lib/retro/retroCRT";
 import { transformarCRT } from "@/lib/retro/paseFinalTexto";
-import { GLSL_TIEMPO_DETENIDO, GLSL_TIEMPO_DETENIDO_UNIFORMS, TIEMPO_UNIFORMS, TIEMPO_VISUAL } from "@/lib/retro/tiempoDetenido";   // Z84
+import { GLSL_TIEMPO_DETENIDO, GLSL_TIEMPO_DETENIDO_UNIFORMS, GLSL_TIEMPO_SLITSCAN, TIEMPO_UNIFORMS, TIEMPO_VISUAL } from "@/lib/retro/tiempoDetenido";   // Z84 · Z86
+import { HIST_PLAN, HISTORIAL } from "@/lib/retro/historialTiempo";   // Z86
 
 const VERT = /* glsl */`
 #define attribute in
@@ -39,10 +40,17 @@ uniform vec2 uTexel;
 #include <tonemapping_pars_fragment>
 #include <colorspace_pars_fragment>
 
-vec3 escena(vec2 p) {
+${GLSL_TIEMPO_DETENIDO_UNIFORMS}
+vec3 escenaBase(vec2 p) {
   vec3 c = texture2D(tDiffuse, p).rgb;
   if (uBloomOn > 0.5) c += texture2D(tBloom, p).rgb;
   return c;
+}
+${GLSL_TIEMPO_SLITSCAN}
+// Z86: con el tiempo detenido en estilo slit-scan, la escena que lee el CRT viene del historial (k = 0: rama apagada)
+vec3 escena(vec2 p) {
+  if (uTiempoK > 0.0 && uTiempoSlit > 0.5) return escenaTiempoDetenido(p, uTiempoK, uTiempoT);
+  return escenaBase(p);
 }
 vec4 escena4(vec2 p) { return vec4(escena(p), 1.0); }
 
@@ -50,6 +58,7 @@ vec4 escena4(vec2 p) { return vec4(escena(p), 1.0); }
 float lumaAA(vec3 c) { float l = dot(c, vec3(0.299, 0.587, 0.114)); return sqrt(max(l, 0.0) / (1.0 + max(l, 0.0))); }
 // corrección = FXAA(p) − escena sin AA en p (solo la imagen de la escena: el bloom es suave y no tiene escalones)
 vec3 correccionAA(vec2 p) {
+  if (uTiempoK > 0.0 && uTiempoSlit > 0.5) return vec3(0.0);   // Z86: la imagen atrasada no es la del cuadro actual
   vec3 rgbM  = texture2D(tDiffuse, p).rgb;
   vec3 rgbNW = texture2D(tDiffuse, p + vec2(-1.0, -1.0) * uTexel).rgb;
   vec3 rgbNE = texture2D(tDiffuse, p + vec2( 1.0, -1.0) * uTexel).rgb;
@@ -77,7 +86,6 @@ vec3 correccionAA(vec2 p) { return vec3(0.0); }
 
 vec4 crtSalida;
 ${crt}
-${GLSL_TIEMPO_DETENIDO_UNIFORMS}
 ${GLSL_TIEMPO_DETENIDO}
 
 void main() {
@@ -85,7 +93,7 @@ void main() {
   else crtSalida = vec4(escena(vUv) + correccionAA(vUv), 1.0);
   vec4 c = crtSalida;
   // Z84: tiempo detenido (lib/retro/tiempoDetenido.ts); con uTiempoK = 0 no se ejecuta: imagen idéntica
-  if (uTiempoK > 0.0) c.rgb = efectoTiempoDetenido(vUv, c.rgb, uTiempoK, uTiempoT);
+  if (uTiempoK > 0.0 && uTiempoSlit < 0.5) c.rgb = efectoTiempoDetenido(vUv, c.rgb, uTiempoK, uTiempoT);   // Z86: solo el estilo provisorio
   if (uSalidaOn > 0.5) {
     #ifdef LINEAR_TONE_MAPPING
       c.rgb = LinearToneMapping(c.rgb);
@@ -168,6 +176,10 @@ export class PaseFinalPass extends Pass {
     (u.uTexel.value as THREE.Vector2).set(1 / Math.max(1, readBuffer.width), 1 / Math.max(1, readBuffer.height));
     u.toneMappingExposure.value = renderer.toneMappingExposure;
     u.uTiempoK.value = TIEMPO_VISUAL.k; u.uTiempoT.value = TIEMPO_VISUAL.t;   // Z84
+    u.uTiempoSlit.value = TIEMPO_VISUAL.slit;
+    // Z86: captura al historial y estela (solo armado; presupuesto fijo: una captura y una estela por cuadro)
+    if (HIST_PLAN.armado) HISTORIAL.paso(renderer, readBuffer, u);
+    else if (HIST_PLAN.liberar) HISTORIAL.liberar();
     // defines de salida: misma lógica que OutputPass
     if (this.tm !== renderer.toneMapping || this.cs !== renderer.outputColorSpace) {
       this.tm = renderer.toneMapping; this.cs = renderer.outputColorSpace;
@@ -188,5 +200,5 @@ export class PaseFinalPass extends Pass {
     this.fsq.render(renderer);
   }
 
-  dispose(): void { this.material.dispose(); this.fsq.dispose(); }
+  dispose(): void { this.material.dispose(); this.fsq.dispose(); HISTORIAL.liberar(); }   // Z86: libera el historial
 }

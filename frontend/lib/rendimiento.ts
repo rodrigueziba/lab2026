@@ -146,6 +146,7 @@ export const SISTEMAS = [
   { id: "estrellas",  etiqueta: "estrellas",        como: "CieloEstrellado dentro de un grupo invisible" },
   { id: "ritmos",     etiqueta: "caja de ritmos",   como: "CajaRitmos (Z80) dentro de un grupo invisible (con su SpotLight: recompila)" },
   { id: "videoDomo",  etiqueta: "video en el domo", como: "Z83: uRemoteMix forzado a 0 (la rama de la proyección y la estática no se ejecuta; no se sube la textura)" },
+  { id: "tiempoDetenido", etiqueta: "tiempo detenido", como: "Z86: desarmado (sin captura del historial ni estela) y uTiempoK = 0 (la rama del pase final no se ejecuta)" },
   // Z72: partes del shader del domo (uniforms uPerf* de dome.frag.glsl: ramas por uniform, como uPerfAnillos)
   { id: "domoFluido",    etiqueta: "domo: fluir de color",  como: "dome.frag.glsl: uPerfFluido salta el fluido de los bloques azul y naranja (Z61/Z63)" },
   { id: "domoSol",       etiqueta: "domo: sol",             como: "dome.frag.glsl: uPerfSol salta solMundo (núcleo, rayos y resplandor; también dentro del portal)" },

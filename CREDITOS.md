@@ -93,3 +93,7 @@ Z45: cálculo en una textura compartida por las 3 caras; port a TypeScript del r
 - Archivos: `frontend/components/CajaRitmos.tsx`, `frontend/lib/ritmos.ts`, `frontend/lib/ritmosMotor.ts`, `frontend/lib/audio/ritmosVoces.ts`.
 - Inspiración visual (solo referencia, sin código reutilizado): video de **@thetokenwise** de un secuenciador circular en 3D (anillos = instrumentos, ángulo = tiempo, línea radial que gira, cubitos que saltan, disco de vinilo central, barra con BPM, 4/4 y posición). Captura guardada en `docs/referencias/ritmos_referencia.png`.
 - El código, la síntesis de las voces y el diseño de la interacción son propios de este proyecto.
+
+## Tiempo detenido: retraso por filas (slit-scan) con estela de luces (Z86)
+- Archivos: `frontend/lib/tiempoHistorial.ts`, `frontend/lib/retro/historialTiempo.ts`, `frontend/lib/retro/tiempoDetenido.ts`.
+- Inspiración: Shadertoy de desplazamiento temporal (**autor pendiente**), que guarda un historial de cuadros en miniaturas y hace que cada fila de la imagen lea un cuadro distinto del pasado. No se reutilizó su código: la implementación es propia (historial nítido en una textura de capas de WebGL2, interpolación entre cuadros vecinos, estela por retroalimentación, desfase de color y banda de seguimiento).
