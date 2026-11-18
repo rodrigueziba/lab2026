@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT } from "@/lib/debugConfig";
 import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent, modoActual } from "@/lib/consentTarimaAcciones";   // Z91
-import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit } from "@/lib/vivo/publicarLiveKit";   // Z92
+import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit, alternarPanelCuadro, panelCuadroVisible } from "@/lib/vivo/publicarLiveKit";   // Z92 · Z94b
 import { sesionIdNavegador } from "@/lib/vivo/vivoAcciones";   // Z92
 import { reintentarCamara, textoEstadoFuente } from "@/lib/fuenteVideoTarima";   // Z87
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
@@ -554,6 +554,14 @@ export function SecLiveKitZ92() {
               <button style={INPUT} onClick={() => { L[k] = !L[k]; toca(); }}>{L[k] ? "ON" : "off"}</button>
             </div>
           ))}
+          <div style={ROW}>
+            <span>PROCESADO_TIMEOUT_S <span style={NOTE}>{L.PROCESADO_TIMEOUT_S.toFixed(1)} s Z94b: sin cuadros procesados → video crudo en caliente</span></span>
+            <input type="range" min={1} max={15} step={0.5} style={{ flex: 1 }} value={L.PROCESADO_TIMEOUT_S} onChange={ev => { L.PROCESADO_TIMEOUT_S = parseFloat(ev.target.value); toca(); }} />
+          </div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); alternarPanelCuadro(); toca(); }}>{panelCuadroVisible() ? "Ocultar el cuadro procesado" : "Ver el cuadro procesado"}</button>
+            <span style={NOTE}>Z94b: el canvas 640×360 que se transmite (panel abajo a la derecha)</span>
+          </div>
           <div style={ROW}>
             <span>ACTIVO <span style={NOTE}>off = como Z91 (solo presencia)</span></span>
             <button style={INPUT} onClick={() => { L.ACTIVO = !L.ACTIVO; toca(); }}>{L.ACTIVO ? "ON" : "off"}</button>

@@ -20,6 +20,8 @@ export interface SalaLK {
   conectar(url: string, token: string): Promise<void>;
   publicarVideo(p: PistaLK, cfg: CfgLK): Promise<void>;
   publicarAudio(p: PistaLK, cfg: CfgLK): Promise<void>;
+  /** Z94b (opcional): reemplaza la pista de video publicada en la misma sala (sin reconectar ni tocar el audio). */
+  reemplazarVideo?(p: PistaLK): Promise<void>;
   alEvento(cb: (e: EventoSala) => void): void;
   pausar(pausa: boolean): void;            // benchmark: pausa la subida (pauseUpstream) sin cortar
   kbps(): number;                          // bitrate saliente (0 si el SDK no lo da)
@@ -154,6 +156,26 @@ export class PublicadorLiveKit {
       case "detenido": return "detenido (corte)";
       default: return this.ultimoError || "sin conexión";
     }
+  }
+
+  /**
+   * Z94b: cambia la pista de video en caliente (respaldo del video procesado). La nueva reemplaza a la publicada en el
+   * mismo publicador; la vieja se libera. Si no se puede (sin sala, sin video publicado o el SDK falla), libera la nueva
+   * y devuelve false (la transmisión sigue como estaba). Nunca lanza.
+   */
+  async cambiarVideo(nueva: PistaLK): Promise<boolean> {
+    const s = this.sala, g = this.gen;
+    if (!s || !s.reemplazarVideo || !this.pistas.video || (this.estado !== "publicando" && this.estado !== "reconectando")) {
+      try { nueva.liberar(); } catch { /* ok */ }
+      return false;
+    }
+    try { await s.reemplazarVideo(nueva); }
+    catch { try { nueva.liberar(); } catch { /* ok */ } return false; }
+    if (g !== this.gen) { try { nueva.liberar(); } catch { /* ok */ } return false; }   // cortada mientras tanto
+    const vieja = this.video;
+    this.video = nueva;
+    if (vieja) { try { vieja.liberar(); } catch { /* ok */ } }
+    return true;
   }
 
   pausar(p: boolean): void { try { this.sala?.pausar(p); } catch { /* ok */ } }

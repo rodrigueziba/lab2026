@@ -74,6 +74,10 @@ function envolverGpu(p: Pass, e: number): void {
   };
 }
 
+/** Z94b: render ORIGINAL del renderer mientras el composer lo reemplaza (null = no hay reemplazo: usar gl.render).
+ *  three define render en el constructor (no en el prototipo), así que no hay otra forma de saltear el composer. */
+export const RENDER_ORIGINAL: { fn: ((scene: THREE.Object3D, camera: THREE.Camera) => void) | null } = { fn: null };
+
 export default function RetroPostFX() {
   const { gl, scene, camera, size } = useThree();
   const dpr = useThree(s => s.viewport.dpr);   // Z66: el composer sigue al DPR (resolución adaptativa)
@@ -199,9 +203,11 @@ export default function RetroPostFX() {
       gl.render = overriddenRender;
     };
     gl.render = overriddenRender;
+    RENDER_ORIGINAL.fn = origRender;   // Z94b
 
     return () => {
       gl.render = origRender;
+      RENDER_ORIGINAL.fn = null;       // Z94b
       for (const p of composer.passes) p.dispose(); // G2: materiales/quads de los pases
       composer.dispose();
       composerRef.current = null;

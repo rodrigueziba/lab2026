@@ -50,28 +50,40 @@ function pistaOndas(cfg: CfgLK): PistaLK | null {
   return { track: t, liberar: () => st.getTracks().forEach(x => x.stop()) };
 }
 
-// ── Z94: video procesado (la imagen del domo de la tarima) ──
+// ── Z94/Z94b: video procesado (la imagen del domo de la tarima) ──
+// Z94b: canvas 2D único + buffer único (compartido con un ImageData único) + captureStream(0) con requestFrame por
+// actualización (Z94 usaba captureStream(fps) y la pista no emitía nada si el canvas nunca cambiaba). Nace con un cuadro
+// negro ya pedido, así la pista nunca está vacía.
 const FABRICA_LIENZO: FabricaLienzo = {
-  crear(ancho, alto, fps) {
+  crear(ancho, alto) {
     if (typeof document === "undefined") return null;
     const cv = document.createElement("canvas");
     cv.width = ancho; cv.height = alto;
     const ctx = cv.getContext("2d", { alpha: false });
     if (!ctx || typeof cv.captureStream !== "function") return null;
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, ancho, alto);
-    const st = cv.captureStream(fps);
-    const pista = st.getVideoTracks()[0];
-    if (!pista) return null;
-    return { canvas: cv, ctx, pista, detenerPista: () => st.getTracks().forEach(t => t.stop()), quitar: () => { cv.width = 0; cv.height = 0; } };
+    const buffer = new Uint8Array(ancho * alto * 4);
+    const imagen = new ImageData(new Uint8ClampedArray(buffer.buffer), ancho, alto);   // misma memoria que buffer
+    const st = cv.captureStream(0);
+    const pista = st.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined;
+    if (!pista || typeof pista.requestFrame !== "function") { st.getTracks().forEach(t => t.stop()); return null; }
+    pista.requestFrame();   // primer cuadro (negro) antes de publicar
+    return {
+      canvas: cv, ctx, pista, buffer,
+      pintar: () => { ctx.putImageData(imagen, 0, 0); pista.requestFrame(); },
+      detenerPista: () => st.getTracks().forEach(t => t.stop()),
+      quitar: () => { cv.remove(); cv.width = 0; cv.height = 0; },
+    };
   },
 };
 /** Pase procesado: lo dibuja components/VideoTransmitidoTarima.tsx (useFrame) mientras `activa`. */
-export const TX_PROC = new TransmisionProcesada(FABRICA_LIENZO);
+export const TX_PROC = new TransmisionProcesada(FABRICA_LIENZO, () => performance.now());
 /** Lo escribe el host del Canvas cada cuadro: el domo de la tarima y su material están listos para el pase. */
 export const PASE_HOST = { listo: false };
 /** Fuente de video efectiva de la transmisión actual (menú). */
-export const VIDEO_TX = { efectiva: "" as string, motivo: "" };
+export const VIDEO_TX = { efectiva: "" as string, motivo: "", respaldoIntentado: false, cambiando: false };
 function pistaProcesada(cfg: CfgLK): PistaLK | null {
+  VIDEO_TX.respaldoIntentado = false;
   const r = TX_PROC.iniciar(DBG_LIVEKIT.PROCESADO_ANCHO, DBG_LIVEKIT.PROCESADO_ALTO, cfg.VIDEO_FPS);
   return r ? { track: r.track, liberar: () => TX_PROC.liberar() } : null;
 }
@@ -90,20 +102,42 @@ function pistaVideo(modo: ModoLK, cfg: CfgLK): PistaLK | null {
     VIDEO_TX.motivo = TX_PROC.fallo || "falló el pase procesado";   // respaldo: como Z92
   }
   if (el.efectiva === "ondas") { VIDEO_TX.efectiva = "ondas"; return pistaOndas(cfg); }
+  return pistaCruda(modo, cfg);
+}
+/** "cruda" de Z92: modo cara → clon de la webcam; si no (o sin webcam) → ondas. Escribe VIDEO_TX.efectiva. */
+function pistaCruda(modo: ModoLK, cfg: CfgLK): PistaLK | null {
   const w = modo === "cara" ? pistaWebcam(cfg) : null;
   if (w) { VIDEO_TX.efectiva = "cruda"; return w; }
   VIDEO_TX.efectiva = "ondas";
   return pistaOndas(cfg);
+}
+/** Z94b: respaldo en caliente: reemplaza la pista procesada por la cruda en el mismo publicador (audio y sesión siguen). */
+async function pasarACruda(motivo: string): Promise<void> {
+  if (VIDEO_TX.cambiando || VIDEO_TX.respaldoIntentado) return;
+  VIDEO_TX.cambiando = true; VIDEO_TX.respaldoIntentado = true;
+  const antes = VIDEO_TX.efectiva;
+  const p = pistaCruda(PUB.modo ?? "privado", DBG_LIVEKIT);
+  const ok = p ? await PUB.cambiarVideo(p) : false;
+  if (ok) VIDEO_TX.motivo = `procesado falló: ${motivo} → ${VIDEO_TX.efectiva}`;
+  else { VIDEO_TX.efectiva = antes; VIDEO_TX.motivo = `procesado falló: ${motivo} (no se pudo reemplazar la pista)`; }
+  VIDEO_TX.cambiando = false;
 }
 
 async function crearSala(): Promise<SalaLK> {
   const lk = await import("livekit-client");   // dinámico: chunk aparte
   const room = new lk.Room({ adaptiveStream: false, dynacast: false, disconnectOnPageLeave: true });
   const locales: { pauseUpstream(): Promise<void>; resumeUpstream(): Promise<void>; currentBitrate: number }[] = [];
+  let videoLocal: import("livekit-client").LocalVideoTrack | null = null;
   return {
+    // Z94b: mismo LocalVideoTrack y misma publicación; solo cambia el MediaStreamTrack (sin reconectar)
+    async reemplazarVideo(p) {
+      if (!videoLocal) throw new Error("sin video publicado");
+      await videoLocal.replaceTrack(p.track as MediaStreamTrack, true);
+    },
     conectar: (url, token) => room.connect(url, token, { autoSubscribe: false }),
     async publicarVideo(p, cfg) {
       const t = new lk.LocalVideoTrack(p.track as MediaStreamTrack, undefined, true);
+      videoLocal = t;
       await room.localParticipant.publishTrack(t, {
         source: lk.Track.Source.Camera, simulcast: false, name: "tarima-video",
         videoEncoding: { maxBitrate: Math.max(50, cfg.VIDEO_KBPS) * 1000, maxFramerate: Math.max(1, cfg.VIDEO_FPS) },
@@ -160,6 +194,12 @@ export function publicarLiveKit(p: { consentimiento: boolean; modo: ModoLK; sesi
 function sondear(): void {
   const pausa = DBG_RENDIMIENTO.SIS.transmisionTarima === false;
   if (pausa !== _pausado) { _pausado = pausa; PUB.pausar(pausa); }
+  // Z94b: vigía del video procesado → respaldo "cruda" en caliente
+  if (VIDEO_TX.efectiva === "procesado" && TX_PROC.activa && PUB.pistas.video) {
+    const m = TX_PROC.vigilar(performance.now(), DBG_LIVEKIT.PROCESADO_TIMEOUT_S, DBG_RENDIMIENTO.SIS.videoTransmitidoTarima === false);
+    if (m) void pasarACruda(m);
+  }
+  actualizarPanelCuadro();
 }
 /** Corta ya: pistas, salida del núcleo y conexión. */
 export function detenerLiveKit(): void {
@@ -167,6 +207,35 @@ export function detenerLiveKit(): void {
   if (_sondeo) { clearInterval(_sondeo); _sondeo = null; }
   _pausado = false;
   PUB.detener();
+  actualizarPanelCuadro();
+}
+
+// ── Z94b: panel de debug "Ver el cuadro procesado" (oculto por defecto): muestra el canvas que se transmite ──
+let _panel: HTMLDivElement | null = null, _panelTxt: HTMLDivElement | null = null, _panelCv: unknown = null;
+export function panelCuadroVisible(): boolean { return _panel !== null; }
+export function alternarPanelCuadro(): void {
+  if (typeof document === "undefined") return;
+  if (_panel) { _panel.remove(); _panel = null; _panelTxt = null; _panelCv = null; return; }
+  const d = document.createElement("div");
+  d.setAttribute("data-debug-panel", "");
+  d.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:9400;background:#2A1400;border:2px solid #FF9A1F;padding:6px;"
+    + "font:12px ui-monospace,Menlo,monospace;color:#FF9A1F;display:flex;flex-direction:column;gap:4px;pointer-events:none";
+  const t = document.createElement("div");
+  d.append(t);
+  document.body.appendChild(d);
+  _panel = d; _panelTxt = t; _panelCv = null;
+  actualizarPanelCuadro();
+}
+function actualizarPanelCuadro(): void {
+  if (!_panel || !_panelTxt) return;
+  const cv = TX_PROC.lienzo?.canvas as HTMLCanvasElement | undefined;
+  if (cv !== _panelCv) {
+    if (_panelCv) (_panelCv as HTMLCanvasElement).remove();
+    if (cv) { cv.style.cssText = "width:320px;height:180px;display:block;background:#000"; _panel.append(cv); }
+    _panelCv = cv ?? null;
+  }
+  _panelTxt.textContent = cv ? `CUADRO PROCESADO (lo que viaja) · ${TX_PROC.cadencia.fpsReal.toFixed(1)} fps · lectura ${TX_PROC.estadoLectura}`
+    : `sin video procesado ahora (${VIDEO_TX.efectiva ? `fuente ${VIDEO_TX.efectiva}` : "sin transmisión"})`;
 }
 /** Estado para el indicador de Z91 y el menú. */
 export function estadoLiveKit(): PublicadorLiveKit { return PUB; }
@@ -175,8 +244,15 @@ export function textoEstadoLiveKit(): string {
   return `Diagnóstico: ${p.diagnostico}\nLiveKit: ${p.estado}${p.modo ? ` · modo ${p.modo}` : ""} · pistas ${p.pistas.video ? "video" : "—"}/${p.pistas.audio ? "audio" : "—"}`
     + `${p.estado === "publicando" ? ` · ${p.kbps().toFixed(0)} kbps salientes` : ""} · reconexiones ${p.reconexiones} · errores ${p.errores}`
     + `${_pausado ? " · subida PAUSADA (benchmark)" : ""}`
-    + (p.pistas.video ? `\nVideo: ${VIDEO_TX.efectiva || "—"}${VIDEO_TX.efectiva === "procesado" ? ` · ${TX_PROC.cadencia.fpsReal.toFixed(1)} fps publicados · ${TX_PROC.ancho}×${TX_PROC.alto}` : ""}`
-      + `${VIDEO_TX.motivo ? ` · respaldo: ${VIDEO_TX.motivo}` : ""}${TX_PROC.activa && TX_PROC.fallo ? ` · ${TX_PROC.fallo}` : ""}` : "");
+    + (p.pistas.video ? `\nVideo: ${VIDEO_TX.efectiva || "—"}${VIDEO_TX.efectiva === "procesado" ? ` · ${TX_PROC.cadencia.fpsReal.toFixed(1)} fps publicados · ${TX_PROC.ancho}×${TX_PROC.alto} · lectura ${textoLectura()}` : ""}`
+      + `${VIDEO_TX.motivo ? ` · ${VIDEO_TX.motivo.startsWith("procesado falló") ? "" : "respaldo: "}${VIDEO_TX.motivo}` : ""}` : "");
+}
+function textoLectura(): string {
+  const T = TX_PROC;
+  if (T.estadoLectura === "falló") return `falló: ${T.motivoLectura}`;
+  if (T.estadoLectura === "saltando") return `saltando cuadros (${T.saltados})`;
+  if (T.estadoLectura === "ok") return `ok (${T.lecturas})`;
+  return T.fallo ? `esperando · ${T.fallo}` : "esperando";
 }
 
 if (DEBUG_ENABLED && typeof window !== "undefined") {

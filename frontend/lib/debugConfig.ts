@@ -1665,6 +1665,7 @@ export const DBG_LIVEKIT = {
   PROCESADO_ANCHO:    640,         // canvas transmisible (vale al publicar)
   PROCESADO_ALTO:     360,
   PROCESADO_ESPEJO:   false,       // espeja en horizontal la copia plana (el domo se ve desde adentro) — live
+  PROCESADO_TIMEOUT_S: 3,          // Z94b: sin lecturas en esto desde el inicio, o sin cuadros nuevos esto seguido → "cruda" en caliente — live
   PROCESADO_SRGB:     true,        // codifica a sRGB (en pantalla lo hace el OutputPass; acá el pase va directo al canvas) — live
 };
 
