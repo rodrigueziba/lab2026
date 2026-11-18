@@ -80,7 +80,7 @@ console.log('\nregistro y sesión más reciente (puro)');
   check(sesionMasReciente(reg, T0 + 15000, 15, out)?.sesionId === ID(2), 'en el borde (15 s justos) todavía cuenta');
   actualizarRegistro(reg, { a: [P({ sesionId: ID(1), inicioMs: T0 - 60000, latido: 1 })] }, T0 + 11000);
   check(reg.length === 1 && reg[0].sesionId === ID(1), 'una sesión que se va del canal se quita del registro');
-  check(esperaReintentoMs(0, CFG) === 2000 && esperaReintentoMs(1, CFG) === 4000 && esperaReintentoMs(3, CFG) === 16000 && esperaReintentoMs(10, CFG) === 60000, 'reintentos: 2, 4, 8, 16 s… tope 60 s'); }
+  check([0, 1, 2, 3, 4, 7].map(n => esperaReintentoMs(n, CFG) / 1000).join() === '1,2,4,8,15,15' && CFG.MAX_REINTENTOS === 8, 'Z95: reintentos 1, 2, 4, 8, 15 s (tope 15 s), máximo 8'); }
 
 console.log('\npublicador y oyente con el canal simulado');
 { const R = crearReloj(), S = crearServidor(), D = deps(R, S);
@@ -146,7 +146,7 @@ console.log('\nerrores y degradado');
   red.on = true; await R.avanzar(2100, 100, tick);
   check(oy.estado === 'idle' && S.aperturas === 1, 'vuelve la red: tras la espera (2 s) se suscribe'); }
 { const R = crearReloj(), S = crearServidor(); S.caido = true;
-  const oy = new OyentePresencia(deps(R, S), cfg()), tick = () => oy.tick(true);
+  const oy = new OyentePresencia(deps(R, S), cfg({ REINTENTO_S: 2, REINTENTO_MAX_S: 60 })), tick = () => oy.tick(true);
   tick(); await R.avanzar(100, 100, tick);
   check(oy.estado === 'error' && oy.errores === 1, 'canal caído (proyecto pausado / error): "error"');
   await R.avanzar(1800, 100, tick); const a1 = S.aperturas;

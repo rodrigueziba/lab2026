@@ -49,6 +49,9 @@ export function SecCheckpointsZ40() {
           </div>
           <NumField label="ADELANTO_S" value={ckf.ADELANTO_S} step={0.25} min={0.05} max={5} note="s de reloj por frame (sala_activa)"
             onChange={v => { DBG_CHECKPOINTS.ADELANTO_S = v; setCkf(o => ({ ...o, ADELANTO_S: v })); }} />
+          <NumField label="RECIBIR_DIST_M" value={ckf.RECIBIR_DIST_M} step={0.25} min={3.25} max={10} note="Z95: m al monolito derecho en «Sillas: recibir»"
+            onChange={v => { DBG_CHECKPOINTS.RECIBIR_DIST_M = v; setCkf(o => ({ ...o, RECIBIR_DIST_M: v })); }} />
+          <div style={{ ...ROW, ...NOTE }}><span>Z95: por URL ?cp=sillas_recibir o ?cp=tarima_compartir (también ?checkpoint=); sin gesto previo aparece «ENTRAR» (habilita el audio)</span></div>
     </>
   );
 }

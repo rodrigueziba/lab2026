@@ -3,7 +3,7 @@
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
 import { DBG_SILLAS, DBG_PASTO, DBG_MONO_VIVO, DBG_AVISO_VIVO, DBG_VIVO, DBG_LIVEKIT_RECIBIR } from "@/lib/debugConfig";
-import { publicarPresencia, detenerPresencia, textoEstadoVivo, textoEstadoRecepcion, reintentarLiveKit } from "@/lib/vivo/vivoAcciones";   // Z89 · Z93
+import { publicarPresencia, detenerPresencia, textoEstadoVivo, textoEstadoRecepcion, reintentarLiveKit, reintentarPresencia } from "@/lib/vivo/vivoAcciones";   // Z89 · Z93 · Z95
 import { mostrarAvisoAhora, reiniciarDecisionAviso, textoEstadoAviso } from "@/lib/avisoVivoAcciones";   // Z85
 import { simularSesionEnVivo, quitarSesion, forzarCerca, reiniciarMonolitosVivo, aceptarTransmision, textoEstadoMonolitos, MONO_VIVO } from "@/lib/monolitosVivoAcciones";   // Z82
 import { MONO_PASTO } from "@/lib/monolitosPasto";
@@ -299,7 +299,7 @@ export function SecSesionVivoZ89() {
               onChange={ev => { V.CANAL = ev.target.value.replace(/[^A-Za-z0-9_:-]/g, ""); toca(); }} />
           </div>
           {([["LATIDO_S", 1, 30, 0.5, "s entre latidos"], ["TIMEOUT_S", 3, 60, 1, "s sin latido → sin sesión"], ["REINTENTO_S", 0.5, 30, 0.5, "s (se duplica)"],
-            ["REINTENTO_MAX_S", 5, 300, 5, "s tope"], ["CIERRE_SIN_USO_S", 0, 120, 1, "s sin monolitos → cierra el canal"]] as const).map(([k, mn, mx, st, nota]) => (
+            ["REINTENTO_MAX_S", 1, 300, 1, "s tope"], ["MAX_REINTENTOS", 0, 30, 1, "Z95: seguidos, cada uno con un canal nuevo"], ["CIERRE_SIN_USO_S", 0, 120, 1, "s sin monolitos → cierra el canal"]] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{V[k].toFixed(st < 1 ? 1 : 0)} {nota}</span></span>
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={V[k]} onChange={ev => { V[k] = parseFloat(ev.target.value); toca(); }} />
@@ -308,6 +308,7 @@ export function SecSesionVivoZ89() {
           <div style={ROW}>
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); const r = publicarPresencia({ modo: "privado", consentimiento: true }); setRes(r.ok ? `publicando ${r.sesionId.slice(0, 8)}…` : `rechazada: ${r.motivo}`); toca(); }}>Publicar presencia de prueba (consentimiento de prueba)</button>
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); detenerPresencia(); setRes("detenida"); toca(); }}>Detener presencia</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); reintentarPresencia(); setRes("reintentando con canales nuevos"); toca(); }}>Reintentar presencia</button>
           </div>
           {res && <div style={{ ...ROW, ...NOTE }}><span>{res}</span></div>}
     </>

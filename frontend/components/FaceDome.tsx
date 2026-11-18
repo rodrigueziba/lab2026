@@ -265,9 +265,17 @@ export default function FaceDome() {
       activeTimeRef.current = Date.now();
       domeTimer.current = setTimeout(() => setShowDome(true), DOME_DELAY_MS);
     };
+    // Z95: checkpoint "tarima_compartir": el domo aparece ya (sin los DOME_DELAY_MS), solo si la tarima ya se eligió
+    const onMostrar = () => {
+      if (!activatedOnce.current) return;
+      if (domeTimer.current) { clearTimeout(domeTimer.current); domeTimer.current = null; }
+      setShowDome(true);
+    };
     window.addEventListener("alight:chose-light", onLight);
+    window.addEventListener("alight:debug-mostrar-domo", onMostrar);
     return () => {
       window.removeEventListener("alight:chose-light", onLight);
+      window.removeEventListener("alight:debug-mostrar-domo", onMostrar);
       if (domeTimer.current) clearTimeout(domeTimer.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

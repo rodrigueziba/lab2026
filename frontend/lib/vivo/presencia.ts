@@ -21,10 +21,16 @@
 //
 // Errores (sin variables, sin red, canal caído, proyecto pausado): estado "error" o "idle" → para el resto de la
 // experiencia es "no hay sesión". Nunca lanza; reintenta con espera creciente (REINTENTO_S × 2^n, tope REINTENTO_MAX_S).
+// Z95: cada reintento abre un canal NUEVO (fabrica(nombre, rol, true): instancia propia del rol, ver canalSupabase.ts),
+// hasta MAX_REINTENTOS seguidos; después queda "agotado" hasta reintentar() (botón "Reintentar presencia"). El motivo
+// guarda el estado exacto de Supabase (SUBSCRIBED / CHANNEL_ERROR / TIMED_OUT / CLOSED) y su mensaje, sin datos sensibles.
 
 export interface CfgVivo {
   CANAL: string; LATIDO_S: number; TIMEOUT_S: number; REINTENTO_S: number; REINTENTO_MAX_S: number; CIERRE_SIN_USO_S: number;
+  MAX_REINTENTOS?: number;   // Z95 (sin el campo: 8)
 }
+/** Z95: rol de quien abre el canal; cada rol tiene su propia instancia (un rol nunca cierra el canal del otro). */
+export type RolPresencia = "publicar" | "escuchar";
 export type ModoPresencia = "cara" | "privado";
 export interface Presencia { sesionId: string; inicioMs: number; modo: ModoPresencia; latido: number }
 /** Mismos valores que RemoteSessionStatus (lib/remoteSession.ts): idle · connecting (conectando) · active (activa) · error. */
@@ -36,13 +42,26 @@ export type EstadoCanal = "SUBSCRIBED" | "TIMED_OUT" | "CLOSED" | "CHANNEL_ERROR
 export interface CanalPresencia {
   alSincronizar(cb: () => void): void;
   estado(): Record<string, unknown[]>;
-  suscribir(cb: (s: EstadoCanal) => void): void;
+  suscribir(cb: (s: EstadoCanal, motivo?: string) => void): void;   // Z95: motivo = mensaje de Supabase (si lo hay)
   track(p: Presencia): unknown;
   untrack(): unknown;
   cerrar(): void;
 }
-/** Abre (o comparte) el canal; null = no hay configuración (faltan las variables de entorno). */
-export type FabricaCanal = (nombre: string) => CanalPresencia | null;
+/** Abre el canal del rol; null = no hay configuración (faltan las variables de entorno). nuevo = después de una falla:
+ *  instancia fresca (nunca la que se estaba cerrando). */
+export type FabricaCanal = (nombre: string, rol?: RolPresencia, nuevo?: boolean) => CanalPresencia | null;
+
+/** Z95: texto del motivo: estado exacto del canal + mensaje breve (una línea, sin nada con forma de token). */
+export function motivoCanal(s: string, motivo?: string): string {
+  const m = (motivo ?? "").split("\n")[0].replace(/eyJ[\w-]*\.[\w-]*\.[\w-]*/g, "[token]").replace(/(apikey|access_token|token)=[^&\s]+/gi, "$1=[token]").trim();
+  const corto = m.length > 80 ? m.slice(0, 79) + "…" : m;
+  return corto ? `${s}: ${corto}` : s;
+}
+/** Z95: tope de reintentos seguidos (cfg o 8). */
+export function maxReintentos(c: CfgVivo): number {
+  const n = c.MAX_REINTENTOS;
+  return Math.max(0, Math.floor(typeof n === "number" && Number.isFinite(n) ? n : 8));
+}
 export interface DepsVivo {
   fabrica: FabricaCanal;
   ahora(): number;                                   // reloj local (ms)
@@ -137,6 +156,10 @@ export class OyentePresencia {
   errores = 0;
   ultimoError = "";
   sinConfig = false;
+  estadoCanal = "";              // Z95: último estado que informó Supabase (exacto)
+  agotado = false;               // Z95: se agotaron los reintentos (hasta reintentar())
+  get intento(): number { return this.intentos; }
+  get reconectando(): boolean { return this.reintento !== null; }
   readonly registros: RegistroSesion[] = [];
   private canal: CanalPresencia | null = null;
   private suscripto = false;
@@ -154,7 +177,7 @@ export class OyentePresencia {
     const ahora = this.deps.ahora();
     if (necesario) {
       this.ultimoUso = ahora;
-      if (!this.canal && this.reintento === null && !this.sinConfig) this.conectar();
+      if (!this.canal && this.reintento === null && !this.sinConfig && !this.agotado) this.conectar();
     } else if (this.canal && ahora - this.ultimoUso > Math.max(0, this.cfg.CIERRE_SIN_USO_S) * 1000) {
       this.cerrar();
       return;
@@ -171,14 +194,15 @@ export class OyentePresencia {
   private conectar(): void {
     if (!this.deps.enLinea()) { this.fallo("sin conexión"); return; }
     let c: CanalPresencia | null = null;
-    try { c = this.deps.fabrica(this.cfg.CANAL); } catch { c = null; }
+    try { c = this.deps.fabrica(this.cfg.CANAL, "escuchar", this.intentos > 0); } catch (e) { this.fallo(motivoCanal("error al abrir el canal", e instanceof Error ? e.message : "")); return; }
     if (!c) { this.sinConfig = true; this.estado = "error"; this.ultimoError = "sin configuración (faltan las variables de Supabase)"; return; }
-    this.canal = c; this.suscripto = false; this.estado = "connecting";
+    this.canal = c; this.suscripto = false; this.estado = "connecting"; this.estadoCanal = "abriendo";
     c.alSincronizar(() => { if (this.canal === c) this.sincronizar(); });
-    c.suscribir(s => {
+    c.suscribir((s, motivo) => {
       if (this.canal !== c) return;
-      if (s === "SUBSCRIBED") { this.suscripto = true; this.intentos = 0; this.estado = "idle"; this.sincronizar(); }
-      else this.fallo(s === "CHANNEL_ERROR" ? "canal con error" : s === "TIMED_OUT" ? "tiempo agotado" : "canal cerrado");
+      this.estadoCanal = s;
+      if (s === "SUBSCRIBED") { this.suscripto = true; this.intentos = 0; this.agotado = false; this.estado = "idle"; this.sincronizar(); }
+      else this.fallo(motivoCanal(s, motivo));
     });
   }
 
@@ -194,8 +218,17 @@ export class OyentePresencia {
     this.soltarCanal();
     this.estado = "error"; this.sesionActual = null; this.modoActual = null; this.vigentes = 0;
     if (this.reintento !== null) return;
+    if (this.intentos >= maxReintentos(this.cfg)) { this.agotado = true; return; }   // Z95: hasta reintentar()
     const ms = esperaReintentoMs(this.intentos++, this.cfg);
-    this.reintento = this.deps.despues(ms, () => { this.reintento = null; });   // el próximo tick (si hace falta) reconecta
+    this.reintento = this.deps.despues(ms, () => { this.reintento = null; });   // el próximo tick (si hace falta) reconecta (canal nuevo)
+  }
+
+  /** Z95: botón "Reintentar presencia": vuelve a intentar desde cero (el próximo tick con necesario = true conecta). */
+  reintentar(): void {
+    if (this.reintento !== null) { this.deps.cancelar(this.reintento); this.reintento = null; }
+    this.soltarCanal();
+    this.agotado = false; this.sinConfig = false; this.intentos = 0;
+    this.estado = "idle";
   }
 
   private soltarCanal(): void {
@@ -209,7 +242,7 @@ export class OyentePresencia {
     if (this.reintento !== null) { this.deps.cancelar(this.reintento); this.reintento = null; }
     this.soltarCanal();
     this.estado = "idle"; this.sesionActual = null; this.modoActual = null; this.vigentes = 0; this.antiguedadLatidoMs = -1;
-    this.intentos = 0;
+    this.intentos = 0; this.agotado = false;
   }
 }
 
@@ -222,6 +255,10 @@ export class PublicadorPresencia {
   publicando = false;
   errores = 0;
   ultimoError = "";
+  estadoCanal = "";              // Z95
+  agotado = false;               // Z95
+  get intento(): number { return this.intentos; }
+  get reconectando(): boolean { return this.reintento !== null; }
   readonly presencia: Presencia;
   private canal: CanalPresencia | null = null;
   private intentos = 0;
@@ -252,16 +289,17 @@ export class PublicadorPresencia {
     if (!this.publicando) return;
     if (!this.deps.enLinea()) { this.fallo("sin conexión"); return; }
     let c: CanalPresencia | null = null;
-    try { c = this.deps.fabrica(this.cfg.CANAL); } catch { c = null; }
+    try { c = this.deps.fabrica(this.cfg.CANAL, "publicar", this.intentos > 0); } catch (e) { this.fallo(motivoCanal("error al abrir el canal", e instanceof Error ? e.message : "")); return; }
     if (!c) { this.estado = "error"; this.ultimoError = "sin configuración (faltan las variables de Supabase)"; this.publicando = false; return; }
-    this.canal = c; this.estado = "connecting";
-    c.suscribir(s => {
+    this.canal = c; this.estado = "connecting"; this.estadoCanal = "abriendo";
+    c.suscribir((s, motivo) => {
       if (this.canal !== c) return;
+      this.estadoCanal = s;
       if (s === "SUBSCRIBED") {
-        this.intentos = 0; this.estado = "active";
+        this.intentos = 0; this.agotado = false; this.estado = "active";
         llamar(() => c.track(this.presencia));
         this.programarLatido();
-      } else this.fallo(s === "CHANNEL_ERROR" ? "canal con error" : s === "TIMED_OUT" ? "tiempo agotado" : "canal cerrado");
+      } else this.fallo(motivoCanal(s, motivo));
     });
   }
 
@@ -282,8 +320,18 @@ export class PublicadorPresencia {
     this.soltar(false);
     this.estado = "error";
     if (!this.publicando || this.reintento !== null) return;
+    if (this.intentos >= maxReintentos(this.cfg)) { this.agotado = true; return; }   // Z95: hasta reintentar()
     const ms = esperaReintentoMs(this.intentos++, this.cfg);
-    this.reintento = this.deps.despues(ms, () => { this.reintento = null; this.conectar(); });
+    this.reintento = this.deps.despues(ms, () => { this.reintento = null; this.conectar(); });   // canal nuevo
+  }
+
+  /** Z95: botón "Reintentar presencia" (solo si sigue publicando). */
+  reintentar(): void {
+    if (!this.publicando) return;
+    if (this.reintento !== null) { this.deps.cancelar(this.reintento); this.reintento = null; }
+    this.soltar(false);
+    this.agotado = false; this.intentos = 0;
+    this.conectar();
   }
 
   private soltar(untrack: boolean): void {
@@ -298,6 +346,6 @@ export class PublicadorPresencia {
     this.publicando = false;
     if (this.reintento !== null) { this.deps.cancelar(this.reintento); this.reintento = null; }
     this.soltar(true);
-    this.estado = "idle"; this.intentos = 0;
+    this.estado = "idle"; this.intentos = 0; this.agotado = false;
   }
 }

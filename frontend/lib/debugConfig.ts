@@ -898,6 +898,7 @@ export const DBG_SECUENCIA = {
 export const DBG_CHECKPOINTS = {
   HABILITADOS:    true,   // false = el menú y ?checkpoint= no hacen nada (el efecto de ink ir_checkpoint sigue) — live
   ADELANTO_S:     1.0,    // s de reloj de la experiencia que se adelantan por frame para llegar a sala_activa — live
+  RECIBIR_DIST_M: 5,      // Z95: "sillas_recibir": distancia al monolito de sonido (fuera de RADIO_INICIO_M = 3 m) — live
 };
 
 // ── Z41: layout de sillas, zona SILLAS, público y monolitos (lib/layoutSala.ts) ──
@@ -1543,8 +1544,9 @@ export const DBG_VIVO = {
   CANAL:            "alight-tarima-v1" as string,   // nombre del canal de Realtime (vale al conectar) — live
   LATIDO_S:         5,       // el publicador sube su contador cada esto — live
   TIMEOUT_S:        15,      // el oyente deja de contar una sesión sin cambio de latido durante esto (reloj local) — live
-  REINTENTO_S:      2,       // primera espera tras un error; se duplica en cada intento — live
-  REINTENTO_MAX_S:  60,      // tope de la espera entre reintentos — live
+  REINTENTO_S:      1,       // Z95 (antes 2): primera espera tras un error; se duplica en cada intento (1, 2, 4, 8, 15) — live
+  REINTENTO_MAX_S:  15,      // Z95 (antes 60): tope de la espera entre reintentos — live
+  MAX_REINTENTOS:   8,       // Z95: reintentos seguidos (cada uno con un canal NUEVO); después "agotado" hasta "Reintentar presencia" — live
   CIERRE_SIN_USO_S: 10,      // el oyente cierra el canal tras esto sin que haga falta (monolitos fuera) — live
 };
 

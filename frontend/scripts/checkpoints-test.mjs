@@ -39,6 +39,13 @@ instalarAcciones({
   irALuz: () => { MUNDO.zona = 'luz'; return true; },
   esperarDialogo: () => MUNDO.dialogo,
   premio: () => { MUNDO.premio = true; return true; },
+  // Z95
+  pastoCompleto: () => { MUNDO.monos = 0; return true; },
+  esperarMonolitos: () => ++MUNDO.monos >= 3,   // Pasto los ubica en su useFrame (unos frames)
+  frenteMonolitos: () => { MUNDO.frente = true; return true; },
+  avisoListo: () => { MUNDO.aviso = 'reiniciado'; return true; },
+  forzarDomo: () => { MUNDO.domo = true; setTimeout(() => {}, 0); MUNDO.figurasEn = 5; return true; },
+  mostrarEleccion: () => { MUNDO.dialogo = true; MUNDO.eleccion = true; return true; },
 });
 // un frame del mundo: remontaje pedido → monta en el frame siguiente; zonas del Player; diálogo bajo la luz
 function frame(dt = 1 / 60) {
@@ -48,12 +55,13 @@ function frame(dt = 1 / 60) {
   if (MUNDO.zona === 'sillas' && !MUNDO.secuencia) { emit('alight:chose-chairs'); MUNDO.secuencia = secuenciaSillas(); }
   if (MUNDO.zona === 'tarima' && !MUNDO.tarimaEmitida) { MUNDO.tarimaEmitida = true; emit('alight:chose-light'); if (MUNDO.atriles) emit('alight:lecterns-visible'); }
   if (MUNDO.zona === 'luz') MUNDO.dialogo = true;
+  if (MUNDO.figurasEn > 0 && --MUNDO.figurasEn === 0) emit('alight:people-visible');   // Z95: figuras en escena
   tickCheckpoints(dt);
 }
 const hasta = (cond, max = 2000) => { let n = 0; while (!cond() && n++ < max) frame(); return n; };
 
 console.log('\nregistro');
-check(CHECKPOINTS.length === 16, `16 checkpoints (Z48: + dia_mediodia, dia_atardecer, dia_noche · Z54: + dia_prisma_sube, dia_flor, dia_prisma_baja): ${CHECKPOINTS.map(c => c.id).join(', ')}`);
+check(CHECKPOINTS.length === 18, `18 checkpoints (Z48: + dia_mediodia, dia_atardecer, dia_noche · Z54: + dia_prisma_sube, dia_flor, dia_prisma_baja · Z95: + sillas_recibir, tarima_compartir): ${CHECKPOINTS.map(c => c.id).join(', ')}`);
 check(CHECKPOINTS.every(c => c.pasos[0][0] === 'base' && c.pasos[1][0] === 'remontar' && c.pasos[2][0] === 'base' && c.pasos[3][0] === 'spawn'), 'todos empiezan por base → remontar → base → spawn');
 check(!irACheckpoint('no_existe') && CK_STATE.fase === 'inactivo', 'id inexistente: false y no hace nada');
 

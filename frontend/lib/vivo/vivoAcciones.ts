@@ -133,14 +133,26 @@ const seg = (ms: number) => (ms < 0 ? "—" : `${(ms / 1000).toFixed(1)} s`);
 export function textoEstadoVivo(): string {
   const cfg = (hayConfigSupabase() ? "variables OK" : "SIN variables de Supabase") + (DBG_VIVO.FUENTE === "auto" ? ` · auto → ${fuenteEfectiva()}${_lk503 ? " (LiveKit sin servidor: 503)" : ""}` : "");
   const o = SESSION instanceof SesionPresencia ? SESSION.oyente : null;
+  // Z95: estado exacto del canal de Supabase, motivo real, "reconectando (intento n)" y "agotado"
   const oy = o
-    ? `oyente: ${o.estado} · sesión ${o.sesionActual ? o.sesionActual.slice(0, 8) + "…" + (o.modoActual ? ` (${o.modoActual})` : "") : "ninguna"} · último latido hace ${seg(o.antiguedadLatidoMs)} · vigentes ${o.vigentes} · inválidas ${o.invalidas} · errores ${o.errores}${o.ultimoError ? ` (${o.ultimoError})` : ""}`
-    : `oyente: ${DBG_VIVO.FUENTE === "supabase" ? "sin montar (monolitos fuera)" : "fuente mock"}`;
+    ? `oyente: ${estadoRol(o)} · canal ${o.estadoCanal || "—"} · sesión ${o.sesionActual ? o.sesionActual.slice(0, 8) + "…" + (o.modoActual ? ` (${o.modoActual})` : "") : "ninguna"} · último latido hace ${seg(o.antiguedadLatidoMs)} · vigentes ${o.vigentes} · inválidas ${o.invalidas} · errores ${o.errores}${o.ultimoError ? ` (${o.ultimoError})` : ""}`
+    : `oyente: ${fuenteEfectiva() === "mock" ? "fuente mock" : "sin montar (monolitos fuera)"}`;
   const pb = _pub
-    ? `publicador: ${_pub.publicando ? _pub.estado : "detenido"} · latido ${_pub.presencia.latido} · errores ${_pub.errores}${_pub.ultimoError ? ` (${_pub.ultimoError})` : ""}`
+    ? `publicador: ${_pub.publicando ? estadoRol(_pub) : "detenido"} · canal ${_pub.estadoCanal || "—"} · latido ${_pub.presencia.latido} · errores ${_pub.errores}${_pub.ultimoError ? ` (${_pub.ultimoError})` : ""}`
     : "publicador: —";
   return `FUENTE ${DBG_VIVO.FUENTE} · ${cfg}\n${oy}\n${pb}`;
 }
+function estadoRol(r: { estado: string; agotado: boolean; reconectando: boolean; intento: number }): string {
+  if (r.agotado) return `error: reintentos agotados (${r.intento}) · usá "Reintentar presencia"`;
+  if (r.reconectando) return `reconectando (intento ${r.intento})`;
+  return r.estado;
+}
+/** Z95: botón del menú: reintenta el oyente y el publicador desde cero (canales nuevos). */
+export function reintentarPresencia(): void {
+  if (SESSION instanceof SesionPresencia) SESSION.oyente.reintentar();
+  _pub?.reintentar();
+}
+
 /** Z93: línea de la recepción (menú). */
 export function textoEstadoRecepcion(): string {
   return textoRecepcion(SESSION instanceof SesionLiveKit ? SESSION.rx : null, _lk503 ? "mock" : fuenteEfectiva());
