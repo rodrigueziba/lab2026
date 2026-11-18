@@ -2,7 +2,8 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA } from "@/lib/debugConfig";
+import { reintentarCamara, textoEstadoFuente } from "@/lib/fuenteVideoTarima";   // Z87
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { STORE } from "@/lib/alightStore";
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
@@ -432,6 +433,39 @@ export function SecCajaRitmosZ80() {
             </>
           )}
           <div style={ROW}><button style={INPUT} onClick={() => { guardarRitmos(); toca(); }}>Guardar en la sesión</button></div>
+    </>
+  );
+}
+
+// sección: ondas-tarima-z87
+export function SecOndasTarimaZ87() {
+  // Z87: fuente de video de la tarima (webcam u ondas del analizador maestro) para las proyecciones del domo de caras.
+  const O = DBG_ONDAS_TARIMA;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  return (
+    <>
+          <span style={LABEL}>Ondas de la tarima Z87 <span style={NOTE}>(live · reemplazo de la webcam en el domo)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoFuente()}</span></div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); O.MODO = "ondas"; toca(); }}>Forzar ondas</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); O.MODO = "webcam"; toca(); }}>Forzar webcam</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); O.MODO = "auto"; toca(); }}>Auto</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); reintentarCamara(); toca(); }}>Reintentar permiso</button>
+          </div>
+          {([["MODO", ["auto", "webcam", "ondas"]], ["ESTILO", ["onda", "espectro", "ambos"]], ["PALETA", ["ambar", "verde", "cian"]]] as const).map(([k, ops]) => (
+            <div key={k} style={ROW}>
+              <span>{k}</span>
+              {ops.map(v => <button key={v} style={{ ...INPUT, opacity: O[k] === v ? 1 : 0.5 }} onClick={() => { O[k] = v; toca(); }}>{v}</button>)}
+            </div>
+          ))}
+          {([["FPS", 5, 60, 1, "cuadros/s"], ["GROSOR", 1, 10, 0.5, "px"], ["PERSISTENCIA", 0, 0.97, 0.01, "estela"], ["SENSIBILIDAD", 0.2, 10, 0.1, "×"], ["PUNTOS", 32, 1024, 16, ""], ["BARRAS", 8, 128, 4, ""]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{O[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={O[k]} onChange={ev => { O[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
     </>
   );
 }

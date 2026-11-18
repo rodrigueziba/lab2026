@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { LIVE_TEX_REF } from "@/lib/faceShared";
+import { texturaTarima, tickFuenteTarima, instalarFuenteTarima, liberarFuenteTarima } from "@/lib/fuenteVideoTarima";   // Z87
 import { STORE } from "@/lib/alightStore";
 
 const DOME_R = 28;
@@ -300,6 +301,12 @@ export default function FaceDome() {
     if (liveTex) domeUniforms.uMap.value = liveTex;
   }, [liveTex, domeUniforms]);
 
+  // Z87: fuente de video de la tarima (webcam u ondas): permisos/dispositivos y limpieza del canvas de ondas
+  useEffect(() => {
+    const quitar = instalarFuenteTarima();
+    return () => { quitar(); liberarFuenteTarima(); };
+  }, []);
+
   // Per-frame: animate star fade-in, advance time uniforms, sync STORE → dome shader
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
@@ -317,6 +324,13 @@ export default function FaceDome() {
     }
 
     domeUniforms.uTime.value = t;
+
+    // Z87: las 7 proyecciones consumen la fuente común (webcam u ondas) sin saber cuál es
+    if (showDome) {
+      const tx = texturaTarima();
+      if (tx && domeUniforms.uMap.value !== tx) domeUniforms.uMap.value = tx;
+      tickFuenteTarima();
+    }
 
     // Sync T5 webcam/psychedelic controls from STORE
     if (showDome) {

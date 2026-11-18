@@ -1046,6 +1046,7 @@ export const DBG_RENDIMIENTO = {
     domoFluido: true, domoSol: true, domoOndas: true, domoEstrellas: true, domoPortal: true, domoSiluetas: true,
     ritmos: true, videoDomo: true,   // Z80 caja de ritmos · Z83 video en el domo
     tiempoDetenido: true,            // Z86: historial, estela y efecto del tiempo detenido
+    ondasTarima: true,               // Z87: dibujo del canvas de ondas de la tarima
   } as Record<string, boolean>,
 };
 
@@ -1593,4 +1594,18 @@ export const DBG_AVISO_VIVO = {
   SOLO_UNA_VEZ:      true,    // una vez por sesión del navegador (sessionStorage alight:aviso-vivo) — live
   CIERRE_MS:         600,     // tras elegir, la terminal se cierra — live
   ESPERA_CIERRE_MS:  300,     // "Prefiero salir de acá": si la pestaña no se cerró en este tiempo, pantalla final — live
+};
+
+// ── Z87: fuente de video de la tarima y visualizador de ondas sin webcam (lib/ondasTarima.ts, lib/fuenteVideoTarima.ts) ──
+// (DBG_ONDAS ya existe: son las ondas por kick del domo de SILLAS, Z52; por eso este se llama DBG_ONDAS_TARIMA.)
+export const DBG_ONDAS_TARIMA = {
+  MODO:          "auto" as string,     // "auto" (sin webcam → ondas) | "webcam" | "ondas" (forzar) — live
+  FPS:           30,                   // cuadros por segundo del canvas de ondas — live
+  ESTILO:        "ambos" as string,    // "onda" | "espectro" | "ambos" — live
+  PALETA:        "ambar" as string,    // "ambar" | "verde" | "cian" — live
+  GROSOR:        3,                    // px del trazo (canvas de 640×360) — live
+  PERSISTENCIA:  0.82,                 // estela: cuánto queda del cuadro anterior (0 = sin estela) — live
+  SENSIBILIDAD:  2.5,                  // ganancia sobre el analizador maestro — live
+  PUNTOS:        256,                  // puntos de la forma de onda — live
+  BARRAS:        48,                   // barras del espectro — live
 };
