@@ -71,6 +71,10 @@ export function publicarPresencia(p: PedidoPublicar): ResultadoPublicar {
   if (r.ok) window.addEventListener("pagehide", _alSalir);
   return r;
 }
+/** Z91: estado del publicador para el indicador EN VIVO (null = nunca se publicó en esta pestaña). Solo lectura. */
+export function estadoPublicador(): { estado: string; publicando: boolean; ultimoError: string } | null {
+  return _pub ? _pub : null;
+}
 /** Deja de publicar (untrack y cierre del canal). */
 export function detenerPresencia(): void {
   if (typeof window !== "undefined") window.removeEventListener("pagehide", _alSalir);

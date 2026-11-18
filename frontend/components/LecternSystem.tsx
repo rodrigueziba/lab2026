@@ -18,7 +18,7 @@ import {
   nextTrack, prevTrack, initAudio, loadPlaylist, playTrack,   // Z79: togglePlayPause ahora va por lib/playTarimaAcciones
   playUIClick,
 } from "@/lib/audioEngine";
-import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS } from "@/lib/debugConfig";
+import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT } from "@/lib/debugConfig";
 import { PLAY_TARIMA } from "@/lib/playTarima";                                              // Z79
 import { alternarPlay, instalarEstadoPlay, prepararSinAutoplay } from "@/lib/playTarimaAcciones"; // Z79
 import { PlayGrande, SlotsAtriles } from "./PlayTarima";                                       // Z79
@@ -2252,6 +2252,7 @@ export default function LecternSystem() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;   // Z40: se cancela al desmontar
     const onPeople = () => {
+      if (DBG_CONSENT.ACTIVO) return;   // Z91: los pide el consentimiento (lib/consentTarimaAcciones.ts) tras la elección
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => { timer = null; requestLecterns(); }, LECTERNS_AFTER_PEOPLE_MS);
     };

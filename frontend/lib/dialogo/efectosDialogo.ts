@@ -197,6 +197,9 @@ const ACCIONES: Record<string, Accion> = {
   aviso_vivo_si:    () => { window.dispatchEvent(new CustomEvent("alight:aviso-vivo-decision", { detail: { decision: "si" } })); },
   aviso_vivo_no:    () => { window.dispatchEvent(new CustomEvent("alight:aviso-vivo-decision", { detail: { decision: "no" } })); },
   aviso_vivo_salir: () => { window.dispatchEvent(new CustomEvent("alight:aviso-vivo-decision", { detail: { decision: "salir" } })); },
+  // Z91: consentimiento de la tarima (docs/dialogos/tarima-exponerse.ink): la elección la aplica lib/consentTarimaAcciones.ts
+  tarima_compartir: () => { window.dispatchEvent(new CustomEvent("alight:tarima-consent", { detail: { eleccion: "compartir" } })); },
+  tarima_privado:   () => { window.dispatchEvent(new CustomEvent("alight:tarima-consent", { detail: { eleccion: "privado" } })); },
 };
 
 // ── instalación ────────────────────────────────────────────────────────────────

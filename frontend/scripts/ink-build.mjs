@@ -28,7 +28,7 @@ fs.mkdirSync(path.dirname(jsonOut), { recursive: true });
 fs.writeFileSync(jsonOut, story.ToJson());
 
 // Z85: diálogos aparte (mismo compilador; no entran en el mapa del camino LUZ)
-for (const [nombre] of [['aviso-vivo']]) {
+for (const [nombre] of [['aviso-vivo'], ['tarima-exponerse']]) {   // Z91: + consentimiento de la tarima
   const extra = fs.readFileSync(path.join(repo, `docs/dialogos/${nombre}.ink`), 'utf8');
   const errs = [];
   const st = new Compiler(extra, { errorHandler: (m, t) => errs.push(`[${t}] ${m}`) }).Compile();

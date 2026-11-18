@@ -1614,6 +1614,19 @@ export const DBG_AVISO_VIVO = {
   ESPERA_CIERRE_MS:  300,     // "Prefiero salir de acá": si la pestaña no se cerró en este tiempo, pantalla final — live
 };
 
+// ── Z91: consentimiento para exponerse y transmitir al elegir la tarima (lib/consentTarima.ts, lib/consentTarimaAcciones.ts,
+// docs/dialogos/tarima-exponerse.ink). ACTIVO = false → como antes: atriles a LECTERNS_AFTER_PEOPLE_MS sin preguntas ni publicar. ──
+export const DBG_CONSENT = {
+  ACTIVO:             true,   // se lee al aparecer las figuras (alight:people-visible) — live
+  ESPERA_INICIAL_S:   8,      // figuras en escena → primer texto — live
+  ESPERA_ENTRE_S:     8,      // fin del primer texto → texto con la elección — live
+  CIERRE_TEXTO_S:     3,      // el primer texto queda en la terminal esto después de terminar de escribirse — live
+  CIERRE_MS:          600,    // tras elegir, la terminal se cierra — live
+  RECORDAR_EN_SESION: true,   // la elección se recuerda solo en sessionStorage de la pestaña (al recargar no repregunta) — live
+  DURACION_MAX_S:     300,    // límite de la transmisión (reloj real: no se detiene con la pausa central) — live
+  AVISO_FIN_S:        30,     // aviso "La transmisión termina en N s" antes del límite — live
+};
+
 // ── Z87: fuente de video de la tarima y visualizador de ondas sin webcam (lib/ondasTarima.ts, lib/fuenteVideoTarima.ts) ──
 // (DBG_ONDAS ya existe: son las ondas por kick del domo de SILLAS, Z52; por eso este se llama DBG_ONDAS_TARIMA.)
 export const DBG_ONDAS_TARIMA = {

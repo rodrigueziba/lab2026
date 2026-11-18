@@ -17,6 +17,7 @@ import TelonTexto from "./TelonTexto"; // Z46: texto proyectado sobre el telón
 import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from "./LecternSystem";
 import { ATRIL_RITMOS } from "@/lib/ritmos";   // Z80: aviso "Tocar E" del atril de la caja de ritmos
 import AvisoVivoHost from "./AvisoVivoHost";   // Z85
+import ConsentTarimaHost from "./ConsentTarimaHost";   // Z91
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import CurtainFlash from "./CurtainFlash"; // F1: destello al atravesar el telón
@@ -530,6 +531,7 @@ function Scene() {
       {path !== "sillas" && <FaceDome />}
       {path !== "sillas" && <WatcherEye />}
       {path !== "sillas" && <LecternSystem />}
+      {path !== "sillas" && <ConsentTarimaHost />}{/* Z91: consentimiento para transmitir, EN VIVO y corte */}
       {path !== "sillas" && <DynamicLights />}
       <Player />
       <BigMeshScanner />

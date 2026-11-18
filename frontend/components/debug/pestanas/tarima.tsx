@@ -2,7 +2,8 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT } from "@/lib/debugConfig";
+import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent } from "@/lib/consentTarimaAcciones";   // Z91
 import { reintentarCamara, textoEstadoFuente } from "@/lib/fuenteVideoTarima";   // Z87
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { STORE } from "@/lib/alightStore";
@@ -482,6 +483,42 @@ export function SecOndasTarimaZ87() {
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={O[k]} onChange={ev => { O[k] = parseFloat(ev.target.value); toca(); }} />
             </div>
           ))}
+    </>
+  );
+}
+
+// sección: consent-tarima-z91
+export function SecConsentTarimaZ91() {
+  // Z91: consentimiento para exponerse y transmitir al elegir la tarima, indicador EN VIVO y corte. Estado 4 veces por segundo.
+  const C = DBG_CONSENT;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  return (
+    <>
+          <span style={LABEL}>Consentimiento de la tarima Z91 <span style={NOTE}>(live · docs/dialogos/tarima-exponerse.ink)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoConsent()}</span></div>
+          {([["ACTIVO", "off = atriles a los 10 s sin preguntas ni publicar (como antes)"], ["RECORDAR_EN_SESION", "sessionStorage de la pestaña (al recargar no repregunta)"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={() => { C[k] = !C[k]; toca(); }}>{C[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([["ESPERA_INICIAL_S", 0, 30, 0.5, "s figuras → texto 1"], ["ESPERA_ENTRE_S", 0, 30, 0.5, "s fin del texto 1 → elección"], ["CIERRE_TEXTO_S", 0, 10, 0.5, "s el texto 1 queda en pantalla"],
+            ["DURACION_MAX_S", 10, 1800, 5, "s límite (reloj real)"], ["AVISO_FIN_S", 0, 120, 1, "s de aviso antes del límite"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{C[k].toFixed(st < 1 ? 1 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={C[k]} onChange={ev => { C[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); mostrarTexto1Ahora(); toca(); }}>Mostrar texto 1 ahora</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); mostrarEleccionAhora(); toca(); }}>Mostrar elección ahora</button>
+          </div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); cortarTransmision("boton"); toca(); }}>Cortar transmisión</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); reiniciarConsentimiento(); toca(); }}>Reiniciar consentimiento</button>
+          </div>
     </>
   );
 }
