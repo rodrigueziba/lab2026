@@ -9,6 +9,9 @@
 // Indicador: HTML fijo arriba a la derecha, fuera del canvas (no pasa por el CRT), ámbar #FF9A1F sobre #2A1400, con el
 // botón "CORTAR TRANSMISIÓN". Tecla X: corta, salvo dentro de los atriles de imagen y sonido, donde X es un atajo de
 // sus controles (ahí el puntero está libre y se usa el botón). Sin contador de espectadores (no existe todavía).
+// Z93a: el flujo lo arranca el tick (tickSubida) cuando las figuras emergieron (o ESPERA_FIGURAS_MAX_S después de elegir
+// la tarima si no llegan) y el usuario está sobre la tarima; bajar antes de elegir lo cancela y volver a subir lo reinicia.
+// Con ATRILES_TRAS_CONSENTIMIENTO, los atriles (y la caja de ritmos, que vive dentro de LecternSystem) esperan la elección.
 
 import { DBG_CONSENT, DBG_ONDAS_TARIMA, DBG_LIVEKIT, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { INTERACT_STATE, requestLecterns } from "@/lib/alightStore";
@@ -18,15 +21,18 @@ import { bloquearMovimiento, liberarMovimiento } from "@/lib/entradaTelon";
 import { publicarPresencia, detenerPresencia, estadoPublicador, sesionIdNavegador } from "@/lib/vivo/vivoAcciones";
 import { publicarLiveKit, detenerLiveKit, estadoLiveKit } from "@/lib/vivo/publicarLiveKit";   // Z92: video y audio
 import { FUENTE_TARIMA } from "@/lib/fuenteVideoTarima";
+import { ZONA_TARIMA } from "@/lib/layoutSala";   // Z93a: la misma zona que dispara alight:chose-light
 import { elegirFuente } from "@/lib/ondasTarima";
 import {
   crearConsent, iniciarConsent, tickConsent, finTexto1, elegirConsent, cortarConsent, forzarTexto1, forzarEleccion,
   reiniciarConsent, modoSegunFuente, segundosTx, segundosRestantes, serializarConsent, leerRecordado, aplicarRecordado,
+  crearSubida, tickSubida, faseConsent, atrilesPermitidos,   // Z93a
   type Eleccion, type ResultadoEleccion,
 } from "@/lib/consentTarima";
 
 export const CLAVE_CONSENT = "alight:consent-tarima";
 export const CONSENT = crearConsent();
+export const SUBIDA = crearSubida();   // Z93a
 const RAZON = "consentimiento-tarima";
 const AUX = { terminalNuestra: false, atrilesVisibles: false, ultimoError: "" };
 let _cierre: ReturnType<typeof setTimeout> | null = null;
@@ -85,9 +91,19 @@ function elegir(e: Eleccion): void {
   aplicar(elegirConsent(CONSENT, e, modoActual(), Date.now()));
 }
 
-/** Un cuadro (ConsentTarimaHost). */
-export function tickConsentTarima(): void {
+/** Z93a: ¿pueden salir los atriles ahora? (LecternSystem lo consulta al recibir alight:request-lecterns) */
+export function atrilesPermitidosAhora(): boolean {
+  return atrilesPermitidos(CONSENT, DBG_CONSENT.ACTIVO, DBG_CONSENT.ATRILES_TRAS_CONSENTIMIENTO);
+}
+
+/** Un cuadro (ConsentTarimaHost). x, z = posición del usuario (cámara). */
+export function tickConsentTarima(x: number, z: number): void {
   const ahora = Date.now();
+  // Z93a: arranque solo, cancelación al bajar de la tarima y reinicio al volver a subir
+  if (DBG_CONSENT.ACTIVO) {
+    const dist = Math.hypot(x - ZONA_TARIMA.x, z - ZONA_TARIMA.z);
+    if (tickSubida(CONSENT, SUBIDA, DBG_CONSENT, ahora, dist, ZONA_TARIMA.radio, AUX.atrilesVisibles) === "cancelar") cancelarTerminal();
+  }
   // ACTIVO apagado a mitad de la secuencia: como antes (atriles, sin publicar)
   if (!DBG_CONSENT.ACTIVO && (CONSENT.estado === "esperando" || CONSENT.estado === "esperando2")) {
     CONSENT.estado = "eligiendo"; elegir("privado");
@@ -99,17 +115,25 @@ export function tickConsentTarima(): void {
   actualizarIndicador(ahora);
 }
 
+/** Z93a: bajó de la tarima antes de elegir: cierra la terminal propia sin aplicar nada (el estado ya volvió a "inactivo"). */
+function cancelarTerminal(): void {
+  if (_cierre) { clearTimeout(_cierre); _cierre = null; }
+  if (AUX.terminalNuestra) { if (DIALOGO_STATE.fuente === RUTA_TARIMA_EXPONERSE) cerrarDialogo(); terminalLiberada(); }
+}
+
 function alPersonas(): void {
+  SUBIDA.figuras = true;             // Z93a: la secuencia de entrada empezó de verdad
   if (!DBG_CONSENT.ACTIVO) return;   // LecternSystem pide los atriles a los 10 s, como antes
   let r = DBG_CONSENT.RECORDAR_EN_SESION ? leerRecordado(almacen()?.getItem(CLAVE_CONSENT)) : null;
   if (r?.eleccion === "compartir" && !DBG_CONSENT.RECORDAR_TRANSMISION) r = null;   // Z92: una transmisión no se reanuda sola al recargar
   if (r) { aplicar(aplicarRecordado(CONSENT, r, DBG_CONSENT, modoActual(), Date.now())); return; }
-  iniciarConsent(CONSENT, Date.now());
+  // Z93a: la espera inicial la arranca tickSubida en este mismo cuadro o el siguiente (si el usuario está sobre la tarima)
 }
 
 /** Listeners (los instala ConsentTarimaHost). Devuelve la limpieza (= salir de la tarima). */
 export function instalarConsentTarima(): () => void {
   const onPeople = () => alPersonas();
+  const onLight = () => { if (!SUBIDA.tEntrada) SUBIDA.tEntrada = Date.now(); };   // Z93a: subió a la tarima
   const onLecterns = () => { AUX.atrilesVisibles = true; };
   const onDecision = (e: Event) => {
     const d = (e as CustomEvent<{ eleccion?: Eleccion }>).detail?.eleccion;
@@ -138,6 +162,7 @@ export function instalarConsentTarima(): () => void {
     cortarTransmision("boton");
   };
   window.addEventListener("alight:people-visible", onPeople);
+  window.addEventListener("alight:chose-light", onLight);
   window.addEventListener("alight:lecterns-visible", onLecterns);
   window.addEventListener("alight:tarima-consent", onDecision);
   window.addEventListener("alight:dialogo-fin", onFin);
@@ -145,6 +170,7 @@ export function instalarConsentTarima(): () => void {
   window.addEventListener("keydown", onKey);
   return () => {
     window.removeEventListener("alight:people-visible", onPeople);
+    window.removeEventListener("alight:chose-light", onLight);
     window.removeEventListener("alight:lecterns-visible", onLecterns);
     window.removeEventListener("alight:tarima-consent", onDecision);
     window.removeEventListener("alight:dialogo-fin", onFin);
@@ -155,6 +181,7 @@ export function instalarConsentTarima(): () => void {
     // salir de la tarima: se corta y se olvida (la próxima vez se vuelve a preguntar)
     cortarTransmision("salida");
     reiniciarConsent(CONSENT); olvidar();
+    Object.assign(SUBIDA, crearSubida());   // Z93a
     AUX.atrilesVisibles = false; AUX.ultimoError = "";
     quitarIndicador();
   };
@@ -232,11 +259,13 @@ export function reiniciarConsentimiento(): void {
 }
 export function textoEstadoConsent(): string {
   const ahora = Date.now(), p = estadoPublicador();
+  const f = faseConsent(CONSENT, SUBIDA, DBG_CONSENT, ahora, AUX.atrilesVisibles);   // Z93a
+  const fase = `fase: ${f.fase}${f.faltan >= 0 ? ` · faltan ${f.faltan.toFixed(1)} s` : ""} · figuras ${SUBIDA.figuras ? "sí" : "no"} · sobre la tarima ${SUBIDA.sobre ? "sí" : "no"} · cancelaciones ${SUBIDA.cancelaciones}\n`;
   const tx = CONSENT.inicioTx ? ` · transmitido ${mmss(segundosTx(CONSENT, ahora))}` : "";
   const modo = CONSENT.modo ? ` · modo ${CONSENT.modo}` : ` · modo si se comparte ahora: ${modoActual()}`;
   const corte = CONSENT.motivoCorte ? ` · corte: ${CONSENT.motivoCorte}` : "";
   const pub = p ? ` · presencia ${p.publicando ? p.estado : "detenida"}${p.ultimoError ? ` (${p.ultimoError})` : ""}` : "";
-  return `${CONSENT.estado}${tx}${modo}${corte}${pub}${AUX.ultimoError ? ` · error: ${AUX.ultimoError}` : ""} · publicaciones ${CONSENT.publicaciones} · atriles ${AUX.atrilesVisibles ? "afuera" : "abajo"}`;
+  return `${fase}${CONSENT.estado}${tx}${modo}${corte}${pub}${AUX.ultimoError ? ` · error: ${AUX.ultimoError}` : ""} · publicaciones ${CONSENT.publicaciones} · atriles ${AUX.atrilesVisibles ? "afuera" : "abajo"}`;
 }
 
 if (DEBUG_ENABLED && typeof window !== "undefined") {

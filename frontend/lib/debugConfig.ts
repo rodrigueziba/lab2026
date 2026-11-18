@@ -1623,10 +1623,15 @@ export const DBG_CONSENT = {
   ESPERA_ENTRE_S:     8,      // fin del primer texto → texto con la elección — live
   CIERRE_TEXTO_S:     3,      // el primer texto queda en la terminal esto después de terminar de escribirse — live
   CIERRE_MS:          600,    // tras elegir, la terminal se cierra — live
-  RECORDAR_EN_SESION: true,   // la elección se recuerda solo en sessionStorage de la pestaña (al recargar no repregunta) — live
+  RECORDAR_EN_SESION: false,  // Z93a (antes true): true = la elección se recuerda en sessionStorage y al recargar NO repregunta
+                              // (los atriles salen con las figuras, sin textos: era la causa del reporte de Z93a) — live
   RECORDAR_TRANSMISION: false, // Z92: al recargar, una transmisión NO se reanuda sola (se vuelve a preguntar); true = Z91 — live
   DURACION_MAX_S:     300,    // límite de la transmisión (reloj real: no se detiene con la pausa central) — live
   AVISO_FIN_S:        30,     // aviso "La transmisión termina en N s" antes del límite — live
+  // Z93a: orden de la tarima (lib/consentTarima.ts tickSubida)
+  ATRILES_TRAS_CONSENTIMIENTO: true, // atriles y caja de ritmos SOLO tras la elección; false = como antes (J1: a LECTERNS_AFTER_PEOPLE_MS de las figuras) — live
+  ESPERA_FIGURAS_MAX_S: 30,   // si las figuras no salen (permiso de cámara sin responder), el flujo arranca igual esto después de elegir la tarima — live
+  SALIDA_EXTRA_M:     0.5,    // bajar de la tarima = alejarse más que el radio de la zona + esto (histéresis); cancela antes de elegir — live
 };
 
 // ── Z92: video y audio de la tarima por LiveKit Cloud tras "Compartir mi sesión." (lib/vivo/publicarLiveKit.ts,

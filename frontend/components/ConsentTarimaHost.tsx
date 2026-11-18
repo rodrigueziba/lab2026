@@ -8,6 +8,6 @@ import { instalarConsentTarima, tickConsentTarima } from "@/lib/consentTarimaAcc
 
 export default function ConsentTarimaHost() {
   useEffect(() => instalarConsentTarima(), []);
-  useFrame(() => tickConsentTarima());
+  useFrame(({ camera }) => tickConsentTarima(camera.position.x, camera.position.z));   // Z93a: posición para bajar/subir de la tarima
   return null;
 }

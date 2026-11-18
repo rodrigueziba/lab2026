@@ -24,6 +24,7 @@ import { alternarPlay, instalarEstadoPlay, prepararSinAutoplay } from "@/lib/pla
 import { PlayGrande, SlotsAtriles } from "./PlayTarima";                                       // Z79
 import { TARIMA_W } from "./Tarima";                                                         // Z79: slots
 import CajaRitmos from "./CajaRitmos";                                                       // Z80
+import { atrilesPermitidosAhora } from "@/lib/consentTarimaAcciones";                         // Z93a
 import SistemaPerf from "./SistemaPerf";                                                     // Z80: benchmark
 import { ATRIL_RITMOS } from "@/lib/ritmos";                                                  // Z80: tecla E
 import { activaAccion } from "@/lib/atrilesClick";                                             // Z81
@@ -2252,7 +2253,9 @@ export default function LecternSystem() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;   // Z40: se cancela al desmontar
     const onPeople = () => {
-      if (DBG_CONSENT.ACTIVO) return;   // Z91: los pide el consentimiento (lib/consentTarimaAcciones.ts) tras la elección
+      // Z91: los pide el consentimiento (lib/consentTarimaAcciones.ts) tras la elección.
+      // Z93a: con ATRILES_TRAS_CONSENTIMIENTO false vuelve el temporizador de J1 aunque el consentimiento esté activo.
+      if (DBG_CONSENT.ACTIVO && DBG_CONSENT.ATRILES_TRAS_CONSENTIMIENTO) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => { timer = null; requestLecterns(); }, LECTERNS_AFTER_PEOPLE_MS);
     };
@@ -2266,6 +2269,7 @@ export default function LecternSystem() {
   // J1: listen to request-lecterns (today fired by timer, future: ink.js dialog)
   useEffect(() => {
     const onRequest = () => {
+      if (!atrilesPermitidosAhora()) return;   // Z93a: no antes de la elección del consentimiento (que los vuelve a pedir)
       setVisible(true);
       appearStart.current = Date.now();
       window.dispatchEvent(new CustomEvent("alight:lecterns-visible"));

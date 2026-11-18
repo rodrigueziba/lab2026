@@ -166,3 +166,67 @@ export function aplicarRecordado(st: Consent, r: Recordado, c: CfgConsent, modo:
   if (r.eleccion === "compartir") { st.estado = "cortado"; st.motivoCorte = "tiempo"; st.finTx = ahora; }
   return res;
 }
+
+// ── Z93a: subida a la tarima (arranque solo, cancelación al bajar, reinicio al volver a subir) ──
+// El flujo arranca cuando la secuencia de entrada empezó de verdad (alight:people-visible = figuras emergiendo) y el
+// usuario está sobre la tarima. Sin cámara, face-captured llega igual por el fallo (useFaceTracking) y las figuras
+// salen; si el permiso queda SIN RESPONDER (no llegan las figuras), arranca igual ESPERA_FIGURAS_MAX_S después de
+// elegir la tarima (alight:chose-light). Bajar de la tarima antes de elegir cancela (vuelve a "inactivo"); volver a
+// subir lo reinicia desde la espera inicial. Una sola vez por subida: iniciarConsent solo sale de "inactivo".
+export interface CfgSubida { ESPERA_INICIAL_S: number; ESPERA_ENTRE_S: number; ESPERA_FIGURAS_MAX_S: number; SALIDA_EXTRA_M: number }
+export interface Subida {
+  figuras: boolean;     // llegó alight:people-visible
+  tEntrada: number;     // ms de alight:chose-light (0 = todavía no)
+  sobre: boolean;       // el usuario está sobre la tarima (con histéresis)
+  cancelaciones: number;
+}
+export function crearSubida(): Subida { return { figuras: false, tEntrada: 0, sobre: true, cancelaciones: 0 }; }
+export type AccionSubida = "ninguna" | "iniciar" | "cancelar";
+const PREVIOS: readonly EstadoConsent[] = ["esperando", "texto1", "esperando2", "eligiendo"];
+/** ¿El flujo está antes de la elección? (ahí los atriles esperan) */
+export function antesDeElegir(st: Consent): boolean { return PREVIOS.includes(st.estado); }
+
+/**
+ * Un paso. dist = distancia horizontal del usuario al centro de la zona de la tarima; radio = radio de esa zona (el
+ * mismo que dispara alight:chose-light). Sale de la tarima al pasar radio + SALIDA_EXTRA_M; vuelve al entrar a radio.
+ * atrilesFuera = los atriles ya salieron por otro camino (p. ej. TARIMA sin público): no se arranca.
+ */
+export function tickSubida(st: Consent, sb: Subida, c: CfgSubida, ahora: number, dist: number, radio: number, atrilesFuera: boolean): AccionSubida {
+  if (sb.sobre && dist > radio + Math.max(0, c.SALIDA_EXTRA_M)) sb.sobre = false;
+  else if (!sb.sobre && dist <= radio) sb.sobre = true;
+  if (!sb.sobre) {
+    if (antesDeElegir(st)) { st.estado = "inactivo"; st.t0 = ahora; sb.cancelaciones++; return "cancelar"; }
+    return "ninguna";
+  }
+  if (st.estado !== "inactivo" || st.atrilesPedidos || atrilesFuera) return "ninguna";
+  const listo = sb.figuras || (sb.tEntrada > 0 && ahora - sb.tEntrada >= s(c.ESPERA_FIGURAS_MAX_S, 30));
+  return listo && iniciarConsent(st, ahora) ? "iniciar" : "ninguna";
+}
+
+/** Fase para el menú (esperando, texto 1, texto 2, elegido, atriles visibles) y segundos que faltan (−1 = no aplica). */
+export interface Fase { fase: string; faltan: number }
+const _fase: Fase = { fase: "", faltan: -1 };
+export function faseConsent(st: Consent, sb: Subida, c: CfgSubida, ahora: number, atrilesVisibles: boolean): Fase {
+  _fase.faltan = -1;
+  switch (st.estado) {
+    case "inactivo":
+      if (atrilesVisibles) { _fase.fase = "atriles visibles (sin consentimiento)"; break; }
+      if (!sb.tEntrada) { _fase.fase = "sin subir a la tarima"; break; }
+      if (!sb.sobre) { _fase.fase = "fuera de la tarima (cancelado: vuelve a empezar al subir)"; break; }
+      if (sb.figuras) { _fase.fase = "por empezar"; break; }
+      _fase.fase = "esperando las figuras";
+      _fase.faltan = Math.max(0, (s(c.ESPERA_FIGURAS_MAX_S, 30) - (ahora - sb.tEntrada)) / 1000);
+      break;
+    case "esperando": _fase.fase = "esperando texto 1"; _fase.faltan = Math.max(0, (s(c.ESPERA_INICIAL_S, 8) - (ahora - st.t0)) / 1000); break;
+    case "texto1": _fase.fase = "texto 1"; break;
+    case "esperando2": _fase.fase = "esperando texto 2"; _fase.faltan = Math.max(0, (s(c.ESPERA_ENTRE_S, 8) - (ahora - st.t0)) / 1000); break;
+    case "eligiendo": _fase.fase = "texto 2 (eligiendo)"; break;
+    default: _fase.fase = `elegido (${st.estado})${atrilesVisibles ? " · atriles visibles" : " · atriles saliendo"}`;
+  }
+  return _fase;
+}
+
+/** ¿Se permite que salgan los atriles ahora? Con el flag, no mientras el flujo está antes de la elección. */
+export function atrilesPermitidos(st: Consent, activo: boolean, trasConsentimiento: boolean): boolean {
+  return !(activo && trasConsentimiento && antesDeElegir(st));
+}

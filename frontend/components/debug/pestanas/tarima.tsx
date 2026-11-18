@@ -499,16 +499,19 @@ export function SecConsentTarimaZ91() {
   return (
     <>
           <span style={LABEL}>Consentimiento de la tarima Z91 <span style={NOTE}>(live · docs/dialogos/tarima-exponerse.ink)</span></span>
-          <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoConsent()}</span></div>
-          {([["ACTIVO", "off = atriles a los 10 s sin preguntas ni publicar (como antes)"], ["RECORDAR_EN_SESION", "sessionStorage de la pestaña (al recargar no repregunta)"],
-            ["RECORDAR_TRANSMISION", "Z92: off = al recargar una transmisión no se reanuda (vuelve a preguntar)"]] as const).map(([k, nota]) => (
+          <div style={{ ...ROW, ...NOTE, whiteSpace: "pre-line" }}><span>{textoEstadoConsent()}</span></div>
+          {([["ACTIVO", "off = atriles a los 10 s sin preguntas ni publicar (como antes)"], ["RECORDAR_EN_SESION", "Z93a: off por defecto · ON = sessionStorage de la pestaña (al recargar no repregunta y los atriles salen sin textos)"],
+            ["RECORDAR_TRANSMISION", "Z92: off = al recargar una transmisión no se reanuda (vuelve a preguntar)"],
+            ["ATRILES_TRAS_CONSENTIMIENTO", "Z93a: atriles y caja de ritmos solo tras la elección · off = como antes (10 s después de las figuras)"]] as const).map(([k, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{nota}</span></span>
               <button style={INPUT} onClick={() => { C[k] = !C[k]; toca(); }}>{C[k] ? "ON" : "off"}</button>
             </div>
           ))}
           {([["ESPERA_INICIAL_S", 0, 30, 0.5, "s figuras → texto 1"], ["ESPERA_ENTRE_S", 0, 30, 0.5, "s fin del texto 1 → elección"], ["CIERRE_TEXTO_S", 0, 10, 0.5, "s el texto 1 queda en pantalla"],
-            ["DURACION_MAX_S", 10, 1800, 5, "s límite (reloj real)"], ["AVISO_FIN_S", 0, 120, 1, "s de aviso antes del límite"]] as const).map(([k, mn, mx, st, nota]) => (
+            ["DURACION_MAX_S", 10, 1800, 5, "s límite (reloj real)"], ["AVISO_FIN_S", 0, 120, 1, "s de aviso antes del límite"],
+            ["ESPERA_FIGURAS_MAX_S", 5, 120, 1, "s Z93a: sin figuras (permiso sin responder), arranca igual tras elegir la tarima"],
+            ["SALIDA_EXTRA_M", 0, 3, 0.1, "m Z93a: bajar de la tarima = radio de la zona + esto (cancela antes de elegir)"]] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{C[k].toFixed(st < 1 ? 1 : 0)} {nota}</span></span>
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={C[k]} onChange={ev => { C[k] = parseFloat(ev.target.value); toca(); }} />
