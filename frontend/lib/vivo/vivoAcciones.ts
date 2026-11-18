@@ -59,6 +59,8 @@ function idSesionNavegador(): string {
   try { sessionStorage.setItem(K, id); } catch { /* sin storage */ }
   return id;
 }
+/** Z92: el mismo sesionId de la presencia (sessionStorage de la pestaña) para la identidad de LiveKit. */
+export function sesionIdNavegador(): string { return _pub ? _pub.presencia.sesionId : idSesionNavegador(); }
 let _pub: PublicadorPresencia | null = null;
 const _alSalir = () => detenerPresencia();
 

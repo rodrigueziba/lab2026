@@ -10,12 +10,13 @@
 // botón "CORTAR TRANSMISIÓN". Tecla X: corta, salvo dentro de los atriles de imagen y sonido, donde X es un atajo de
 // sus controles (ahí el puntero está libre y se usa el botón). Sin contador de espectadores (no existe todavía).
 
-import { DBG_CONSENT, DBG_ONDAS_TARIMA, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { DBG_CONSENT, DBG_ONDAS_TARIMA, DBG_LIVEKIT, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { INTERACT_STATE, requestLecterns } from "@/lib/alightStore";
 import { abrirDialogo, cerrarDialogo, DIALOGO_STATE } from "@/lib/dialogo/dialogoEstado";
 import { RUTA_TARIMA_EXPONERSE } from "@/lib/dialogo/dialogoInk";
 import { bloquearMovimiento, liberarMovimiento } from "@/lib/entradaTelon";
-import { publicarPresencia, detenerPresencia, estadoPublicador } from "@/lib/vivo/vivoAcciones";
+import { publicarPresencia, detenerPresencia, estadoPublicador, sesionIdNavegador } from "@/lib/vivo/vivoAcciones";
+import { publicarLiveKit, detenerLiveKit, estadoLiveKit } from "@/lib/vivo/publicarLiveKit";   // Z92: video y audio
 import { FUENTE_TARIMA } from "@/lib/fuenteVideoTarima";
 import { elegirFuente } from "@/lib/ondasTarima";
 import {
@@ -56,6 +57,8 @@ function aplicar(res: ResultadoEleccion): void {
   if (res.publicar) {
     const r = publicarPresencia({ modo: CONSENT.modo ?? "privado", consentimiento: true });
     AUX.ultimoError = r.ok ? "" : r.motivo;   // falla: la sesión sigue local y el indicador lo muestra
+    // Z92: video y audio por LiveKit, con el mismo consentimiento explícito y el mismo sesionId que la presencia
+    if (DBG_LIVEKIT.ACTIVO) publicarLiveKit({ consentimiento: true, modo: CONSENT.modo ?? "privado", sesionId: sesionIdNavegador() });
   }
   guardar();
 }
@@ -74,6 +77,7 @@ function terminalLiberada(): void {
 export function cortarTransmision(motivo: "boton" | "tiempo" | "salida" = "boton"): void {
   const estaba = cortarConsent(CONSENT, Date.now(), motivo);
   detenerPresencia();   // al instante, aunque el estado no fuera "compartiendo" (no hace daño)
+  detenerLiveKit();     // Z92: pistas, salida del núcleo y conexión
   if (estaba) guardar();
 }
 
@@ -91,13 +95,14 @@ export function tickConsentTarima(): void {
   const a = tickConsent(CONSENT, DBG_CONSENT, ahora, !DIALOGO_STATE.activo);
   if (a === "abrirTexto1") abrirTerminal("tx_texto1");
   else if (a === "abrirEleccion") abrirTerminal("tx_eleccion");
-  else if (a === "cortarPorTiempo") { detenerPresencia(); guardar(); }
+  else if (a === "cortarPorTiempo") { detenerPresencia(); detenerLiveKit(); guardar(); }
   actualizarIndicador(ahora);
 }
 
 function alPersonas(): void {
   if (!DBG_CONSENT.ACTIVO) return;   // LecternSystem pide los atriles a los 10 s, como antes
-  const r = DBG_CONSENT.RECORDAR_EN_SESION ? leerRecordado(almacen()?.getItem(CLAVE_CONSENT)) : null;
+  let r = DBG_CONSENT.RECORDAR_EN_SESION ? leerRecordado(almacen()?.getItem(CLAVE_CONSENT)) : null;
+  if (r?.eleccion === "compartir" && !DBG_CONSENT.RECORDAR_TRANSMISION) r = null;   // Z92: una transmisión no se reanuda sola al recargar
   if (r) { aplicar(aplicarRecordado(CONSENT, r, DBG_CONSENT, modoActual(), Date.now())); return; }
   iniciarConsent(CONSENT, Date.now());
 }
@@ -188,8 +193,14 @@ function actualizarIndicador(ahora: number): void {
   crearIndicador();
   if (!_txt || !_aviso) return;
   const p = estadoPublicador();
-  const red = AUX.ultimoError || !p || p.estado === "error" ? "SIN CONEXIÓN · solo local"
+  const presRed = AUX.ultimoError || !p || p.estado === "error" ? "SIN CONEXIÓN · solo local"
     : p.estado === "connecting" ? "CONECTANDO…" : p.estado === "active" ? "" : "SIN CONEXIÓN · solo local";
+  // Z92: con LiveKit, el rótulo sigue su estado real (la presencia sola, como Z91, si está apagado)
+  const lk = estadoLiveKit().estado;
+  const red = !DBG_LIVEKIT.ACTIVO ? presRed
+    : lk === "publicando" ? (presRed ? "SIN PRESENCIA" : "")
+    : lk === "pidiendo" || lk === "conectando" ? "CONECTANDO…"
+    : lk === "reconectando" ? "RECONECTANDO…" : "SIN CONEXIÓN · solo local";
   const seg = Math.floor(segundosTx(CONSENT, ahora));
   const resta = Math.ceil(segundosRestantes(CONSENT, DBG_CONSENT, ahora));
   const avisar = CONSENT.avisoFin && resta > 0;

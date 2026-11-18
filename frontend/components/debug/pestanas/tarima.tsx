@@ -2,8 +2,10 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT } from "@/lib/debugConfig";
-import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent } from "@/lib/consentTarimaAcciones";   // Z91
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT } from "@/lib/debugConfig";
+import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent, modoActual } from "@/lib/consentTarimaAcciones";   // Z91
+import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit } from "@/lib/vivo/publicarLiveKit";   // Z92
+import { sesionIdNavegador } from "@/lib/vivo/vivoAcciones";   // Z92
 import { reintentarCamara, textoEstadoFuente } from "@/lib/fuenteVideoTarima";   // Z87
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { STORE } from "@/lib/alightStore";
@@ -498,7 +500,8 @@ export function SecConsentTarimaZ91() {
     <>
           <span style={LABEL}>Consentimiento de la tarima Z91 <span style={NOTE}>(live · docs/dialogos/tarima-exponerse.ink)</span></span>
           <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoConsent()}</span></div>
-          {([["ACTIVO", "off = atriles a los 10 s sin preguntas ni publicar (como antes)"], ["RECORDAR_EN_SESION", "sessionStorage de la pestaña (al recargar no repregunta)"]] as const).map(([k, nota]) => (
+          {([["ACTIVO", "off = atriles a los 10 s sin preguntas ni publicar (como antes)"], ["RECORDAR_EN_SESION", "sessionStorage de la pestaña (al recargar no repregunta)"],
+            ["RECORDAR_TRANSMISION", "Z92: off = al recargar una transmisión no se reanuda (vuelve a preguntar)"]] as const).map(([k, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{nota}</span></span>
               <button style={INPUT} onClick={() => { C[k] = !C[k]; toca(); }}>{C[k] ? "ON" : "off"}</button>
@@ -519,6 +522,38 @@ export function SecConsentTarimaZ91() {
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); cortarTransmision("boton"); toca(); }}>Cortar transmisión</button>
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); reiniciarConsentimiento(); toca(); }}>Reiniciar consentimiento</button>
           </div>
+    </>
+  );
+}
+
+// sección: livekit-z92
+export function SecLiveKitZ92() {
+  // Z92: video y audio de la tarima por LiveKit Cloud (solo tras "Compartir mi sesión."). Estado 4 veces por segundo.
+  const L = DBG_LIVEKIT;
+  const [, setTick] = useState(0);
+  const [res, setRes] = useState("");
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  return (
+    <>
+          <span style={LABEL}>Transmisión LiveKit Z92 <span style={NOTE}>(video y audio de la tarima · token firmado en /api/livekit/token)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoLiveKit()}</span></div>
+          <div style={ROW}>
+            <span>ACTIVO <span style={NOTE}>off = como Z91 (solo presencia)</span></span>
+            <button style={INPUT} onClick={() => { L.ACTIVO = !L.ACTIVO; toca(); }}>{L.ACTIVO ? "ON" : "off"}</button>
+          </div>
+          <div style={{ ...ROW, ...NOTE }}><span>SALA {L.SALA} (informativa: la fija el servidor)</span></div>
+          {([["VIDEO_FPS", 1, 30, 1, "fps (vale al publicar)"], ["VIDEO_KBPS", 100, 2000, 50, "kbps video"], ["AUDIO_KBPS", 16, 256, 8, "kbps audio estéreo"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{L[k]} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={L[k]} onChange={ev => { L[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); const r = publicarLiveKit({ consentimiento: true, modo: modoActual(), sesionId: sesionIdNavegador() }); setRes(r.ok ? "publicando (prueba)" : `rechazada: ${r.motivo}`); toca(); }}>Publicar de prueba (SIMULA el consentimiento)</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); detenerLiveKit(); setRes("detenida"); toca(); }}>Detener</button>
+          </div>
+          {res && <div style={{ ...ROW, ...NOTE }}><span>{res}</span></div>}
     </>
   );
 }

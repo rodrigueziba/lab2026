@@ -1047,6 +1047,7 @@ export const DBG_RENDIMIENTO = {
     ritmos: true, videoDomo: true,   // Z80 caja de ritmos · Z83 video en el domo
     tiempoDetenido: true,            // Z86: historial, estela y efecto del tiempo detenido
     ondasTarima: true,               // Z87: dibujo del canvas de ondas de la tarima
+    transmisionTarima: true,         // Z92: subida a LiveKit (false = pauseUpstream: sin codificar ni enviar)
   } as Record<string, boolean>,
 };
 
@@ -1623,8 +1624,19 @@ export const DBG_CONSENT = {
   CIERRE_TEXTO_S:     3,      // el primer texto queda en la terminal esto después de terminar de escribirse — live
   CIERRE_MS:          600,    // tras elegir, la terminal se cierra — live
   RECORDAR_EN_SESION: true,   // la elección se recuerda solo en sessionStorage de la pestaña (al recargar no repregunta) — live
+  RECORDAR_TRANSMISION: false, // Z92: al recargar, una transmisión NO se reanuda sola (se vuelve a preguntar); true = Z91 — live
   DURACION_MAX_S:     300,    // límite de la transmisión (reloj real: no se detiene con la pausa central) — live
   AVISO_FIN_S:        30,     // aviso "La transmisión termina en N s" antes del límite — live
+};
+
+// ── Z92: video y audio de la tarima por LiveKit Cloud tras "Compartir mi sesión." (lib/vivo/publicarLiveKit.ts,
+// lib/vivo/liveKitCiclo.ts, app/api/livekit/token/route.ts). ACTIVO = false → como Z91 (solo presencia). ──
+export const DBG_LIVEKIT = {
+  ACTIVO:     true,                // — live (vale al elegir compartir)
+  SALA:       "alight-tarima-v1",  // SOLO informativo: la sala la fija el servidor (LIVEKIT_SALA o este valor)
+  VIDEO_FPS:  15,                  // captureStream del canvas de ondas / tope de la webcam (vale al publicar)
+  VIDEO_KBPS: 500,                 // bitrate máximo del video (vale al publicar)
+  AUDIO_KBPS: 64,                  // bitrate del audio estéreo (vale al publicar)
 };
 
 // ── Z87: fuente de video de la tarima y visualizador de ondas sin webcam (lib/ondasTarima.ts, lib/fuenteVideoTarima.ts) ──

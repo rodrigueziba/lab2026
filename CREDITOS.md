@@ -97,3 +97,9 @@ Z45: cálculo en una textura compartida por las 3 caras; port a TypeScript del r
 ## Tiempo detenido: retraso por filas (slit-scan) con estela de luces (Z86)
 - Archivos: `frontend/lib/tiempoHistorial.ts`, `frontend/lib/retro/historialTiempo.ts`, `frontend/lib/retro/tiempoDetenido.ts`.
 - Inspiración: Shadertoy de desplazamiento temporal (**autor pendiente**), que guarda un historial de cuadros en miniaturas y hace que cada fila de la imagen lea un cuadro distinto del pasado. No se reutilizó su código: la implementación es propia (historial nítido en una textura de capas de WebGL2, interpolación entre cuadros vecinos, estela por retroalimentación, desfase de color y banda de seguimiento).
+
+## Transmisión en vivo de la tarima por LiveKit (Z92)
+- Archivos: `frontend/lib/vivo/publicarLiveKit.ts`, `frontend/lib/vivo/liveKitCiclo.ts`, `frontend/lib/vivo/tokenLiveKit.ts`, `frontend/app/api/livekit/token/route.ts`.
+- **livekit-client** 2.24.1 (LiveKit, Inc., licencia Apache-2.0): SDK del navegador para conectar a la sala y publicar las pistas. Se carga con `import()` dinámico solo al publicar.
+- **livekit-server-sdk** 2.20.0 (LiveKit, Inc., licencia Apache-2.0): firma de los tokens de acceso en la ruta de Next (solo servidor).
+- Servicio: LiveKit Cloud (plan gratuito). El código de la integración es propio.
