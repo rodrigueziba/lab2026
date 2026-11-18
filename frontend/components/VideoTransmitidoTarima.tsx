@@ -51,10 +51,15 @@ export default function VideoTransmitidoTarima() {
     PASE_HOST.listo = FACE_DOME_VIS.value && !!base;
     const T = TX_PROC;
     if (!T.activa) { if (gpu.current) { soltar(gpu.current); gpu.current = null; } return; }   // cortar: nada queda
-    if (DBG_RENDIMIENTO.SIS.videoTransmitidoTarima === false) return;   // benchmark: queda el último cuadro
     const ahora = performance.now();
+    T.vigilarLectura(ahora, DBG_LIVEKIT.PROCESADO_LECTURA_MAX_MS);   // Z94c: una lectura que no termina no traba el pase
+    // Z94c: el pase NO depende de la cámara (ni del frustum: quad propio, render target propio). Solo se pausa por
+    // causas legítimas, que el vigía no cuenta como falla.
+    if (DBG_RENDIMIENTO.SIS.videoTransmitidoTarima === false) { T.marcarPase("pausado", "benchmark"); return; }   // queda el último cuadro
+    if (!PASE_HOST.listo || !base) { T.marcarPase("no disponible", "el domo de la tarima todavía no existe"); return; }
+    T.marcarPase("dibujando", "");
     if (!T.cadencia.toca(ahora, T.fps)) return;
-    if (!PASE_HOST.listo || !base) { T.marcarFallo("el domo de la tarima no está en pantalla"); return; }
+    T.turno();
     const l = T.lienzo;
     if (!l) return;
     let g = gpu.current;

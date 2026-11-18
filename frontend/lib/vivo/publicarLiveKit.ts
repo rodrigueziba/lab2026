@@ -14,7 +14,7 @@ import { DBG_LIVEKIT, DBG_RENDIMIENTO, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { obtenerSalidaTransmisible, liberarSalidaTransmisible } from "@/lib/audio/nucleo";
 import { LIVE_TEX_REF } from "@/lib/faceShared";
 import { FUENTE_TARIMA, texturaTarima } from "@/lib/fuenteVideoTarima";
-import { TransmisionProcesada, elegirFuenteVideo, type FabricaLienzo } from "./videoProcesado";   // Z94
+import { TransmisionProcesada, RespaldoVideo, elegirFuenteVideo, normalizarFuenteVideo, type FabricaLienzo } from "./videoProcesado";   // Z94 · Z94c
 import { PublicadorLiveKit, MOTIVO_TOKEN, motivoPorEstado, leerRespuestaToken, type DepsLK, type SalaLK, type PistaLK, type CfgLK, type ModoLK, type RespuestaToken, type ResultadoLK } from "./liveKitCiclo";
 
 // Z92b: el cliente NO lee ninguna variable: pide el token primero y conecta con la url que devuelve el servidor.
@@ -81,11 +81,13 @@ export const TX_PROC = new TransmisionProcesada(FABRICA_LIENZO, () => performanc
 /** Lo escribe el host del Canvas cada cuadro: el domo de la tarima y su material están listos para el pase. */
 export const PASE_HOST = { listo: false };
 /** Fuente de video efectiva de la transmisión actual (menú). */
-export const VIDEO_TX = { efectiva: "" as string, motivo: "", respaldoIntentado: false, cambiando: false };
+export const VIDEO_TX = { efectiva: "" as string, motivo: "", cambiando: false };
+/** Z94c: respaldo reversible (procesado ⇄ cruda) con reintentos en segundo plano. */
+export const RESPALDO = new RespaldoVideo(DBG_LIVEKIT);
+const pistaDeTxProc = (track: unknown): PistaLK => ({ track, liberar: () => TX_PROC.liberar() });
 function pistaProcesada(cfg: CfgLK): PistaLK | null {
-  VIDEO_TX.respaldoIntentado = false;
   const r = TX_PROC.iniciar(DBG_LIVEKIT.PROCESADO_ANCHO, DBG_LIVEKIT.PROCESADO_ALTO, cfg.VIDEO_FPS);
-  return r ? { track: r.track, liberar: () => TX_PROC.liberar() } : null;
+  return r ? pistaDeTxProc(r.track) : null;
 }
 function webcamViva(): boolean {
   const ms = (LIVE_TEX_REF.value as { image?: HTMLVideoElement } | null)?.image?.srcObject as MediaStream | null | undefined;
@@ -96,11 +98,14 @@ function pistaVideo(modo: ModoLK, cfg: CfgLK): PistaLK | null {
   _disp.procesado = PASE_HOST.listo; _disp.webcam = webcamViva();
   const el = elegirFuenteVideo(DBG_LIVEKIT.FUENTE_VIDEO, modo, _disp);
   VIDEO_TX.motivo = el.motivo;
+  RESPALDO.reiniciar(normalizarFuenteVideo(DBG_LIVEKIT.FUENTE_VIDEO) === "procesado" ? "procesado" : "inactivo");
   if (el.efectiva === "procesado") {
     const p = pistaProcesada(cfg);
-    if (p) { VIDEO_TX.efectiva = "procesado"; return p; }
+    if (p) { VIDEO_TX.efectiva = "procesado"; TX_PROC.publicando = true; return p; }
     VIDEO_TX.motivo = TX_PROC.fallo || "falló el pase procesado";   // respaldo: como Z92
   }
+  // Z94c: pedido "procesado" pero no disponible al iniciar (p. ej. el domo todavía no existe) → arranca en cruda y reintenta
+  if (RESPALDO.estado === "procesado") RESPALDO.fallo(performance.now(), VIDEO_TX.motivo || "pase procesado no disponible");
   if (el.efectiva === "ondas") { VIDEO_TX.efectiva = "ondas"; return pistaOndas(cfg); }
   return pistaCruda(modo, cfg);
 }
@@ -111,15 +116,39 @@ function pistaCruda(modo: ModoLK, cfg: CfgLK): PistaLK | null {
   VIDEO_TX.efectiva = "ondas";
   return pistaOndas(cfg);
 }
-/** Z94b: respaldo en caliente: reemplaza la pista procesada por la cruda en el mismo publicador (audio y sesión siguen). */
+/** Z94b/Z94c: respaldo en caliente: reemplaza la pista procesada por la cruda en el mismo publicador (audio y sesión
+ *  siguen) y agenda el reintento (RespaldoVideo). */
 async function pasarACruda(motivo: string): Promise<void> {
-  if (VIDEO_TX.cambiando || VIDEO_TX.respaldoIntentado) return;
-  VIDEO_TX.cambiando = true; VIDEO_TX.respaldoIntentado = true;
+  if (VIDEO_TX.cambiando || RESPALDO.estado !== "procesado") return;
+  VIDEO_TX.cambiando = true;
   const antes = VIDEO_TX.efectiva;
   const p = pistaCruda(PUB.modo ?? "privado", DBG_LIVEKIT);
   const ok = p ? await PUB.cambiarVideo(p) : false;
-  if (ok) VIDEO_TX.motivo = `procesado falló: ${motivo} → ${VIDEO_TX.efectiva}`;
+  if (ok) { RESPALDO.fallo(performance.now(), motivo); VIDEO_TX.motivo = `procesado falló: ${motivo} → ${VIDEO_TX.efectiva}`; }
   else { VIDEO_TX.efectiva = antes; VIDEO_TX.motivo = `procesado falló: ${motivo} (no se pudo reemplazar la pista)`; }
+  VIDEO_TX.cambiando = false;
+}
+/** Z94c: en cruda, prueba el procesado EN SEGUNDO PLANO (sin publicarlo) y, si da cuadros CONFIRMAR_S, lo vuelve a poner. */
+async function tickRespaldo(ahora: number): Promise<void> {
+  if (VIDEO_TX.cambiando || !PUB.pistas.video || (PUB.estado !== "publicando" && PUB.estado !== "reconectando")) return;
+  const pausa = DBG_RENDIMIENTO.SIS.videoTransmitidoTarima === false;
+  if (RESPALDO.debeProbar(ahora, PASE_HOST.listo && !pausa)) {
+    if (!TX_PROC.iniciar(DBG_LIVEKIT.PROCESADO_ANCHO, DBG_LIVEKIT.PROCESADO_ALTO, DBG_LIVEKIT.VIDEO_FPS)) RESPALDO.pruebaFallida(ahora, TX_PROC.fallo || "no se pudo crear el canvas");
+    return;
+  }
+  if (RESPALDO.estado !== "probando") return;
+  const r = RESPALDO.evaluar(ahora, TX_PROC.pintados, TX_PROC.fps, TX_PROC.vigilar(ahora, DBG_LIVEKIT.PROCESADO_TIMEOUT_S, pausa));
+  if (r === "seguir") return;
+  const pista = TX_PROC.lienzo?.pista;
+  if (r === "fallar" || !pista) {
+    const m = TX_PROC.fallo || (TX_PROC.pintados ? "cuadros insuficientes" : "sin cuadros en la prueba");
+    TX_PROC.liberar(); RESPALDO.pruebaFallida(ahora, m);
+    return;
+  }
+  VIDEO_TX.cambiando = true;
+  const ok = await PUB.cambiarVideo(pistaDeTxProc(pista));   // libera la cruda; sin reconectar ni tocar el audio
+  if (ok) { RESPALDO.confirmado(); VIDEO_TX.efectiva = "procesado"; VIDEO_TX.motivo = ""; TX_PROC.publicando = true; }
+  else { RESPALDO.pruebaFallida(performance.now(), "no se pudo reemplazar la pista"); }   // cambiarVideo ya liberó el lienzo
   VIDEO_TX.cambiando = false;
 }
 
@@ -195,10 +224,13 @@ function sondear(): void {
   const pausa = DBG_RENDIMIENTO.SIS.transmisionTarima === false;
   if (pausa !== _pausado) { _pausado = pausa; PUB.pausar(pausa); }
   // Z94b: vigía del video procesado → respaldo "cruda" en caliente
-  if (VIDEO_TX.efectiva === "procesado" && TX_PROC.activa && PUB.pistas.video) {
-    const m = TX_PROC.vigilar(performance.now(), DBG_LIVEKIT.PROCESADO_TIMEOUT_S, DBG_RENDIMIENTO.SIS.videoTransmitidoTarima === false);
+  const ahora = performance.now();
+  if (RESPALDO.estado === "procesado" && VIDEO_TX.efectiva === "procesado" && TX_PROC.activa && PUB.pistas.video) {
+    const m = TX_PROC.vigilar(ahora, DBG_LIVEKIT.PROCESADO_TIMEOUT_S, DBG_RENDIMIENTO.SIS.videoTransmitidoTarima === false);
     if (m) void pasarACruda(m);
-  }
+  } else if (RESPALDO.estado === "cruda" || RESPALDO.estado === "probando") void tickRespaldo(ahora);   // Z94c
+  // Z94c: la publicación se cayó sola (sin conexión): una prueba en segundo plano no queda viva
+  if (RESPALDO.estado === "probando" && !PUB.activo && !VIDEO_TX.cambiando) { TX_PROC.liberar(); RESPALDO.reiniciar("inactivo"); }
   actualizarPanelCuadro();
 }
 /** Corta ya: pistas, salida del núcleo y conexión. */
@@ -207,6 +239,9 @@ export function detenerLiveKit(): void {
   if (_sondeo) { clearInterval(_sondeo); _sondeo = null; }
   _pausado = false;
   PUB.detener();
+  TX_PROC.liberar();                 // Z94c: una prueba en segundo plano (no publicada) también se suelta
+  RESPALDO.reiniciar("inactivo");    // Z94c: sin reintentos pendientes
+  VIDEO_TX.cambiando = false;
   actualizarPanelCuadro();
 }
 
@@ -244,14 +279,27 @@ export function textoEstadoLiveKit(): string {
   return `Diagnóstico: ${p.diagnostico}\nLiveKit: ${p.estado}${p.modo ? ` · modo ${p.modo}` : ""} · pistas ${p.pistas.video ? "video" : "—"}/${p.pistas.audio ? "audio" : "—"}`
     + `${p.estado === "publicando" ? ` · ${p.kbps().toFixed(0)} kbps salientes` : ""} · reconexiones ${p.reconexiones} · errores ${p.errores}`
     + `${_pausado ? " · subida PAUSADA (benchmark)" : ""}`
-    + (p.pistas.video ? `\nVideo: ${VIDEO_TX.efectiva || "—"}${VIDEO_TX.efectiva === "procesado" ? ` · ${TX_PROC.cadencia.fpsReal.toFixed(1)} fps publicados · ${TX_PROC.ancho}×${TX_PROC.alto} · lectura ${textoLectura()}` : ""}`
-      + `${VIDEO_TX.motivo ? ` · ${VIDEO_TX.motivo.startsWith("procesado falló") ? "" : "respaldo: "}${VIDEO_TX.motivo}` : ""}` : "");
+    + (p.pistas.video ? `\nVideo: ${VIDEO_TX.efectiva || "—"}${TX_PROC.activa ? ` · pase ${textoPase()} · ${TX_PROC.cadencia.fpsReal.toFixed(1)} fps${TX_PROC.publicando ? " publicados" : " (prueba en segundo plano)"} · ${TX_PROC.ancho}×${TX_PROC.alto} · lectura ${textoLectura()}` : ""}`
+      + `${VIDEO_TX.motivo ? ` · ${VIDEO_TX.motivo.startsWith("procesado falló") ? "" : "respaldo: "}${VIDEO_TX.motivo}` : ""}`
+      + `\nProcesados publicados ${TX_PROC.publicadosTotal} · a cruda ${RESPALDO.aCruda} · de vuelta a procesado ${RESPALDO.aProcesado}${textoRespaldo()}` : "");
+}
+function textoPase(): string {
+  const T = TX_PROC;
+  return T.pase === "dibujando" ? "dibujando" : `${T.pase}${T.motivoPase ? ` (${T.motivoPase})` : ""}`;
+}
+function textoRespaldo(): string {
+  const R = RESPALDO, ahora = performance.now();
+  if (R.estado === "inactivo" || (R.estado === "procesado" && !R.aCruda)) return "";
+  const falta = R.faltaS(ahora);
+  return ` · respaldo ${R.estado === "cruda_final" ? "en cruda (sin más reintentos)" : R.estado === "probando" ? "probando el procesado" : R.estado}`
+    + ` · reintentos ${R.reintentos}/${Math.floor(DBG_LIVEKIT.PROCESADO_MAX_REINTENTOS)}${falta >= 0 ? ` · próximo en ${falta.toFixed(0)} s` : ""}`
+    + `${R.ultimoMotivo ? ` · último fallo: ${R.ultimoMotivo}` : ""}`;
 }
 function textoLectura(): string {
   const T = TX_PROC;
   if (T.estadoLectura === "falló") return `falló: ${T.motivoLectura}`;
   if (T.estadoLectura === "saltando") return `saltando cuadros (${T.saltados})`;
-  if (T.estadoLectura === "ok") return `ok (${T.lecturas})`;
+  if (T.estadoLectura === "ok") return `ok (${T.lecturas})${T.colgadas ? ` · colgadas ${T.colgadas}` : ""}`;
   return T.fallo ? `esperando · ${T.fallo}` : "esperando";
 }
 

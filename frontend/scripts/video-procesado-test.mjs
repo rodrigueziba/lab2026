@@ -3,7 +3,7 @@
 // allocations, e integración leyendo el código (mismo shader y uniforms del domo, sin readPixels, prototype.render).
 // Uso: node scripts/video-procesado-test.mjs
 import fs from 'node:fs';
-import { elegirFuenteVideo, normalizarFuenteVideo, Cadencia, TransmisionProcesada } from '../lib/vivo/videoProcesado.ts';
+import { elegirFuenteVideo, normalizarFuenteVideo, Cadencia, TransmisionProcesada, RespaldoVideo } from '../lib/vivo/videoProcesado.ts';
 import { PublicadorLiveKit } from '../lib/vivo/liveKitCiclo.ts';
 
 const leer = f => fs.readFileSync(new URL(f, import.meta.url), 'utf8');
@@ -14,7 +14,7 @@ let ok = 0, fallas = 0;
 const check = (c, m) => { if (c) { ok++; console.log('  ✓ ' + m); } else { fallas++; console.log('  ✗ ' + m); } };
 
 console.log('\nconfiguración');
-check(L.PROCESADO_TIMEOUT_S === 3 && L.FUENTE_VIDEO === 'procesado' && L.PROCESADO_ANCHO === 640 && L.PROCESADO_ALTO === 360 && L.VIDEO_FPS === 15 && L.VIDEO_KBPS === 500,
+check(L.PROCESADO_REINTENTO_S === 10 && L.PROCESADO_MAX_REINTENTOS === 5 && L.PROCESADO_CONFIRMAR_S === 2 && L.PROCESADO_TIMEOUT_S === 3 && L.FUENTE_VIDEO === 'procesado' && L.PROCESADO_ANCHO === 640 && L.PROCESADO_ALTO === 360 && L.VIDEO_FPS === 15 && L.VIDEO_KBPS === 500,
   'DBG_LIVEKIT: FUENTE_VIDEO procesado, 640×360, 15 fps, 500 kbps (bitrate de Z92 sin cambios)');
 check(/videoTransmitidoTarima: true/.test(src) && /id: "videoTransmitidoTarima"/.test(leer('../lib/rendimiento.ts')), 'fila del benchmark "videoTransmitidoTarima"');
 
@@ -105,18 +105,67 @@ console.log('\nZ94b: una sola lectura en vuelo, requestFrame por cuadro, sin all
 check(T_handlersEstables(), 'los handlers de la lectura se crean una vez (sin closures por cuadro)');
 function T_handlersEstables() { const T = new TransmisionProcesada(fabrica().fab, reloj); const a = T.alLeer, b = T.alFallar; T.iniciar(640, 360, 15); T.liberar(); return a === T.alLeer && b === T.alFallar; }
 
-console.log('\nZ94b: vigía (timeout) y respaldo con reloj simulado');
+console.log('\nZ94c: vigía por turnos (solo mientras el pase puede dibujar)');
+// host simulado: replica las condiciones de components/VideoTransmitidoTarima.tsx (sin cámara ni frustum)
+function hostCuadro(T, ahora, { domo = true, bench = false, leer = 'ok' } = {}) {
+  T.vigilarLectura(ahora, L.PROCESADO_LECTURA_MAX_MS);
+  if (bench) { T.marcarPase('pausado', 'benchmark'); return; }
+  if (!domo) { T.marcarPase('no disponible', 'el domo de la tarima todavía no existe'); return; }
+  T.marcarPase('dibujando', '');
+  if (!T.cadencia.toca(ahora, T.fps)) return;
+  T.turno();
+  if (!T.empezarLectura(ahora)) return;
+  if (leer === 'ok') T.alLeer(); else if (leer === 'falla') T.alFallar(new Error('GL_INVALID_OPERATION'));   // 'colgada': nunca vuelve
+}
 { const F = fabrica(), T = new TransmisionProcesada(F.fab, reloj);
-  RELOJ = 1000; T.iniciar(640, 360, 15);
-  check(T.vigilar(3900, 3, false) === '', 'antes de 3 s sin lecturas: nada');
-  check(T.vigilar(4000, 3, false).startsWith('ninguna lectura en 3 s'), 'a los 3 s sin ninguna lectura: motivo → respaldo');
-  T.marcarFallo('el domo de la tarima no está en pantalla');
-  check(T.vigilar(4000, 3, false) === 'ninguna lectura en 3 s (el domo de la tarima no está en pantalla)', 'el motivo incluye la causa real');
-  RELOJ = 1500; T.empezarLectura(RELOJ); T.alLeer();
-  check(T.vigilar(4400, 3, false) === '', 'con lecturas recientes: nada');
-  check(T.vigilar(4500, 3, false).startsWith('sin cuadros nuevos en 3 s'), '3 s seguidos sin cuadros nuevos: motivo → respaldo');
-  check(T.vigilar(9000, 3, true) === '' && T.vigilar(9100, 3, false) === '', 'benchmark (pausa intencional): no dispara el respaldo');
-  T.liberar(); check(T.vigilar(99999, 3, false) === '', 'sin transmisión: el vigía no hace nada'); }
+  RELOJ = 0; T.iniciar(640, 360, 15); T.publicando = true;
+  // 20 s mirando hacia abajo dentro del atril: para el pase no cambia nada (no depende de la cámara)
+  for (RELOJ = 0; RELOJ <= 20000; RELOJ += 1000 / 60) hostCuadro(T, RELOJ);
+  check(T.pase === 'dibujando' && T.lecturas >= 295 && T.vigilar(RELOJ, 3, false) === '', `domo fuera de cámara 20 s: el pase sigue dibujando (${T.lecturas} cuadros) y el vigía no dispara`);
+  check(T.publicadosTotal === T.lecturas, 'contador de cuadros procesados publicados');
+  // un cuadro de 4 s del hilo principal (p. ej. recompilar materiales): no es falla
+  const t0 = RELOJ; RELOJ += 4000;
+  check(T.vigilar(RELOJ, 3, false) === '', 'un cuadro largo (4 s sin turnos) no dispara el respaldo: no hubo turnos perdidos');
+  hostCuadro(T, RELOJ);
+  check(T.vigilar(RELOJ + 10, 3, false) === '' && RELOJ - t0 === 4000, '…y al seguir dibujando todo vuelve a la normalidad');
+  // pausa legítima: benchmark y domo todavía inexistente
+  for (let k = 0; k < 600; k++) { RELOJ += 1000 / 60; hostCuadro(T, RELOJ, { bench: true }); T.vigilar(RELOJ, 3, false); }
+  check(T.pase === 'pausado' && T.vigilar(RELOJ, 3, false) === '', 'benchmark en pausa 10 s: "pausado (benchmark)", el vigía no dispara');
+  for (let k = 0; k < 600; k++) { RELOJ += 1000 / 60; hostCuadro(T, RELOJ, { domo: false }); T.vigilar(RELOJ, 3, false); }
+  check(T.pase === 'no disponible' && T.vigilar(RELOJ, 3, false) === '', 'domo todavía inexistente 10 s: "no disponible", el vigía no dispara');
+  // falla real: lecturas colgadas → el guardián las libera; lecturas que fallan → el vigía dispara con el motivo
+  for (let k = 0; k < 240; k++) { RELOJ += 1000 / 60; hostCuadro(T, RELOJ, { leer: 'colgada' }); }
+  check(T.colgadas >= 2 && !(T.enVuelo && T.colgadas === 0), `lecturas colgadas liberadas por el guardián (${T.colgadas})`);
+  const m = T.vigilar(RELOJ, 3, false);
+  check(m.startsWith('sin cuadros nuevos en 3 s (') && /turnos/.test(m), `falla real: el vigía dispara con detalle → "${m}"`);
+  T.liberar(); }
+
+console.log('\nZ94c: respaldo reversible con reloj simulado');
+{ const R = new RespaldoVideo(L);
+  R.reiniciar('procesado');
+  R.fallo(1000, 'sin cuadros nuevos en 3 s');
+  check(R.estado === 'cruda' && R.aCruda === 1 && Math.round(R.faltaS(1000)) === L.PROCESADO_REINTENTO_S, `falla → cruda, próximo reintento en ${L.PROCESADO_REINTENTO_S} s`);
+  check(!R.debeProbar(1000 + L.PROCESADO_REINTENTO_S * 1000 - 1, true), 'antes del intervalo: no prueba');
+  check(!R.debeProbar(11000, false) && R.estado === 'cruda', 'sin condiciones del pase (domo no disponible, benchmark): no prueba');
+  check(R.debeProbar(11000, true) && R.estado === 'probando' && R.reintentos === 1, 'a los 10 s con condiciones: prueba en segundo plano (reintento 1)');
+  check(R.evaluar(12000, 15, 15, '') === 'seguir', 'menos de CONFIRMAR_S: sigue');
+  check(R.evaluar(13000, 30, 15, '') === 'confirmar', 'cuadros durante 2 s seguidos: confirmar');
+  R.confirmado();
+  check(R.estado === 'procesado' && R.aProcesado === 1, 'vuelve a "procesado"'); }
+{ const R = new RespaldoVideo(L); R.reiniciar('procesado'); R.fallo(0, 'x');
+  let t = 0, pruebas = 0;
+  for (let i = 0; i < 20; i++) {
+    t += L.PROCESADO_REINTENTO_S * 1000;
+    if (R.debeProbar(t, true)) { pruebas++; if (R.evaluar(t + 500, 0, 15, 'ninguna lectura en 3 s') !== 'fallar') fallas++; R.pruebaFallida(t + 500, 'ninguna lectura'); }
+  }
+  check(pruebas === L.PROCESADO_MAX_REINTENTOS && R.estado === 'cruda_final' && R.faltaS(t) === -1, `tope: ${L.PROCESADO_MAX_REINTENTOS} reintentos y queda en cruda (sin más pruebas)`);
+  check(R.evaluar(0, 0, 15, '') === 'seguir', 'cruda_final: no evalúa nada'); }
+{ const R = new RespaldoVideo(L); R.reiniciar('procesado'); R.fallo(0, 'x'); R.debeProbar(10000, true);
+  check(R.evaluar(10000 + (L.PROCESADO_CONFIRMAR_S + L.PROCESADO_TIMEOUT_S) * 1000, 3, 15, '') === 'fallar', 'prueba sin cuadros suficientes: falla tras CONFIRMAR_S + TIMEOUT_S');
+  R.pruebaFallida(15000, 'cuadros insuficientes');
+  check(R.estado === 'cruda' && R.ultimoMotivo === 'cuadros insuficientes' && R.proximoMs === 25000, 'vuelve a cruda y espera otro intervalo');
+  R.reiniciar('inactivo'); check(R.estado === 'inactivo' && R.reintentos === 0 && !R.debeProbar(1e9, true), 'al cortar: sin reintentos pendientes'); }
+
 { // respaldo en caliente: cambiarVideo del publicador (mismo publicador, sin reconectar, audio intacto)
   const sala = { conectada: false, desconectada: 0, video: null, audio: null, reemplazos: [],
     conectar: async () => { sala.conectada = true; }, publicarVideo: async p => { sala.video = p; }, publicarAudio: async p => { sala.audio = p; },
@@ -148,12 +197,21 @@ console.log('\nintegración (lectura del código)');
   check(/captureStream\(0\)/.test(P) && /pintar: \(\) => \{ ctx\.putImageData\(imagen, 0, 0\); pista\.requestFrame\(\); \}/.test(P) && /pista\.requestFrame\(\);   \/\/ primer cuadro/.test(P), 'captureStream(0) + putImageData + requestFrame por cuadro; primer cuadro antes de publicar');
   check(/new ImageData\(new Uint8ClampedArray\(buffer\.buffer\), ancho, alto\)/.test(P), 'ImageData único sobre la misma memoria que el buffer (sin copias)');
   check(/soltar\(gpu\.current\); gpu\.current = null; \} return; \}/.test(H) && /g\.rt\.dispose\(\)/.test(H), 'sin transmisión: libera render target, material y quad');
-  check(/SIS\.videoTransmitidoTarima === false\) return;/.test(H), 'benchmark: apagado no dibuja');
-  check(/await videoLocal\.replaceTrack\(p\.track as MediaStreamTrack, true\)/.test(P) && /TX_PROC\.vigilar\(performance\.now\(\), DBG_LIVEKIT\.PROCESADO_TIMEOUT_S/.test(P), 'vigía cada 0,5 s y respaldo con replaceTrack (sin reconectar)');
+  check(/SIS\.videoTransmitidoTarima === false\) \{ T\.marcarPase\("pausado", "benchmark"\); return; \}/.test(H), 'benchmark: apagado no dibuja (pase "pausado")');
+  check(/await videoLocal\.replaceTrack\(p\.track as MediaStreamTrack, true\)/.test(P) && /TX_PROC\.vigilar\(ahora, DBG_LIVEKIT\.PROCESADO_TIMEOUT_S/.test(P), 'vigía cada 0,5 s y respaldo con replaceTrack (sin reconectar)');
   check(/procesado falló: \$\{motivo\} → \$\{VIDEO_TX\.efectiva\}/.test(P) && !/console\.(error|warn)/.test(H + P), 'línea de estado "procesado falló: <motivo> → cruda", sin errores en consola');
   check(/data-debug-panel/.test(P) && /export function alternarPanelCuadro/.test(P), 'panel "Ver el cuadro procesado" (oculto por defecto)');
   check(/FACE_DOME_VIS\.value = showDome/.test(FD) && /PASE_HOST\.listo = FACE_DOME_VIS\.value && !!base/.test(H), 'disponible solo con el domo de la tarima en pantalla');
-  check(/path !== "sillas" && <VideoTransmitidoTarima \/>/.test(TS), 'montado en el camino de la tarima'); }
+  check(/path !== "sillas" && <VideoTransmitidoTarima \/>/.test(TS), 'montado en el camino de la tarima');
+  const HC = H.replace(/\/\/.*$/gm, '');
+  check(!/frustum\.|\.visible|camera\.|getWorldDirection|isMeshVisible/.test(HC.split('useFrame(')[1] ?? ''), 'Z94c: el pase no mira la cámara ni la visibilidad del domo');
+  const FU = FD.split('useFrame(')[1] ?? '';
+  check(/if \(showDome\) \{[\s\S]*?domeUniforms\.uBrightness\.value = STORE\.webcam\.brightness;[\s\S]*?domeUniforms\.uPsych\.value/.test(FU) && /domeUniforms\.uTime\.value = t;/.test(FU) && !/frustum|isVisible|\.visible/.test(FU.split('if (!active) return null;')[0]),
+    'Z94c: FaceDome actualiza uTime, uMap y los ajustes del atril en su useFrame aunque el domo esté fuera de cámara');
+  check(/mesh\.frustumCulled = false/.test(H), 'el quad del pase no se descarta por frustum');
+  check(/T\.marcarPase\("pausado", "benchmark"\)/.test(H) && /T\.marcarPase\("no disponible"/.test(H) && /T\.turno\(\);/.test(H), 'Z94c: el host informa dibujando / pausado / no disponible y cuenta turnos');
+  check(/TX_PROC\.liberar\(\);                 \/\/ Z94c/.test(P) && /RESPALDO\.reiniciar\("inactivo"\);    \/\/ Z94c/.test(P), 'Z94c: cortar libera la prueba en segundo plano y los reintentos pendientes');
+  check(/await PUB\.cambiarVideo\(pistaDeTxProc\(pista\)\)/.test(P), 'Z94c: volver a procesado con replaceTrack (cambiarVideo), sin reconectar'); }
 
 console.log(`\n${ok} OK · ${fallas} fallas`);
 process.exit(fallas ? 1 : 0);

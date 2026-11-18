@@ -1666,6 +1666,10 @@ export const DBG_LIVEKIT = {
   PROCESADO_ALTO:     360,
   PROCESADO_ESPEJO:   false,       // espeja en horizontal la copia plana (el domo se ve desde adentro) — live
   PROCESADO_TIMEOUT_S: 3,          // Z94b: sin lecturas en esto desde el inicio, o sin cuadros nuevos esto seguido → "cruda" en caliente — live
+  PROCESADO_REINTENTO_S: 10,       // Z94c: en "cruda", cada esto se prueba el procesado en segundo plano — live
+  PROCESADO_MAX_REINTENTOS: 5,     // Z94c: tope de pruebas por transmisión; después queda en "cruda" — live
+  PROCESADO_CONFIRMAR_S: 2,        // Z94c: la prueba debe dar cuadros esto seguido para volver a "procesado" — live
+  PROCESADO_LECTURA_MAX_MS: 1000,  // Z94c: una lectura asíncrona que tarda más se da por colgada (y se libera el turno) — live
   PROCESADO_SRGB:     true,        // codifica a sRGB (en pantalla lo hace el OutputPass; acá el pase va directo al canvas) — live
 };
 

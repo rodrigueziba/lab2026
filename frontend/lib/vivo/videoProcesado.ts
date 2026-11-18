@@ -72,6 +72,7 @@ export class Cadencia {
 export interface Lienzo { canvas: unknown; ctx: unknown; pista: unknown; buffer: Uint8Array; pintar(): void; detenerPista(): void; quitar(): void }
 export interface FabricaLienzo { crear(ancho: number, alto: number): Lienzo | null }
 export type EstadoLectura = "esperando" | "ok" | "saltando" | "falló";
+export type EstadoPase = "dibujando" | "pausado" | "no disponible";
 
 /** Motivo breve de una excepción (una línea, máx. 70 caracteres). */
 export function motivoBreveVP(e: unknown): string {
@@ -95,6 +96,14 @@ export class TransmisionProcesada {
   creados = 0; liberados = 0;    // diagnóstico de fugas
   enVuelo = false;
   lecturas = 0; saltados = 0; ignoradas = 0; pintados = 0;
+  // Z94c: estado del pase (lo escribe el host), turnos sin cuadro, lecturas colgadas y totales
+  pase: EstadoPase = "no disponible";
+  motivoPase = "";
+  turnosSinCuadro = 0;           // turnos en los que el pase PODÍA dibujar y no salió un cuadro nuevo
+  colgadas = 0;
+  publicando = false;            // la pista de este lienzo es la publicada (no una prueba en segundo plano)
+  publicadosTotal = 0;           // cuadros procesados publicados (acumulado de la página)
+  private inicioLectura = 0;
   estadoLectura: EstadoLectura = "esperando";
   motivoLectura = "";
   inicioMs = 0; ultimaMs = 0;
@@ -114,17 +123,27 @@ export class TransmisionProcesada {
     if (!l || !l.pista) { this.fallo = "no se pudo crear el canvas transmisible"; return null; }
     this.lienzo = l; this.fallo = ""; this.creados++;
     this.cadencia.reiniciar();
-    this.enVuelo = false; this.lecturas = 0; this.saltados = 0; this.pintados = 0;
+    this.enVuelo = false; this.lecturas = 0; this.saltados = 0; this.pintados = 0; this.turnosSinCuadro = 0; this.publicando = false;
     this.estadoLectura = "esperando"; this.motivoLectura = "";
     this.inicioMs = this.reloj(); this.ultimaMs = 0;
     return { track: l.pista };
   }
 
   /** El host va a leer: false si no hay lienzo o si ya hay una lectura en vuelo (se saltea el cuadro). */
+  /** Z94c: el host informa el estado del pase (strings constantes: sin allocations). */
+  marcarPase(estado: EstadoPase, motivo: string): void { this.pase = estado; this.motivoPase = motivo; }
+  /** Z94c: un turno en el que el pase puede dibujar (solo estos cuentan para el vigía). */
+  turno(): void { this.turnosSinCuadro++; }
+  /** Z94c: libera una lectura que no termina en maxMs (la respuesta tardía se ignora). */
+  vigilarLectura(ahoraMs: number, maxMs: number): void {
+    if (!this.enVuelo || ahoraMs - this.inicioLectura < Math.max(100, maxMs)) return;
+    this.enVuelo = false; this.genVuelo = -1; this.colgadas++;
+    this.estadoLectura = "falló"; this.motivoLectura = "lectura colgada";
+  }
   empezarLectura(ahoraMs: number): boolean {
     if (!this.lienzo) return false;
     if (this.enVuelo) { this.saltados++; if (this.estadoLectura !== "falló") this.estadoLectura = "saltando"; return false; }
-    this.enVuelo = true; this.genVuelo = this.gen;
+    this.enVuelo = true; this.genVuelo = this.gen; this.inicioLectura = ahoraMs;
     this.cadencia.marcar(ahoraMs);
     return true;
   }
@@ -135,7 +154,8 @@ export class TransmisionProcesada {
     try { this.lienzo.pintar(); } catch (e) { this.alFallar(e); return; }
     const t = this.reloj();
     this.cadencia.contar(t);
-    this.lecturas++; this.pintados++; this.ultimaMs = t;
+    this.lecturas++; this.pintados++; this.ultimaMs = t; this.turnosSinCuadro = 0;
+    if (this.publicando) this.publicadosTotal++;
     this.estadoLectura = "ok"; this.motivoLectura = ""; this.fallo = "";
   };
   /** Lectura (o pase) fallida (handler creado una vez: se pasa directo a .catch / .then). */
@@ -148,15 +168,21 @@ export class TransmisionProcesada {
   /** El host avisa que no puede dibujar (p. ej. el domo se fue): queda el último cuadro y el motivo. */
   marcarFallo(motivo: string): void { this.fallo = motivo; }
 
-  /** Vigía (cada ~0,5 s). "" = bien; si no, el motivo para cambiar a "cruda". pausado = benchmark (no cuenta). */
+  /**
+   * Vigía (cada ~0,5 s). "" = bien; si no, el motivo para cambiar a "cruda". pausado = benchmark (no cuenta).
+   * Z94c: cuenta TURNOS en los que el pase podía dibujar (TIMEOUT_S · fps) además del tiempo: un cuadro largo del hilo
+   * principal (recompilar materiales, entrar al atril) o el pase pausado/no disponible ya no lo disparan.
+   */
   vigilar(ahora: number, timeoutS: number, pausado: boolean): string {
     if (!this.lienzo) return "";
     const lim = Math.max(0.5, Number.isFinite(timeoutS) ? timeoutS : 3) * 1000;
-    if (pausado) { if (this.ultimaMs) this.ultimaMs = ahora; else this.inicioMs = ahora; return ""; }
-    if (!this.lecturas) {
-      return ahora - this.inicioMs >= lim ? `ninguna lectura en ${(lim / 1000).toFixed(0)} s${this.fallo ? ` (${this.fallo})` : ""}` : "";
-    }
-    return ahora - this.ultimaMs >= lim ? `sin cuadros nuevos en ${(lim / 1000).toFixed(0)} s${this.fallo ? ` (${this.fallo})` : ""}` : "";
+    if (pausado || this.pase !== "dibujando") { this.turnosSinCuadro = 0; if (this.ultimaMs) this.ultimaMs = ahora; else this.inicioMs = ahora; return ""; }
+    const turnos = Math.max(2, Math.ceil((lim / 1000) * this.fps));
+    if (this.turnosSinCuadro < turnos || ahora - (this.lecturas ? this.ultimaMs : this.inicioMs) < lim) return "";
+    const que = this.lecturas ? "sin cuadros nuevos" : "ninguna lectura";
+    const lect = this.estadoLectura === "saltando" ? `lectura en vuelo sin terminar, ${this.saltados} salteados`
+      : this.estadoLectura === "falló" ? `lectura falló: ${this.motivoLectura}` : `lectura ${this.estadoLectura}`;
+    return `${que} en ${(lim / 1000).toFixed(0)} s (${this.turnosSinCuadro} turnos; ${lect}${this.fallo && this.estadoLectura !== "falló" ? `; ${this.fallo}` : ""})`;
   }
 
   liberar(): void {
@@ -164,9 +190,66 @@ export class TransmisionProcesada {
     this.gen++;                                   // lecturas pendientes: se ignoran al llegar
     this.enVuelo = false;
     if (!l) return;
-    this.lienzo = null; this.liberados++;
+    this.lienzo = null; this.liberados++; this.publicando = false; this.turnosSinCuadro = 0;
     try { l.detenerPista(); } catch { /* ya detenida */ }
     try { l.quitar(); } catch { /* ok */ }
     this.cadencia.reiniciar();
   }
+}
+
+// ── Z94c: respaldo REVERSIBLE (procesado ⇄ cruda) ──
+export type EstadoRespaldo = "inactivo" | "procesado" | "cruda" | "probando" | "cruda_final";
+export interface CfgRespaldo { PROCESADO_REINTENTO_S: number; PROCESADO_MAX_REINTENTOS: number; PROCESADO_CONFIRMAR_S: number; PROCESADO_TIMEOUT_S: number }
+export type ResultadoPrueba = "seguir" | "confirmar" | "fallar";
+/**
+ * procesado --(vigía: falla)--> cruda --(cada REINTENTO_S, con condiciones)--> probando (el pase vuelve a dibujar EN
+ * SEGUNDO PLANO, sin publicarse; la cruda sigue al aire) --(cuadros durante CONFIRMAR_S)--> procesado (replaceTrack)
+ *                                                        \--(vigía o sin cuadros)--> cruda (otro intervalo)
+ * Tope: MAX_REINTENTOS por transmisión → cruda_final. Pura (reloj inyectado por parámetro).
+ */
+export class RespaldoVideo {
+  estado: EstadoRespaldo = "inactivo";
+  reintentos = 0; aCruda = 0; aProcesado = 0;
+  ultimoMotivo = "";
+  proximoMs = 0; inicioPruebaMs = 0;
+  private readonly cfg: CfgRespaldo;
+  constructor(cfg: CfgRespaldo) { this.cfg = cfg; }
+  private max(): number { return Math.max(0, Math.floor(this.cfg.PROCESADO_MAX_REINTENTOS)); }
+  private espera(): number { return Math.max(1, this.cfg.PROCESADO_REINTENTO_S) * 1000; }
+
+  /** Nueva transmisión: "procesado" si arrancó procesado; "inactivo" si la fuente pedida no es procesado. */
+  reiniciar(estado: "inactivo" | "procesado"): void {
+    this.estado = estado; this.reintentos = 0; this.ultimoMotivo = ""; this.proximoMs = 0; this.inicioPruebaMs = 0;
+  }
+  /** El procesado falló (vigía, o no estaba disponible al iniciar): pasa a cruda y agenda el reintento. */
+  fallo(ahora: number, motivo: string): void {
+    this.ultimoMotivo = motivo; this.aCruda++;
+    this.estado = this.reintentos >= this.max() ? "cruda_final" : "cruda";
+    this.proximoMs = ahora + this.espera();
+  }
+  /** ¿Toca probar el procesado ahora? (en cruda, con condiciones del pase, tras el intervalo y bajo el tope) */
+  debeProbar(ahora: number, condiciones: boolean): boolean {
+    if (this.estado !== "cruda" || !condiciones || ahora < this.proximoMs) return false;
+    if (this.reintentos >= this.max()) { this.estado = "cruda_final"; return false; }
+    this.reintentos++; this.estado = "probando"; this.inicioPruebaMs = ahora;
+    return true;
+  }
+  /** Evalúa la prueba: cuadros pintados desde que empezó y el motivo del vigía ("" = bien). */
+  evaluar(ahora: number, cuadros: number, fps: number, motivoVigia: string): ResultadoPrueba {
+    if (this.estado !== "probando") return "seguir";
+    if (motivoVigia) return "fallar";
+    const conf = Math.max(0.5, this.cfg.PROCESADO_CONFIRMAR_S) * 1000;
+    const t = ahora - this.inicioPruebaMs;
+    if (t >= conf && cuadros >= Math.max(1, Math.floor((conf / 1000) * fps * 0.5))) return "confirmar";
+    if (t >= conf + Math.max(0.5, this.cfg.PROCESADO_TIMEOUT_S) * 1000) return "fallar";
+    return "seguir";
+  }
+  confirmado(): void { this.estado = "procesado"; this.aProcesado++; this.proximoMs = 0; }
+  pruebaFallida(ahora: number, motivo: string): void {
+    this.ultimoMotivo = motivo;
+    this.estado = this.reintentos >= this.max() ? "cruda_final" : "cruda";
+    this.proximoMs = ahora + this.espera();
+  }
+  /** Segundos hasta el próximo reintento (−1 = no hay). */
+  faltaS(ahora: number): number { return this.estado === "cruda" ? Math.max(0, (this.proximoMs - ahora) / 1000) : -1; }
 }

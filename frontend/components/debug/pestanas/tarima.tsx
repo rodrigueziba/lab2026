@@ -558,6 +558,13 @@ export function SecLiveKitZ92() {
             <span>PROCESADO_TIMEOUT_S <span style={NOTE}>{L.PROCESADO_TIMEOUT_S.toFixed(1)} s Z94b: sin cuadros procesados → video crudo en caliente</span></span>
             <input type="range" min={1} max={15} step={0.5} style={{ flex: 1 }} value={L.PROCESADO_TIMEOUT_S} onChange={ev => { L.PROCESADO_TIMEOUT_S = parseFloat(ev.target.value); toca(); }} />
           </div>
+          {([["PROCESADO_REINTENTO_S", 2, 60, 1, "s Z94c: en cruda, cada esto prueba volver a procesado"], ["PROCESADO_MAX_REINTENTOS", 0, 20, 1, "Z94c: pruebas por transmisión"],
+            ["PROCESADO_CONFIRMAR_S", 0.5, 10, 0.5, "s Z94c: cuadros seguidos para volver a procesado"], ["PROCESADO_LECTURA_MAX_MS", 200, 5000, 100, "ms Z94c: lectura colgada"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{L[k].toFixed(st < 1 ? 1 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={L[k]} onChange={ev => { L[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
           <div style={ROW}>
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); alternarPanelCuadro(); toca(); }}>{panelCuadroVisible() ? "Ocultar el cuadro procesado" : "Ver el cuadro procesado"}</button>
             <span style={NOTE}>Z94b: el canvas 640×360 que se transmite (panel abajo a la derecha)</span>
