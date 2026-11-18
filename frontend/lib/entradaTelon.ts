@@ -75,6 +75,14 @@ export interface CfgPoseEntrada {
   POS_X: number; POS_Z: number; YAW_DEG: number; PITCH_DEG: number; DESPLAZ_IZQ_M?: number; MIRAR_TARIMA?: boolean;
   // Z75: modo de la pose ("linea_sillas" | "desplazamiento" | "manual"; sin MODO = "desplazamiento", como Z65)
   MODO?: string; MARGEN_LINEA_SILLAS_M?: number; DIST_MIN_OBJETOS_M?: number;
+  YAW_EXTRA_DEG?: number;   // Z88: giro final hacia la derecha del usuario (no afecta la posición ni el modo "manual")
+}
+/** Z88: yaw en (−180, 180]. */
+export function normYawDeg(y: number): number {
+  if (y > -180 && y <= 180) return y;   // ya en rango: tal cual (sin error de redondeo)
+  let r = ((y + 180) % 360 + 360) % 360 - 180;
+  if (r === -180) r = 180;
+  return r;
 }
 /** Rectángulo en XZ (x0 < x1, z0 < z1). */
 export interface RectXZ { x0: number; z0: number; x1: number; z1: number }
@@ -118,6 +126,9 @@ export function poseEntrada(c: CfgPoseEntrada, salaMedia: number, obstaculos: re
     const dx = tarima.x - x, dz = tarima.z - z;
     if (dx * dx + dz * dz > 1e-6) yawDeg = (Math.atan2(-dx, -dz) * 180) / Math.PI;   // mirada (−sin, −cos) = dirección a la tarima
   }
+  // Z88: giro extra SOLO de la orientación final (la posición ya se calculó con el yaw base). Positivo = hacia la derecha
+  // del usuario (horario visto desde arriba) = yaw de three decreciente. No se aplica en "manual".
+  if (modo !== "manual") yawDeg = normYawDeg(yawDeg - fin(c.YAW_EXTRA_DEG ?? 0, 0));
   out.x = x; out.z = z; out.yawDeg = yawDeg; out.pitchDeg = fin(c.PITCH_DEG, 0); out.ajustada = ajustada;
   out.modo = modo; out.desplazM = d; out.lateralBordeM = borde;
   return out;

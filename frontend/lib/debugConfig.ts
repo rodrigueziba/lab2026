@@ -1089,6 +1089,7 @@ export const DBG_ENTRADA = {
   MODO:                   "linea_sillas" as string,
   MARGEN_LINEA_SILLAS_M:  1.0,    // Z75: metros más allá del borde exterior de la fila (hacia la izquierda de la mirada) — live
   DIST_MIN_OBJETOS_M:     0.6,    // Z75: distancia mínima a la tarima, a las sillas y a las zonas SILLAS/TARIMA (si no, se ajusta lo mínimo) — live
+  YAW_EXTRA_DEG:          30,     // Z88: giro final hacia la DERECHA del usuario (+ = horario visto desde arriba); la posición se calcula con YAW_DEG; no aplica en "manual" — live
 };
 
 export const DBG_LAYOUT = {
@@ -1469,7 +1470,9 @@ export const DBG_PLAY = {
   BOTON_V:             0.0,     // 0 = franja libre entre las dos bandas de controles — live
   BOTON_ELEV:          0.012,   // alto de la base sobre el panel (m) — live
   MOSTRAR_SLOTS:       false,   // marcadores de debug de los slots de los atriles de instrumentos — live
-  APARECER_TRAS_PLAY:  true,    // los atriles de instrumentos saldrán del piso al apretar play (todavía sin implementar)
+  APARECER_TRAS_PLAY:  false,   // Z88 (antes true): false = la caja de ritmos (y los futuros instrumentos) salen con los atriles; true = al apretar play (Z80) — live
+  // Z88: con DBG_RITMOS.UBICACION "detras_tarima" los slots van en línea detrás de la tarima (eje sillas → tarima), el
+  // de la caja en el centro; SLOTS_DIST_M y SLOTS_ARCO_GRADOS solo valen con "slot_atril"
   SLOTS_N:             4,       // cantidad de slots — live
   SLOTS_DIST_M:        2.0,     // distancia detrás del atril de sonido (m) — live (Z80: 1,4 → 2,0: con 1,4 quedaba un pasillo de 0,5 m entre atriles)
   SLOTS_SEP_M:         1.7,     // separación entre slots (m) — live
@@ -1485,7 +1488,9 @@ export const DBG_PLAY = {
 export const DBG_RITMOS = {
   ACTIVO:            true,     // false = no se monta ni suena — live
   MOSTRAR:           "tras_play" as string,   // "tras_play" (con DBG_PLAY.APARECER_TRAS_PLAY) | "siempre" — live
-  SLOT:              1,        // slot de Z79 (0…SLOTS_N − 1) — live
+  SLOT:              1,        // slot de Z79 (0…SLOTS_N − 1); Z88: en "detras_tarima" este slot va al centro, sobre el eje — live
+  UBICACION:         "detras_tarima" as string,   // Z88: "detras_tarima" (eje sillas → tarima, del lado opuesto) | "slot_atril" (Z80: detrás del atril de sonido) — live
+  DIST_DETRAS_M:     2.0,      // Z88: metros desde el borde de la tarima opuesto a las sillas (detras_tarima) — live
   PASOS:             16,       // 8 | 12 | 16 | 32 por vuelta (= un compás) — live (reinicia el reloj)
   PISTAS:            ["kick", "clap", "hatC", "hatA", "shaker", "perc"] as string[],   // anillos de adentro hacia afuera
   BPM:               120,      // 60…180 (parámetro ritmos.bpm de Z78) — live

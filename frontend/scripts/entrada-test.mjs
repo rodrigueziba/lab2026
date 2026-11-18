@@ -1,7 +1,7 @@
 // Z59: prueba de la línea de tiempo de la entrada tras el telón (lib/entradaTelon.ts) contra la máquina del destello
 // (fases de lib/curtainFlash.ts con los tiempos de DBG_FLASH). Uso: node scripts/entrada-test.mjs
 import fs from 'node:fs';
-import { BLOQUEO_MOV, iniciarEntrada, tickEntrada, cancelarEntrada, movimientoBloqueado, bloquearMovimiento, liberarMovimiento, crearEstadoEntrada, poseEntrada, crearPoseEntrada, lateralDe, bordeLateralSillas, distARect } from '../lib/entradaTelon.ts';
+import { BLOQUEO_MOV, iniciarEntrada, tickEntrada, cancelarEntrada, movimientoBloqueado, bloquearMovimiento, liberarMovimiento, crearEstadoEntrada, poseEntrada, crearPoseEntrada, lateralDe, bordeLateralSillas, distARect, normYawDeg } from '../lib/entradaTelon.ts';
 import { sillaEn, N_SILLAS, ASIENTO_MEDIO, zonaSillasEn, ZONA_SILLAS_BASE, ZONA_TARIMA, SILLAS_BASE } from '../lib/layoutSala.ts';
 
 const src = fs.readFileSync(new URL('../lib/debugConfig.ts', import.meta.url), 'utf8');
@@ -70,7 +70,7 @@ check(d.teleportT.length === 0 && d.estado.fase === 'inactiva' && d.razonesFinal
 
 // ── Z65: pose final = pose de Z59 + DESPLAZ_IZQ_M a la izquierda de la mirada (perpendicular al yaw, en el suelo) ──
 console.log('\nZ65: desplazamiento a la izquierda');
-{ const C = { ...obj('DBG_ENTRADA'), MODO: 'desplazamiento' };   // Z75: el default es linea_sillas; acá, el modo de Z65
+{ const C = { ...obj('DBG_ENTRADA'), MODO: 'desplazamiento', YAW_EXTRA_DEG: 0 };   // Z75: el default es linea_sillas; acá, el modo de Z65 · Z88: sin giro extra (orientación de Z65)
   const OBST = [{ x0: -1.596 - 0.6, z0: -1.596 - 0.6, x1: 1.596 + 0.6, z1: 1.596 + 0.6 }, { x0: -3.3, z0: -7.9, x1: 3.3, z1: -6.1 }];   // = calcularPoseEntrada
   const P = poseEntrada(C, 39.5, OBST, { x: 0, z: 0 }, crearPoseEntrada());
   const yaw = C.YAW_DEG * Math.PI / 180, fwd = [-Math.sin(yaw), -Math.cos(yaw)], izq = [-Math.cos(yaw), Math.sin(yaw)];
@@ -104,7 +104,8 @@ const armar = (lay = LAY, m = C.DIST_MIN_OBJETOS_M) => {   // réplica de calcul
   return { sillas, obst: [{ x0: -TW / 2 - m, x1: TW / 2 + m, z0: -TW / 2 - m, z1: TW / 2 + m }, fila],
     zonas: [{ x: s.x, z: s.z, radio: ZONA_SILLAS_BASE.radio + m }, { x: ZONA_TARIMA.x, z: ZONA_TARIMA.z, radio: ZONA_TARIMA.radio + m }] };
 };
-const pose = (cfg, g = armar()) => poseEntrada(cfg, 39.5, g.obst, { x: 0, z: 0 }, crearPoseEntrada(), g.sillas, g.zonas);
+const poseZ88 = (cfg, g = armar()) => poseEntrada(cfg, 39.5, g.obst, { x: 0, z: 0 }, crearPoseEntrada(), g.sillas, g.zonas);
+const pose = (cfg, g = armar()) => poseZ88({ ...cfg, YAW_EXTRA_DEG: 0 }, g);   // Z88: este bloque verifica la orientación anterior (sin giro extra)
 { const g = armar(), s0 = g.sillas[0], sN = g.sillas[N_SILLAS - 1];
   console.log(`    sillas: ${N_SILLAS} en z = ${f(s0.z0 + ASIENTO_MEDIO.z, 2)}, x ${f(s0.x0 + ASIENTO_MEDIO.x, 2)}…${f(sN.x0 + ASIENTO_MEDIO.x, 2)} cada 1 m · huella ${f(ASIENTO_MEDIO.x * 2, 2)} × ${f(ASIENTO_MEDIO.z * 2, 2)} m · fila x ${f(s0.x0, 2)}…${f(sN.x1, 2)}, z ${f(s0.z0, 2)}…${f(s0.z1, 2)} (largo ${f(sN.x1 - s0.x0, 2)} m)`);
   const yaw = C.YAW_DEG, izq = [-Math.cos(yaw * Math.PI / 180), Math.sin(yaw * Math.PI / 180)], borde = bordeLateralSillas(g.sillas, yaw);
@@ -144,6 +145,32 @@ const pose = (cfg, g = armar()) => poseEntrada(cfg, 39.5, g.obst, { x: 0, z: 0 }
   // el telón ya no está (se oculta en el destello y se desmonta con curtain-done); informativo
   const L = Math.hypot(10, 7), ej = [10 / L, 7 / L], tc = [-10 + ej[0] * 3, -7 + ej[1] * 3];
   console.log(`    telón (ya desmontado al llegar): la nueva queda a ${f(Math.hypot(P.x - tc[0], P.z - tc[1]), 2)} m de su centro, ${f((P.x - tc[0]) * ej[0] + (P.z - tc[1]) * ej[1], 2)} m de su plano (negativo = lado del spawn; el cruce se detecta una sola vez)`);
+}
+
+// ── Z88: giro extra SOLO de la orientación final (posición idéntica); + = derecha del usuario; no en "manual" ──
+console.log('\nZ88: yaw extra de la entrada');
+{ const g = armar(), E = C.YAW_EXTRA_DEG, rad = d => d * Math.PI / 180;
+  const fwd = y => [-Math.sin(rad(y)), -Math.cos(rad(y))], der = y => [Math.cos(rad(y)), -Math.sin(rad(y))];
+  check(E === 30, `DBG_ENTRADA.YAW_EXTRA_DEG por defecto = 30 (hoy ${E})`);
+  for (const [modo, mt] of [['linea_sillas', false], ['desplazamiento', false], ['linea_sillas', true], ['desplazamiento', true]]) {
+    const cfg = { ...C, MODO: modo, MIRAR_TARIMA: mt };
+    const A = poseZ88({ ...cfg, YAW_EXTRA_DEG: 0 }, g), B = poseZ88(cfg, g);
+    const esperado = normYawDeg(A.yawDeg - E);
+    console.log(`    ${modo}${mt ? ' + MIRAR_TARIMA' : ''}: posición (${f(B.x, 2)}, ${f(B.z, 2)}) · yaw base ${f(A.yawDeg, 1)}° → final ${f(B.yawDeg, 1)}°`);
+    check(A.x === B.x && A.z === B.z && A.pitchDeg === B.pitchDeg, `${modo}${mt ? ' + MIRAR_TARIMA' : ''}: posición y pitch idénticos con y sin yaw extra`);
+    check(Math.abs(B.yawDeg - esperado) < 1e-9, `${modo}${mt ? ' + MIRAR_TARIMA' : ''}: yaw final = base − ${E}° = ${f(esperado, 1)}°`);
+    // sentido: la nueva mirada tiene componente positiva sobre la DERECHA de la mirada base (girar a la derecha)
+    const fb = fwd(A.yawDeg), db = der(A.yawDeg), fn = fwd(B.yawDeg);
+    check(fn[0] * db[0] + fn[1] * db[1] > 0 && Math.abs(Math.acos(Math.max(-1, Math.min(1, fn[0] * fb[0] + fn[1] * fb[1]))) - rad(Math.abs(E))) < 1e-9,
+      `${modo}${mt ? ' + MIRAR_TARIMA' : ''}: la mirada giró ${E}° hacia la derecha del usuario (horario visto desde arriba)`);
+  }
+  const M0 = poseZ88({ ...C, MODO: 'manual' }, g);
+  check(M0.yawDeg === C.YAW_DEG && M0.x === C.POS_X && M0.z === C.POS_Z, `manual: pose guardada tal cual (yaw ${C.YAW_DEG}°, sin giro extra)`);
+  const D = poseZ88(C, g);   // default real: linea_sillas, MIRAR_TARIMA false
+  const fD = fwd(D.yawDeg);
+  console.log(`    default (${D.modo}, MIRAR_TARIMA ${C.MIRAR_TARIMA}): yaw final ${f(D.yawDeg, 1)}° · mirada (${f(fD[0], 3)}, ${f(fD[1], 3)}) — base mira a +X (la tarima), la derecha es +Z (lejos de la fila de sillas)`);
+  check(Math.abs(D.yawDeg - normYawDeg(C.YAW_DEG - E)) < 1e-9, `default: yaw final ${f(D.yawDeg, 1)}° (= ${C.YAW_DEG} − ${E})`);
+  check(normYawDeg(190) === -170 && normYawDeg(-180) === 180 && normYawDeg(-200) === 160, 'normYawDeg en (−180, 180]');
 }
 
 console.log(`\n${ok} OK · ${fallas} fallas`);

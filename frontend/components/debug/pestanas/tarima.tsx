@@ -11,6 +11,8 @@ import { useDbg } from "../contexto";
 import { RITMOS, playRitmos, pausaRitmos, borrarRitmos, cargarEjemploHouse, setBpmRitmos, setSwingRitmos, setPasosRitmos, probarVoz, guardarRitmos } from "@/lib/ritmosMotor"; // Z80
 import { pistasValidas, NOMBRE_VOZ, PASOS_VALIDOS, VOCES_IDS, type VozId } from "@/lib/ritmos";   // Z80
 import { PLAY_TARIMA } from "@/lib/playTarima";                                             // Z79
+import { EJE_TARIMA, UBIC_SLOTS } from "@/components/PlayTarima";                             // Z88
+import { ATRIL_RITMOS } from "@/lib/ritmos";                                                 // Z88
 import { playTarima, pausaTarima, estadoContextoTarima } from "@/lib/playTarimaAcciones";      // Z79
 import { aplicarConfigNucleo, iniciarReloj, detenerReloj, setMetronomo, setRuidoPrueba, setOverlayNivel, actualizarEstadoNucleo } from "@/lib/audio/nucleo"; // Z78
 
@@ -320,7 +322,7 @@ export function SecPlayTarimaZ79() {
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); playTarima(); toca(); }}>Play</button>
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); pausaTarima(); toca(); }}>Pausa</button>
           </div>
-          {([["AUTOPLAY", "arranque automático anterior · vale al aparecer los atriles"], ["MOSTRAR_SLOTS", "marcadores de los slots"], ["APARECER_TRAS_PLAY", "los atriles de instrumentos salen al apretar play"],
+          {([["AUTOPLAY", "arranque automático anterior · vale al aparecer los atriles"], ["MOSTRAR_SLOTS", "marcadores de los slots"], ["APARECER_TRAS_PLAY", "Z88: off = la caja sale con los atriles · ON = al apretar play (Z80)"],
             ["CLICK_UNICO", "Z81: botones una vez por pulsación (off = doble disparo anterior)"], ["SLOTS_PEDESTAL", "Z81: base bajo los atriles de instrumentos"]] as const).map(([k, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{nota}</span></span>
@@ -381,6 +383,20 @@ export function SecCajaRitmosZ80() {
             {(["tras_play", "siempre"] as const).map(m => (
               <button key={m} style={{ ...INPUT, opacity: R.MOSTRAR === m ? 1 : 0.5 }} onClick={() => { R.MOSTRAR = m; toca(); }}>{m}</button>
             ))}
+          </div>
+          {/* Z88: ubicación de la caja y de los slots */}
+          <div style={ROW}>
+            <span>UBICACION <span style={NOTE}>Z88</span></span>
+            {(["detras_tarima", "slot_atril"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, opacity: R.UBICACION === m ? 1 : 0.5 }} onClick={() => { R.UBICACION = m; toca(); }}>{m}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <span>DIST_DETRAS_M <span style={NOTE}>{R.DIST_DETRAS_M.toFixed(2)} m del borde de la tarima (detras_tarima)</span></span>
+            <input type="range" min={0} max={8} step={0.05} style={{ flex: 1 }} value={R.DIST_DETRAS_M} onChange={ev => { R.DIST_DETRAS_M = parseFloat(ev.target.value); toca(); }} />
+          </div>
+          <div style={{ ...ROW, ...NOTE }}>
+            <span>caja: {ATRIL_RITMOS.visible ? `(${ATRIL_RITMOS.x.toFixed(2)}, ${ATRIL_RITMOS.z.toFixed(2)}) · a ${Math.hypot(ATRIL_RITMOS.x - UBIC_SLOTS.atrilX, ATRIL_RITMOS.z).toFixed(2)} m del atril de sonido` : "todavía no salió"} · eje (${EJE_TARIMA.ux.toFixed(2)}, ${EJE_TARIMA.uz.toFixed(2)})</span>
           </div>
           <div style={ROW}>
             <span>PASOS</span>

@@ -286,7 +286,7 @@ export function SecEntradaTrasElTelonZ59() {
               <button key={m} style={{ ...INPUT, opacity: DBG_ENTRADA.MODO === m ? 1 : 0.5 }} onClick={() => { DBG_ENTRADA.MODO = m; tocarDia(); }}>{m}</button>
             ))}
           </div>
-          {([["MARGEN_LINEA_SILLAS_M", -1, 5, 0.05, "m más allá de la fila (linea_sillas)"], ["DIST_MIN_OBJETOS_M", 0, 2, 0.05, "m a tarima, sillas y zonas"]] as const).map(([k, mn, mx, st, nota]) => (
+          {([["MARGEN_LINEA_SILLAS_M", -1, 5, 0.05, "m más allá de la fila (linea_sillas)"], ["DIST_MIN_OBJETOS_M", 0, 2, 0.05, "m a tarima, sillas y zonas"], ["YAW_EXTRA_DEG", -180, 180, 1, "° Z88 giro final a la derecha (no en manual; no mueve la posición)"]] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{DBG_ENTRADA[k].toFixed(2)} {nota}</span></span>
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={DBG_ENTRADA[k]}

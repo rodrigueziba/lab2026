@@ -2,6 +2,9 @@
 // Z80: caja de ritmos circular sobre un atril propio, en el slot DBG_RITMOS.SLOT de Z79 (detrás del atril de sonido).
 // Sale del piso como los atriles (−1,6 m → 0 en 2 s, ease-out cúbica) cuando el usuario aprieta play en el atril de sonido
 // (DBG_PLAY.APARECER_TRAS_PLAY) o siempre (DBG_RITMOS.MOSTRAR = "siempre").
+// Z88: por defecto sale CON los atriles (APARECER_TRAS_PLAY = false; la animación arranca en el mismo instante que la de
+// ellos, prop inicioRef) y va detrás de la tarima, sobre el eje sillas → tarima (DBG_RITMOS.UBICACION "detras_tarima",
+// DIST_DETRAS_M del borde); "slot_atril" = ubicación de Z80.
 // Interacción: el mismo mecanismo de los atriles (LecternSystem): tecla E cerca → modo "ritmos" (cámara fija sobre el
 // disco, puntero suelto), clic por raycast contra window.__lecternMeshes. El disco es UNA malla de tipo "superficie":
 // el punto de impacto se pasa al plano del disco y se convierte a anillo y paso en polares (lib/ritmos.ts), sin mallas
@@ -15,7 +18,8 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_RITMOS, DBG_PLAY, DEBUG_ENABLED, DBG_RENDIMIENTO } from "@/lib/debugConfig";
 import { INTERACT_STATE } from "@/lib/alightStore";
-import { PLAY_TARIMA, slotsInstrumentos, alturaPedestal, type Slot } from "@/lib/playTarima";
+import { PLAY_TARIMA, alturaPedestal, cajaSaleConAtriles, type Slot } from "@/lib/playTarima";
+import { slotsActuales } from "./PlayTarima";                                                  // Z88
 import {
   ATRIL_RITMOS, puntoACelda, centroCelda, pistasValidas, posicionActual, textoPosicion, pasosDesde, escalaSalto,
   NOMBRE_VOZ, type Celda, type GeoDisco, type Posicion, type VozId,
@@ -100,7 +104,10 @@ function dibujarBarra(c: CanvasRenderingContext2D, w: number, h: number, sonando
   c.fillText(`SW ${swing}%`, 800, 66);
 }
 
-export default function CajaRitmos({ atrilX, tarimaMedia, tarimaH }: { atrilX: number; tarimaMedia: number; tarimaH: number }) {
+export default function CajaRitmos({ atrilX, tarimaMedia, tarimaH, inicioRef }: {
+  atrilX: number; tarimaMedia: number; tarimaH: number;
+  inicioRef?: { readonly current: number };   // Z88: Date.now() de la aparición de los atriles (LecternSystem.appearStart)
+}) {
   const raizRef = useRef<THREE.Group>(null);
   const discoRef = useRef<THREE.Group>(null);
   const discoHitRef = useRef<THREE.Mesh>(null);
@@ -200,10 +207,17 @@ export default function CajaRitmos({ atrilX, tarimaMedia, tarimaH }: { atrilX: n
     if (!raiz) return;
     // ── aparición ──
     const quiere = DBG_RITMOS.ACTIVO && (DBG_RITMOS.MOSTRAR === "siempre" || !DBG_PLAY.APARECER_TRAS_PLAY || PLAY_TARIMA.sonando);
-    if (quiere && !CR.aparecio) { CR.aparecio = true; CR.t0 = Date.now(); if (PLAY_TARIMA.sonando && DBG_RITMOS.SEGUIR_PLAY_ATRIL && !RITMOS.sonando) playRitmos(); }
+    if (quiere && !CR.aparecio) {
+      CR.aparecio = true;
+      // Z88: si sale con los atriles, su animación arranca con la de ellos (no con el primer frame de este componente)
+      // (si la de ellos ya terminó, p. ej. ACTIVO reactivado desde el menú, la caja hace su propia animación completa)
+      const ahora = Date.now(), ini = inicioRef ? inicioRef.current : 0;
+      const conAtriles = cajaSaleConAtriles(DBG_PLAY.APARECER_TRAS_PLAY, DBG_RITMOS.MOSTRAR) && ini > 0 && ahora - ini < APARICION_MS;
+      CR.t0 = conAtriles ? Math.min(ahora, ini) : ahora;
+      if (PLAY_TARIMA.sonando && DBG_RITMOS.SEGUIR_PLAY_ATRIL && !RITMOS.sonando) playRitmos(); }
     if (!DBG_RITMOS.ACTIVO) { CR.aparecio = false; if (RITMOS.sonando) pausaRitmos(); }
     ATRIL_RITMOS.visible = false;
-    const s = slotsInstrumentos(DBG_PLAY, atrilX, tarimaMedia, tarimaH, CR.slots);
+    const s = slotsActuales(atrilX, tarimaMedia, tarimaH, CR.slots);   // Z88: detrás de la tarima (o slot_atril)
     const slot = s[Math.max(0, Math.min(s.length - 1, Math.floor(DBG_RITMOS.SLOT)))];
     const cuerpo = cuerpoRef.current;
     if (cuerpo) cuerpo.visible = CR.aparecio && !!slot;

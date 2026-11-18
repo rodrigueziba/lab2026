@@ -2463,8 +2463,9 @@ export default function LecternSystem() {
       <InteractionHandler />
       {/* Z79: slots de los atriles de instrumentos (detrás del atril de sonido; marcadores con DBG_PLAY.MOSTRAR_SLOTS) */}
       <SlotsAtriles atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} anchoM={OUTER_W} profM={OUTER_D} />
-      {/* Z80: caja de ritmos en su slot (sale del piso al apretar play del atril de sonido) */}
-      {DBG_RITMOS.ACTIVO && <SistemaPerf id="ritmos"><CajaRitmos atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} /></SistemaPerf>}
+      {/* Z80: caja de ritmos en su slot (sale del piso al apretar play del atril de sonido) · Z88: por defecto sale con
+          los atriles (mismo instante, inicioRef) y va detrás de la tarima (DBG_RITMOS.UBICACION) */}
+      {DBG_RITMOS.ACTIVO && <SistemaPerf id="ritmos"><CajaRitmos atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} inicioRef={appearStart} /></SistemaPerf>}
     </>
   );
 }
