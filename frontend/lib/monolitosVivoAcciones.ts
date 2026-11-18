@@ -14,6 +14,7 @@ import { SESSION, setSession, MockRemoteSession } from "@/lib/remoteSession";
 import { SesionPrueba } from "@/lib/sesionPrueba";
 import { N5_STATE, contextoViz, setMezclaRemota, leerMezclaRemota } from "@/lib/vizAudio";
 import { crearMono, reiniciarMono, tickPar, mezclaEqualPower, pesoEfectivo, type Mono } from "@/lib/monolitosVivo";
+import { tickFuenteVivo, soltarFuenteVivo } from "@/lib/vivo/vivoAcciones";   // Z89: presencia de Supabase (DBG_VIVO.FUENTE)
 
 export const MONO_VIVO = {
   sonido: crearMono() as Mono,
@@ -44,6 +45,7 @@ export function tickMonolitosVivo(dSonido: number, dVideo: number, op: number, d
   if (M.forzar === "sonido") dSonido = 0;
   else if (M.forzar === "video") dVideo = 0;
   M.forzar = "";
+  tickFuenteVivo(op > 0.001);   // Z89: con FUENTE "supabase", SESSION.status sale de la presencia (solo se suscribe si se ven los monolitos)
   M.haySesion = SESSION.status === "active";
   tickPar(M.sonido, M.video, dSonido, dVideo, dt, DBG_MONO_VIVO);
 
@@ -107,6 +109,7 @@ export function modoN5(): void { if (_activo) { _activo = false; soltarMonolitos
 /** Al desmontar los monolitos o volver a N5: audio propio entero y overlay fuera. */
 export function soltarMonolitosVivo(): void {
   setMezclaRemota(1, 0, null, 0);
+  soltarFuenteVivo();   // Z89: cierra el canal del oyente (con FUENTE "mock" no hace nada)
   if (_ov) { _ov.remove(); _ov = null; }
 }
 

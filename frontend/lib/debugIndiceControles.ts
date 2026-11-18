@@ -60,6 +60,7 @@ export const INDICE_CONTROLES: Record<string, readonly string[]> = {
   "retro-atriles": ["wear","wearScale","grime","crtCurve","crtScan","Skin retro"],
   "sector-effects": [],
   "secuencia-sillas": ["releaseDelayMs","lockLook","Saltar → sala activa","Reiniciar secuencia"],
+  "sesion-vivo-z89": ["mock","supabase","FUENTE","CANAL","Detener presencia","LATIDO_S","TIMEOUT_S","REINTENTO_S","REINTENTO_MAX_S","CIERRE_SIN_USO_S"],
   "shader-del-domo": ["domePortalAzimuth","domePortalElevation","domePortalHalfFovDeg","domeSkySphereR","domeSolAmt","domeMontAmt","domeCieloAmt","domeLinAmt","domeKickAmt","domeWarp","domeRingFlow","domeRingScale","domeRingFade0","domeRingFade1","domeStarCut","domeSoftEdge","usarDomoShader","domeLowQuality","showDomeMeters","domeSiluetasSuaves"],
   "simbolos-n3": ["symbolRadiusM","symbolPeriodS","symbolLineWidthM"],
   "sol-n3": ["sunIntensity","sunAngularDeg","sunDriftEnabled"],

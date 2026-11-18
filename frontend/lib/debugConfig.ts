@@ -1530,6 +1530,19 @@ export const DBG_MONO_VIVO = {
   OVERLAY:             false,   // estados, pesos y contadores (abajo a la izquierda) — live
 };
 
+// ── Z89: presencia de la sesión en vivo con Supabase Realtime (lib/vivo/presencia.ts, canalSupabase.ts, vivoAcciones.ts) ──
+// Sin medios: solo "hay alguien en la tarima". FUENTE "mock" = Z82–Z86 tal cual; "supabase" = MONO_VIVO.haySesion sale
+// de la presencia (audio y video = patrones de prueba mientras no haya medios). Canal público con la clave anónima.
+export const DBG_VIVO = {
+  FUENTE:           "mock" as string,   // "mock" | "supabase" — live
+  CANAL:            "alight-tarima-v1" as string,   // nombre del canal de Realtime (vale al conectar) — live
+  LATIDO_S:         5,       // el publicador sube su contador cada esto — live
+  TIMEOUT_S:        15,      // el oyente deja de contar una sesión sin cambio de latido durante esto (reloj local) — live
+  REINTENTO_S:      2,       // primera espera tras un error; se duplica en cada intento — live
+  REINTENTO_MAX_S:  60,      // tope de la espera entre reintentos — live
+  CIERRE_SIN_USO_S: 10,      // el oyente cierra el canal tras esto sin que haga falta (monolitos fuera) — live
+};
+
 // ── Z83: el domo de SILLAS muestra la sesión en vivo de la tarima o estática (lib/domoVivo.ts, lib/domoVivoAcciones.ts) ──
 // uRemoteMix = peso del monolito de video (Z82). ACTIVO = false → domo como estaba (la rama del shader no se ejecuta).
 export const DBG_DOMO_VIVO = {
