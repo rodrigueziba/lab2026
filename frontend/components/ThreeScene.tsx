@@ -18,6 +18,7 @@ import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from ".
 import { ATRIL_RITMOS } from "@/lib/ritmos";   // Z80: aviso "Tocar E" del atril de la caja de ritmos
 import AvisoVivoHost from "./AvisoVivoHost";   // Z85
 import ConsentTarimaHost from "./ConsentTarimaHost";   // Z91
+import VideoTransmitidoTarima from "./VideoTransmitidoTarima";   // Z94
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import CurtainFlash from "./CurtainFlash"; // F1: destello al atravesar el telón
@@ -532,6 +533,7 @@ function Scene() {
       {path !== "sillas" && <WatcherEye />}
       {path !== "sillas" && <LecternSystem />}
       {path !== "sillas" && <ConsentTarimaHost />}{/* Z91: consentimiento para transmitir, EN VIVO y corte */}
+      {path !== "sillas" && <VideoTransmitidoTarima />}{/* Z94: imagen procesada del domo para la transmisión */}
       {path !== "sillas" && <DynamicLights />}
       <Player />
       <BigMeshScanner />

@@ -67,7 +67,8 @@ const DOME_VERT = /* glsl */`
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
-const DOME_FRAG = /* glsl */`
+// Z94: exportado para el pase plano de la transmisión (components/VideoTransmitidoTarima.tsx: mismo shader y uniforms)
+export const DOME_FRAG = /* glsl */`
   uniform sampler2D uMap;
   uniform float     uTime;
   uniform float     uE0, uE1, uE2, uE3, uE4, uE5, uE6;
@@ -187,6 +188,8 @@ function makeStarGeo(): THREE.BufferGeometry {
 // Exported for the C9 debug menu to update shader uniforms live
 export const DBG_STAR_MAT: { value: THREE.ShaderMaterial | null } = { value: null };
 export const DBG_DOME_MAT: { value: THREE.ShaderMaterial | null } = { value: null };
+/** Z94: el domo de la tarima está en pantalla (su material y su textura están vivos): habilita el pase procesado. */
+export const FACE_DOME_VIS = { value: false };
 
 // ── FaceDome ──────────────────────────────────────────────────────────────────
 export default function FaceDome() {
@@ -304,7 +307,7 @@ export default function FaceDome() {
   // Z87: fuente de video de la tarima (webcam u ondas): permisos/dispositivos y limpieza del canvas de ondas
   useEffect(() => {
     const quitar = instalarFuenteTarima();
-    return () => { quitar(); liberarFuenteTarima(); };
+    return () => { quitar(); liberarFuenteTarima(); FACE_DOME_VIS.value = false; };   // Z94
   }, []);
 
   // Per-frame: animate star fade-in, advance time uniforms, sync STORE → dome shader
@@ -324,6 +327,7 @@ export default function FaceDome() {
     }
 
     domeUniforms.uTime.value = t;
+    FACE_DOME_VIS.value = showDome;   // Z94
 
     // Z87: las 7 proyecciones consumen la fuente común (webcam u ondas) sin saber cuál es
     if (showDome) {

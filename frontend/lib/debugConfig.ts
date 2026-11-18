@@ -1048,6 +1048,7 @@ export const DBG_RENDIMIENTO = {
     tiempoDetenido: true,            // Z86: historial, estela y efecto del tiempo detenido
     ondasTarima: true,               // Z87: dibujo del canvas de ondas de la tarima
     transmisionTarima: true,         // Z92: subida a LiveKit (false = pauseUpstream: sin codificar ni enviar)
+    videoTransmitidoTarima: true,    // Z94: pase plano del domo + copia al canvas transmisible (false = queda el último cuadro)
     recepcionTarima:   true,         // Z93: recepción en SILLAS (false = des-suscribe audio y video sin desconectar)
   } as Record<string, boolean>,
 };
@@ -1657,6 +1658,14 @@ export const DBG_LIVEKIT = {
   VIDEO_FPS:  15,                  // captureStream del canvas de ondas / tope de la webcam (vale al publicar)
   VIDEO_KBPS: 500,                 // bitrate máximo del video (vale al publicar)
   AUDIO_KBPS: 64,                  // bitrate del audio estéreo (vale al publicar)
+  // Z94: qué video se publica. "procesado" = la imagen del domo de la tarima con sus efectos y el atril de imagen
+  // (components/VideoTransmitidoTarima.tsx); "cruda" = Z92 (clon de la webcam u ondas); "ondas" = canvas de ondas (pruebas).
+  // Si el pase procesado no está disponible al iniciar, cae a "cruda" y lo dice la línea de estado.
+  FUENTE_VIDEO:       "procesado" as string,   // "procesado" | "cruda" | "ondas" (vale al publicar)
+  PROCESADO_ANCHO:    640,         // canvas transmisible (vale al publicar)
+  PROCESADO_ALTO:     360,
+  PROCESADO_ESPEJO:   false,       // espeja en horizontal la copia plana (el domo se ve desde adentro) — live
+  PROCESADO_SRGB:     true,        // codifica a sRGB (en pantalla lo hace el OutputPass; acá el pase va directo al canvas) — live
 };
 
 // ── Z87: fuente de video de la tarima y visualizador de ondas sin webcam (lib/ondasTarima.ts, lib/fuenteVideoTarima.ts) ──

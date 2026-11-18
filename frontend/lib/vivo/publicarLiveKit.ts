@@ -14,6 +14,7 @@ import { DBG_LIVEKIT, DBG_RENDIMIENTO, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { obtenerSalidaTransmisible, liberarSalidaTransmisible } from "@/lib/audio/nucleo";
 import { LIVE_TEX_REF } from "@/lib/faceShared";
 import { FUENTE_TARIMA, texturaTarima } from "@/lib/fuenteVideoTarima";
+import { TransmisionProcesada, elegirFuenteVideo, type FabricaLienzo } from "./videoProcesado";   // Z94
 import { PublicadorLiveKit, MOTIVO_TOKEN, motivoPorEstado, leerRespuestaToken, type DepsLK, type SalaLK, type PistaLK, type CfgLK, type ModoLK, type RespuestaToken, type ResultadoLK } from "./liveKitCiclo";
 
 // Z92b: el cliente NO lee ninguna variable: pide el token primero y conecta con la url que devuelve el servidor.
@@ -47,6 +48,52 @@ function pistaOndas(cfg: CfgLK): PistaLK | null {
   const t = st.getVideoTracks()[0];
   if (!t) return null;
   return { track: t, liberar: () => st.getTracks().forEach(x => x.stop()) };
+}
+
+// ── Z94: video procesado (la imagen del domo de la tarima) ──
+const FABRICA_LIENZO: FabricaLienzo = {
+  crear(ancho, alto, fps) {
+    if (typeof document === "undefined") return null;
+    const cv = document.createElement("canvas");
+    cv.width = ancho; cv.height = alto;
+    const ctx = cv.getContext("2d", { alpha: false });
+    if (!ctx || typeof cv.captureStream !== "function") return null;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, ancho, alto);
+    const st = cv.captureStream(fps);
+    const pista = st.getVideoTracks()[0];
+    if (!pista) return null;
+    return { canvas: cv, ctx, pista, detenerPista: () => st.getTracks().forEach(t => t.stop()), quitar: () => { cv.width = 0; cv.height = 0; } };
+  },
+};
+/** Pase procesado: lo dibuja components/VideoTransmitidoTarima.tsx (useFrame) mientras `activa`. */
+export const TX_PROC = new TransmisionProcesada(FABRICA_LIENZO);
+/** Lo escribe el host del Canvas cada cuadro: el domo de la tarima y su material están listos para el pase. */
+export const PASE_HOST = { listo: false };
+/** Fuente de video efectiva de la transmisión actual (menú). */
+export const VIDEO_TX = { efectiva: "" as string, motivo: "" };
+function pistaProcesada(cfg: CfgLK): PistaLK | null {
+  const r = TX_PROC.iniciar(DBG_LIVEKIT.PROCESADO_ANCHO, DBG_LIVEKIT.PROCESADO_ALTO, cfg.VIDEO_FPS);
+  return r ? { track: r.track, liberar: () => TX_PROC.liberar() } : null;
+}
+function webcamViva(): boolean {
+  const ms = (LIVE_TEX_REF.value as { image?: HTMLVideoElement } | null)?.image?.srcObject as MediaStream | null | undefined;
+  return ms?.getVideoTracks?.()[0]?.readyState === "live";
+}
+const _disp = { procesado: false, webcam: false, ondas: true };
+function pistaVideo(modo: ModoLK, cfg: CfgLK): PistaLK | null {
+  _disp.procesado = PASE_HOST.listo; _disp.webcam = webcamViva();
+  const el = elegirFuenteVideo(DBG_LIVEKIT.FUENTE_VIDEO, modo, _disp);
+  VIDEO_TX.motivo = el.motivo;
+  if (el.efectiva === "procesado") {
+    const p = pistaProcesada(cfg);
+    if (p) { VIDEO_TX.efectiva = "procesado"; return p; }
+    VIDEO_TX.motivo = TX_PROC.fallo || "falló el pase procesado";   // respaldo: como Z92
+  }
+  if (el.efectiva === "ondas") { VIDEO_TX.efectiva = "ondas"; return pistaOndas(cfg); }
+  const w = modo === "cara" ? pistaWebcam(cfg) : null;
+  if (w) { VIDEO_TX.efectiva = "cruda"; return w; }
+  VIDEO_TX.efectiva = "ondas";
+  return pistaOndas(cfg);
 }
 
 async function crearSala(): Promise<SalaLK> {
@@ -85,7 +132,7 @@ async function crearSala(): Promise<SalaLK> {
 const DEPS: DepsLK = {
   pedirToken,
   crearSala,
-  video: (modo: ModoLK, cfg: CfgLK) => (modo === "cara" ? pistaWebcam(cfg) ?? pistaOndas(cfg) : pistaOndas(cfg)),
+  video: (modo: ModoLK, cfg: CfgLK) => pistaVideo(modo, cfg),   // Z94: procesado / cruda (Z92) / ondas
   audio: () => {
     try {
       const n = obtenerSalidaTransmisible();
@@ -127,7 +174,9 @@ export function textoEstadoLiveKit(): string {
   const p = PUB;
   return `Diagnóstico: ${p.diagnostico}\nLiveKit: ${p.estado}${p.modo ? ` · modo ${p.modo}` : ""} · pistas ${p.pistas.video ? "video" : "—"}/${p.pistas.audio ? "audio" : "—"}`
     + `${p.estado === "publicando" ? ` · ${p.kbps().toFixed(0)} kbps salientes` : ""} · reconexiones ${p.reconexiones} · errores ${p.errores}`
-    + `${_pausado ? " · subida PAUSADA (benchmark)" : ""}`;
+    + `${_pausado ? " · subida PAUSADA (benchmark)" : ""}`
+    + (p.pistas.video ? `\nVideo: ${VIDEO_TX.efectiva || "—"}${VIDEO_TX.efectiva === "procesado" ? ` · ${TX_PROC.cadencia.fpsReal.toFixed(1)} fps publicados · ${TX_PROC.ancho}×${TX_PROC.alto}` : ""}`
+      + `${VIDEO_TX.motivo ? ` · respaldo: ${VIDEO_TX.motivo}` : ""}${TX_PROC.activa && TX_PROC.fallo ? ` · ${TX_PROC.fallo}` : ""}` : "");
 }
 
 if (DEBUG_ENABLED && typeof window !== "undefined") {

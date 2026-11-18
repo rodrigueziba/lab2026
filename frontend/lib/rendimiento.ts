@@ -148,6 +148,7 @@ export const SISTEMAS = [
   { id: "videoDomo",  etiqueta: "video en el domo", como: "Z83: uRemoteMix forzado a 0 (la rama de la proyección y la estática no se ejecuta; no se sube la textura)" },
   { id: "ondasTarima", etiqueta: "ondas de la tarima", como: "Z87: el canvas de ondas no se redibuja (queda el último cuadro; sin subida de textura)" },
   { id: "transmisionTarima", etiqueta: "transmisión de la tarima", como: "Z92: pauseUpstream de las pistas de LiveKit (sin codificar ni enviar; sigue conectada). Sin transmisión activa no cambia nada" },
+  { id: "videoTransmitidoTarima", etiqueta: "video transmitido (procesado)", como: "Z94: no dibuja el pase plano del domo ni lo copia al canvas transmisible (se publica el último cuadro). Sin transmisión activa no cambia nada" },
   { id: "recepcionTarima", etiqueta: "recepción de la tarima", como: "Z93: des-suscribe el audio y el video de LiveKit sin desconectar (sin decodificar ni subir la textura; el domo muestra estática). Sin sesión recibida no cambia nada" },
   { id: "tiempoDetenido", etiqueta: "tiempo detenido", como: "Z86: desarmado (sin captura del historial ni estela) y uTiempoK = 0 (la rama del pase final no se ejecuta)" },
   // Z72: partes del shader del domo (uniforms uPerf* de dome.frag.glsl: ramas por uniform, como uPerfAnillos)
