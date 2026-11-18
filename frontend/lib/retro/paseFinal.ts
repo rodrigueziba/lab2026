@@ -11,6 +11,7 @@ import * as THREE from "three";
 import { Pass, FullScreenQuad } from "three/addons/postprocessing/Pass.js";
 import { RetroCRTShader } from "@/lib/retro/retroCRT";
 import { transformarCRT } from "@/lib/retro/paseFinalTexto";
+import { GLSL_TIEMPO_DETENIDO, GLSL_TIEMPO_DETENIDO_UNIFORMS, TIEMPO_UNIFORMS, TIEMPO_VISUAL } from "@/lib/retro/tiempoDetenido";   // Z84
 
 const VERT = /* glsl */`
 #define attribute in
@@ -76,11 +77,15 @@ vec3 correccionAA(vec2 p) { return vec3(0.0); }
 
 vec4 crtSalida;
 ${crt}
+${GLSL_TIEMPO_DETENIDO_UNIFORMS}
+${GLSL_TIEMPO_DETENIDO}
 
 void main() {
   if (uCrtOn > 0.5) crtMain();
   else crtSalida = vec4(escena(vUv) + correccionAA(vUv), 1.0);
   vec4 c = crtSalida;
+  // Z84: tiempo detenido (lib/retro/tiempoDetenido.ts); con uTiempoK = 0 no se ejecuta: imagen idéntica
+  if (uTiempoK > 0.0) c.rgb = efectoTiempoDetenido(vUv, c.rgb, uTiempoK, uTiempoT);
   if (uSalidaOn > 0.5) {
     #ifdef LINEAR_TONE_MAPPING
       c.rgb = LinearToneMapping(c.rgb);
@@ -130,6 +135,7 @@ export class PaseFinalPass extends Pass {
     u.uBloomOn = { value: 0 }; u.uCrtOn = { value: 1 }; u.uSalidaOn = { value: 1 };
     u.uTexel = { value: new THREE.Vector2(1, 1) };
     u.toneMappingExposure = { value: 1 };
+    for (const k of Object.keys(TIEMPO_UNIFORMS)) u[k] = TIEMPO_UNIFORMS[k];   // Z84
     this.uniforms = u;
     this.material = new THREE.RawShaderMaterial({
       name: "PaseFinalZ69", glslVersion: THREE.GLSL3, uniforms: u, defines: { AA_FXAA: 0, FXAA_LIGERO: 0, ACES_RAPIDO: 0 },
@@ -161,6 +167,7 @@ export class PaseFinalPass extends Pass {
     u.tDiffuse.value = readBuffer.texture;
     (u.uTexel.value as THREE.Vector2).set(1 / Math.max(1, readBuffer.width), 1 / Math.max(1, readBuffer.height));
     u.toneMappingExposure.value = renderer.toneMappingExposure;
+    u.uTiempoK.value = TIEMPO_VISUAL.k; u.uTiempoT.value = TIEMPO_VISUAL.t;   // Z84
     // defines de salida: misma lógica que OutputPass
     if (this.tm !== renderer.toneMapping || this.cs !== renderer.outputColorSpace) {
       this.tm = renderer.toneMapping; this.cs = renderer.outputColorSpace;

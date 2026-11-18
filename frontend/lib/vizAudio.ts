@@ -110,6 +110,7 @@ let _masterGain:    GainNode | null = null;
 // JS-side current values (smoothed toward targets each frame by applyEffects)
 let _lpCur = 20000, _hpCur = 20;
 let _echoFBCur = 0, _echoMxCur = 0, _revMxCur = 0, _rateCur = 1.0;
+let _rateTiempo = 1.0, _ppTiempo = false;   // Z84: multiplicador del tiempo detenido (solo el mp3 propio) y si apagó preservesPitch
 
 function makeIR(ctx: AudioContext, dur = 2.8, decay = 3.5): AudioBuffer {
   const sr = ctx.sampleRate;
@@ -445,6 +446,7 @@ export function stopVizAudio(): void {
   _delay = null; _echoFeedback = null; _echoOutGain = null;
   _convolver = null; _reverbOutGain = null; _masterGain = null;
   _lpCur = 20000; _hpCur = 20; _echoFBCur = 0; _echoMxCur = 0; _revMxCur = 0; _rateCur = 1.0;
+  _rateTiempo = 1.0; _ppTiempo = false;   // Z84
   _pausadoPorArea = false; // Z28
   VIZ_AUDIO_DEBUG.ctxState = "closed";
   VIZ_AUDIO_DEBUG.paused   = true;
@@ -541,7 +543,7 @@ export function applyEffects(
   if (_echoOutGain)   _echoOutGain.gain.value         = Math.max(0, _echoMxCur);
   if (_reverbOutGain) _reverbOutGain.gain.value        = Math.max(0, _revMxCur);
   if (_vizAudioEl) {
-    _vizAudioEl.playbackRate = Math.max(0.25, Math.min(4, _rateCur));
+    _vizAudioEl.playbackRate = Math.max(0.25, Math.min(4, _rateCur * _rateTiempo));   // Z84: respeta el tiempo detenido
     (_vizAudioEl as any).preservesPitch = false;
   }
   VIZ_EFFECTS_DEBUG.lpCut  = _lpCur;
@@ -561,7 +563,7 @@ export function resetEffects(): void {
   if (_echoFeedback)  _echoFeedback.gain.value        = 0;
   if (_echoOutGain)   _echoOutGain.gain.value         = 0;
   if (_reverbOutGain) _reverbOutGain.gain.value        = 0;
-  if (_vizAudioEl)    { _vizAudioEl.playbackRate = 1.0; (_vizAudioEl as any).preservesPitch = true; }
+  if (_vizAudioEl)    { _vizAudioEl.playbackRate = _rateTiempo; (_vizAudioEl as any).preservesPitch = !_ppTiempo; }   // Z84: respeta el tiempo detenido
 }
 
 // ── N4: gate control ──────────────────────────────────────────────────────────
@@ -647,3 +649,18 @@ export function leerMezclaRemota(): { ctx: string; orig: number; rem: number; fu
     fuente: !_nodoRemoto ? "ninguna" : _estatica && _nodoRemoto === _estatica.salida ? `estática (${_estatica.tipo})` : "sesión",
   };
 }
+
+// ── Z84: tiempo detenido: velocidad del mp3 propio (como una cinta que se frena; tono y velocidad juntos) ──────────
+// Solo el elemento <audio> del visualizador: la fuente remota de Z82 (sesión o estática) no pasa por acá. applyEffects()
+// multiplica su tasa por este factor, así no lo pisa. Escribe solo cuando cambia.
+export function setTasaTiempo(m: number): void {
+  const v = Math.max(0.25, Math.min(1, Number.isFinite(m) ? m : 1));
+  if (v === _rateTiempo) return;
+  _rateTiempo = v;
+  if (!_vizAudioEl) return;
+  const el = _vizAudioEl as any;
+  if (v < 1 && !_ppTiempo) { el.preservesPitch = false; _ppTiempo = true; }   // tono y velocidad juntos (cinta)
+  _vizAudioEl.playbackRate = Math.max(0.25, Math.min(4, _rateCur * v));
+  if (v === 1 && _ppTiempo) { el.preservesPitch = true; _ppTiempo = false; }
+}
+export function tasaTiempoActual(): number { return _rateTiempo; }

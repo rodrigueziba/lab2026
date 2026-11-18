@@ -21,6 +21,7 @@ import { RETRO_FLAGS } from "@/lib/retro/retroFlags";
 import { SMAAPass }        from "three/addons/postprocessing/SMAAPass.js";    // Z69: ANTIALIAS_MODO "smaa" (se crea al elegirlo)
 import { BloomLigeroPass } from "@/lib/retro/bloomLigero";                     // Z69
 import { PaseFinalPass }   from "@/lib/retro/paseFinal";                       // Z69
+import { tickTiempoDetenido } from "@/lib/tiempoDetenidoAcciones";          // Z84
 import { E_GPU, medirIni, medirFin } from "@/lib/gpuPases";                    // Z69
 
 const QUALITY_BLOOM_SCALE: Record<string, number> = {
@@ -238,6 +239,7 @@ export default function RetroPostFX() {
   }, []);
 
   useFrame(({ gl: renderer, clock }) => {
+    tickTiempoDetenido();   // Z84: envolvente del tiempo detenido (audio propio + uTiempoK del pase final)
     if (!RETRO_FLAGS.enabled) return;
     CRT_UNIFORMS.uTime.value = clock.elapsedTime;
     CRT_UNIFORMS.uComfort.value = RETRO_FLAGS.comfortMode ? 1 : 0;

@@ -2,7 +2,8 @@
 // Z70: pestaña "Visualizador y música" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_SILLAS, DBG_DOMO_VIVO, DBG_RENDIMIENTO } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_DOMO_VIVO, DBG_RENDIMIENTO, DBG_TIEMPO } from "@/lib/debugConfig";
+import { dispararTiempoAhora, pararTiempoAhora, textoEstadoTiempo } from "@/lib/tiempoDetenidoAcciones";   // Z84
 import { textoEstadoDomoVivo } from "@/lib/domoVivoAcciones";   // Z83
 import { simularSesionEnVivo, quitarSesion } from "@/lib/monolitosVivoAcciones";   // Z82
 import { BAND_STATE, reshuffleAssignment } from "@/lib/vizAudio";
@@ -273,6 +274,40 @@ export function SecDomoVivoZ83() {
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{D[k].toFixed(st < 0.1 ? 2 : st < 1 ? 1 : 0)} {nota}</span></span>
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={D[k]} onChange={ev => { D[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
+    </>
+  );
+}
+
+// sección: tiempo-detenido-z84
+export function SecTiempoDetenidoZ84() {
+  // Z84: tiempo detenido al alejarse de un monolito sin sesión (lib/tiempoDetenido.ts). Estado 4 veces por segundo.
+  const T = DBG_TIEMPO;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  return (
+    <>
+          <span style={LABEL}>Tiempo detenido Z84 <span style={NOTE}>(live · solo el mp3 propio y la cámara propia)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoTiempo()}</span></div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); dispararTiempoAhora(); toca(); }}>Disparar ahora</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); pararTiempoAhora(); toca(); }}>Parar</button>
+          </div>
+          {([["ACTIVO", "off = sin efecto"], ["DISPARO_PARCIAL", "también sin llegar a cerca"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={() => { T[k] = !T[k]; toca(); }}>{T[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([
+            ["DURACION_S", 0.5, 20, 0.1, "s"], ["CORTE_S", 0.1, 5, 0.05, "s"], ["ATAQUE_S", 0.01, 2, 0.01, "s"], ["RATE_MIN", 0.25, 1, 0.01, "× velocidad"],
+            ["INTENSIDAD_AUDIO", 0, 1, 0.01, ""], ["INTENSIDAD_VISUAL", 0, 2, 0.01, ""],
+          ] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{T[k].toFixed(2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={T[k]} onChange={ev => { T[k] = parseFloat(ev.target.value); toca(); }} />
             </div>
           ))}
     </>

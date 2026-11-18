@@ -1541,3 +1541,17 @@ export const DBG_DOMO_VIVO = {
   ESTATICA_VELOCIDAD:  24,      // cuadros de ruido por segundo — live
   FORZAR:              "ninguno" as string,   // "ninguno" (monolito) | "video" | "estatica" | "apagar" — live
 };
+
+// ── Z84: tiempo detenido simulado (lib/tiempoDetenido.ts, lib/tiempoDetenidoAcciones.ts, lib/retro/tiempoDetenido.ts) ──
+// Al alejarse de un monolito (tras haber estado cerca) y sin sesión: el mp3 propio se frena como una cinta y la cámara
+// propia toma un efecto tipo CRT (provisorio). Nunca afecta la sesión remota ni la estática.
+export const DBG_TIEMPO = {
+  ACTIVO:            true,    // — live
+  DURACION_S:        6,       // bajada de k a 0 (= RETORNO_S de los monolitos) — live
+  CORTE_S:           1,       // bajada si aparece una sesión o se vuelve a "cerca" — live
+  ATAQUE_S:          0.35,    // subida de la cinta (sin saltos de tono ni clics) — live
+  RATE_MIN:          0.5,     // velocidad mínima del mp3 con k = 1 — live
+  INTENSIDAD_AUDIO:  1,       // × k para el audio — live
+  INTENSIDAD_VISUAL: 1,       // × k para el shader (uTiempoK) — live
+  DISPARO_PARCIAL:   false,   // también al alejarse sin haber llegado a "cerca" (k = acercamiento máximo) — live
+};
