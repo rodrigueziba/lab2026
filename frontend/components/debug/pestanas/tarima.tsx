@@ -2,7 +2,7 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO } from "@/lib/debugConfig";
 import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent, modoActual } from "@/lib/consentTarimaAcciones";   // Z91
 import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit, alternarPanelCuadro, panelCuadroVisible } from "@/lib/vivo/publicarLiveKit";   // Z92 · Z94b
 import { sesionIdNavegador } from "@/lib/vivo/vivoAcciones";   // Z92
@@ -585,6 +585,34 @@ export function SecLiveKitZ92() {
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); detenerLiveKit(); setRes("detenida"); toca(); }}>Detener</button>
           </div>
           {res && <div style={{ ...ROW, ...NOTE }}><span>{res}</span></div>}
+    </>
+  );
+}
+
+// sección: atril-sonido-z96
+export function SecAtrilSonidoZ96() {
+  // Z96: atril de sonido rediseñado ("SONIDO SN-40"). Diseño y escala de etiquetas avisan a LecternSystem (evento).
+  const A = DBG_ATRIL_SONIDO;
+  const [, setTick] = useState(0);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const avisar = (remontar: boolean) => window.dispatchEvent(new CustomEvent("alight:atril-sonido-cambio", { detail: { remontar } }));
+  return (
+    <>
+          <span style={LABEL}>Atril de sonido Z96 <span style={NOTE}>(SONIDO SN-40 · probar con el checkpoint «Atril de sonido» o ?cp=atril_sonido)</span></span>
+          <div style={ROW}>
+            <span>DISENO_NUEVO <span style={NOTE}>off = layout anterior (J3) tal cual</span></span>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); A.DISENO_NUEVO = !A.DISENO_NUEVO; avisar(true); toca(); }}>{A.DISENO_NUEVO ? "ON" : "off"}</button>
+          </div>
+          {([["PLAY_ESCALA", 0.5, 1.5, 0.05, "PLAY/PAUSA (1 = 32 × 8,2 cm)", false], ["ETIQUETA_ESCALA", 0.7, 1.4, 0.05, "títulos y etiquetas (rehace la serigrafía)", true],
+            ["DISPLAY_VALOR_S", 0.5, 8, 0.5, "s que el display muestra el control tocado", false], ["VU_HZ", 5, 60, 1, "tope de actualización del VU y del display", false]] as const).map(([k, mn, mx, st, nota, rehacer]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{A[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={A[k]}
+                onChange={ev => { A[k] = parseFloat(ev.target.value); toca(); }}
+                onPointerUp={() => { if (rehacer) avisar(false); }} onKeyUp={() => { if (rehacer) avisar(false); }} />
+            </div>
+          ))}
+          <div style={{ ...ROW, ...NOTE }}><span>doble clic sobre una perilla o el fader: vuelve a su valor por defecto · el display muestra el control tocado</span></div>
     </>
   );
 }

@@ -19,7 +19,8 @@ export type CheckpointId =
   | "tarima" | "tarima_vacia" | "luz_dialogo" | "premio"
   | "dia_mediodia" | "dia_atardecer" | "dia_noche"   // Z48
   | "dia_prisma_sube" | "dia_flor" | "dia_prisma_baja"   // Z54
-  | "sillas_recibir" | "tarima_compartir";   // Z95: prueba de la transmisión en vivo con dos ventanas
+  | "sillas_recibir" | "tarima_compartir"   // Z95: prueba de la transmisión en vivo con dos ventanas
+  | "atril_sonido";                          // Z96: probar el atril de sonido rediseñado
 
 /** ["accion", ...args] */
 export type Paso = readonly [string, ...(string | number)[]];
@@ -90,6 +91,11 @@ export const CHECKPOINTS: readonly Checkpoint[] = [
   { id: "tarima_compartir", nombre: "Tarima: compartir", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
       ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["mostrarEleccion"], ["esperarDialogo", 10]],
     descripcion: "Sobre la tarima con figuras y domo; el texto 2 del consentimiento abierto (Compartir / No compartir)." },
+  // Z96: figuras sentadas, atriles ya afuera SIN el diálogo y sin transmitir ("No compartir" en silencio), frente al atril
+  // de sonido a distancia de interacción, listo para apretar E
+  { id: "atril_sonido", nombre: "Atril de sonido", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
+      ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["frenteAtrilSonido"], ["esperarFrames", 2]],
+    descripcion: "Sobre la tarima con figuras y atriles (sin diálogo ni transmisión), frente al atril de sonido: apretá E." },
 ];
 
 /**

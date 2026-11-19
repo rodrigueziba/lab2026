@@ -18,7 +18,13 @@ import {
   nextTrack, prevTrack, initAudio, loadPlaylist, playTrack,   // Z79: togglePlayPause ahora va por lib/playTarimaAcciones
   playUIClick,
 } from "@/lib/audioEngine";
-import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT } from "@/lib/debugConfig";
+import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT, DBG_ATRIL_SONIDO } from "@/lib/debugConfig";
+// Z96: atril de sonido rediseñado ("SONIDO SN-40"): layout como datos (lib/atrilSonido.ts) y piezas (AtrilSonidoNuevo.tsx)
+import {
+  POSICIONES as POS_SONIDO_NUEVO, FADER_RAIL, GRANDE_ESCALA, PLAY_W, PLAY_D, textoValor, camaraAtril, legibilidadMinima,
+  LEGIBLE_MIN, esDobleClic, type FormaCtrl, type GeoAtril, type PosCtrl,
+} from "@/lib/atrilSonido";
+import { DisplaySonido, VuSonido, PlacaFrenteSonido, buildSilkscreenSonido, mostrarEnDisplay } from "./AtrilSonidoNuevo";
 import { PLAY_TARIMA } from "@/lib/playTarima";                                              // Z79
 import { alternarPlay, instalarEstadoPlay, prepararSinAutoplay } from "@/lib/playTarimaAcciones"; // Z79
 import { PlayGrande, SlotsAtriles } from "./PlayTarima";                                       // Z79
@@ -193,6 +199,26 @@ function labelTex(text: string): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(cv);
   _labelCache.set(text, tex);
   return tex;
+}
+
+// ── Z96: pantalla del PLAY/PAUSA grande (una textura por estado, por instancia; se liberan al desmontar) ──
+const PLAY_TECLA_MAT = new THREE.MeshStandardMaterial({ color: "#C0552F", roughness: 0.75, metalness: 0 });
+function texPlayGrande(sonando: boolean): THREE.CanvasTexture {
+  const w = 1024, h = 256, cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  const c = cv.getContext("2d")!;
+  c.fillStyle = "#2A1400"; c.fillRect(0, 0, w, h);
+  c.fillStyle = "rgba(255,154,31,0.08)";
+  for (let y = 0; y < h; y += 5) c.fillRect(0, y, w, 2);
+  c.fillStyle = sonando ? "#7CF0A8" : "#FF9A1F";
+  c.shadowColor = sonando ? "rgba(124,240,168,0.7)" : "rgba(255,154,31,0.7)"; c.shadowBlur = 16;
+  if (sonando) { c.fillRect(90, 58, 46, 140); c.fillRect(160, 58, 46, 140); }
+  else { c.beginPath(); c.moveTo(96, 50); c.lineTo(226, 128); c.lineTo(96, 206); c.closePath(); c.fill(); }
+  c.font = "bold 150px monospace"; c.textBaseline = "middle"; c.textAlign = "left";
+  c.fillText(sonando ? "PAUSA" : "PLAY", 290, 136);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 // ── Keycap texture ────────────────────────────────────────────────────────────
@@ -523,6 +549,7 @@ const _drag = {
   holdTimer: null    as ReturnType<typeof setInterval> | null,
 };
 let _hoveredId: string | null = null;
+const _dobleClic = { id: "", t: -1e9 };   // Z96
 
 function getCursorStyle(
   type: CtrlDef["type"] | "press" | "slide_h" | "slide_v" | "rotate",
@@ -576,11 +603,24 @@ function _makePose(
   return { pos: [camPos.x, camPos.y, camPos.z], quat: [q.x, q.y, q.z, q.w], fovDeg };
 }
 
+// Z96: geometría del atril para la legibilidad (lib/atrilSonido.ts, la misma transformación que plateM)
+let _geoAtril: GeoAtril | null = null;
+function geoAtril(): GeoAtril { return _geoAtril ?? (_geoAtril = { LEG_H, PANEL_W, PANEL_D, PANEL_T, CPANEL_T, TILT_RAD, LBL_H, ROW1_V_A }); }
+
+/**
+ * Z96: con el diseño nuevo del atril de sonido, tres pasadas: (1) igual que antes + texto más lejano ≥ LEGIBLE_MIN de la
+ * altura de la pantalla; (2) lo mismo con el ancho mínimo del panel relajado (85 % → 65 %); (3) la búsqueda anterior,
+ * sin la exigencia. Recién después, la pose fija de siempre. Con el diseño viejo: solo la búsqueda anterior.
+ */
 function fitLecternCamera(
   side: "left" | "right",
   aspect: number,
+  pasada = 1,
 ): { pos: [number,number,number]; quat: [number,number,number,number]; fovDeg: number } {
   const isImage = side === "left";
+  const nuevoSonido = !isImage && DBG_ATRIL_SONIDO.DISENO_NUEVO;
+  const exigirLegible = nuevoSonido && pasada < 3;
+  const anchoMinNdc = nuevoSonido && pasada === 2 ? 1.30 : 1.70;
   const dbgCfg  = isImage ? DBG_CAM_IMAGE : DBG_CAM_SOUND;
 
   // Debug override: bypass search
@@ -668,12 +708,18 @@ function fitLecternCamera(
           if (!isImage) {
             // ── Sound: plate ≥ 85% of frame width ────────────────────────────
             const ndcXs = ndcs.map(n => n.x);
-            if (Math.max(...ndcXs) - Math.min(...ndcXs) < 1.70) continue;
+            if (Math.max(...ndcXs) - Math.min(...ndcXs) < anchoMinNdc) continue;
 
             // ── Sound: label pixel height ≥ K1_LABEL_MIN_PX ──────────────────
             const lDist = farLabelWorld.distanceTo(camPos);
             const px = (LBL_H / (2 * lDist * Math.tan(fovRad / 2))) * 1080;
             if (px < K1_LABEL_MIN_PX) continue;
+
+            // ── Z96: texto más lejano del diseño nuevo ≥ LEGIBLE_MIN (proyección real sobre la placa inclinada) ──
+            if (exigirLegible) {
+              const cp = camaraAtril(geoAtril(), fovDeg, height, dist, pitchDeg, aspect);
+              if (legibilidadMinima(geoAtril(), cp, DBG_ATRIL_SONIDO.ETIQUETA_ESCALA).min < LEGIBLE_MIN) continue;
+            }
           } else {
             // ── Image: dome visibility (6×3 grid, top 30% of screen, ≥70%) ──
             const GRID_X = [-5/6, -3/6, -1/6, 1/6, 3/6, 5/6];
@@ -702,8 +748,9 @@ function fitLecternCamera(
     }
 
     if (bestPose) return bestPose;
-    if (fovDeg >= 90) console.warn(`[K1 fit] No pose found for side=${side} at fov=90°`);
+    if (fovDeg >= 90 && (!nuevoSonido || pasada === 3)) console.warn(`[K1 fit] No pose found for side=${side} at fov=90°`);
   }
+  if (nuevoSonido && pasada < 3) return fitLecternCamera(side, aspect, pasada + 1);   // Z96
 
   // Final fallback: use initial values from spec
   return _makePose(side, isImage ? 75 : 60, isImage ? 0.9 : 0.8, isImage ? 0.75 : 0.8, isImage ? -22 : -45);
@@ -758,6 +805,8 @@ interface CtrlDef {
   orientation?: "h" | "v";  // slider axis; "h" default (along u), "v" along v
   color?: "green" | "amber" | "chrome" | "blue" | "mustard";
   icon?: IconName;           // J3: drawn on button/toggle top face; "volume" on slider marks ends
+  forma?: FormaCtrl;         // Z96: "pastilla" (ON del módulo), "play" (PLAY/PAUSA grande), "grande" (perilla CORTE)
+  nombreLargo?: string;      // Z96: lo que muestra el display al tocarlo
   min: number;
   max: number;
   initial: number;
@@ -779,8 +828,19 @@ function setCtrl(id: string, v: number, def: CtrlDef) {
     LECTERN_DBG.hudLabel  = `${def.label}: ${val.toFixed(dec)}`;
     LECTERN_DBG.hudExpiry = performance.now() + 1200;
   }
+  // Z96: el display del atril de sonido muestra el control tocado (nombre y valor) durante DISPLAY_VALOR_S
+  if (DBG_ATRIL_SONIDO.DISENO_NUEVO && id.startsWith("s_")) {
+    const p = _posSonido.get(id);
+    if (p && (def.type !== "button" || ctrlState[id] > 0.5)) {
+      const nombre = id === "s_lfo_wf" ? `LFO ONDA ${ONDAS_NOMBRE[_lfoWfIdx % 4]}` : id === "s_lfo_tg" ? `LFO DESTINO ${DESTINOS_NOMBRE[_lfoTgIdx % 3]}` : p.nombreLargo;
+      mostrarEnDisplay(textoValor(nombre, def.type as "button" | "toggle" | "slider" | "knob", ctrlState[id], def.min, def.max));
+    }
+  }
   storeNotify();
 }
+const _posSonido = new Map<string, PosCtrl>(POS_SONIDO_NUEVO.map(p => [p.id, p]));
+const ONDAS_NOMBRE = ["SENO", "TRIÁNGULO", "CUADRADA", "SIERRA"];
+const DESTINOS_NOMBRE = ["VOLUMEN", "FILTRO", "PITCH"];
 
 // ── Single control mesh constants (must precede validateLayout + controls arrays) ─
 const BTN_R     = 0.030;   // half-size for hit zone
@@ -1016,6 +1076,20 @@ validateLayout(SOUND_CONTROLS, SOUND_SECTIONS);
 // Initialise defaults
 [...IMAGE_CONTROLS, ...SOUND_CONTROLS].forEach(c => { ctrlState[c.id] = c.initial; });
 
+// Z96: layout nuevo del atril de sonido = los MISMOS controles (mismo id, mismo onActivate, mismo rango) en otra
+// posición, con su etiqueta y su forma; el estado (ctrlState) es el mismo, así que cambiar de diseño no pierde valores.
+export const SOUND_CONTROLS_NUEVO: CtrlDef[] = SOUND_CONTROLS.map(d => {
+  const p = POS_SONIDO_NUEVO.find(x => x.id === d.id);
+  if (!p) return d;
+  return { ...d, px: p.u, py: p.v, label: p.etiqueta, forma: p.forma, nombreLargo: p.nombreLargo,
+    ...(d.id === "s_vol" ? { railLen: FADER_RAIL } : {}) };
+});
+function controlesSonido(): CtrlDef[] { return DBG_ATRIL_SONIDO.DISENO_NUEVO ? SOUND_CONTROLS_NUEVO : SOUND_CONTROLS; }
+/** Z96: cambia el diseño o la escala de etiquetas desde el menú (LecternSystem remonta el atril o rehace la serigrafía). */
+export function cambiarAtrilSonido(remontar: boolean): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("alight:atril-sonido-cambio", { detail: { remontar } }));
+}
+
 // K2: dev direction tests — run from console: window.__lecternTests()
 export function runControlDirectionTests(): void {
   if (typeof window === "undefined") return;
@@ -1103,6 +1177,14 @@ function CtrlMesh({
   const overlayMatRef  = useRef<THREE.MeshBasicMaterial | null>(null);
   const haloMatRef     = useRef<THREE.MeshBasicMaterial | null>(null);
   const keycapMatRef   = useRef<THREE.MeshStandardMaterial | null>(null);
+  // Z96: PLAY/PAUSA grande (forma "play") y ON en pastilla (forma "pastilla")
+  const playGrupoRef   = useRef<THREE.Group>(null);
+  const playTeclaRef   = useRef<THREE.Group>(null);
+  const playPantRef    = useRef<THREE.MeshBasicMaterial | null>(null);
+  const playLuzRef     = useRef<THREE.MeshStandardMaterial | null>(null);
+  const playSonandoRef = useRef<boolean | null>(null);
+  const playTex = useMemo(() => def.forma === "play" ? { play: texPlayGrande(false), pausa: texPlayGrande(true) } : null, [def.forma]);
+  useEffect(() => () => { playTex?.play.dispose(); playTex?.pausa.dispose(); }, [playTex]);
 
   const register = (mesh: THREE.Mesh | null) => {
     if (!mesh || meshesRef.current.includes(mesh)) return;
@@ -1147,6 +1229,28 @@ function CtrlMesh({
         const angle = Math.PI * 1.75 - norm * Math.PI * 1.5;
         knobRotRef.current.rotation.y = angle;
       }
+      return;
+    }
+
+    // Z96: ON en pastilla (sin palanca: solo la luz)
+    if (def.forma === "pastilla") {
+      if (ledMatRef.current) ledMatRef.current.emissiveIntensity = v > 0.5 ? 2.4 : 0.04;
+      return;
+    }
+    // Z96: PLAY/PAUSA grande: escala en vivo, hundido al apretar, pantalla y luz según PLAY_TARIMA.sonando
+    if (def.forma === "play") {
+      if (playGrupoRef.current) playGrupoRef.current.scale.setScalar(Math.max(0.3, DBG_ATRIL_SONIDO.PLAY_ESCALA));
+      const ms = performance.now() - (_pressAt[def.id] ?? -1e9);
+      let hund = 0;
+      if (ms < 220) { const t = ms / 220; hund = t < 0.2 ? 0.007 * t / 0.2 : 0.007 * Math.max(0, Math.exp(-6 * (t - 0.2)) * Math.cos(Math.PI * 2 * (t - 0.2))); }
+      if (playTeclaRef.current) playTeclaRef.current.position.y = -hund;
+      const s = PLAY_TARIMA.sonando;
+      if (s !== playSonandoRef.current && playPantRef.current && playTex) {
+        playSonandoRef.current = s;
+        playPantRef.current.map = s ? playTex.pausa : playTex.play; playPantRef.current.needsUpdate = true;
+        if (playLuzRef.current) { playLuzRef.current.emissive.set(s ? "#2E9E5B" : "#FF9A1F"); }
+      }
+      if (playLuzRef.current) playLuzRef.current.emissiveIntensity = s ? 2.6 : 0.9;
       return;
     }
 
@@ -1375,7 +1479,7 @@ function CtrlMesh({
       return { x: Math.sin(angle) * r, z: -Math.cos(angle) * r, isEnd };
     });
     return (
-      <group position={[def.px, surfY, -def.py]}>
+      <group position={[def.px, surfY, -def.py]} scale={def.forma === "grande" ? GRANDE_ESCALA : 1}>
         {/* Skirt: flat disk below body */}
         <mesh position={[0, KNOB_SKIRT_H / 2 - 0.001, 0]}>
           <cylinderGeometry args={[KNOB_SKIRT_R, KNOB_SKIRT_R, KNOB_SKIRT_H, 32]} />
@@ -1415,6 +1519,69 @@ function CtrlMesh({
               polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
           </mesh>
         )}
+      </group>
+    );
+  }
+
+  // ── Z96: ON en pastilla con luz (arriba a la derecha de la banda de título del módulo) ──
+  if (def.type === "toggle" && def.forma === "pastilla") {
+    return (
+      <group position={[def.px, surfY, -def.py]}>
+        <mesh position={[0, 0.004, 0]}>
+          <boxGeometry args={[0.058, 0.008, 0.026]} />
+          <primitive object={ROCKER_BASE_DARK_MAT} attach="material" />
+        </mesh>
+        {/* lente ámbar: se enciende con el módulo */}
+        <mesh position={[0, 0.0095, 0]}>
+          <boxGeometry args={[0.046, 0.004, 0.018]} />
+          <meshStandardMaterial ref={ledMatRef} color="#3A1A00" emissive={lecternPalette().ledToggle} emissiveIntensity={0.04} roughness={0.5} />
+        </mesh>
+        <mesh position={[0, 0.0118, 0]} rotation={LBL_ROT}>
+          <planeGeometry args={[0.040, 0.0125]} />
+          <meshBasicMaterial map={labelTex("ON")} transparent alphaTest={0.05} depthWrite={false} toneMapped={false}
+            polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+        </mesh>
+        <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, 0.006, 0]} visible={false}>
+          <boxGeometry args={[0.058 * HIT_PAD, 0.016, 0.026 * HIT_PAD]} />
+          <meshBasicMaterial transparent opacity={0} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // ── Z96: PLAY/PAUSA grande (rectangular, con pantalla y luz propia) ──
+  if (def.forma === "play") {
+    const BW = PLAY_W, BD = PLAY_D;
+    return (
+      <group position={[def.px, surfY, -def.py]}>
+        <group ref={playGrupoRef}>
+          {/* marco carbón */}
+          <mesh position={[0, 0.005, 0]}>
+            <boxGeometry args={[BW, 0.010, BD]} />
+            <meshStandardMaterial color="#3A3B3C" roughness={0.85} metalness={0.05} />
+          </mesh>
+          <group ref={playTeclaRef}>
+            {/* tecla óxido */}
+            <mesh position={[0, 0.018, 0]}>
+              <boxGeometry args={[BW - 0.014, 0.016, BD - 0.014]} />
+              <primitive object={PLAY_TECLA_MAT} attach="material" />
+            </mesh>
+            {/* pantalla ▶ PLAY / ❚❚ PAUSA */}
+            <mesh position={[0, 0.0265, 0.004]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[BW - 0.040, BD - 0.034]} />
+              <meshBasicMaterial ref={m => { playPantRef.current = m; }} map={playTex?.play ?? null} toneMapped={false} />
+            </mesh>
+            {/* luz propia (franja del lado lejano): verde = reproduciendo · ámbar = en pausa */}
+            <mesh position={[0, 0.0268, -(BD - 0.014) / 2 + 0.008]}>
+              <boxGeometry args={[BW - 0.040, 0.002, 0.007]} />
+              <meshStandardMaterial ref={m => { playLuzRef.current = m; }} color="#1a1000" emissive="#FF9A1F" emissiveIntensity={0.9} />
+            </mesh>
+          </group>
+          <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, 0.014, 0]} visible={false}>
+            <boxGeometry args={[BW, 0.030, BD]} />
+            <meshBasicMaterial transparent opacity={0} />
+          </mesh>
+        </group>
       </group>
     );
   }
@@ -1727,7 +1894,7 @@ if (typeof window !== "undefined") {
 }
 
 // ── Lectern geometry ──────────────────────────────────────────────────────────
-function LecternBody({ side }: { side: "left" | "right" }) {
+function LecternBody({ side, silkV = 0 }: { side: "left" | "right"; silkV?: number }) {
   const { gl } = useThree();
   const sign   = side === "left" ? -1 : 1;
   const silkMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
@@ -1739,18 +1906,26 @@ function LecternBody({ side }: { side: "left" | "right" }) {
   }, [gl]);
 
   // L3: build silkscreen canvas texture and apply to the plane
+  // Z96: el atril de sonido con DISENO_NUEVO usa su propia serigrafía; se rehace con silkV (ETIQUETA_ESCALA) y la
+  // textura anterior se libera (también al desmontar)
+  const nuevoSonido = side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO;
   useEffect(() => {
     if (LABEL_MODE !== "silkscreen") return;
     let cancelled = false;
-    buildSilkscreen(side).then(tex => {
+    let propia: THREE.CanvasTexture | null = null;
+    (nuevoSonido ? buildSilkscreenSonido({ CW: CPANEL_W, CD: CPANEL_D, KNOB_SKIRT_R, THUMB_W }) : buildSilkscreen(side)).then(tex => {
       if (cancelled) { tex.dispose(); return; }
+      propia = tex;
       if (silkMatRef.current) {
         silkMatRef.current.map = tex;
         silkMatRef.current.needsUpdate = true;
       }
     });
-    return () => { cancelled = true; };
-  }, [side]);
+    return () => {
+      cancelled = true;
+      if (propia) { if (silkMatRef.current?.map === propia) silkMatRef.current.map = null; propia.dispose(); }
+    };
+  }, [side, nuevoSonido, silkV]);
 
   return (
     <group>
@@ -1766,6 +1941,8 @@ function LecternBody({ side }: { side: "left" | "right" }) {
       </mesh>
       {/* J5: retro branded apron between the legs (front / user side) */}
       <LecternApron side={side} topY={LEG_H - 0.03} />
+      {/* Z96: placa con el nombre del equipo en la cara frontal del mueble (como la CR-80) */}
+      {nuevoSonido && <PlacaFrenteSonido y={LEG_H - 0.03 - 0.12} z={0.0135} ancho={0.80} />}
 
       {/* ── Top plate group: tilted, front (+Z) lower, back (-Z) higher ───── */}
       {/* Pivot at local +Z = front edge; rotation.x = +TILT_RAD lowers +Z */}
@@ -1819,13 +1996,14 @@ function LecternBody({ side }: { side: "left" | "right" }) {
 
 // ── Full lectern ──────────────────────────────────────────────────────────────
 function Lectern({
-  side, controls, appearProgress, keyVersion, flipVersion,
+  side, controls, appearProgress, keyVersion, flipVersion, silkV = 0,
 }: {
   side: "left" | "right";
   controls: CtrlDef[];
   appearProgress: React.MutableRefObject<number>;
   keyVersion: number;
   flipVersion: number;
+  silkV?: number;
 }) {
   const groupRef  = useRef<THREE.Group>(null);
   const meshesRef = useRef<THREE.Mesh[]>([]);
@@ -1857,6 +2035,14 @@ function Lectern({
     }
   });
 
+  // Z96: al desmontar (p. ej. cambiar el diseño del atril de sonido), sus mallas de impacto dejan de ser clickeables
+  useEffect(() => () => {
+    const ex = (window as unknown as { __lecternMeshes?: THREE.Mesh[] }).__lecternMeshes;
+    if (!ex) return;
+    for (const m of meshesRef.current) { const i = ex.indexOf(m); if (i >= 0) ex.splice(i, 1); }
+    meshesRef.current.length = 0;
+  }, []);
+
   useFrame(() => {
     if (!groupRef.current) return;
     const ease = 1 - Math.pow(1 - appearProgress.current, 3);
@@ -1874,7 +2060,7 @@ function Lectern({
   return (
     <group ref={groupRef}>
       <group position={[sign * LECTERN_PLACE_X, TARIMA_H_REF, 0]} rotation={[0, yaw, 0]}>
-        <LecternBody side={side} />
+        <LecternBody side={side} silkV={silkV} />
 
         {/* SpotLight: above and slightly toward user (local +Z), aimed at plate centre */}
         <spotLight
@@ -1957,7 +2143,9 @@ function Lectern({
               )
             }
             {/* Z79: botón grande de PLAY en la franja libre del centro del atril de sonido */}
-            {side === "right" && <PlayGrande />}
+            {side === "right" && !DBG_ATRIL_SONIDO.DISENO_NUEVO && <PlayGrande />}
+            {/* Z96: display ámbar (franja lejana) y VU de la columna SALIDA del diseño nuevo */}
+            {side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO && <><DisplaySonido /><VuSonido /></>}
             {controls.map(def => (
               <CtrlMesh
                 key={def.id}
@@ -2094,6 +2282,14 @@ function InteractionHandler() {
       // Z80: control "superficie" (disco de la caja de ritmos): recibe el punto de impacto y decide la celda él mismo
       if ((def.type as string) === "superficie") {
         (def as unknown as { onPunto?: (p: THREE.Vector3) => void }).onPunto?.(point);
+        return;
+      }
+
+      // Z96: doble clic / doble toque sobre una perilla o el fader del atril de sonido → valor por defecto
+      if ((def.type === "knob" || def.type === "slider") && DBG_ATRIL_SONIDO.DISENO_NUEVO && def.id.startsWith("s_")
+          && esDobleClic(_dobleClic, def.id, performance.now())) {
+        setCtrl(def.id, def.initial, def);
+        playUIClick(900, 0.08);
         return;
       }
 
@@ -2302,6 +2498,17 @@ export default function LecternSystem() {
     return () => document.removeEventListener("pointerlockerror", onErr);
   }, []);
 
+  // Z96: menú del atril de sonido: diseño (remonta) o escala de etiquetas (rehace la serigrafía)
+  const [disenoV, setDisenoV] = useState(0);
+  const [silkV, setSilkV] = useState(0);
+  useEffect(() => {
+    const on = (e: Event) => {
+      if ((e as CustomEvent<{ remontar?: boolean }>).detail?.remontar) setDisenoV(v => v + 1); else setSilkV(v => v + 1);
+    };
+    window.addEventListener("alight:atril-sonido-cambio", on);
+    return () => window.removeEventListener("alight:atril-sonido-cambio", on);
+  }, []);
+
   // I1: flip lectern orientation (debug)
   useEffect(() => {
     const onFlip = (e: Event) => {
@@ -2464,7 +2671,8 @@ export default function LecternSystem() {
   return (
     <>
       <Lectern side="left"  controls={IMAGE_CONTROLS} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} />
-      <Lectern side="right" controls={SOUND_CONTROLS}  appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} />
+      {/* Z96: la key remonta el atril de sonido al cambiar DISENO_NUEVO (mallas y serigrafía limpias) */}
+      <Lectern key={`sonido-${disenoV}`} side="right" controls={controlesSonido()} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} silkV={silkV} />
       <InteractionHandler />
       {/* Z79: slots de los atriles de instrumentos (detrás del atril de sonido; marcadores con DBG_PLAY.MOSTRAR_SLOTS) */}
       <SlotsAtriles atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} anchoM={OUTER_W} profM={OUTER_D} />

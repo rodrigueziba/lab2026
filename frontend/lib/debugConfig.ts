@@ -746,6 +746,16 @@ export const DBG_LECTERNS = {
   debugOverlays:    false,  // L5: show lectern status line — off by default
 };
 
+// ── Z96: atril de SONIDO rediseñado ("SONIDO SN-40": lib/atrilSonido.ts, components/AtrilSonidoNuevo.tsx) ──
+// DISENO_NUEVO false = layout anterior (J3) tal cual. El atril de imagen no cambia.
+export const DBG_ATRIL_SONIDO = {
+  DISENO_NUEVO:    true,    // — live (redibuja el atril)
+  PLAY_ESCALA:     1.0,     // PLAY/PAUSA grande: 1 = 32 × 8,2 cm (23 % del ancho del panel) — live
+  ETIQUETA_ESCALA: 1.0,     // multiplica el alto de títulos y etiquetas (los lejanos ya son más grandes) — live (redibuja la serigrafía)
+  DISPLAY_VALOR_S: 2.5,     // s que el display muestra el control tocado (nombre y valor) antes de volver al estado — live
+  VU_HZ:           30,      // tope de actualización del VU y del display (solo con el atril en pantalla) — live
+};
+
 // ── J5: retro skin (cassette futurism) for TARIMA lecterns ───────────────────
 export const DBG_RETRO = {
   lecterns:  true,   // J5: beige/carbón + desgaste — live (rótulos/teclas: reload)

@@ -248,6 +248,17 @@ export function mostrarEleccionAhora(): void {
   if (_cierre) { clearTimeout(_cierre); _cierre = null; }
   if (forzarEleccion(CONSENT, Date.now())) abrirTerminal("tx_eleccion");
 }
+/**
+ * Z96: checkpoint "atril_sonido": salta el diálogo eligiendo "No compartir" en silencio (sin terminal y sin publicar
+ * nada): salen los atriles como tras esa elección. Con una transmisión en curso no hace nada.
+ */
+export function atajoSinCompartir(): void {
+  if (_cierre) { clearTimeout(_cierre); _cierre = null; }
+  if (AUX.terminalNuestra) { if (DIALOGO_STATE.fuente === RUTA_TARIMA_EXPONERSE) cerrarDialogo(); terminalLiberada(); }
+  if (CONSENT.estado === "compartiendo") return;
+  CONSENT.estado = "eligiendo";
+  elegir("privado");
+}
 /** Vuelve a empezar: corta, olvida la elección y arranca la espera inicial (los atriles que ya salieron no se repiten). */
 export function reiniciarConsentimiento(): void {
   cortarTransmision("boton");

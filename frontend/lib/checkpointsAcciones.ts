@@ -44,7 +44,9 @@ import { completarCuarto } from "@/lib/pasto";
 import { MONO_PASTO } from "@/lib/monolitosPasto";
 import { reiniciarDecisionAviso } from "@/lib/avisoVivoAcciones";
 import { reiniciarMonolitosVivo } from "@/lib/monolitosVivoAcciones";
-import { mostrarEleccionAhora } from "@/lib/consentTarimaAcciones";
+import { mostrarEleccionAhora, atajoSinCompartir } from "@/lib/consentTarimaAcciones";
+import { LECTERN_OUTWARD_OFFSET_M } from "@/lib/debugConfig";
+import { ATRIL_X_BASE, poseFrenteAtril } from "@/lib/atrilSonido";   // Z96
 import { detenerPresencia } from "@/lib/vivo/vivoAcciones";
 import { detenerLiveKit } from "@/lib/vivo/publicarLiveKit";
 
@@ -245,6 +247,21 @@ export const ACCIONES_CHECKPOINT: Record<string, Accion> = {
   forzarDomo: () => { window.dispatchEvent(new CustomEvent("alight:debug-mostrar-domo")); return true; },
   // lo mismo que el botón "Mostrar elección ahora": texto 2 con Compartir / No compartir (hay que elegir igual)
   mostrarEleccion: () => { mostrarEleccionAhora(); return true; },
+  // ── Z96 ──
+  // "No compartir" en silencio (sin terminal ni transmisión) y espera a que salgan los atriles
+  atrilesSinConsentimiento: (_p, ctx) => {
+    if (ctx.primera) { escuchar("alight:lecterns-visible"); atajoSinCompartir(); }
+    if (_esperado.visto) { soltarEscucha(); return true; }
+    return false;
+  },
+  // frente al atril de sonido, a 1 m (dentro de INTERACT_RANGE 1,8 m; el de imagen queda a más de 2 m), mirando su panel
+  frenteAtrilSonido: () => {
+    if (!_camara) return false;
+    const p = poseFrenteAtril(ATRIL_X_BASE + LECTERN_OUTWARD_OFFSET_M, 1.0);
+    _camara.position.set(p.x, 1.6, p.z);
+    _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
+    return true;
+  },
 
   premio: () => {
     guardarPremio();
