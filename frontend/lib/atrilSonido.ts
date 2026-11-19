@@ -12,7 +12,7 @@
 // placa inclinada, no solo distancia).
 
 export type TipoCtrl = "button" | "toggle" | "slider" | "knob";
-export type FormaCtrl = "normal" | "grande" | "pastilla" | "play";
+export type FormaCtrl = "normal" | "grande" | "pastilla" | "play" | "pad" | "indicador";   // Z97: pad (atril de imagen) e indicador
 export interface PosCtrl { id: string; u: number; v: number; forma: FormaCtrl; etiqueta: string; nombreLargo: string; modulo: string }
 export interface Rect { u0: number; u1: number; v0: number; v1: number }   // v1 = borde lejano
 export interface Modulo { id: string; titulo: string; fila: Fila; rect: Rect; on: string | null }
@@ -276,32 +276,39 @@ export function legibilidadMinima(g: GeoAtril, cam: CamaraPura, escala: number):
   return { min, id };
 }
 
-/**
- * Réplica pura de la búsqueda de fitLecternCamera (rama de sonido): las mismas restricciones y el mismo orden, más la
- * de Z96 (legibilidad ≥ LEGIBLE_MIN de la fila de efectos) si exigirLegible. Devuelve la pose elegida o null.
- */
-export function buscarPoseSonido(g: GeoAtril, aspect: number, exigirLegible: boolean, escala: number, anchoMinNdc = 1.7):
+/** Z97: opciones de la búsqueda (las dos ramas de fitLecternCamera). */
+export interface OpcionesBusqueda {
+  fovs: number[]; hMin: number; pMin: number; pMax: number;
+  anchoMinNdc: number | null;          // sonido: ancho mínimo del panel en NDC (null = sin la restricción: imagen)
+  etiquetaK1: boolean;                 // sonido: la etiqueta de K1 ≥ 12 px
+  legible: ((cam: CamaraPura) => number) | null;   // exigencia de legibilidad (null = sin exigir)
+}
+export const BUSQUEDA_SONIDO = { fovs: [60, 65, 70, 75, 80, 85, 90], hMin: 0.70, pMin: -60, pMax: -25 };
+export const BUSQUEDA_IMAGEN = { fovs: [75, 80, 85, 90], hMin: 0.80, pMin: -35, pMax: -10 };
+/** Réplica pura de la búsqueda de fitLecternCamera (mismas restricciones y orden). legible = fracción del texto lejano. */
+export function buscarPose(g: GeoAtril, aspect: number, o: OpcionesBusqueda):
   { fov: number; height: number; dist: number; pitch: number; legible: number } | null {
   const hw = g.PANEL_W / 2, hd = g.PANEL_D / 2;
   const esq = [[-hw, -hd], [hw, -hd], [-hw, hd], [hw, hd]].map(([x, z]) => aLocal(g, x, 0, -z));
   const plateCtr = aLocal(g, 0, 0, 0);
   const lab = aLocal(g, 0, g.LBL_H / 2, -g.ROW1_V_A);   // farLabelWorld de K1: (0, LBL_H/2, ROW1_V_A) en el panel (z = ROW1_V_A)
-  for (const fov of [60, 65, 70, 75, 80, 85, 90]) {
+  for (const fov of o.fovs) {
     let mejor: { fov: number; height: number; dist: number; pitch: number; legible: number } | null = null, mejorD = Infinity;
     for (let dist = 0.5; dist <= 1.2 + 1e-6; dist += 0.05) {
-      for (let height = 0.7; height <= 1.3 + 1e-6; height += 0.05) {
-        for (let pitch = -60; pitch <= -25; pitch += 1) {
+      for (let height = o.hMin; height <= 1.3 + 1e-6; height += 0.05) {
+        for (let pitch = o.pMin; pitch <= o.pMax; pitch += 1) {
           const cam = camaraAtril(g, fov, height, dist, pitch, aspect);
-          if (cam.pos[1] < plateCtr[1] + 0.7) continue;
+          if (cam.pos[1] < plateCtr[1] + o.hMin) continue;
           const n = esq.map(p => ndc(cam, p));
           if (!n.every(q => q.z > 0.05 && Math.abs(q.x) <= 0.9 && Math.abs(q.y) <= 0.9)) continue;
           if (Math.min(n[2].y, n[3].y) < -0.84) continue;
-          const xs = n.map(q => q.x);
-          if (Math.max(...xs) - Math.min(...xs) < anchoMinNdc) continue;
-          const lDist = Math.hypot(lab[0] - cam.pos[0], lab[1] - cam.pos[1], lab[2] - cam.pos[2]);
-          if ((g.LBL_H / (2 * lDist * cam.tanV)) * 1080 < 12) continue;
-          const leg = legibilidadMinima(g, cam, escala).min;
-          if (exigirLegible && leg < LEGIBLE_MIN) continue;
+          if (o.anchoMinNdc !== null) { const xs = n.map(q => q.x); if (Math.max(...xs) - Math.min(...xs) < o.anchoMinNdc) continue; }
+          if (o.etiquetaK1) {
+            const lDist = Math.hypot(lab[0] - cam.pos[0], lab[1] - cam.pos[1], lab[2] - cam.pos[2]);
+            if ((g.LBL_H / (2 * lDist * cam.tanV)) * 1080 < 12) continue;
+          }
+          const leg = o.legible ? o.legible(cam) : 0;
+          if (o.legible && leg < LEGIBLE_MIN) continue;
           if (dist < mejorD) { mejorD = dist; mejor = { fov, height, dist, pitch, legible: leg }; }
         }
       }
@@ -309,6 +316,17 @@ export function buscarPoseSonido(g: GeoAtril, aspect: number, exigirLegible: boo
     if (mejor) return mejor;
   }
   return null;
+}
+/**
+ * Réplica pura de la búsqueda de fitLecternCamera (rama de sonido): las mismas restricciones y el mismo orden, más la
+ * de Z96 (legibilidad ≥ LEGIBLE_MIN del texto más lejano) si exigirLegible. Devuelve la pose elegida o null.
+ */
+export function buscarPoseSonido(g: GeoAtril, aspect: number, exigirLegible: boolean, escala: number, anchoMinNdc = 1.7):
+  { fov: number; height: number; dist: number; pitch: number; legible: number } | null {
+  const r = buscarPose(g, aspect, { ...BUSQUEDA_SONIDO, anchoMinNdc, etiquetaK1: true,
+    legible: exigirLegible ? (cam => legibilidadMinima(g, cam, escala).min) : null });
+  if (r && !exigirLegible) { const cam = camaraAtril(g, r.fov, r.height, r.dist, r.pitch, aspect); r.legible = legibilidadMinima(g, cam, escala).min; }
+  return r;
 }
 
 // ── display: texto de estado (puro) ──
@@ -497,11 +515,11 @@ export const ROTULO_MIN = 0.020;
 export const LEYENDA_FILAS = "1 EFECTOS · 2 TONO · 3 TRANSPORTE";
 /** La placa de la barra en dos líneas: placa (lejos) y leyenda (cerca); franjas finas del lado del jugador. */
 export const BARRA_2L = { placa: 0.0325, leyenda: 0.0215, franjas: 0.008, gap: 0.003, margen: 0.003 };
-export function lineasBarra(nCharsPlaca: number, conLeyenda: boolean): { placa: { u: number; v: number; alto: number }; leyenda: { u: number; v: number; alto: number } | null } {
+export function lineasBarra(nCharsPlaca: number, conLeyenda: boolean, nCharsLeyenda = LEYENDA_FILAS.length): { placa: { u: number; v: number; alto: number }; leyenda: { u: number; v: number; alto: number } | null } {
   if (!conLeyenda) return { placa: textoPlaca(nCharsPlaca), leyenda: null };
   const vc = (BARRA.v0 + BARRA.v1) / 2, top = vc + PLACA_BARRA.prof / 2 - BARRA_2L.margen;
   const hp = Math.min(BARRA_2L.placa, (PLACA_BARRA.ancho - 0.04) / (nCharsPlaca * ANCHO_CHAR));
-  const hl = Math.min(BARRA_2L.leyenda, (PLACA_BARRA.ancho - 0.04) / (LEYENDA_FILAS.length * ANCHO_CHAR));
+  const hl = Math.min(BARRA_2L.leyenda, (PLACA_BARRA.ancho - 0.04) / (nCharsLeyenda * ANCHO_CHAR));
   return { placa: { u: 0, v: top - hp / 2, alto: hp }, leyenda: { u: 0, v: top - hp - BARRA_2L.gap - hl / 2, alto: hl } };
 }
 /** Números de fila grandes en el margen (uno por fila, derechos). */

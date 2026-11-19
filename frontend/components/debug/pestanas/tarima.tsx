@@ -2,7 +2,7 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO } from "@/lib/debugConfig";
 import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent, modoActual } from "@/lib/consentTarimaAcciones";   // Z91
 import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit, alternarPanelCuadro, panelCuadroVisible } from "@/lib/vivo/publicarLiveKit";   // Z92 · Z94b
 import { sesionIdNavegador } from "@/lib/vivo/vivoAcciones";   // Z92
@@ -633,6 +633,54 @@ export function SecAtrilSonidoZ96() {
             </div>
           ))}
           <div style={{ ...ROW, ...NOTE }}><span>doble clic sobre una perilla o el fader: vuelve a su valor por defecto · el display muestra el control tocado</span></div>
+    </>
+  );
+}
+
+// sección: atril-imagen-z97
+export function SecAtrilImagenZ97() {
+  // Z97: atril de imagen rediseñado ("IMAGEN IM-40"). Diseño y escala de etiquetas avisan a LecternSystem (evento).
+  const A = DBG_ATRIL_VIDEO;
+  const [, setTick] = useState(0);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const avisar = (remontar: boolean) => window.dispatchEvent(new CustomEvent("alight:atril-imagen-cambio", { detail: { remontar } }));
+  return (
+    <>
+          <span style={LABEL}>Atril de imagen Z97 <span style={NOTE}>(IMAGEN IM-40 · probar con el checkpoint «Atril de imagen» o ?cp=atril_imagen)</span></span>
+          <div style={ROW}>
+            <span>DISENO_NUEVO <span style={NOTE}>off = layout anterior (ON/OFF, REACTIVO, SIG.EFE.) y la rotación de 5 s de siempre</span></span>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); A.DISENO_NUEVO = !A.DISENO_NUEVO; avisar(true); toca(); }}>{A.DISENO_NUEVO ? "ON" : "off"}</button>
+          </div>
+          {([["ETIQUETA_ESCALA", 0.7, 1.4, 0.05, "títulos y etiquetas (rehace la serigrafía)", true],
+            ["DISPLAY_VALOR_S", 0.5, 8, 0.5, "s que el display muestra el control tocado", false],
+            ["VELOC_MIN_S", 0.5, 5, 0.5, "mínimo de VELOC. (s entre pasos de AUTO)", false],
+            ["VELOC_MAX_S", 5, 30, 1, "máximo de VELOC.", false]] as const).map(([k, mn, mx, st, nota, rehacer]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{A[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={A[k]}
+                onChange={ev => { A[k] = parseFloat(ev.target.value); toca(); }}
+                onPointerUp={() => { if (rehacer) avisar(false); }} onKeyUp={() => { if (rehacer) avisar(false); }} />
+            </div>
+          ))}
+          {([["ROTULOS_FILA", "rótulos de fila (DOMO · IMAGEN)"], ["ETIQUETA_AUTO_ASPECTO", "proporción < 1,6: etiquetas hasta × 1,15"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); A[k] = !A[k]; avisar(false); toca(); }}>{A[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          <div style={ROW}>
+            <span>ROTULOS_MODO <span style={NOTE}>margen = verticales DOMO · IMAGEN · barra = leyenda numerada en la placa + 1·2</span></span>
+            {(["margen", "barra"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, opacity: A.ROTULOS_MODO === m ? 1 : 0.5 }} onClick={ev => { ev.currentTarget.blur(); A.ROTULOS_MODO = m; avisar(false); toca(); }}>{m}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <span>CAMARA <span style={NOTE}>panel = mira el panel (texto legible, domo casi fuera de cuadro) · domo = la de antes (domo arriba, texto chico). Vale al volver a apretar E</span></span>
+            {(["panel", "domo"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, opacity: A.CAMARA === m ? 1 : 0.5 }} onClick={ev => { ev.currentTarget.blur(); A.CAMARA = m; toca(); }}>{m}</button>
+            ))}
+          </div>
+          <div style={{ ...ROW, ...NOTE }}><span>PADS_INICIO 0x{A.PADS_INICIO.toString(16)} (pads encendidos al cargar) · doble clic sobre una perilla o un fader: vuelve a su valor por defecto</span></div>
     </>
   );
 }

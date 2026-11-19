@@ -20,7 +20,8 @@ export type CheckpointId =
   | "dia_mediodia" | "dia_atardecer" | "dia_noche"   // Z48
   | "dia_prisma_sube" | "dia_flor" | "dia_prisma_baja"   // Z54
   | "sillas_recibir" | "tarima_compartir"   // Z95: prueba de la transmisión en vivo con dos ventanas
-  | "atril_sonido";                          // Z96: probar el atril de sonido rediseñado
+  | "atril_sonido"                           // Z96: probar el atril de sonido rediseñado
+  | "atril_imagen";                          // Z97: probar el atril de imagen rediseñado
 
 /** ["accion", ...args] */
 export type Paso = readonly [string, ...(string | number)[]];
@@ -96,6 +97,10 @@ export const CHECKPOINTS: readonly Checkpoint[] = [
   { id: "atril_sonido", nombre: "Atril de sonido", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
       ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["frenteAtrilSonido"], ["esperarFrames", 2]],
     descripcion: "Sobre la tarima con figuras y atriles (sin diálogo ni transmisión), frente al atril de sonido: apretá E." },
+  // Z97: igual que atril_sonido, pero frente al atril de imagen (izquierda)
+  { id: "atril_imagen", nombre: "Atril de imagen", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
+      ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["frenteAtrilImagen"], ["esperarFrames", 2]],
+    descripcion: "Sobre la tarima con figuras y atriles (sin diálogo ni transmisión), frente al atril de imagen: apretá E." },
 ];
 
 /**

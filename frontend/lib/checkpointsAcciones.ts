@@ -47,6 +47,7 @@ import { reiniciarMonolitosVivo } from "@/lib/monolitosVivoAcciones";
 import { mostrarEleccionAhora, atajoSinCompartir } from "@/lib/consentTarimaAcciones";
 import { LECTERN_OUTWARD_OFFSET_M } from "@/lib/debugConfig";
 import { ATRIL_X_BASE, poseFrenteAtril } from "@/lib/atrilSonido";   // Z96
+import { poseFrenteAtrilImagen } from "@/lib/atrilImagen";            // Z97
 import { detenerPresencia } from "@/lib/vivo/vivoAcciones";
 import { detenerLiveKit } from "@/lib/vivo/publicarLiveKit";
 
@@ -258,6 +259,15 @@ export const ACCIONES_CHECKPOINT: Record<string, Accion> = {
   frenteAtrilSonido: () => {
     if (!_camara) return false;
     const p = poseFrenteAtril(ATRIL_X_BASE + LECTERN_OUTWARD_OFFSET_M, 1.0);
+    _camara.position.set(p.x, 1.6, p.z);
+    _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
+    return true;
+  },
+
+  // Z97: a 1 m del atril de imagen (izquierda), mirándolo; el de sonido queda a ~2,2 m (fuera del rango de E)
+  frenteAtrilImagen: () => {
+    if (!_camara) return false;
+    const p = poseFrenteAtrilImagen(ATRIL_X_BASE + LECTERN_OUTWARD_OFFSET_M, 1.0);
     _camara.position.set(p.x, 1.6, p.z);
     _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
     return true;

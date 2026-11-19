@@ -206,7 +206,7 @@ console.log('\nintegración (lectura del código)');
   const HC = H.replace(/\/\/.*$/gm, '');
   check(!/frustum\.|\.visible|camera\.|getWorldDirection|isMeshVisible/.test(HC.split('useFrame(')[1] ?? ''), 'Z94c: el pase no mira la cámara ni la visibilidad del domo');
   const FU = FD.split('useFrame(')[1] ?? '';
-  check(/if \(showDome\) \{[\s\S]*?domeUniforms\.uBrightness\.value = STORE\.webcam\.brightness;[\s\S]*?domeUniforms\.uPsych\.value/.test(FU) && /domeUniforms\.uTime\.value = t;/.test(FU) && !/frustum|isVisible|\.visible/.test(FU.split('if (!active) return null;')[0]),
+  check(/if \(showDome\) \{[\s\S]*?domeUniforms\.uBrightness\.value = (imgOn \? )?STORE\.webcam\.brightness( : 1)?;[\s\S]*?domeUniforms\.uPsych\.value/.test(FU) && /domeUniforms\.uTime\.value = t;/.test(FU) && !/frustum|isVisible|\.visible/.test(FU.split('if (!active) return null;')[0]),
     'Z94c: FaceDome actualiza uTime, uMap y los ajustes del atril en su useFrame aunque el domo esté fuera de cámara');
   check(/mesh\.frustumCulled = false/.test(H), 'el quad del pase no se descarta por frustum');
   check(/T\.marcarPase\("pausado", "benchmark"\)/.test(H) && /T\.marcarPase\("no disponible"/.test(H) && /T\.turno\(\);/.test(H), 'Z94c: el host informa dibujando / pausado / no disponible y cuenta turnos');

@@ -763,6 +763,24 @@ export const DBG_ATRIL_SONIDO = {
   ETIQUETA_AUTO_ASPECTO: true,  // proporción < 1,6: ETIQUETA_ESCALA sube hasta × 1,15 (acotada por lugar) — live (rehace la serigrafía)
 };
 
+// ── Z97: atril de IMAGEN rediseñado ("IMAGEN IM-40": lib/atrilImagen.ts, lib/domoEfectos.ts, components/AtrilImagenNuevo.tsx) ──
+// DISENO_NUEVO false = atril de imagen anterior (J3) tal cual, con la rotación fija de 5 s. El atril de sonido no cambia.
+export const DBG_ATRIL_VIDEO = {
+  DISENO_NUEVO:          true,    // — live (redibuja el atril)
+  ETIQUETA_ESCALA:       1.0,     // multiplica títulos y etiquetas — live (rehace la serigrafía)
+  ETIQUETA_AUTO_ASPECTO: true,    // proporción < 1,6: hasta × 1,15 (acotado por lugar) — live
+  DISPLAY_VALOR_S:       2.5,     // s que el display muestra el control tocado — live
+  VELOC_MIN_S:           1,       // rango de VELOC. (s entre pasos de la rotación AUTO) — live
+  VELOC_MAX_S:           10,      // — live
+  VELOC_DEFECTO_S:       5,       // como la rotación de hoy (vale al cargar) — live
+  ROTULOS_FILA:          true,    // rótulos de fila DOMO · IMAGEN — live
+  ROTULOS_MODO:          "margen" as string,   // "margen" (verticales) | "barra" (leyenda numerada en la placa) — live
+  PADS_INICIO:           0x7f,    // pads encendidos al cargar (bit i = efecto i; 0x7f = los 7, como hoy) — vale al cargar
+  // Cámara de la tecla E: "panel" = mira el panel (texto lejano ≥ 2,5 %; el domo queda fuera de cuadro) · "domo" = la de
+  // hoy (el domo ocupa ~10 % de arriba de la pantalla, texto lejano 1,4 %). Vale al entrar con E.
+  CAMARA:                "panel" as string,
+};
+
 // ── J5: retro skin (cassette futurism) for TARIMA lecterns ───────────────────
 export const DBG_RETRO = {
   lecterns:  true,   // J5: beige/carbón + desgaste — live (rótulos/teclas: reload)

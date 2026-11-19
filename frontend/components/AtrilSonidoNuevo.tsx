@@ -276,7 +276,7 @@ export function VuSonido() {
 }
 
 // ── placa frontal del mueble ──
-export function PlacaFrenteSonido({ y, z, ancho }: { y: number; z: number; ancho: number }) {
+export function PlacaFrenteSonido({ y, z, ancho, nombre = NOMBRE_EQUIPO, descripcion = DESCRIPCION_EQUIPO }: { y: number; z: number; ancho: number; nombre?: string; descripcion?: string }) {
   const r = useMemo(() => {
     const cv = document.createElement("canvas");
     cv.width = 1024; cv.height = 256;
@@ -284,14 +284,14 @@ export function PlacaFrenteSonido({ y, z, ancho }: { y: number; z: number; ancho
     c.fillStyle = "#E8DCC4"; c.fillRect(0, 0, 1024, 256);
     for (let i = 0; i < 5; i++) { c.fillStyle = FRANJAS[i]; c.fillRect(0, 150 + i * 14, 1024, 12); }
     c.fillStyle = "#3A3B3C"; c.font = "bold 64px monospace"; c.textBaseline = "alphabetic";
-    c.fillText(NOMBRE_EQUIPO, 40, 90);
-    c.font = "26px monospace"; c.fillText(`${NOMBRE_EMPRESA_MAYUS} · ${DESCRIPCION_EQUIPO}`, 40, 132);
+    c.fillText(nombre, 40, 90);
+    c.font = "26px monospace"; c.fillText(`${NOMBRE_EMPRESA_MAYUS} · ${descripcion}`, 40, 132);
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
     const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
     const geo = new THREE.PlaneGeometry(ancho, ancho / 4);
     return { tex, mat, geo };
-  }, [ancho]);
+  }, [ancho, nombre, descripcion]);
   useEffect(() => () => { r.tex.dispose(); r.mat.dispose(); r.geo.dispose(); }, [r]);
   return <mesh position={[0, y, z]} geometry={r.geo} material={r.mat} />;
 }
@@ -299,7 +299,7 @@ export function PlacaFrenteSonido({ y, z, ancho }: { y: number; z: number; ancho
 // ── Z96b: placa sobre la barra trasera del marco (la ve la cámara del modo atril) ──
 // Crema con franja de arcoíris, estilo CR-80. Con ROTULOS_FILA y ROTULOS_MODO "barra" suma una segunda línea con la
 // leyenda numerada de las filas. Se dibuja una vez por combinación (rotulos/modo); libera textura y geometría.
-export function PlacaBarraSonido({ conLeyenda }: { conLeyenda: boolean }) {
+export function PlacaBarraSonido({ conLeyenda, texto: textoP, leyenda = LEYENDA_FILAS }: { conLeyenda: boolean; texto?: string; leyenda?: string }) {
   const r = useMemo(() => {
     const W = PLACA_BARRA.ancho, D = PLACA_BARRA.prof, cw = 4096, ch = Math.round((cw * D) / W);
     const cv = document.createElement("canvas");
@@ -308,11 +308,11 @@ export function PlacaBarraSonido({ conLeyenda }: { conLeyenda: boolean }) {
     const ppm = cw / W, vc = (BARRA.v0 + BARRA.v1) / 2;
     const Y = (v: number) => (vc + D / 2 - v) * ppm;
     c.fillStyle = "#E8DCC4"; c.fillRect(0, 0, cw, ch);
-    const texto = TEXTO_PLACA(NOMBRE_EMPRESA_MAYUS);
-    const l = lineasBarra(texto.length, conLeyenda);
+    const texto = textoP ?? TEXTO_PLACA(NOMBRE_EMPRESA_MAYUS);
+    const l = lineasBarra(texto.length, conLeyenda, leyenda.length);
     c.fillStyle = "#3A3B3C"; c.textAlign = "center"; c.textBaseline = "middle";
     c.font = `bold ${Math.round(l.placa.alto * ppm)}px monospace`; c.fillText(texto, cw / 2, Y(l.placa.v));
-    if (l.leyenda) { c.font = `bold ${Math.round(l.leyenda.alto * ppm)}px monospace`; c.fillStyle = "#5a4a3a"; c.fillText(LEYENDA_FILAS, cw / 2, Y(l.leyenda.v)); }
+    if (l.leyenda) { c.font = `bold ${Math.round(l.leyenda.alto * ppm)}px monospace`; c.fillStyle = "#5a4a3a"; c.fillText(leyenda, cw / 2, Y(l.leyenda.v)); }
     // franjas del lado del jugador
     const fr = (conLeyenda ? BARRA_2L.franjas : PLACA_BARRA.franjas) * ppm, h1 = fr / 5;
     for (let i = 0; i < 5; i++) { c.fillStyle = FRANJAS[i]; c.fillRect(0, ch - fr + i * h1, cw, h1 * 0.8); }
@@ -321,13 +321,14 @@ export function PlacaBarraSonido({ conLeyenda }: { conLeyenda: boolean }) {
     const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
     const geo = new THREE.PlaneGeometry(W, D);
     return { tex, mat, geo, vc };
-  }, [conLeyenda]);
+  }, [conLeyenda, textoP, leyenda]);
   useEffect(() => () => { r.tex.dispose(); r.mat.dispose(); r.geo.dispose(); }, [r]);
   return <mesh position={[0, BARRA.y + 0.0008, -r.vc]} rotation={[-Math.PI / 2, 0, 0]} geometry={r.geo} material={r.mat} />;
 }
 
 // ── Z96b: margen izquierdo de la placa: rótulos de fila verticales ("margen") o números de fila 1·2·3 ("barra") ──
-export function MargenRotulos({ modo }: { modo: string }) {
+type ItemRotulo = { texto: string; v: number; alto: number };
+export function MargenRotulos({ modo, verticales, numeros }: { modo: string; verticales?: ItemRotulo[]; numeros?: ItemRotulo[] }) {
   const r = useMemo(() => {
     const W = MARGEN_ROTULOS.u1 - MARGEN_ROTULOS.u0, v0 = FILAS.transporte.v0, v1 = FILAS.display.v1, D = v1 - v0;
     const ch = 2048, cw = Math.max(32, Math.round((ch * W) / D));
@@ -338,12 +339,12 @@ export function MargenRotulos({ modo }: { modo: string }) {
     c.clearRect(0, 0, cw, ch);
     c.fillStyle = `${CREMA}0.92)`; c.textAlign = "center"; c.textBaseline = "middle";
     if (modo === "margen") {
-      for (const t of rotulosFila()) {
+      for (const t of verticales ?? rotulosFila()) {
         c.save(); c.translate(cw / 2, Y(t.v)); c.rotate(-Math.PI / 2);   // se lee de abajo hacia arriba
         c.font = `bold ${Math.round(t.alto * ppm)}px monospace`; c.fillText(t.texto, 0, 0); c.restore();
       }
     } else {
-      for (const n of numerosFilaMargen()) { c.font = `bold ${Math.round(n.alto * ppm)}px monospace`; c.fillText(n.texto, cw / 2, Y(n.v)); }
+      for (const n of numeros ?? numerosFilaMargen()) { c.font = `bold ${Math.round(n.alto * ppm)}px monospace`; c.fillText(n.texto, cw / 2, Y(n.v)); }
     }
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
@@ -351,7 +352,7 @@ export function MargenRotulos({ modo }: { modo: string }) {
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     const geo = new THREE.PlaneGeometry(W, D);
     return { tex, mat, geo, uc: (MARGEN_ROTULOS.u0 + MARGEN_ROTULOS.u1) / 2, vc: (v0 + v1) / 2 };
-  }, [modo]);
+  }, [modo, verticales, numeros]);
   useEffect(() => () => { r.tex.dispose(); r.mat.dispose(); r.geo.dispose(); }, [r]);
   return <mesh position={[r.uc, 0.0006, -r.vc]} rotation={[-Math.PI / 2, 0, 0]} geometry={r.geo} material={r.mat} />;
 }

@@ -18,13 +18,18 @@ import {
   nextTrack, prevTrack, initAudio, loadPlaylist, playTrack,   // Z79: togglePlayPause ahora va por lib/playTarimaAcciones
   playUIClick,
 } from "@/lib/audioEngine";
-import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT, DBG_ATRIL_SONIDO } from "@/lib/debugConfig";
+import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO } from "@/lib/debugConfig";
 // Z96: atril de sonido rediseñado ("SONIDO SN-40"): layout como datos (lib/atrilSonido.ts) y piezas (AtrilSonidoNuevo.tsx)
 import {
   POSICIONES as POS_SONIDO_NUEVO, FADER_RAIL, GRANDE_ESCALA, PLAY_W, PLAY_D, textoValor, camaraAtril, legibilidadMinima,
   LEGIBLE_MIN, esDobleClic, escalaEfectiva, type FormaCtrl, type GeoAtril, type PosCtrl,
 } from "@/lib/atrilSonido";
 import { DisplaySonido, VuSonido, PlacaFrenteSonido, buildSilkscreenSonido, mostrarEnDisplay, PlacaBarraSonido, MargenRotulos, escalaActual } from "./AtrilSonidoNuevo";
+// Z97: atril de imagen rediseñado ("IMAGEN IM-40")
+import { POSICIONES_I, legibilidadMinimaI, NOMBRE_EQUIPO_I, DESCRIPCION_EQUIPO_I, TEXTO_PLACA_I, LEYENDA_FILAS_I, type PosCtrlI } from "@/lib/atrilImagen";
+import { DOMO_EFECTOS, fijarPad } from "@/lib/domoEfectos";
+import { DisplayImagen, buildSilkscreenImagen, mostrarEnDisplayImagen, escalaActualImagen, ROTULOS_VERTICALES_I, ROTULOS_NUMEROS_I } from "./AtrilImagenNuevo";
+import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
 import { PLAY_TARIMA } from "@/lib/playTarima";                                              // Z79
 import { alternarPlay, instalarEstadoPlay, prepararSinAutoplay } from "@/lib/playTarimaAcciones"; // Z79
 import { PlayGrande, SlotsAtriles } from "./PlayTarima";                                       // Z79
@@ -628,8 +633,14 @@ function fitLecternCamera(
 ): { pos: [number,number,number]; quat: [number,number,number,number]; fovDeg: number } {
   const isImage = side === "left";
   const nuevoSonido = !isImage && DBG_ATRIL_SONIDO.DISENO_NUEVO;
-  const exigirLegible = nuevoSonido && pasada < 3;
-  const anchoMinNdc = nuevoSonido && pasada === 2 ? 1.30 : 1.70;
+  // Z97: atril de imagen nuevo con CAMARA "panel": busca como el de sonido (mira el panel) y exige la legibilidad;
+  // con "domo", la cámara de siempre (más el pedido de legibilidad, que con ella no se alcanza: cae a la de siempre)
+  const nuevoImagen = isImage && DBG_ATRIL_VIDEO.DISENO_NUEVO;
+  const modoImagen = isImage && !(nuevoImagen && DBG_ATRIL_VIDEO.CAMARA !== "domo");
+  const imagenPanel = nuevoImagen && !modoImagen;
+  const conPasadas = nuevoSonido || imagenPanel;
+  const exigirLegible = conPasadas && pasada < 3;
+  const anchoMinNdc = conPasadas && pasada === 2 ? 1.30 : 1.70;
   const dbgCfg  = isImage ? DBG_CAM_IMAGE : DBG_CAM_SOUND;
 
   // Debug override: bypass search
@@ -662,19 +673,19 @@ function fitLecternCamera(
   const farLabelWorld = new THREE.Vector3(0, LBL_H / 2, ROW1_V_A).applyMatrix4(plateM);
 
   // ── Search parameters ───────────────────────────────────────────────────────
-  const fovsToTry = isImage
+  const fovsToTry = modoImagen
     ? [75, 80, 85, 90]
     : [60, 65, 70, 75, 80, 85, 90];
 
   const heightStep = 0.05;
   const distStep   = 0.05;
   const pitchStep  = 1;
-  const hMin = isImage ? 0.80 : 0.70;
+  const hMin = modoImagen ? 0.80 : 0.70;
   const hMax = 1.30;
   const dMin = 0.50;
   const dMax = 1.20;
-  const pMin = isImage ? -35 : -60;
-  const pMax = isImage ? -10 : -25;
+  const pMin = modoImagen ? -35 : -60;
+  const pMax = modoImagen ? -10 : -25;
 
   const testCam = new THREE.PerspectiveCamera(75, aspect, 0.05, 200);
 
@@ -714,7 +725,7 @@ function fitLecternCamera(
           // ── Constraint: front edge ≥ 8% above bottom (NDC y ≥ -0.84) ─────
           if (Math.min(ndcs[2].y, ndcs[3].y) < -0.84) continue;
 
-          if (!isImage) {
+          if (!modoImagen) {
             // ── Sound: plate ≥ 85% of frame width ────────────────────────────
             const ndcXs = ndcs.map(n => n.x);
             if (Math.max(...ndcXs) - Math.min(...ndcXs) < anchoMinNdc) continue;
@@ -727,7 +738,10 @@ function fitLecternCamera(
             // ── Z96: texto más lejano del diseño nuevo ≥ LEGIBLE_MIN (proyección real sobre la placa inclinada) ──
             if (exigirLegible) {
               const cp = camaraAtril(geoAtril(), fovDeg, height, dist, pitchDeg, aspect);
-              if (legibilidadMinima(geoAtril(), cp, escalaEfectiva(DBG_ATRIL_SONIDO.ETIQUETA_ESCALA, DBG_ATRIL_SONIDO.ETIQUETA_AUTO_ASPECTO, aspect)).min < LEGIBLE_MIN) continue;
+              const leg = isImage
+                ? legibilidadMinimaI(geoAtril(), cp, escalaEfectiva(DBG_ATRIL_VIDEO.ETIQUETA_ESCALA, DBG_ATRIL_VIDEO.ETIQUETA_AUTO_ASPECTO, aspect)).min
+                : legibilidadMinima(geoAtril(), cp, escalaEfectiva(DBG_ATRIL_SONIDO.ETIQUETA_ESCALA, DBG_ATRIL_SONIDO.ETIQUETA_AUTO_ASPECTO, aspect)).min;
+              if (leg < LEGIBLE_MIN) continue;
             }
           } else {
             // ── Image: dome visibility (6×3 grid, top 30% of screen, ≥70%) ──
@@ -757,9 +771,9 @@ function fitLecternCamera(
     }
 
     if (bestPose) return bestPose;
-    if (fovDeg >= 90 && (!nuevoSonido || pasada === 3)) console.warn(`[K1 fit] No pose found for side=${side} at fov=90°`);
+    if (fovDeg >= 90 && (!conPasadas || pasada === 3)) console.warn(`[K1 fit] No pose found for side=${side} at fov=90°`);
   }
-  if (nuevoSonido && pasada < 3) return fitLecternCamera(side, aspect, pasada + 1);   // Z96
+  if (conPasadas && pasada < 3) return fitLecternCamera(side, aspect, pasada + 1);   // Z96 (Z97: también imagen "panel")
 
   // Final fallback: use initial values from spec
   return _makePose(side, isImage ? 75 : 60, isImage ? 0.9 : 0.8, isImage ? 0.75 : 0.8, isImage ? -22 : -45);
@@ -784,7 +798,7 @@ export function reshuffleKeys() {
 function buildKeyMap(side: "left" | "right") {
   if (_keyMapSide === side) return;  // already built for this side
   _keyMapSide = side;
-  const controls = side === "left" ? IMAGE_CONTROLS : SOUND_CONTROLS;
+  const controls = side === "left" ? controlesImagen() : SOUND_CONTROLS;   // Z97: con el diseño nuevo, pads y AUTO entran al sorteo
   const btns = controls.filter(c => c.type === "button" || c.type === "toggle");
   const rng  = seededRand(_keySeed + (side === "left" ? 0 : 1000));
   const idxs = btns.map((_, i) => i).sort(() => rng() - 0.5).slice(0, KEY_LETTERS.length);
@@ -845,9 +859,18 @@ function setCtrl(id: string, v: number, def: CtrlDef) {
       mostrarEnDisplay(textoValor(nombre, def.type as "button" | "toggle" | "slider" | "knob", ctrlState[id], def.min, def.max));
     }
   }
+  // Z97: lo mismo en el display del atril de imagen
+  if (DBG_ATRIL_VIDEO.DISENO_NUEVO && _posImagen?.has(id)) {
+    const p = _posImagen.get(id)!;
+    if (def.type !== "button" || ctrlState[id] > 0.5) {
+      mostrarEnDisplayImagen(id === "dom_rot_s" ? `${p.nombreLargo} ${ctrlState[id].toFixed(1)} s`
+        : textoValor(p.nombreLargo, def.type as "button" | "toggle" | "slider" | "knob", ctrlState[id], def.min, def.max));
+    }
+  }
   storeNotify();
 }
 const _posSonido = new Map<string, PosCtrl>(POS_SONIDO_NUEVO.map(p => [p.id, p]));
+const TEXTO_PLACA_IMAGEN = TEXTO_PLACA_I(NOMBRE_EMPRESA_MAYUS);   // Z97
 const ONDAS_NOMBRE = ["SENO", "TRIÁNGULO", "CUADRADA", "SIERRA"];
 const DESTINOS_NOMBRE = ["VOLUMEN", "FILTRO", "PITCH"];
 
@@ -1095,6 +1118,34 @@ export const SOUND_CONTROLS_NUEVO: CtrlDef[] = SOUND_CONTROLS.map(d => {
     ...(d.id === "s_vol" ? { railLen: FADER_RAIL } : {}) };
 });
 function controlesSonido(): CtrlDef[] { return DBG_ATRIL_SONIDO.DISENO_NUEVO ? SOUND_CONTROLS_NUEVO : SOUND_CONTROLS; }
+
+// Z97: controles NUEVOS del atril de imagen (pads de efectos, AUTO, VELOC. de la rotación y los ON de EFECTOS e IMAGEN).
+// Escriben DOMO_EFECTOS (lib/domoEfectos.ts); FaceDome lo aplica a uE0..uE6 y a los ajustes de imagen (uniforms que
+// comparte el pase de transmisión, así que SILLAS ve lo mismo).
+const marcar = () => { DOMO_EFECTOS.version++; };
+export const IMAGE_CONTROLS_EXTRA: CtrlDef[] = [
+  ...Array.from({ length: 7 }, (_, i): CtrlDef => ({ id: `dom_fx${i}`, type: "toggle", label: `FX${i}`, px: 0, py: 0,
+    min: 0, max: 1, initial: (DBG_ATRIL_VIDEO.PADS_INICIO >> i) & 1, onActivate: (v) => fijarPad(DOMO_EFECTOS, i, v > 0.5) })),
+  { id: "dom_auto",  type: "toggle", label: "AUTO", px: 0, py: 0, min: 0, max: 1, initial: 1, onActivate: (v) => { DOMO_EFECTOS.auto = v > 0.5; DOMO_EFECTOS.acum = 0; marcar(); } },
+  { id: "dom_rot_s", type: "knob", label: "VELOC.", px: 0, py: 0, min: DBG_ATRIL_VIDEO.VELOC_MIN_S, max: DBG_ATRIL_VIDEO.VELOC_MAX_S, initial: DBG_ATRIL_VIDEO.VELOC_DEFECTO_S,
+    onActivate: (v) => { DOMO_EFECTOS.rotS = v; marcar(); } },
+  { id: "dom_fx_on", type: "toggle", label: "ON", px: 0, py: 0, min: 0, max: 1, initial: 1, onActivate: (v) => { DOMO_EFECTOS.on = v > 0.5; marcar(); } },
+  { id: "wcam_on",   type: "toggle", label: "ON", px: 0, py: 0, min: 0, max: 1, initial: 1, onActivate: (v) => { DOMO_EFECTOS.imagenOn = v > 0.5; } },
+];
+IMAGE_CONTROLS_EXTRA.forEach(c => { ctrlState[c.id] = c.initial; });
+DOMO_EFECTOS.mascara = DBG_ATRIL_VIDEO.PADS_INICIO & 0x7f;
+DOMO_EFECTOS.rotS = DBG_ATRIL_VIDEO.VELOC_DEFECTO_S;
+/** Layout nuevo del atril de imagen: los controles que siguen (mismo id, acción y rango) + los nuevos, en otra posición. */
+export const IMAGE_CONTROLS_NUEVO: CtrlDef[] = POSICIONES_I.map((p: PosCtrlI) => {
+  const d = IMAGE_CONTROLS.find(c => c.id === p.id) ?? IMAGE_CONTROLS_EXTRA.find(c => c.id === p.id)!;
+  return { ...d, px: p.u, py: p.v, label: p.etiqueta, nombreLargo: p.nombreLargo,
+    forma: (p.forma === "indicador" ? undefined : p.forma) as FormaCtrl | undefined,
+    type: p.tipo,                                                  // FOV pasa de fader a perilla
+    ...(p.tipo === "knob" ? { color: "mustard" as const } : {}),
+    ...(p.tipo === "slider" ? { railLen: 0.20, orientation: "v" as const } : {}) };
+});
+function controlesImagen(): CtrlDef[] { return DBG_ATRIL_VIDEO.DISENO_NUEVO ? IMAGE_CONTROLS_NUEVO : IMAGE_CONTROLS; }
+const _posImagen = new Map<string, PosCtrlI>(POSICIONES_I.map(p => [p.id, p]));
 /** Z96: cambia el diseño o la escala de etiquetas desde el menú (LecternSystem remonta el atril o rehace la serigrafía). */
 export function cambiarAtrilSonido(remontar: boolean): void {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("alight:atril-sonido-cambio", { detail: { remontar } }));
@@ -1243,7 +1294,7 @@ function CtrlMesh({
     }
 
     // Z96: ON en pastilla (sin palanca: solo la luz)
-    if (def.forma === "pastilla") {
+    if (def.forma === "pastilla" || def.forma === "pad") {   // Z97: el pad de efecto también es "solo la luz"
       if (ledMatRef.current) ledMatRef.current.emissiveIntensity = v > 0.5 ? 2.4 : 0.04;
       return;
     }
@@ -1566,6 +1617,30 @@ function CtrlMesh({
         </mesh>
         <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, 0.006, 0]} visible={false}>
           <boxGeometry args={[0.058 * HIT_PAD, 0.016, 0.026 * HIT_PAD]} />
+          <meshBasicMaterial transparent opacity={0} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // ── Z97: pad de efecto (tecla crema con luz en el borde lejano; el nombre va serigrafiado debajo) ──
+  if (def.type === "toggle" && def.forma === "pad") {
+    return (
+      <group position={[def.px, surfY, -def.py]}>
+        <mesh position={[0, 0.004, 0]}>
+          <boxGeometry args={[0.100, 0.008, 0.056]} />
+          <primitive object={ROCKER_BASE_DARK_MAT} attach="material" />
+        </mesh>
+        <mesh position={[0, 0.0125, 0.004]}>
+          <boxGeometry args={[0.090, 0.009, 0.040]} />
+          <primitive object={PUSHBTN_MAT} attach="material" />
+        </mesh>
+        <mesh position={[0, 0.0100, -0.0215]}>
+          <boxGeometry args={[0.080, 0.004, 0.007]} />
+          <meshStandardMaterial ref={ledMatRef} color="#3A1A00" emissive={lecternPalette().ledToggle} emissiveIntensity={0.04} roughness={0.5} />
+        </mesh>
+        <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, 0.008, 0]} visible={false}>
+          <boxGeometry args={[0.100, 0.020, 0.056]} />
           <meshBasicMaterial transparent opacity={0} />
         </mesh>
       </group>
@@ -1932,11 +2007,13 @@ function LecternBody({ side, silkV = 0 }: { side: "left" | "right"; silkV?: numb
   // Z96: el atril de sonido con DISENO_NUEVO usa su propia serigrafía; se rehace con silkV (ETIQUETA_ESCALA) y la
   // textura anterior se libera (también al desmontar)
   const nuevoSonido = side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO;
+  const nuevoImagen = side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO;   // Z97
   useEffect(() => {
     if (LABEL_MODE !== "silkscreen") return;
     let cancelled = false;
     let propia: THREE.CanvasTexture | null = null;
-    (nuevoSonido ? buildSilkscreenSonido({ CW: CPANEL_W, CD: CPANEL_D, KNOB_SKIRT_R, THUMB_W }) : buildSilkscreen(side)).then(tex => {
+    (nuevoSonido ? buildSilkscreenSonido({ CW: CPANEL_W, CD: CPANEL_D, KNOB_SKIRT_R, THUMB_W })
+      : nuevoImagen ? buildSilkscreenImagen({ CW: CPANEL_W, CD: CPANEL_D }) : buildSilkscreen(side)).then(tex => {
       if (cancelled) { tex.dispose(); return; }
       propia = tex;
       if (silkMatRef.current) {
@@ -1948,7 +2025,7 @@ function LecternBody({ side, silkV = 0 }: { side: "left" | "right"; silkV?: numb
       cancelled = true;
       if (propia) { if (silkMatRef.current?.map === propia) silkMatRef.current.map = null; propia.dispose(); }
     };
-  }, [side, nuevoSonido, silkV]);
+  }, [side, nuevoSonido, nuevoImagen, silkV]);
 
   return (
     <group>
@@ -1966,6 +2043,7 @@ function LecternBody({ side, silkV = 0 }: { side: "left" | "right"; silkV?: numb
       <LecternApron side={side} topY={LEG_H - 0.03} />
       {/* Z96: placa con el nombre del equipo en la cara frontal del mueble (como la CR-80) */}
       {nuevoSonido && <PlacaFrenteSonido y={LEG_H - 0.03 - 0.12} z={0.0135} ancho={0.80} />}
+      {nuevoImagen && <PlacaFrenteSonido y={LEG_H - 0.03 - 0.12} z={0.0135} ancho={0.80} nombre={NOMBRE_EQUIPO_I} descripcion={DESCRIPCION_EQUIPO_I} />}
 
       {/* ── Top plate group: tilted, front (+Z) lower, back (-Z) higher ───── */}
       {/* Pivot at local +Z = front edge; rotation.x = +TILT_RAD lowers +Z */}
@@ -2176,6 +2254,15 @@ function Lectern({
             {side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO && DBG_ATRIL_SONIDO.ROTULOS_FILA && (
               <MargenRotulos modo={DBG_ATRIL_SONIDO.ROTULOS_MODO === "margen" ? "margen" : "barra"} />
             )}
+            {/* Z97: atril de imagen: display, placa de la barra y rótulos DOMO · IMAGEN */}
+            {side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO && <DisplayImagen />}
+            {side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO && (
+              <PlacaBarraSonido texto={TEXTO_PLACA_IMAGEN} leyenda={LEYENDA_FILAS_I}
+                conLeyenda={DBG_ATRIL_VIDEO.ROTULOS_FILA && DBG_ATRIL_VIDEO.ROTULOS_MODO === "barra"} />
+            )}
+            {side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO && DBG_ATRIL_VIDEO.ROTULOS_FILA && (
+              <MargenRotulos modo={DBG_ATRIL_VIDEO.ROTULOS_MODO === "barra" ? "barra" : "margen"} verticales={ROTULOS_VERTICALES_I} numeros={ROTULOS_NUMEROS_I} />
+            )}
             {controls.map(def => (
               <CtrlMesh
                 key={def.id}
@@ -2316,7 +2403,9 @@ function InteractionHandler() {
       }
 
       // Z96: doble clic / doble toque sobre una perilla o el fader del atril de sonido → valor por defecto
-      if ((def.type === "knob" || def.type === "slider") && DBG_ATRIL_SONIDO.DISENO_NUEVO && def.id.startsWith("s_")
+      // Z97: también perillas y faders del atril de imagen nuevo (vuelven a su valor inicial)
+      if ((def.type === "knob" || def.type === "slider")
+          && ((DBG_ATRIL_SONIDO.DISENO_NUEVO && def.id.startsWith("s_")) || (DBG_ATRIL_VIDEO.DISENO_NUEVO && _posImagen.has(def.id)))
           && esDobleClic(_dobleClic, def.id, performance.now())) {
         setCtrl(def.id, def.initial, def);
         playUIClick(900, 0.08);
@@ -2400,7 +2489,7 @@ function InteractionHandler() {
       _drag.type = "none"; LECTERN_DBG.dragType = "none";
       _drag.def = null; _drag.pointerId = -1;
       canvas.style.cursor = _hoveredId ? getCursorStyle(
-        ([...IMAGE_CONTROLS, ...SOUND_CONTROLS].find(c => c.id === _hoveredId)?.type ?? "button")
+        ([...IMAGE_CONTROLS_NUEVO, ...IMAGE_CONTROLS, ...SOUND_CONTROLS].find(c => c.id === _hoveredId)?.type ?? "button")
       ) : "";
     };
 
@@ -2536,11 +2625,15 @@ export default function LecternSystem() {
       if ((e as CustomEvent<{ remontar?: boolean }>).detail?.remontar) setDisenoV(v => v + 1); else setSilkV(v => v + 1);
     };
     window.addEventListener("alight:atril-sonido-cambio", on);
+    window.addEventListener("alight:atril-imagen-cambio", on);   // Z97
     // Z96b: con ETIQUETA_AUTO_ASPECTO, si al cambiar el tamaño de la ventana cambia la escala efectiva, se rehace la serigrafía
-    let escPrev = escalaActual();
-    const onResize = () => { const e = escalaActual(); if (Math.abs(e - escPrev) > 0.005) { escPrev = e; setSilkV(v => v + 1); } };
+    let escPrev = escalaActual(), escPrevI = escalaActualImagen();
+    const onResize = () => {
+      const e = escalaActual(), ei = escalaActualImagen();
+      if (Math.abs(e - escPrev) > 0.005 || Math.abs(ei - escPrevI) > 0.005) { escPrev = e; escPrevI = ei; setSilkV(v => v + 1); }
+    };
     window.addEventListener("resize", onResize);
-    return () => { window.removeEventListener("alight:atril-sonido-cambio", on); window.removeEventListener("resize", onResize); };
+    return () => { window.removeEventListener("alight:atril-sonido-cambio", on); window.removeEventListener("alight:atril-imagen-cambio", on); window.removeEventListener("resize", onResize); };
   }, []);
 
   // I1: flip lectern orientation (debug)
@@ -2678,7 +2771,7 @@ export default function LecternSystem() {
       if (!KEY_LETTERS.includes(key as KeyLetter)) return;
       const id = _keyMap.get(key as KeyLetter);
       if (!id) return;
-      const allCtrl = [...IMAGE_CONTROLS, ...SOUND_CONTROLS];
+      const allCtrl = [...controlesImagen(), ...SOUND_CONTROLS];   // Z97
       const def = allCtrl.find(c => c.id === id);
       if (!def) return;
       const cur = ctrlVal(id, def.initial);
@@ -2704,7 +2797,8 @@ export default function LecternSystem() {
 
   return (
     <>
-      <Lectern side="left"  controls={IMAGE_CONTROLS} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} />
+      {/* Z97: la key remonta el atril de imagen al cambiar DBG_ATRIL_VIDEO.DISENO_NUEVO */}
+      <Lectern key={`imagen-${disenoV}`} side="left" controls={controlesImagen()} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} silkV={silkV} />
       {/* Z96: la key remonta el atril de sonido al cambiar DISENO_NUEVO (mallas y serigrafía limpias) */}
       <Lectern key={`sonido-${disenoV}`} side="right" controls={controlesSonido()} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} silkV={silkV} />
       <InteractionHandler />

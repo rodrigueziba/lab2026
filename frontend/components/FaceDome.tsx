@@ -6,6 +6,8 @@ import * as THREE from "three";
 import { LIVE_TEX_REF } from "@/lib/faceShared";
 import { texturaTarima, tickFuenteTarima, instalarFuenteTarima, liberarFuenteTarima } from "@/lib/fuenteVideoTarima";   // Z87
 import { STORE } from "@/lib/alightStore";
+import { DBG_ATRIL_VIDEO } from "@/lib/debugConfig";                                            // Z97
+import { DOMO_EFECTOS, tickRotacion, asignarSectores } from "@/lib/domoEfectos";                  // Z97
 
 const DOME_R = 28;
 
@@ -116,11 +118,12 @@ export const DOME_FRAG = /* glsl */`
       // 5: Vertical stretch (expand centre slice)
       float y = clamp((uv.y - 0.3) / 0.4, 0.0, 1.0);
       col = texture2D(uMap, vec2(uv.x, y));
-    } else {
+    } else if (eff < 6.5) {
       // 6: Posterize (4 levels)
       col = texture2D(uMap, uv);
       col.rgb = floor(col.rgb * 4.0) / 4.0;
     }
+    // Z97: 7 = sin efecto (pads apagados): queda la lectura inicial, sin lecturas de textura extra
     return col;
   }
 
@@ -185,6 +188,10 @@ function makeStarGeo(): THREE.BufferGeometry {
   return geo;
 }
 
+// Z97: buffers de módulo (sin allocations por frame)
+const _sectores: number[] = [0, 1, 2, 3, 4, 5, 6];
+const EF_KEYS = ["uE0", "uE1", "uE2", "uE3", "uE4", "uE5", "uE6"] as const;
+
 // Exported for the C9 debug menu to update shader uniforms live
 export const DBG_STAR_MAT: { value: THREE.ShaderMaterial | null } = { value: null };
 export const DBG_DOME_MAT: { value: THREE.ShaderMaterial | null } = { value: null };
@@ -200,6 +207,7 @@ export default function FaceDome() {
   const activeTimeRef   = useRef(0);
   const fadeDoneRef     = useRef(false);
   const glitchOffset    = useRef(0);
+  const efVersion       = useRef(-1);   // Z97: última versión de DOMO_EFECTOS escrita en uE0..uE6
   const activatedOnce   = useRef(false); // guard: prevent double-fire + avoid deps=[active] cleanup bug
   const domeTimer       = useRef<ReturnType<typeof setTimeout>  | null>(null);
   const glitchTimer     = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -287,6 +295,8 @@ export default function FaceDome() {
     window.dispatchEvent(new CustomEvent("alight:dome-visible"));
     const efKeys = ["uE0","uE1","uE2","uE3","uE4","uE5","uE6"] as const;
     const rotate = () => {
+      if (DBG_ATRIL_VIDEO.DISENO_NUEVO) return;   // Z97: con el atril nuevo la rotación la hace el useFrame (pads, AUTO, VELOC.)
+      efVersion.current = -1;                      // Z97: al volver al diseño nuevo, se reescriben uE0..uE6
       glitchOffset.current = (glitchOffset.current + 1) % N_SECTORS;
       for (let i = 0; i < N_SECTORS; i++) {
         const eff = (SECTOR_INIT[i] + glitchOffset.current) % N_SECTORS;
@@ -319,7 +329,7 @@ export default function FaceDome() {
   }, []);
 
   // Per-frame: animate star fade-in, advance time uniforms, sync STORE → dome shader
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const t = clock.elapsedTime;
 
     if (active && !fadeDoneRef.current) {
@@ -346,11 +356,22 @@ export default function FaceDome() {
 
     // Sync T5 webcam/psychedelic controls from STORE
     if (showDome) {
-      domeUniforms.uBrightness.value = STORE.webcam.brightness;
-      domeUniforms.uContrast.value   = STORE.webcam.contrast;
-      domeUniforms.uSaturation.value = STORE.webcam.saturation;
-      domeUniforms.uZoom.value       = STORE.webcam.zoom;
+      // Z97: con el atril nuevo, el ON de IMAGEN apagado deja los ajustes neutros (también en lo que se transmite)
+      const imgOn = !DBG_ATRIL_VIDEO.DISENO_NUEVO || DOMO_EFECTOS.imagenOn;
+      domeUniforms.uBrightness.value = imgOn ? STORE.webcam.brightness : 1;
+      domeUniforms.uContrast.value   = imgOn ? STORE.webcam.contrast : 1;
+      domeUniforms.uSaturation.value = imgOn ? STORE.webcam.saturation : 1;
+      domeUniforms.uZoom.value       = imgOn ? STORE.webcam.zoom : 1;
       domeUniforms.uPsych.value      = STORE.dome.psychedelic ? 1.0 : 0.0;
+      // Z97: pads, AUTO y VELOC. (rotación por dt, sin timers); uE0..uE6 solo se escriben cuando cambian
+      if (DBG_ATRIL_VIDEO.DISENO_NUEVO) {
+        tickRotacion(DOMO_EFECTOS, delta, DBG_ATRIL_VIDEO.VELOC_MIN_S, DBG_ATRIL_VIDEO.VELOC_MAX_S);
+        if (DOMO_EFECTOS.version !== efVersion.current) {
+          efVersion.current = DOMO_EFECTOS.version;
+          asignarSectores(DOMO_EFECTOS, _sectores);
+          for (let i = 0; i < N_SECTORS; i++) domeUniforms[EF_KEYS[i]].value = _sectores[i];
+        }
+      } else if (efVersion.current !== -1) efVersion.current = -1;   // al volver al atril nuevo, reescribe
     }
   });
 
