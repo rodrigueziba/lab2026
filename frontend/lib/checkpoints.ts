@@ -21,7 +21,8 @@ export type CheckpointId =
   | "dia_prisma_sube" | "dia_flor" | "dia_prisma_baja"   // Z54
   | "sillas_recibir" | "tarima_compartir"   // Z95: prueba de la transmisión en vivo con dos ventanas
   | "atril_sonido"                           // Z96: probar el atril de sonido rediseñado
-  | "atril_imagen";                          // Z97: probar el atril de imagen rediseñado
+  | "atril_imagen"                           // Z97: probar el atril de imagen rediseñado
+  | "atril_bajo";                            // Z99: probar el BAJO ÁCIDO BA-40
 
 /** ["accion", ...args] */
 export type Paso = readonly [string, ...(string | number)[]];
@@ -101,6 +102,10 @@ export const CHECKPOINTS: readonly Checkpoint[] = [
   { id: "atril_imagen", nombre: "Atril de imagen", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
       ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["frenteAtrilImagen"], ["esperarFrames", 2]],
     descripcion: "Sobre la tarima con figuras y atriles (sin diálogo ni transmisión), frente al atril de imagen: apretá E." },
+  // Z99: igual, frente al BA-40 (slot de instrumentos detrás de la tarima, junto a la caja de ritmos)
+  { id: "atril_bajo", nombre: "Atril del bajo", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
+      ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["esperarFrames", 3], ["frenteAtrilBajo"], ["esperarFrames", 2]],
+    descripcion: "Atriles afuera (sin diálogo ni transmisión), frente al BAJO ÁCIDO BA-40: tocá play en la caja de ritmos y apretá E en el bajo." },
 ];
 
 /**

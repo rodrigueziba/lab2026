@@ -228,12 +228,16 @@ function dibujar(r: { cv: HTMLCanvasElement; tex: THREE.CanvasTexture; cw: numbe
 }
 
 // ── VU ──
-export function VuSonido() {
+/** Z99: props opcionales para reusarlo en otros atriles (BA-40): geometría, analizador y tope de Hz (referencias estables). */
+export function VuSonido({ vu = VU, analizador = analizadorMaestro, hz }: {
+  vu?: { segmentos: number; u: number; v0: number; v1: number; ancho: number };
+  analizador?: () => AnalyserNode | null; hz?: () => number;
+} = {}) {
   const grupoRef = useRef<THREE.Group>(null);
   const segsRef = useRef<(THREE.Mesh | null)[]>([]);
   const r = useMemo(() => {
-    const n = VU.segmentos, alto = (VU.v1 - VU.v0) / n;
-    const geo = new THREE.BoxGeometry(VU.ancho, 0.004, alto * 0.72);
+    const n = vu.segmentos, alto = (vu.v1 - vu.v0) / n;
+    const geo = new THREE.BoxGeometry(vu.ancho, 0.004, alto * 0.72);
     const apagado = new THREE.MeshStandardMaterial({ color: "#1d120a", roughness: 0.8, metalness: 0 });
     const encendido = [
       new THREE.MeshBasicMaterial({ color: "#2E9E5B", toneMapped: false }),
@@ -241,7 +245,7 @@ export function VuSonido() {
       new THREE.MeshBasicMaterial({ color: "#E5322B", toneMapped: false }),
     ];
     return { n, alto, geo, apagado, encendido };
-  }, []);
+  }, [vu]);
   const st = useRef({ ms: -1e9, nivel: 0, buf: null as Float32Array | null, an: null as AnalyserNode | null, lit: -1, pico: -2,
     p: { idx: -1, t: 0 }, ambar: -1, rojo: -1 });
 
@@ -251,11 +255,11 @@ export function VuSonido() {
     const g = grupoRef.current, s = st.current;
     if (!g) return;
     const ahora = performance.now();
-    if (!tocaActualizar(ahora, s.ms, DBG_ATRIL_SONIDO.VU_HZ)) return;
+    if (!tocaActualizar(ahora, s.ms, hz ? hz() : DBG_ATRIL_SONIDO.VU_HZ)) return;
     const dt = Math.min(0.2, (ahora - s.ms) / 1000);
     s.ms = ahora;
     if (!enPantalla(g, camera)) return;
-    const an = analizadorMaestro();
+    const an = analizador();
     let x = 0;
     if (an) {
       if (s.an !== an || !s.buf || s.buf.length !== an.fftSize) { s.an = an; s.buf = new Float32Array(an.fftSize); }   // una vez por analizador
@@ -278,10 +282,10 @@ export function VuSonido() {
   });
 
   return (
-    <group ref={grupoRef} position={[VU.u, 0.002, 0]}>
+    <group ref={grupoRef} position={[vu.u, 0.002, 0]}>
       {Array.from({ length: r.n }, (_, i) => (
         <mesh key={i} ref={m => { segsRef.current[i] = m; }} geometry={r.geo} material={r.apagado}
-          position={[0, 0, -(VU.v0 + r.alto * (i + 0.5))]} />
+          position={[0, 0, -(vu.v0 + r.alto * (i + 0.5))]} />
       ))}
     </group>
   );

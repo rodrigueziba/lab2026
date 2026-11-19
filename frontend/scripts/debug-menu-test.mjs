@@ -65,10 +65,12 @@ console.log('\n(b) orden por ultimoZ');
   check(rec.length > 0 && rec.every(s => Z.slice(0, N_RECIENTES).includes(s.ultimoZ)) && SECCIONES_DEBUG.filter(s => Z.slice(0, N_RECIENTES).includes(s.ultimoZ)).length === rec.length,
     `Recientes = secciones de los últimos ${N_RECIENTES} Z distintos (${Z.slice(0, N_RECIENTES).join(', ')}): ${rec.map(s => s.id).join(', ')}`);
   check(SECCIONES_DEBUG.filter(s => esNueva(s)).every(s => Z.slice(0, N_NUEVO).includes(s.ultimoZ)), `NUEVO = últimos ${N_NUEVO} Z distintos (${Z.slice(0, N_NUEVO).join(', ')})`);
-  // registro ficticio: una sección tocada en Z99 pasa a encabezar su pestaña, Recientes y el orden de pestañas
-  const fict = SECCIONES_DEBUG.map(s => (s.id === 'telon-n6' ? { ...s, ultimoZ: 99 } : s));
+  // registro ficticio: una sección tocada en la PRÓXIMA tarea pasa a encabezar su pestaña, Recientes y el orden de pestañas
+  // (Z99: antes se simulaba con 99 fijo; desde que hay secciones reales en 99, se usa el máximo real + 1)
+  const zSim = Math.max(...SECCIONES_DEBUG.map(s => s.ultimoZ)) + 1;
+  const fict = SECCIONES_DEBUG.map(s => (s.id === 'telon-n6' ? { ...s, ultimoZ: zSim } : s));
   check(ordenPestanas(fict)[2].id === 'telon' && seccionesDePestana('telon', fict)[0].id === 'telon-n6' && seccionesDePestana(PESTANA_RECIENTES, fict)[0].id === 'telon-n6' && esNueva(fict.find(s => s.id === 'telon-n6'), fict),
-    'al subir ultimoZ de una sección (prueba con Z99) se ordena sola: primera de su pestaña, de Recientes y su pestaña primera, con NUEVO');
+    `al subir ultimoZ de una sección (prueba con Z${zSim}) se ordena sola: primera de su pestaña, de Recientes y su pestaña primera, con NUEVO`);
   check(ordenarSecciones(SECCIONES_DEBUG).length === SECCIONES_DEBUG.length, 'ordenar no pierde secciones');
   const b = buscarSecciones('ESCALA', { 'composicion-del-domo-z49': ['ESCALA'] });
   check(b.some(r => r.seccion.id === 'composicion-del-domo-z49' && r.coincidencias.includes('ESCALA')) && buscarSecciones('  ', {}).length === 0, 'buscador: encuentra por nombre de control; vacío = sin resultados');

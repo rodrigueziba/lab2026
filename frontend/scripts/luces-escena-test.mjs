@@ -81,7 +81,7 @@ console.log('\n(d) doble clic');
   check(/def\.id === "lights_ind" && DBG_ATRIL_VIDEO\.DISENO_NUEVO && esDobleClic\(_dobleClic, def\.id, performance\.now\(\)\)\) \{\s*STORE\.lights\.globalIntensity = acotarNivel\(DBG_ATRIL_VIDEO\.LUZ_DEFECTO/.test(LS)
     && /def\.id !== "lights_ind"/.test(LS), 'NIVEL recibe el clic y el doble clic restaura LUZ_DEFECTO');
   check(/dom_int:   \{ min: DBG_ATRIL_VIDEO\.LUZ_MIN, max: DBG_ATRIL_VIDEO\.LUZ_MAX, initial: DBG_ATRIL_VIDEO\.LUZ_DEFECTO,/.test(LS)
-    && /DBG_ATRIL_VIDEO\.DISENO_NUEVO && _posImagen\.has\(def\.id\)\)\)\s*&& esDobleClic[\s\S]{0,80}setCtrl\(def\.id, def\.initial, def\)/.test(LS),
+    && /DBG_ATRIL_VIDEO\.DISENO_NUEVO && _posImagen\.has\(def\.id\)\)[^\n]*\n\s*&& esDobleClic[\s\S]{0,80}setCtrl\(def\.id, def\.initial, def\)/.test(LS),
     'doble clic en INTENS. → su valor inicial, que ahora es LUZ_DEFECTO'); }
 
 console.log('\n(e) restaurar y checkpoints');

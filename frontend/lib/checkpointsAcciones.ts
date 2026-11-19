@@ -49,6 +49,7 @@ import { LECTERN_OUTWARD_OFFSET_M } from "@/lib/debugConfig";
 import { ATRIL_X_BASE, poseFrenteAtril } from "@/lib/atrilSonido";   // Z96
 import { poseFrenteAtrilImagen } from "@/lib/atrilImagen";            // Z97
 import { restaurarLucesEscena } from "@/lib/lucesEscenaAcciones";    // Z97b
+import { ATRIL_BAJO, poseFrenteAtrilBajo } from "@/lib/atrilBajo";   // Z99
 import { detenerPresencia } from "@/lib/vivo/vivoAcciones";
 import { detenerLiveKit } from "@/lib/vivo/publicarLiveKit";
 
@@ -270,6 +271,15 @@ export const ACCIONES_CHECKPOINT: Record<string, Accion> = {
   frenteAtrilImagen: () => {
     if (!_camara) return false;
     const p = poseFrenteAtrilImagen(ATRIL_X_BASE + LECTERN_OUTWARD_OFFSET_M, 1.0);
+    _camara.position.set(p.x, 1.6, p.z);
+    _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
+    return true;
+  },
+
+  // Z99: a 1 m del BA-40, mirándolo (su posición la escribe LecternSystem desde el slot de instrumentos)
+  frenteAtrilBajo: () => {
+    if (!_camara) return false;
+    const p = poseFrenteAtrilBajo(ATRIL_BAJO.x, ATRIL_BAJO.z, ATRIL_BAJO.yaw, 1.0);
     _camara.position.set(p.x, 1.6, p.z);
     _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
     return true;

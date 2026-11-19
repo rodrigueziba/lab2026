@@ -16,6 +16,7 @@ import Curtain from "./Curtain";
 import TelonTexto from "./TelonTexto"; // Z46: texto proyectado sobre el telón
 import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from "./LecternSystem";
 import { ATRIL_RITMOS } from "@/lib/ritmos";   // Z80: aviso "Tocar E" del atril de la caja de ritmos
+import { ATRIL_BAJO } from "@/lib/atrilBajo";                                                // Z99
 import AvisoVivoHost from "./AvisoVivoHost";   // Z85
 import ConsentTarimaHost from "./ConsentTarimaHost";   // Z91
 import VideoTransmitidoTarima from "./VideoTransmitidoTarima";   // Z94
@@ -471,6 +472,7 @@ function Player() {
       if (dL < LECTERN_PROMPT_M) near = "image";
       else if (dR < LECTERN_PROMPT_M) near = "sound";
       else if (ATRIL_RITMOS.visible && Math.hypot(cam.position.x - ATRIL_RITMOS.x, cam.position.z - ATRIL_RITMOS.z) < LECTERN_PROMPT_M) near = "sound";   // Z80: caja de ritmos
+      else if (ATRIL_BAJO.visible && Math.hypot(cam.position.x - ATRIL_BAJO.x, cam.position.z - ATRIL_BAJO.z) < LECTERN_PROMPT_M) near = "sound";   // Z99: BA-40
       if (near !== nearLectern.current) {
         nearLectern.current = near;
         window.dispatchEvent(new CustomEvent("alight:near-lectern", { detail: { which: near } }));

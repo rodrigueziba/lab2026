@@ -2,7 +2,7 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_BAJO, DBG_ATRIL_BAJO } from "@/lib/debugConfig";
 import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent, modoActual } from "@/lib/consentTarimaAcciones";   // Z91
 import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit, alternarPanelCuadro, panelCuadroVisible } from "@/lib/vivo/publicarLiveKit";   // Z92 · Z94b
 import { sesionIdNavegador } from "@/lib/vivo/vivoAcciones";   // Z92
@@ -11,6 +11,8 @@ import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials
 import { STORE, storeNotify } from "@/lib/alightStore";
 import { LUZ_ESCENA } from "@/lib/lucesEscena";                       // Z97b
 import { textoCronoVis } from "@/lib/visualizadorTarimaDibujo";        // Z98
+import { BAJO, PARAMS as PARAMS_BAJO_EST, cargarPatron, patronLimpio, setParamBajo, aplicarParamsBajo, silenciarYReiniciarBajo, bpmBajo } from "@/lib/audio/bajoAcido";   // Z99
+import { PARAMS_BAJO, NOMBRES_PATRON, nombreNota, indiceParam } from "@/lib/bajoAcido";   // Z99
 import { restaurarLucesEscena } from "@/lib/lucesEscenaAcciones";    // Z97b
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
 import { useDbg } from "../contexto";
@@ -720,6 +722,74 @@ export function SecAtrilImagenZ97() {
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); A.LUZ_REPETIR_AL_MANTENER = !A.LUZ_REPETIR_AL_MANTENER; toca(); }}>{A.LUZ_REPETIR_AL_MANTENER ? "ON" : "off"}</button>
           </div>
           <div style={{ ...ROW, ...NOTE }}><span>PADS_INICIO 0x{A.PADS_INICIO.toString(16)} (pads encendidos al cargar) · doble clic sobre una perilla o un fader: vuelve a su valor por defecto</span></div>
+    </>
+  );
+}
+
+// sección: bajo-acido-z99
+export function SecBajoZ99() {
+  // Z99: BAJO ÁCIDO BA-40 (motor lib/audio/bajoAcido.ts). Estado 4 veces por segundo.
+  const B = DBG_BAJO, A = DBG_ATRIL_BAJO;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const avisar = (remontar: boolean) => window.dispatchEvent(new CustomEvent("alight:atril-bajo-cambio", { detail: { remontar } }));
+  return (
+    <>
+          <span style={LABEL}>Bajo ácido Z99 <span style={NOTE}>(BA-40 · probar con el checkpoint «Atril del bajo» o ?cp=atril_bajo · suena con el play de la caja de ritmos)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{BAJO.sonando ? "sonando" : "parado"} · paso {BAJO.pasoSonando >= 0 ? BAJO.pasoSonando + 1 : "-"} · patrón {BAJO.patron}{BAJO.editado ? " (editado)" : ""} · nota {BAJO.ultimaNota >= 0 ? nombreNota(BAJO.ultimaNota) : "-"} · {Math.round(bpmBajo())} BPM · notas {BAJO.notas} · voz {BAJO.vozLista ? "lista" : "sin crear"}</span></div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); silenciarYReiniciarBajo(); toca(); }}>Silenciar y reiniciar bajo</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); patronLimpio(); toca(); }}>Patrón limpio</button>
+          </div>
+          <div style={ROW}>
+            <span>PATRÓN</span>
+            {NOMBRES_PATRON.map(nm => <button key={nm} style={{ ...INPUT, opacity: BAJO.patron === nm ? 1 : 0.5 }} onClick={() => { cargarPatron(nm); toca(); }}>{nm}</button>)}
+          </div>
+          {([["ONDA", ["sierra", "cuadrada"]]] as const).map(([k, ops]) => (
+            <div key={k} style={ROW}>
+              <span>{k}</span>
+              {ops.map(v => <button key={v} style={{ ...INPUT, opacity: B[k] === v ? 1 : 0.5 }} onClick={() => { B[k] = v; aplicarParamsBajo(); toca(); }}>{v}</button>)}
+            </div>
+          ))}
+          {([["ACTIVO", "off = sin bajo (vale al remontar)"], ["ON", "ON del módulo SALIDA (silencia sin parar el reloj)"], ["TEMPO_HEREDADO", "reloj y tempo de la caja · off = reloj propio con BPM"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); B[k] = !B[k]; aplicarParamsBajo(); if (k === "ACTIVO") avisar(true); toca(); }}>{B[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {/* parámetros del motor: van por setParamBajo(id, valor, "manual") (los mismos que mueve el atril) */}
+          {PARAMS_BAJO.map(d => (
+            <div key={d.id} style={ROW}>
+              <span>{d.nombre} <span style={NOTE}>{PARAMS_BAJO_EST.manual[indiceParam(d.id)].toFixed(d.max > 50 ? 0 : 2)} {d.unidad}</span></span>
+              <input type="range" min={d.min} max={d.max} step={(d.max - d.min) / 200} style={{ flex: 1 }} value={PARAMS_BAJO_EST.manual[indiceParam(d.id)]}
+                onChange={ev => { setParamBajo(d.id, parseFloat(ev.target.value), "manual"); toca(); }} />
+            </div>
+          ))}
+          {([["RAIZ_MIDI", 24, 48, 1, "nota 0 de los pasos"], ["BPM", 60, 180, 1, "solo con TEMPO_HEREDADO off"], ["LOOKAHEAD_S", 0.03, 0.3, 0.01, "reloj propio: anticipo"],
+            ["INTERVALO_S", 0.01, 0.1, 0.005, "reloj propio (vale al arrancar)"], ["FILTRO_FRECUENCIA_MIN", 20, 300, 5, "Hz"], ["FILTRO_FRECUENCIA_MAX", 1000, 12000, 100, "Hz"],
+            ["RES_MAX", 2, 30, 0.5, "Q máximo"], ["ENV_OCTAVAS", 0, 6, 0.1, "octavas de MOD. ENV."], ["GATE", 0.1, 0.95, 0.05, "duración de una nota sin desliz"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{B[k].toFixed(st < 1 ? 3 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={B[k]} onChange={ev => { B[k] = parseFloat(ev.target.value); aplicarParamsBajo(); toca(); }} />
+            </div>
+          ))}
+          <span style={LABEL}>Atril BA-40</span>
+          {([["ETIQUETA_ESCALA", 0.7, 1.4, 0.05, "títulos y etiquetas (rehace la serigrafía)", false], ["DISPLAY_VALOR_S", 0.5, 8, 0.5, "s del control tocado en el display", false],
+            ["VU_HZ", 5, 60, 1, "tope del VU y del display", false], ["ESCALA_PASOS", 0.8, 1.2, 0.05, "teclas PASO (vale al remontar)", true], ["SLOT", 0, 3, 1, "slot de instrumentos (1 = el de la caja)", true]] as const).map(([k, mn, mx, st, nota, remontar]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{A[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={A[k]}
+                onChange={ev => { A[k] = parseFloat(ev.target.value); toca(); }} onPointerUp={() => avisar(remontar)} onKeyUp={() => avisar(remontar)} />
+            </div>
+          ))}
+          {([["ROTULOS_FILA", "leyenda 1 SECUENCIA · 2 VOZ · 3 SALIDA y números en los títulos"], ["ETIQUETA_AUTO_ASPECTO", "proporción < 1,6: etiquetas hasta × 1,15"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); A[k] = !A[k]; avisar(false); toca(); }}>{A[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          <div style={{ ...ROW, ...NOTE }}><span>ROTULOS_MODO {A.ROTULOS_MODO} (leyenda en la placa de la barra) · doble clic en perillas y fader: valor por defecto · E entra · Q sale</span></div>
     </>
   );
 }

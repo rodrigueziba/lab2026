@@ -156,7 +156,7 @@ export function instalarConsentTarima(): () => void {
   const onKey = (e: KeyboardEvent) => {
     if (e.code !== "KeyX" || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
     if (CONSENT.estado !== "compartiendo") return;
-    if (INTERACT_STATE.mode === "image" || INTERACT_STATE.mode === "sound") return;   // ahí X es un atajo del atril
+    if (INTERACT_STATE.mode === "image" || INTERACT_STATE.mode === "sound" || INTERACT_STATE.mode === "bass") return;   // ahí X es un atajo del atril (Z99: también el BA-40)
     const t = e.target as HTMLElement | null;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
     cortarTransmision("boton");

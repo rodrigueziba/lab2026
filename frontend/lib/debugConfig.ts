@@ -1721,6 +1721,44 @@ export const DBG_LIVEKIT = {
   PROCESADO_SRGB:     true,        // codifica a sRGB (en pantalla lo hace el OutputPass; acá el pase va directo al canvas) — live
 };
 
+// ── Z99: BAJO ÁCIDO (motor lib/audio/bajoAcido.ts, lógica lib/bajoAcido.ts) y su atril BA-40 (lib/atrilBajo.ts) ──
+export const DBG_BAJO = {
+  ACTIVO:                 true,     // false = sin bajo (no se suscribe al reloj ni crea la voz) — vale al montar
+  RAIZ_MIDI:              36,       // C2: nota 0 de los pasos (0…24 semitonos encima) — live
+  TEMPO_HEREDADO:         true,     // true = reloj y tempo de la caja de ritmos (núcleo); false = reloj propio con BPM — live
+  BPM:                    124,      // solo con TEMPO_HEREDADO false — live
+  LOOKAHEAD_S:            0.1,      // reloj propio: anticipo de programación (s) — live
+  INTERVALO_S:            0.025,    // reloj propio: cada cuánto despierta el programador (s) — vale al arrancar
+  FILTRO_FRECUENCIA_MIN:  60,       // Hz (rango de CORTE) — live
+  FILTRO_FRECUENCIA_MAX:  6000,     // Hz — live
+  RES_MAX:                18,       // Q máximo de la etapa resonante — live
+  ENV_OCTAVAS:            4,        // cuánto sube el corte con MOD. ENV. al máximo (octavas) — live
+  GATE:                   0.55,     // fracción del paso que dura una nota sin desliz — live
+  ONDA:                   "sierra" as string,   // "sierra" | "cuadrada" (defecto) — live
+  ON:                     true,     // ON del módulo SALIDA (silencia sin parar el reloj) — live
+  PATRON_INICIAL:         "CHICAGO" as string,  // vale al cargar
+  // valores por defecto de cada parámetro (los rangos están en PARAMS_BAJO de lib/bajoAcido.ts)
+  AFINACION:              0,        // semitonos
+  CORTE:                  420,      // Hz
+  RESONANCIA:             0.6,      // 0…1
+  MOD_ENV:                0.6,      // 0…1
+  DECAY:                  0.3,      // s
+  ACENTO:                 0.6,      // 0…1
+  DESLIZ:                 0.06,     // s
+  DISTORSION:             0.15,     // 0…1
+  VOLUMEN:                0.7,      // 0…1
+};
+export const DBG_ATRIL_BAJO = {
+  SLOT:                   0,        // slot de instrumentos detrás de la tarima (Z88; 0 = el de al lado de la caja, lado del atril de sonido) — live
+  ETIQUETA_ESCALA:        1.0,      // multiplica títulos y etiquetas — live (rehace la serigrafía)
+  ETIQUETA_AUTO_ASPECTO:  true,     // proporción < 1,6: hasta × 1,15 — live
+  DISPLAY_VALOR_S:        2.5,      // s que el display muestra el control tocado — live
+  VU_HZ:                  30,       // tope de actualización del VU y del display — live
+  ROTULOS_FILA:           true,     // leyenda "1 SECUENCIA · 2 VOZ · 3 SALIDA" en la placa y números en los títulos — live
+  ROTULOS_MODO:           "barra" as string,   // "barra" (leyenda en la placa de la barra) — live
+  ESCALA_PASOS:           1.0,      // tamaño de las teclas PASO (0,8…1,2) — vale al remontar
+};
+
 // ── Z87: fuente de video de la tarima y visualizador de ondas sin webcam (lib/ondasTarima.ts, lib/fuenteVideoTarima.ts) ──
 // (DBG_ONDAS ya existe: son las ondas por kick del domo de SILLAS, Z52; por eso este se llama DBG_ONDAS_TARIMA.)
 export const DBG_ONDAS_TARIMA = {
