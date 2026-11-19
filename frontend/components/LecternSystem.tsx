@@ -23,11 +23,13 @@ import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_P
 import {
   POSICIONES as POS_SONIDO_NUEVO, FADER_RAIL, GRANDE_ESCALA, PLAY_W, PLAY_D, textoValor, camaraAtril, legibilidadMinima,
   LEGIBLE_MIN, esDobleClic, escalaEfectiva, type FormaCtrl, type GeoAtril, type PosCtrl,
+  TECLA_PLAY, layoutTeclaPlay,   // Z97b
 } from "@/lib/atrilSonido";
 import { DisplaySonido, VuSonido, PlacaFrenteSonido, buildSilkscreenSonido, mostrarEnDisplay, PlacaBarraSonido, MargenRotulos, escalaActual } from "./AtrilSonidoNuevo";
 // Z97: atril de imagen rediseñado ("IMAGEN IM-40")
 import { POSICIONES_I, legibilidadMinimaI, NOMBRE_EQUIPO_I, DESCRIPCION_EQUIPO_I, TEXTO_PLACA_I, LEYENDA_FILAS_I, type PosCtrlI } from "@/lib/atrilImagen";
 import { DOMO_EFECTOS, fijarPad } from "@/lib/domoEfectos";
+import { LUZ_ESCENA, acotarNivel, pasoNivel, textoNivel } from "@/lib/lucesEscena";   // Z97b
 import { DisplayImagen, buildSilkscreenImagen, mostrarEnDisplayImagen, escalaActualImagen, ROTULOS_VERTICALES_I, ROTULOS_NUMEROS_I } from "./AtrilImagenNuevo";
 import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
 import { PLAY_TARIMA } from "@/lib/playTarima";                                              // Z79
@@ -225,11 +227,20 @@ function texPlayGrande(): THREE.CanvasTexture {
   c.fillStyle = "rgba(255,154,31,0.08)";
   for (let y = 0; y < h; y += 5) c.fillRect(0, y, w, 2);
   c.fillStyle = "#FF9A1F"; c.shadowColor = "rgba(255,154,31,0.7)"; c.shadowBlur = 14;
-  // ícono combinado ▶❚❚
-  c.beginPath(); c.moveTo(60, 70); c.lineTo(150, 128); c.lineTo(60, 186); c.closePath(); c.fill();
-  c.fillRect(168, 70, 26, 116); c.fillRect(208, 70, 26, 116);
-  c.font = "bold 112px monospace"; c.textBaseline = "middle"; c.textAlign = "left";
-  c.fillText(TEXTO_TECLA_PLAY, 270, 132);
+  // Z97b: el texto se mide (measureText) y ícono, separación y fuente se escalan juntos hasta que todo entra con 6 % de
+  // margen por lado (antes: 112 px desde x 270 → terminaba en ~1103 px de 1024 y se cortaba la "A")
+  c.textBaseline = "middle"; c.textAlign = "left";
+  c.font = `bold ${TECLA_PLAY.pxBase}px monospace`;
+  const L = layoutTeclaPlay(c.measureText(TEXTO_TECLA_PLAY).width / TECLA_PLAY.pxBase);
+  let px = L.px;
+  c.font = `bold ${px}px monospace`;
+  const limite = w * (1 - TECLA_PLAY.margen) - L.xTexto;
+  while (px > 20 && c.measureText(TEXTO_TECLA_PLAY).width > limite) { px--; c.font = `bold ${px}px monospace`; }
+  // ícono combinado ▶❚❚ (las medidas de antes, escaladas por L.s y centradas en la altura)
+  const s = L.s, x = L.xIcono, y0 = h / 2 - (TECLA_PLAY.iconoAlto * s) / 2;
+  c.beginPath(); c.moveTo(x, y0); c.lineTo(x + 90 * s, h / 2); c.lineTo(x, y0 + TECLA_PLAY.iconoAlto * s); c.closePath(); c.fill();
+  c.fillRect(x + 108 * s, y0, 26 * s, TECLA_PLAY.iconoAlto * s); c.fillRect(x + 148 * s, y0, 26 * s, TECLA_PLAY.iconoAlto * s);
+  c.fillText(TEXTO_TECLA_PLAY, L.xTexto, h / 2 + 4);
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -521,7 +532,7 @@ function zoneTitleTex(text: string): THREE.CanvasTexture {
 }
 
 // ── Lights-indicator canvas draw — K3: shows globalIntensity ──────────────────
-function drawLightsIndicator(cv: HTMLCanvasElement, intensity: number): void {
+function drawLightsIndicator(cv: HTMLCanvasElement, intensity: number, extra = false): void {
   const ctx = cv.getContext("2d")!;
   const w = cv.width, h = cv.height;
   ctx.clearRect(0, 0, w, h);
@@ -529,10 +540,15 @@ function drawLightsIndicator(cv: HTMLCanvasElement, intensity: number): void {
   ctx.fillStyle = pal.indBg;
   ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = pal.indFg;
-  ctx.font = `bold ${Math.floor(h * 0.62)}px monospace`;
+  // Z97b: valor real y "+EX" con EXTRA encendida; el tamaño se ajusta al ancho medido (6 % de margen por lado)
+  const txt = textoNivel(intensity, extra);
+  let px = Math.floor(h * 0.62);
+  ctx.font = `bold ${px}px monospace`;
+  const ancho = ctx.measureText(txt).width;
+  if (ancho > w * 0.88) { px = Math.floor(px * (w * 0.88) / ancho); ctx.font = `bold ${px}px monospace`; }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(intensity.toFixed(1), w / 2, h / 2);
+  ctx.fillText(txt, w / 2, h / 2);
 }
 
 // ── E3: drag / hover module-level state ───────────────────────────────────────
@@ -1144,6 +1160,23 @@ export const IMAGE_CONTROLS_NUEVO: CtrlDef[] = POSICIONES_I.map((p: PosCtrlI) =>
     ...(p.tipo === "knob" ? { color: "mustard" as const } : {}),
     ...(p.tipo === "slider" ? { railLen: 0.20, orientation: "v" as const } : {}) };
 });
+// Z97b: luces de ESCENA del diseño nuevo (lib/lucesEscena.ts): LUZ ± un paso acotado por pulsación, EXTRA on/off sin
+// acumular, INTENS. en [LUZ_MIN, LUZ_MAX]. La perilla INTENS. sigue al nivel. El diseño anterior queda como estaba
+// (más el tope final, que vale para los dos).
+function luzPaso(signo: 1 | -1): void {
+  STORE.lights.globalIntensity = pasoNivel(STORE.lights.globalIntensity, signo, DBG_ATRIL_VIDEO);
+  ctrlState.dom_int = STORE.lights.globalIntensity;
+  storeNotify();
+}
+const LUZ_NUEVO: Record<string, Partial<CtrlDef>> = {
+  dom_minus: { onActivate: () => luzPaso(-1) },
+  dom_plus:  { onActivate: () => luzPaso(1) },
+  dom_star:  { type: "toggle", initial: 0, onActivate: (v) => { LUZ_ESCENA.extra = v > 0.5; LUZ_ESCENA.version++; storeNotify(); } },
+  dom_int:   { min: DBG_ATRIL_VIDEO.LUZ_MIN, max: DBG_ATRIL_VIDEO.LUZ_MAX, initial: DBG_ATRIL_VIDEO.LUZ_DEFECTO,
+               onActivate: (v) => { STORE.lights.globalIntensity = acotarNivel(v, DBG_ATRIL_VIDEO); storeNotify(); } },
+  lights_ind: { initial: DBG_ATRIL_VIDEO.LUZ_DEFECTO },
+};
+IMAGE_CONTROLS_NUEVO.forEach((d, i) => { const o = LUZ_NUEVO[d.id]; if (o) IMAGE_CONTROLS_NUEVO[i] = { ...d, ...o }; });
 function controlesImagen(): CtrlDef[] { return DBG_ATRIL_VIDEO.DISENO_NUEVO ? IMAGE_CONTROLS_NUEVO : IMAGE_CONTROLS; }
 const _posImagen = new Map<string, PosCtrlI>(POSICIONES_I.map(p => [p.id, p]));
 /** Z96: cambia el diseño o la escala de etiquetas desde el menú (LecternSystem remonta el atril o rehace la serigrafía). */
@@ -1272,9 +1305,11 @@ function CtrlMesh({
       RETRO_CRT.uTime.value = clock.elapsedTime;
       // K3: show globalIntensity instead of extras count
       const intensity = STORE.lights.globalIntensity;
-      if (Math.abs(intensity - indLastVal.current) > 0.001 && indCanvasRef.current && indTexRef.current) {
-        indLastVal.current = intensity;
-        drawLightsIndicator(indCanvasRef.current, intensity);
+      const extra = DBG_ATRIL_VIDEO.DISENO_NUEVO && LUZ_ESCENA.extra;   // Z97b: "+EX" en la lectura
+      const clave = intensity + (extra ? 1000 : 0);
+      if (Math.abs(clave - indLastVal.current) > 0.001 && indCanvasRef.current && indTexRef.current) {
+        indLastVal.current = clave;
+        drawLightsIndicator(indCanvasRef.current, intensity, extra);
         indTexRef.current.needsUpdate = true;
       }
       return;
@@ -1432,6 +1467,13 @@ function CtrlMesh({
           <planeGeometry args={[DW - 0.012, DD - 0.010]} />
           <primitive object={indMat} attach="material" />
         </mesh>
+        {/* Z97b: NIVEL del diseño nuevo recibe el doble clic (vuelve al nivel por defecto) */}
+        {def.id === "lights_ind" && DBG_ATRIL_VIDEO.DISENO_NUEVO && (
+          <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, DH / 2, 0]} visible={false}>
+            <boxGeometry args={[DW, DH + 0.006, DD]} />
+            <meshBasicMaterial transparent opacity={0} />
+          </mesh>
+        )}
         {LABEL_MODE === "mesh" && (
           <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
             <planeGeometry args={[LBL_W, LBL_H]} />
@@ -2329,7 +2371,7 @@ function InteractionHandler() {
       const hits = localRc.current.intersectObjects(meshes, false);
       if (!hits.length) return null;
       const def = hits[0].object.userData.controlDef as CtrlDef | undefined;
-      if (!def || def.type === "indicator") return null;
+      if (!def || (def.type === "indicator" && def.id !== "lights_ind")) return null;   // Z97b: NIVEL acepta doble clic
       return { mesh: hits[0].object as THREE.Mesh, def, point: hits[0].point };
     }
 
@@ -2402,6 +2444,17 @@ function InteractionHandler() {
         return;
       }
 
+      // Z97b: la lectura NIVEL no se arrastra; doble clic / doble toque → nivel por defecto
+      if (def.type === "indicator") {
+        if (def.id === "lights_ind" && DBG_ATRIL_VIDEO.DISENO_NUEVO && esDobleClic(_dobleClic, def.id, performance.now())) {
+          STORE.lights.globalIntensity = acotarNivel(DBG_ATRIL_VIDEO.LUZ_DEFECTO, DBG_ATRIL_VIDEO);
+          ctrlState.dom_int = STORE.lights.globalIntensity;
+          storeNotify();
+          playUIClick(900, 0.08);
+        }
+        return;
+      }
+
       // Z96: doble clic / doble toque sobre una perilla o el fader del atril de sonido → valor por defecto
       // Z97: también perillas y faders del atril de imagen nuevo (vuelven a su valor inicial)
       if ((def.type === "knob" || def.type === "slider")
@@ -2428,7 +2481,8 @@ function InteractionHandler() {
           playUIClick(1200, 0.12);
           setTimeout(() => setCtrl(def.id, 0, def), 120);
           // Hold-repeat for ±-step buttons
-          if (def.id === "dom_minus" || def.id === "dom_plus") {
+          // Z97b: con el diseño nuevo, una pulsación = un paso (LUZ_REPETIR_AL_MANTENER true = como antes)
+          if ((def.id === "dom_minus" || def.id === "dom_plus") && (!DBG_ATRIL_VIDEO.DISENO_NUEVO || DBG_ATRIL_VIDEO.LUZ_REPETIR_AL_MANTENER)) {
             _drag.holdTimer = setInterval(() => {
               setCtrl(def.id, 1, def);
               setTimeout(() => setCtrl(def.id, 0, def), 60);
@@ -2626,6 +2680,9 @@ export default function LecternSystem() {
     };
     window.addEventListener("alight:atril-sonido-cambio", on);
     window.addEventListener("alight:atril-imagen-cambio", on);   // Z97
+    // Z97b: "Restaurar luces del domo" y checkpoints: la perilla INTENS. y la tecla EXTRA vuelven con los valores
+    const onLuces = () => { ctrlState.dom_int = STORE.lights.globalIntensity; ctrlState.dom_star = 0; };
+    window.addEventListener("alight:luces-restauradas", onLuces);
     // Z96b: con ETIQUETA_AUTO_ASPECTO, si al cambiar el tamaño de la ventana cambia la escala efectiva, se rehace la serigrafía
     let escPrev = escalaActual(), escPrevI = escalaActualImagen();
     const onResize = () => {
@@ -2633,7 +2690,7 @@ export default function LecternSystem() {
       if (Math.abs(e - escPrev) > 0.005 || Math.abs(ei - escPrevI) > 0.005) { escPrev = e; escPrevI = ei; setSilkV(v => v + 1); }
     };
     window.addEventListener("resize", onResize);
-    return () => { window.removeEventListener("alight:atril-sonido-cambio", on); window.removeEventListener("alight:atril-imagen-cambio", on); window.removeEventListener("resize", onResize); };
+    return () => { window.removeEventListener("alight:atril-sonido-cambio", on); window.removeEventListener("alight:atril-imagen-cambio", on); window.removeEventListener("alight:luces-restauradas", onLuces); window.removeEventListener("resize", onResize); };
   }, []);
 
   // I1: flip lectern orientation (debug)
@@ -2772,6 +2829,7 @@ export default function LecternSystem() {
       const id = _keyMap.get(key as KeyLetter);
       if (!id) return;
       const allCtrl = [...controlesImagen(), ...SOUND_CONTROLS];   // Z97
+      if (e.repeat && id.startsWith("dom_")) return;   // Z97b: mantener la tecla no repite las teclas de luz ni los pads
       const def = allCtrl.find(c => c.id === id);
       if (!def) return;
       const cur = ctrlVal(id, def.initial);

@@ -8,7 +8,9 @@ import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit, alternarPanelCuadr
 import { sesionIdNavegador } from "@/lib/vivo/vivoAcciones";   // Z92
 import { reintentarCamara, textoEstadoFuente } from "@/lib/fuenteVideoTarima";   // Z87
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
-import { STORE } from "@/lib/alightStore";
+import { STORE, storeNotify } from "@/lib/alightStore";
+import { LUZ_ESCENA } from "@/lib/lucesEscena";                       // Z97b
+import { restaurarLucesEscena } from "@/lib/lucesEscenaAcciones";    // Z97b
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
 import { useDbg } from "../contexto";
 import { RITMOS, playRitmos, pausaRitmos, borrarRitmos, cargarEjemploHouse, setBpmRitmos, setSwingRitmos, setPasosRitmos, probarVoz, guardarRitmos } from "@/lib/ritmosMotor"; // Z80
@@ -679,6 +681,23 @@ export function SecAtrilImagenZ97() {
             {(["panel", "domo"] as const).map(m => (
               <button key={m} style={{ ...INPUT, opacity: A.CAMARA === m ? 1 : 0.5 }} onClick={ev => { ev.currentTarget.blur(); A.CAMARA = m; toca(); }}>{m}</button>
             ))}
+          </div>
+          {/* Z97b: luces de ESCENA acotadas */}
+          <div style={ROW}>
+            <span>Luces de ESCENA <span style={NOTE}>nivel {STORE.lights.globalIntensity.toFixed(2)} · EXTRA {LUZ_ESCENA.extra ? "on" : "off"} · luces extra viejas {STORE.lights.extras.length}</span></span>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); restaurarLucesEscena(); toca(); }}>Restaurar luces del domo</button>
+          </div>
+          {([["LUZ_MIN", 0, 1, 0.1, "nivel mínimo"], ["LUZ_MAX", 1, 5, 0.1, "nivel máximo"], ["LUZ_PASO", 0.05, 0.5, 0.05, "paso de LUZ - / LUZ +"],
+            ["LUZ_DEFECTO", 0, 3, 0.1, "nivel por defecto (doble clic, checkpoints, restaurar)"], ["LUZ_TOPE_FINAL", 1, 5, 0.1, "tope del aporte total: ninguna combinación lo pasa"],
+            ["EXTRA_APORTE", 0, 1.5, 0.05, "aporte de EXTRA encendida"], ["EXTRA_REF_CD", 20, 300, 10, "cd por 1 de aporte"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{A[k].toFixed(2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={A[k]} onChange={ev => { A[k] = parseFloat(ev.target.value); storeNotify(); toca(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <span>LUZ_REPETIR_AL_MANTENER <span style={NOTE}>LUZ ± repiten mientras se mantienen (como antes)</span></span>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); A.LUZ_REPETIR_AL_MANTENER = !A.LUZ_REPETIR_AL_MANTENER; toca(); }}>{A.LUZ_REPETIR_AL_MANTENER ? "ON" : "off"}</button>
           </div>
           <div style={{ ...ROW, ...NOTE }}><span>PADS_INICIO 0x{A.PADS_INICIO.toString(16)} (pads encendidos al cargar) · doble clic sobre una perilla o un fader: vuelve a su valor por defecto</span></div>
     </>

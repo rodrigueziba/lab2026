@@ -344,6 +344,26 @@ export function lineasDisplay(e: EstadoDisplay): [string, string] {
   const l2 = `${e.sonando ? "▶ PLAY" : "❚❚ PAUSA"}   LOOP A ${a}  B ${b}${e.loopOn ? "  [ON]" : ""}`;
   return [l1, l2];
 }
+/**
+ * Z97b: la tecla PLAY / PAUSA (lienzo 1024 × 256): ícono ▶❚❚ + texto fijo. Antes el texto (112 px, desde x 270) medía
+ * ~833 px y terminaba en ~1103 > 1024: se cortaba la "A". Ahora ícono, separación y fuente se escalan juntos para que
+ * todo entre con MARGEN (6 %) a cada lado, centrado. anchoTextoPorPx = ancho del texto medido con una fuente de 1 px
+ * (en el navegador, measureText / px; en Node, el modelo 0,62 × caracteres).
+ */
+export const TECLA_PLAY = { w: 1024, h: 256, margen: 0.06, pxBase: 112, iconoAncho: 174, iconoAlto: 116, gap: 36 };
+export function layoutTeclaPlay(anchoTextoPorPx: number): { px: number; s: number; xIcono: number; xTexto: number; anchoTotal: number } {
+  const T = TECLA_PLAY, disp = T.w * (1 - 2 * T.margen);
+  const natural = T.iconoAncho + T.gap + T.pxBase * Math.max(0, anchoTextoPorPx);
+  const s = Math.min(1, disp / natural, (T.h * (1 - 2 * T.margen)) / Math.max(T.iconoAlto, T.pxBase));
+  const px = Math.floor(T.pxBase * s);
+  const anchoTotal = (T.iconoAncho + T.gap) * s + px * anchoTextoPorPx;
+  const xIcono = (T.w - anchoTotal) / 2;
+  return { px, s, xIcono, xTexto: xIcono + (T.iconoAncho + T.gap) * s, anchoTotal };
+}
+/** Z97b: líneas del display con lugar fijo: si no entran, se recortan con "…" (en el navegador además se mide). */
+export function recortarLinea(texto: string, maxChars: number): string {
+  return texto.length <= maxChars ? texto : texto.slice(0, Math.max(0, maxChars - 1)) + "…";
+}
 /** Valor mostrado al tocar un control: escala 0…10 con un decimal (perillas y fader), ON/OFF (interruptores). */
 export function textoValor(nombreLargo: string, tipo: TipoCtrl, v: number, min: number, max: number): string {
   if (tipo === "toggle") return `${nombreLargo} ${v > 0.5 ? "ON" : "OFF"}`;

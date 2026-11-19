@@ -779,6 +779,16 @@ export const DBG_ATRIL_VIDEO = {
   // Cámara de la tecla E: "panel" = mira el panel (texto lejano ≥ 2,5 %; el domo queda fuera de cuadro) · "domo" = la de
   // hoy (el domo ocupa ~10 % de arriba de la pantalla, texto lejano 1,4 %). Vale al entrar con E.
   CAMARA:                "panel" as string,
+  // Z97b: luces de ESCENA (lib/lucesEscena.ts). Nivel = STORE.lights.globalIntensity (multiplica el DiagonalSpot).
+  LUZ_MIN:               0,       // nivel mínimo (LUZ -, INTENS.) — live
+  LUZ_MAX:               3,       // nivel máximo (LUZ +, INTENS.; el rango que ya tenía la perilla) — live
+  LUZ_PASO:              0.2,     // cuánto mueve cada pulsación de LUZ - / LUZ + — live
+  LUZ_DEFECTO:           1.0,     // valor al cargar, con doble clic, en checkpoints y con "Restaurar luces del domo" — live
+  LUZ_TOPE_FINAL:        3.0,     // tope del aporte total (nivel + EXTRA + luces extra del diseño anterior): ninguna combinación lo pasa — live
+  EXTRA_APORTE:          0.6,     // cuánto suma la tecla EXTRA encendida (una sola luz fija; no acumula) — live
+  EXTRA_REF_CD:          100,     // candelas de luz puntual que equivalen a 1 de aporte (EXTRA = 60 cd; antes 200 cd × hasta 12) — live
+  EXTRA_COLOR:           "#FFB060" as string,   // luz cálida, sobre la tarima — live
+  LUZ_REPETIR_AL_MANTENER: false, // true = LUZ ± repiten cada 120 ms mientras se mantienen apretadas (como antes) — live
 };
 
 // ── J5: retro skin (cassette futurism) for TARIMA lecterns ───────────────────

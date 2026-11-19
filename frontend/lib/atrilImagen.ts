@@ -66,7 +66,8 @@ function construir(): PosCtrlI[] {
   L.push({ id: "dom_minus", u: es.rect.u0 + we * 0.5, v: FILA_ESCENA.botones, forma: "normal", tipo: "button", etiqueta: "LUZ -", nombreLargo: "LUZ DE ESCENA −", modulo: "escena" });
   L.push({ id: "lights_ind", u: es.rect.u0 + we * 1.5, v: FILA_ESCENA.botones, forma: "indicador", tipo: "indicator", etiqueta: "NIVEL", nombreLargo: "NIVEL DE LUZ", modulo: "escena" });
   L.push({ id: "dom_plus", u: es.rect.u0 + we * 2.5, v: FILA_ESCENA.botones, forma: "normal", tipo: "button", etiqueta: "LUZ +", nombreLargo: "LUZ DE ESCENA +", modulo: "escena" });
-  L.push({ id: "dom_star", u: es.rect.u0 + we * 3.5, v: FILA_ESCENA.botones, forma: "normal", tipo: "button", etiqueta: "EXTRA", nombreLargo: "LUZ EXTRA DE COLOR", modulo: "escena" });
+  // Z97b: EXTRA pasa a ser una tecla con luz (on/off de UNA luz fija); antes sumaba una luz de 200 cd por pulsación
+  L.push({ id: "dom_star", u: es.rect.u0 + we * 3.5, v: FILA_ESCENA.botones, forma: "pad", tipo: "toggle", etiqueta: "EXTRA", nombreLargo: "LUZ EXTRA", modulo: "escena" });
   L.push({ id: "dom_int", u: es.rect.u0 + we * 1.0, v: FILA_ESCENA.perillas, forma: "normal", tipo: "knob", etiqueta: "INTENS.", nombreLargo: "INTENSIDAD DE LUCES", modulo: "escena" });
   L.push({ id: "cam_fov", u: es.rect.u0 + we * 3.0, v: FILA_ESCENA.perillas, forma: "normal", tipo: "knob", etiqueta: "FOV", nombreLargo: "CAMPO DE VISIÓN", modulo: "escena" });
   return L;

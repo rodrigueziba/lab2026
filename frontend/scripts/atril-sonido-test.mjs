@@ -143,7 +143,7 @@ check(/"atril_sonido"/.test(leer('../lib/checkpoints.ts')) && /atrilesSinConsent
 
 // ════════════════════════════ Z96b ════════════════════════════
 console.log('\nZ96b (a) PLAY: texto fijo y luz según el estado');
-{ check(/export const TEXTO_TECLA_PLAY = "PLAY \/ PAUSA";/.test(LS) && /c\.fillText\(TEXTO_TECLA_PLAY, 270, 132\);/.test(LS), 'la tecla muestra siempre "PLAY / PAUSA" (con ▶❚❚): una sola textura');
+{ check(/export const TEXTO_TECLA_PLAY = "PLAY \/ PAUSA";/.test(LS) && /c\.fillText\(TEXTO_TECLA_PLAY, (270, 132|L\.xTexto, h \/ 2 \+ 4)\);/.test(LS), 'la tecla muestra siempre "PLAY / PAUSA" (con ▶❚❚): una sola textura');
   check(!/playTex\.pausa|texPlayGrande\(true\)/.test(LS), 'ya no cambia la pantalla de la tecla según el estado (no contradice al display)');
   const m = /export function intensidadLuzPlay\(sonando: boolean, ahoraMs: number\): number \{\n  return ([^\n]+)\n\}/.exec(LS);
   const fn = Function('sonando', 'ahoraMs', 'LUZ_PLAY', `return ${m[1].replace(/;$/, '')}`);

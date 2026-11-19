@@ -48,6 +48,7 @@ import { mostrarEleccionAhora, atajoSinCompartir } from "@/lib/consentTarimaAcci
 import { LECTERN_OUTWARD_OFFSET_M } from "@/lib/debugConfig";
 import { ATRIL_X_BASE, poseFrenteAtril } from "@/lib/atrilSonido";   // Z96
 import { poseFrenteAtrilImagen } from "@/lib/atrilImagen";            // Z97
+import { restaurarLucesEscena } from "@/lib/lucesEscenaAcciones";    // Z97b
 import { detenerPresencia } from "@/lib/vivo/vivoAcciones";
 import { detenerLiveKit } from "@/lib/vivo/publicarLiveKit";
 
@@ -132,6 +133,7 @@ function limpiezaBase(): void {
   // atriles (TARIMA): FOV e intensidad global a sus valores de arranque
   STORE.cam.fov = 90;
   STORE.lights.globalIntensity = 1.0;
+  restaurarLucesEscena();   // Z97b: nivel por defecto, EXTRA apagada y sin luces extra acumuladas
 }
 
 // Z41: zonas desde lib/layoutSala.ts (siguen a DBG_LAYOUT), salidas reutilizadas

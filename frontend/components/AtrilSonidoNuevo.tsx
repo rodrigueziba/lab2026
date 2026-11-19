@@ -25,6 +25,7 @@ import {
   // Z96b
   numerosPerilla, esPerilla, numerosFader, ESCALA_FADER, HUELLA, colorSegmento, tickPico, escalaEfectiva,
   BARRA, PLACA_BARRA, TEXTO_PLACA, LEYENDA_FILAS, BARRA_2L, lineasBarra, rotulosFila, numerosFilaMargen, MARGEN_ROTULOS, FILAS, modulo, lineasDisplay, rms, nivelVu, balistica, tocaActualizar,
+  recortarLinea, DISPLAY_CHARS_1, DISPLAY_CHARS_2,   // Z97b
 } from "@/lib/atrilSonido";
 
 export const NOMBRE_EQUIPO = "SONIDO SN-40";
@@ -198,6 +199,14 @@ export function DisplaySonido() {
     </group>
   );
 }
+/** Z97b: una línea de texto que nunca se dibuja fuera del ancho disponible (achica la fuente si hace falta). */
+function linea(c: CanvasRenderingContext2D, t: string, alto: number, anchoMax: number, x: number, y: number): void {
+  let px = Math.round(alto);
+  c.font = `bold ${px}px monospace`;
+  const a = c.measureText(t).width;
+  if (a > anchoMax) { px = Math.max(8, Math.floor(px * anchoMax / a)); c.font = `bold ${px}px monospace`; }
+  c.fillText(t, x, y);
+}
 function dibujar(r: { cv: HTMLCanvasElement; tex: THREE.CanvasTexture; cw: number; ch: number; w: number; h: number }, l1: string, l2: string): void {
   const c = r.cv.getContext("2d");
   if (!c) return;
@@ -209,8 +218,11 @@ function dibujar(r: { cv: HTMLCanvasElement; tex: THREE.CanvasTexture; cw: numbe
   const h1 = a1 * ppm, h2 = a2 * ppm, pad = DISPLAY_PAD * ppm;
   c.fillStyle = "#FF9A1F"; c.shadowColor = "rgba(255,154,31,0.6)"; c.shadowBlur = 10;
   c.textAlign = "left"; c.textBaseline = "middle";
-  c.font = `bold ${Math.round(h1)}px monospace`; c.fillText(l1, 0.012 * ppm, pad + h1 / 2);
-  c.font = `bold ${Math.round(h2)}px monospace`; c.fillText(l2, 0.012 * ppm, pad + h1 + DISPLAY_INTERLINEA * ppm + h2 / 2);
+  // Z97b: recorte a los caracteres del display y, además, medición real: si el glifo es más ancho que el modelo, la
+  // fuente baja hasta entrar (al tocar un control, la línea 2 muestra la línea 1, que podía pasar de 44 caracteres)
+  const anchoMax = r.cw - 2 * 0.012 * ppm;
+  linea(c, recortarLinea(l1, DISPLAY_CHARS_1), h1, anchoMax, 0.012 * ppm, pad + h1 / 2);
+  linea(c, recortarLinea(l2, DISPLAY_CHARS_2), h2, anchoMax, 0.012 * ppm, pad + h1 + DISPLAY_INTERLINEA * ppm + h2 / 2);
   c.shadowBlur = 0;
   r.tex.needsUpdate = true;
 }
