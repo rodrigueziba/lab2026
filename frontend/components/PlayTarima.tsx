@@ -13,6 +13,8 @@ import * as THREE from "three";
 import { DBG_PLAY, DBG_RITMOS, DBG_LAYOUT, DEBUG_ENABLED } from "@/lib/debugConfig";
 import { PLAY_TARIMA, alturaPedestal, slotsSegunUbicacion, ejeDetrasTarima, type Slot, type EjeTarima } from "@/lib/playTarima";
 import { TARIMA_CENTRO, centroSillasEn } from "@/lib/layoutSala";
+import { enArco, poseInstrumento } from "@/lib/instrumentosPose";                                   // Z99b
+import { indiceDesdeSlotLinea } from "@/lib/instrumentosDisposicion";                               // Z99b
 import { alternarPlay, playTarima, pausaTarima, estadoContextoTarima } from "@/lib/playTarimaAcciones";
 import { createStripeBandTex } from "@/lib/retro/decals";
 import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
@@ -163,8 +165,21 @@ export function slotsActuales(atrilX: number, tarimaMedia: number, tarimaH: numb
   UBIC_SLOTS.atrilX = atrilX;
   centroSillasEn(DBG_LAYOUT, _sillasC);
   ejeDetrasTarima(TARIMA_CENTRO.x, TARIMA_CENTRO.z, _sillasC.x, _sillasC.z, EJE_TARIMA);
-  return slotsSegunUbicacion(DBG_PLAY, DBG_RITMOS, atrilX, EJE_TARIMA, tarimaMedia, tarimaH, out);
+  slotsSegunUbicacion(DBG_PLAY, DBG_RITMOS, atrilX, EJE_TARIMA, tarimaMedia, tarimaH, out);
+  // Z99b: con la disposición "arco", los slots que no son el de la caja van al arco (el de la caja no se toca)
+  if (enArco()) {
+    const centro = Math.max(0, Math.min(out.length - 1, Math.floor(DBG_RITMOS.SLOT)));
+    for (let i = 0; i < out.length; i++) {
+      if (i === centro || !poseInstrumento(indiceDesdeSlotLinea(i, centro), _poseArco)) continue;
+      const s = out[i];
+      s.x = _poseArco.x; s.z = _poseArco.z; s.yaw = _poseArco.yaw;
+      s.sobreTarima = Math.abs(s.x - EJE_TARIMA.cx) <= tarimaMedia && Math.abs(s.z - EJE_TARIMA.cz) <= tarimaMedia;
+      s.y = s.sobreTarima ? tarimaH : 0;
+    }
+  }
+  return out;
 }
+const _poseArco = { x: 0, z: 0, yaw: 0 };
 
 /** Marcadores de los slots (espacio de LecternSystem). anchoM/profM = huella de un atril. */
 export function SlotsAtriles({ atrilX, tarimaMedia, tarimaH, anchoM, profM }: {

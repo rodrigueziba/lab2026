@@ -49,7 +49,8 @@ import { LECTERN_OUTWARD_OFFSET_M } from "@/lib/debugConfig";
 import { ATRIL_X_BASE, poseFrenteAtril } from "@/lib/atrilSonido";   // Z96
 import { poseFrenteAtrilImagen } from "@/lib/atrilImagen";            // Z97
 import { restaurarLucesEscena } from "@/lib/lucesEscenaAcciones";    // Z97b
-import { ATRIL_BAJO, poseFrenteAtrilBajo } from "@/lib/atrilBajo";   // Z99
+import { poseFrenteAtrilBajo } from "@/lib/atrilBajo";               // Z99
+import { poseAtrilBajo, poseInstrumento } from "@/lib/instrumentosPose";   // Z99b: posición única (arco / línea)
 import { detenerPresencia } from "@/lib/vivo/vivoAcciones";
 import { detenerLiveKit } from "@/lib/vivo/publicarLiveKit";
 
@@ -57,6 +58,15 @@ import { detenerLiveKit } from "@/lib/vivo/publicarLiveKit";
 export const HOST = { montajes: 0, frames: 0 };
 
 let _camara: THREE.Camera | null = null;
+const _poseBajo = { x: 0, z: 0, yaw: 0 };   // Z99b
+/** Z99b: pone la cámara a 1 m del instrumento del índice k del arco (0 = caja), mirándolo. Para el menú de debug. */
+export function irAInstrumento(k: number): boolean {
+  if (!_camara || !poseInstrumento(k, _poseBajo)) return false;
+  const p = poseFrenteAtrilBajo(_poseBajo.x, _poseBajo.z, _poseBajo.yaw, 1.0);
+  _camara.position.set(p.x, 1.6, p.z);
+  _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
+  return true;
+}
 export function setCamaraCheckpoints(c: THREE.Camera): void { _camara = c; }
 
 // ── espera de un evento (uno a la vez; la base lo suelta) ──
@@ -276,10 +286,11 @@ export const ACCIONES_CHECKPOINT: Record<string, Accion> = {
     return true;
   },
 
-  // Z99: a 1 m del BA-40, mirándolo (su posición la escribe LecternSystem desde el slot de instrumentos)
+  // Z99: a 1 m del BA-40, mirándolo · Z99b: su pose sale de la función única (arco o línea), no de ATRIL_BAJO
   frenteAtrilBajo: () => {
     if (!_camara) return false;
-    const p = poseFrenteAtrilBajo(ATRIL_BAJO.x, ATRIL_BAJO.z, ATRIL_BAJO.yaw, 1.0);
+    const b = poseAtrilBajo(_poseBajo);
+    const p = poseFrenteAtrilBajo(b.x, b.z, b.yaw, 1.0);
     _camara.position.set(p.x, 1.6, p.z);
     _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
     return true;

@@ -2,7 +2,7 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_BAJO, DBG_ATRIL_BAJO } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_BAJO, DBG_ATRIL_BAJO, DBG_INSTRUMENTOS } from "@/lib/debugConfig";
 import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent, modoActual } from "@/lib/consentTarimaAcciones";   // Z91
 import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit, alternarPanelCuadro, panelCuadroVisible } from "@/lib/vivo/publicarLiveKit";   // Z92 · Z94b
 import { sesionIdNavegador } from "@/lib/vivo/vivoAcciones";   // Z92
@@ -14,6 +14,9 @@ import { textoCronoVis } from "@/lib/visualizadorTarimaDibujo";        // Z98
 import { BAJO, PARAMS as PARAMS_BAJO_EST, cargarPatron, patronLimpio, setParamBajo, aplicarParamsBajo, silenciarYReiniciarBajo, bpmBajo } from "@/lib/audio/bajoAcido";   // Z99
 import { PARAMS_BAJO, NOMBRES_PATRON, nombreNota, indiceParam } from "@/lib/bajoAcido";   // Z99
 import { restaurarLucesEscena } from "@/lib/lucesEscenaAcciones";    // Z97b
+import { radioCaja, radioArco, pasoArcoActual, indiceMaxArco, poseInstrumento, enArco } from "@/lib/instrumentosPose";   // Z99b
+import { ORDEN_SLOTS, INDICE_MAX } from "@/lib/instrumentosDisposicion";                   // Z99b
+import { irAInstrumento } from "@/lib/checkpointsAcciones";                                // Z99b
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
 import { useDbg } from "../contexto";
 import { RITMOS, playRitmos, pausaRitmos, borrarRitmos, cargarEjemploHouse, setBpmRitmos, setSwingRitmos, setPasosRitmos, probarVoz, guardarRitmos } from "@/lib/ritmosMotor"; // Z80
@@ -776,7 +779,7 @@ export function SecBajoZ99() {
           ))}
           <span style={LABEL}>Atril BA-40</span>
           {([["ETIQUETA_ESCALA", 0.7, 1.4, 0.05, "títulos y etiquetas (rehace la serigrafía)", false], ["DISPLAY_VALOR_S", 0.5, 8, 0.5, "s del control tocado en el display", false],
-            ["VU_HZ", 5, 60, 1, "tope del VU y del display", false], ["ESCALA_PASOS", 0.8, 1.2, 0.05, "teclas PASO (vale al remontar)", true], ["SLOT", 0, 3, 1, "slot de instrumentos (1 = el de la caja)", true]] as const).map(([k, mn, mx, st, nota, remontar]) => (
+            ["VU_HZ", 5, 60, 1, "tope del VU y del display", false], ["ESCALA_PASOS", 0.8, 1.2, 0.05, "teclas PASO (vale al remontar)", true], ["INDICE_ARCO", -3, 3, 1, "Z99b: índice en el arco (0 = caja; vale con «arco»)", false], ["SLOT", 0, 3, 1, "slot de la línea de Z88 (1 = el de la caja; vale con «linea»)", false]] as const).map(([k, mn, mx, st, nota, remontar]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{A[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={A[k]}
@@ -790,6 +793,53 @@ export function SecBajoZ99() {
             </div>
           ))}
           <div style={{ ...ROW, ...NOTE }}><span>ROTULOS_MODO {A.ROTULOS_MODO} (leyenda en la placa de la barra) · doble clic en perillas y fader: valor por defecto · E entra · Q sale</span></div>
+    </>
+  );
+}
+
+// sección: instrumentos-arco-z99b
+export function SecInstrumentosArcoZ99b() {
+  // Z99b: disposición de los instrumentos detrás de la tarima (lib/instrumentosPose.ts). Estado 4 veces por segundo.
+  const I = DBG_INSTRUMENTOS;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const paso = pasoArcoActual();
+  const p = { x: 0, z: 0, yaw: 0 };
+  const ocupados: number[] = [];
+  for (let k = -INDICE_MAX; k <= INDICE_MAX; k++) if (ORDEN_SLOTS[k]?.ocupado || (k !== 0 && k === Math.round(DBG_ATRIL_BAJO.INDICE_ARCO))) ocupados.push(k);
+  const nombre = (k: number) => k === Math.round(DBG_ATRIL_BAJO.INDICE_ARCO) && k !== 0 ? "BAJO ÁCIDO BA-40" : ORDEN_SLOTS[k]?.nombre ?? "LIBRE";
+  return (
+    <>
+          <span style={LABEL}>Instrumentos en arco Z99b <span style={NOTE}>(la caja de ritmos queda en el centro del arco, donde la puso Z88; los demás a su misma distancia del centro de la tarima, mirando al centro)</span></span>
+          <div style={ROW}>
+            <span>DISPOSICION</span>
+            {(["arco", "linea"] as const).map(v => <button key={v} style={{ ...INPUT, opacity: I.DISPOSICION === v ? 1 : 0.5 }} onClick={ev => { ev.currentTarget.blur(); I.DISPOSICION = v; toca(); }}>{v}</button>)}
+          </div>
+          <div style={{ ...ROW, ...NOTE }}><span>{enArco() ? "arco" : "línea (Z88)"} · radio caja {radioCaja().toFixed(3)} m · radio arco {radioArco().toFixed(3)} m · ángulo entre vecinos {(paso.angulo * 180 / Math.PI).toFixed(1)}° · separación {paso.separacion.toFixed(2)} m{paso.reducida ? " (REDUCIDA por el tope)" : ""} · arco total ±{indiceMaxArco()} = {paso.arcoTotalGrados.toFixed(1)}°</span></div>
+          {([["RADIO_M", 0, 8, 0.05, "0 = automático (el de la caja; la caja no se mueve)"], ["SEPARACION_M", 1, 4, 0.05, "distancia en línea recta entre vecinos (> 1,8 m: rango de E)"],
+            ["ARCO_MAX_GRADOS", 30, 180, 1, "tope del arco total"], ["INDICE_MAX", 0, 3, 1, "0 = auto (mayor índice ocupado o reservado)"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{I[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={I[k]} onChange={ev => { I[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <span>MIRAR_AL_CENTRO <span style={NOTE}>off = todos con el yaw de la caja</span></span>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); I.MIRAR_AL_CENTRO = !I.MIRAR_AL_CENTRO; toca(); }}>{I.MIRAR_AL_CENTRO ? "ON" : "off"}</button>
+          </div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); I.GUIA = !I.GUIA; toca(); }}>{I.GUIA ? "Ocultar guía del arco" : "Dibujar guía del arco"}</button>
+          </div>
+          {ocupados.map(k => {
+            const ok = poseInstrumento(k, p);
+            return (
+              <div key={k} style={ROW}>
+                <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); irAInstrumento(k); }}>Ir al instrumento {k > 0 ? `+${k}` : k}</button>
+                <span style={NOTE}>{nombre(k)} · {ok ? `x ${p.x.toFixed(2)} · z ${p.z.toFixed(2)} · yaw ${(p.yaw * 180 / Math.PI).toFixed(1)}°` : "sin slot en la línea"}</span>
+              </div>
+            );
+          })}
     </>
   );
 }

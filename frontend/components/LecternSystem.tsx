@@ -41,13 +41,13 @@ import {
 } from "@/lib/audio/bajoAcido";
 import { PARAMS_BAJO, aNormal, deNormal, valorParam, indiceParam, nombreNota, type NombrePatron } from "@/lib/bajoAcido";
 import { DisplayBajo, VuBajo, buildSilkscreenBajo, mostrarEnDisplayBajo, escalaActualBajo } from "./AtrilBajoNuevo";
-import type { Slot } from "@/lib/playTarima";
+import { poseAtrilBajo, GEO_INSTRUMENTOS } from "@/lib/instrumentosPose";                      // Z99b: posición única de los instrumentos
 import { FUENTE_TARIMA } from "@/lib/fuenteVideoTarima";                               // Z98
 import { DisplayImagen, buildSilkscreenImagen, mostrarEnDisplayImagen, escalaActualImagen, ROTULOS_VERTICALES_I, ROTULOS_NUMEROS_I } from "./AtrilImagenNuevo";
 import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
 import { PLAY_TARIMA } from "@/lib/playTarima";                                              // Z79
 import { alternarPlay, instalarEstadoPlay, prepararSinAutoplay } from "@/lib/playTarimaAcciones"; // Z79
-import { PlayGrande, SlotsAtriles, slotsActuales } from "./PlayTarima";                                       // Z79
+import { PlayGrande, SlotsAtriles } from "./PlayTarima";                                       // Z79
 import { TARIMA_W } from "./Tarima";                                                         // Z79: slots
 import CajaRitmos from "./CajaRitmos";                                                       // Z80
 import { atrilesPermitidosAhora } from "@/lib/consentTarimaAcciones";                         // Z93a
@@ -68,6 +68,8 @@ const LECTERN_CAM_MS           = 600;      // camera fly-in duration
 const LECTERN_APPEAR_DUR_MS    = 2_000;
 const POINTERLOCK_RETRY_MS     = 1300;
 const TARIMA_H_REF             = 0.267;
+// Z99b: la geometría que usa la posición única de los instrumentos (lib/instrumentosPose.ts)
+GEO_INSTRUMENTOS.atrilX = LECTERN_PLACE_X; GEO_INSTRUMENTOS.tarimaMedia = TARIMA_W / 2; GEO_INSTRUMENTOS.tarimaH = TARIMA_H_REF;
 
 // Top plate
 const PANEL_W   = DBG_LECTERNS.panelW;   // 1.20 m
@@ -621,15 +623,11 @@ const K1_DOME_R = 27.5;      // FaceDome sphere radius (DOME_R - 0.5)
 
 // Z99: lado del atril: "left" (IM-40), "right" (SN-40) o "bajo" (BA-40, en un slot de instrumentos detrás de la tarima)
 type Lado = "left" | "right" | "bajo";
-const _slotsBajo: Slot[] = [];
 const _poseLado = { x: 0, z: 0, yaw: 0 };
 /** Posición (x, z) y yaw (local +Z = frente, mirando al usuario) de cada atril. El cuerpo va a la altura de la tarima. */
 function poseLado(side: Lado): { x: number; z: number; yaw: number } {
   if (side === "bajo") {
-    const sl = slotsActuales(LECTERN_PLACE_X, TARIMA_W / 2, TARIMA_H_REF, _slotsBajo)[Math.max(0, Math.floor(DBG_ATRIL_BAJO.SLOT))];
-    if (sl) { ATRIL_BAJO.x = sl.x; ATRIL_BAJO.z = sl.z; ATRIL_BAJO.yaw = sl.yaw; }
-    _poseLado.x = ATRIL_BAJO.x; _poseLado.z = ATRIL_BAJO.z; _poseLado.yaw = ATRIL_BAJO.yaw;
-    return _poseLado;
+    return poseAtrilBajo(_poseLado);   // Z99b: arco (INDICE_ARCO) o línea de Z88 (SLOT); escribe ATRIL_BAJO
   }
   const sign = side === "left" ? -1 : 1;
   const flip = (side === "left" ? DBG_LECTERNS.yawFlipLeft : DBG_LECTERNS.yawFlipRight) ? Math.PI : 0;
@@ -2332,10 +2330,17 @@ function Lectern({
     meshesRef.current.length = 0;
   }, []);
 
+  const poseRef = useRef<THREE.Group>(null);   // Z99b
   useFrame(() => {
     if (!groupRef.current) return;
     const ease = 1 - Math.pow(1 - appearProgress.current, 3);
     groupRef.current.position.y = THREE.MathUtils.lerp(-1.6, 0, ease);
+    // Z99b: el BA-40 sigue en vivo la disposición (arco / línea, radio, separación, índice)
+    if (side === "bajo" && poseRef.current) {
+      const p = poseLado("bajo");
+      poseRef.current.position.set(p.x, TARIMA_H_REF, p.z);
+      poseRef.current.rotation.set(0, p.yaw, 0);
+    }
   });
 
   // Reverse lookup: controlId → keyLetter (only when this side is active)
@@ -2348,7 +2353,7 @@ function Lectern({
 
   return (
     <group ref={groupRef}>
-      <group position={[posX, TARIMA_H_REF, posZ]} rotation={[0, yaw, 0]}>
+      <group ref={poseRef} position={[posX, TARIMA_H_REF, posZ]} rotation={[0, yaw, 0]}>
         <LecternBody side={side} silkV={silkV} />
         {/* Z99: el BA-40 está fuera de la tarima: pedestal desde el piso hasta la altura de la tarima, y su motor */}
         {side === "bajo" && (

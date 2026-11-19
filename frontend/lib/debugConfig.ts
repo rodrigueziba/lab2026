@@ -1748,8 +1748,22 @@ export const DBG_BAJO = {
   DISTORSION:             0.15,     // 0…1
   VOLUMEN:                0.7,      // 0…1
 };
+// ── Z99b: disposición de los instrumentos detrás de la tarima (lib/instrumentosDisposicion.ts, lib/instrumentosPose.ts) ──
+// "arco": todos a la misma distancia del centro de la tarima (la de la caja de ritmos), mirando al centro; la caja en el
+// medio del arco, donde la dejó Z88. "linea": la línea de Z88 (vuelve atrás sin borrar nada). Solo con
+// DBG_RITMOS.UBICACION "detras_tarima" (con "slot_atril" sigue Z79).
+export const DBG_INSTRUMENTOS = {
+  DISPOSICION:      "arco" as string,   // "arco" | "linea" — live
+  RADIO_M:          0,        // 0 = automático: distancia de la caja al centro de la tarima (3,596 m hoy) — live (la caja no se mueve)
+  SEPARACION_M:     2.0,      // distancia en línea recta entre vecinos (> 1,8 m: rango de la tecla E) — live
+  ARCO_MAX_GRADOS:  150,      // tope del arco total; si se pasa, se reduce la separación proporcionalmente — live
+  INDICE_MAX:       0,        // 0 = auto (el mayor |índice| ocupado o reservado: hoy 2); 1…3 = fijo — live
+  MIRAR_AL_CENTRO:  true,     // false = todos con el yaw de la caja (de frente a la tarima) — live
+  GUIA:             false,    // guía de debug en el piso con los slots numerados (oculta por defecto) — live
+};
 export const DBG_ATRIL_BAJO = {
-  SLOT:                   0,        // slot de instrumentos detrás de la tarima (Z88; 0 = el de al lado de la caja, lado del atril de sonido) — live
+  INDICE_ARCO:            1,        // Z99b: índice en el arco (0 = caja; +1 = al lado, lado del atril de sonido) — live (con "arco")
+  SLOT:                   0,        // slot de instrumentos detrás de la tarima (Z88; 0 = el de al lado de la caja, lado del atril de sonido) — live (con "linea")
   ETIQUETA_ESCALA:        1.0,      // multiplica títulos y etiquetas — live (rehace la serigrafía)
   ETIQUETA_AUTO_ASPECTO:  true,     // proporción < 1,6: hasta × 1,15 — live
   DISPLAY_VALOR_S:        2.5,      // s que el display muestra el control tocado — live
