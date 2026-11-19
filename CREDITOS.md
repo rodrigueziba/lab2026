@@ -103,3 +103,10 @@ Z45: cálculo en una textura compartida por las 3 caras; port a TypeScript del r
 - **livekit-client** 2.24.1 (LiveKit, Inc., licencia Apache-2.0): SDK del navegador para conectar a la sala y publicar las pistas. Se carga con `import()` dinámico solo al publicar.
 - **livekit-server-sdk** 2.20.0 (LiveKit, Inc., licencia Apache-2.0): firma de los tokens de acceso en la ruta de Next (solo servidor).
 - Servicio: LiveKit Cloud (plan gratuito). El código de la integración es propio.
+
+## Tocar el BA-40 con la cara (Z100)
+- Archivos: `frontend/lib/cara.ts`, `frontend/lib/caraBajo.ts`, `frontend/lib/caraWorker.ts`, `frontend/components/AtrilBajoNuevo.tsx` (módulo CARA).
+- Inspiración (solo ideas, sin código reutilizado): **mouth-acid** de **Electro-Dig** ("Play a TB-303-style acid line with your face", MediaPipe + AudioWorklet), licencia **MIT**: https://github.com/Electro-Dig/mouth-acid . De ahí la idea de que los gestos de la cara muevan el filtro y la envolvente de un bajo ácido.
+- **@mediapipe/tasks-vision** 1.0.1 (Google, licencia Apache-2.0): Face Landmarker con blendshapes, en un Web Worker. Modelo `face_landmarker.task` (float16, versión 1) de Google (Apache-2.0), servido desde `public/alight/mediapipe/` o, si no está, desde `storage.googleapis.com/mediapipe-models/`.
+- Filtro "1 euro": algoritmo de **Géry Casiez, Nicolas Roussel y Daniel Vogel** ("1€ Filter: A Simple Speed-based Low-pass Filter for Noisy Input in Interactive Systems", CHI 2012). Reimplementado (sin copiar código).
+- El mapa de gestos, la calibración, los detectores de cabeceo y guiño y el módulo del atril son propios de este proyecto.

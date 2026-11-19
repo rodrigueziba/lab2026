@@ -1097,6 +1097,7 @@ export const DBG_RENDIMIENTO = {
     transmisionTarima: true,         // Z92: subida a LiveKit (false = pauseUpstream: sin codificar ni enviar)
     videoTransmitidoTarima: true,    // Z94: pase plano del domo + copia al canvas transmisible (false = queda el último cuadro)
     recepcionTarima:   true,         // Z93: recepción en SILLAS (false = des-suscribe audio y video sin desconectar)
+    caraBajo:          true,         // Z100: lector de cara del BA-40 (false = no manda cuadros al worker)
   } as Record<string, boolean>,
 };
 
@@ -1771,6 +1772,46 @@ export const DBG_ATRIL_BAJO = {
   ROTULOS_FILA:           true,     // leyenda "1 SECUENCIA · 2 VOZ · 3 SALIDA" en la placa y números en los títulos — live
   ROTULOS_MODO:           "barra" as string,   // "barra" (leyenda en la placa de la barra) — live
   ESCALA_PASOS:           1.0,      // tamaño de las teclas PASO (0,8…1,2) — vale al remontar
+  MODULO_CARA:            true,     // Z100: módulo 4 CARA en la fila de abajo (false = layout de Z99) — vale al recargar
+};
+
+// ── Z100: tocar el BA-40 con la cara (lib/cara.ts puro, lib/caraBajo.ts, lib/caraWorker.ts, MediaPipe Face Landmarker) ──
+// El video de la cara NO sale de la máquina: se reduce a 320×240, lo procesa un Web Worker local y vuelve solo un arreglo
+// de 9 números (7 blendshapes, inclinación y presencia). Lo que viaja a SILLAS sigue siendo el audio del bus y la imagen
+// procesada del domo (Z94), como antes.
+export const DBG_CARA = {
+  FPS_CARA:                   20,      // cuadros por segundo que se mandan al worker (uno en vuelo a la vez) — live
+  ANCHO_CUADRO:               320,     // px del cuadro reducido que se manda al worker — live
+  ALTO_CUADRO:                240,
+  ACTIVO_SOLO_EN_ATRIL:       true,    // se apaga al salir del modo atril del BA-40 — live
+  CARA_PRIORIDAD_MANUAL:      true,    // arrastrar una perilla tomada manda sobre la cara solo mientras se arrastra — live
+  CARA_MINCUTOFF:             1.2,     // filtro 1 euro: corte en reposo (Hz). Más bajo = más suave quieto — live
+  CARA_BETA:                  0.6,     // filtro 1 euro: cuánto sube el corte con la velocidad (menos retraso) — live
+  CARA_DCUTOFF:               1.0,     // filtro 1 euro: corte de la medición de velocidad (Hz) — live
+  CARA_RANGO_MIN:             0.08,    // rango mínimo de un gesto calibrado (no divide por casi cero) — live
+  CARA_ACENTO_UMBRAL:         1.6,     // cabeceo: velocidad del pitch (rad/s) que dispara el acento forzado — live
+  CARA_ACENTO_REFRACTARIO_MS: 300,     // cabeceo: ms sin volver a disparar — live
+  CARA_GUINO_CERRADO:         0.6,     // guiño: un ojo por encima de esto… — live
+  CARA_GUINO_ABIERTO:         0.3,     // …y el otro por debajo de esto — live
+  CARA_GUINO_MIN_MS:          120,     // guiño: sostenido al menos esto — live
+  CARA_GUINO_REFRACTARIO_MS:  800,     // guiño: ms sin volver a cambiar de patrón — live
+  CARA_MEDIDOR_CAIDA:         0.85,    // caída por cuadro del medidor CABECEO (se ve el golpe) — live
+  CAL_PASO_S:                 2,       // segundos por paso de la calibración — live
+  SIN_CALIBRAR:               false,   // true = usa los límites por defecto aunque haya calibración guardada — live
+  MODELO_LOCAL:               true,    // busca primero /alight/mediapipe/ (modelo y wasm locales); si no están, el CDN — vale al encender
+  // Mapa gesto → parámetro (tabla de datos; gesto: 0 BOCA, 1 O, 2 SONRISA, 3 CEJAS). salMin/salMax: rango 0…1 del
+  // parámetro (CORTE va con su curva exponencial de 60 a 6000 Hz). Solo parámetros modulables (Z99) — live
+  MAPA: [
+    { gesto: 0, param: "corte",      salMin: 0.15, salMax: 1,    activo: true },
+    { gesto: 1, param: "resonancia", salMin: 0.2,  salMax: 0.95, activo: true },
+    { gesto: 2, param: "decay",      salMin: 0.1,  salMax: 0.9,  activo: true },
+    { gesto: 3, param: "distorsion", salMin: 0,    salMax: 0.8,  activo: true },
+  ],
+  CABECEO_ACENTO:             true,    // cabeceo → acento forzado de la próxima nota — live
+  GUINO_PATRON:               true,    // guiño → siguiente patrón de fábrica — live
+  // Simulación sin cámara (menú): alimenta el mismo camino desde los blendshapes, sin worker. Apagada por defecto.
+  SIMULAR:                    false,
+  SIM_BOCA: 0, SIM_O: 0, SIM_SONRISA: 0, SIM_CEJAS: 0, SIM_CABECEO: 0, SIM_GUINO: 0,   // 0…1 (CABECEO = pitch 0…0,6 rad)
 };
 
 // ── Z87: fuente de video de la tarima y visualizador de ondas sin webcam (lib/ondasTarima.ts, lib/fuenteVideoTarima.ts) ──

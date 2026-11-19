@@ -29,20 +29,40 @@ export const FILAS_B: Record<FilaB, { v0: number; v1: number }> = {
 };
 export const DISPLAY_TEXTO_U1 = 0.28;                     // el texto ocupa hasta acá; a la derecha, la curva del filtro
 export const CURVA_B = { u0: 0.30, u1: DER - 0.012, v0: FILAS_B.display.v0 + 0.008, v1: FILAS_B.display.v1 - 0.008 };
-const ANCHO_PATRON = 0.40, ANCHO_VOZ = 0.65;
-export const MODULOS_B: ModuloB[] = [
-  { id: "display",   titulo: "", etiqueta: "", fila: "display", rect: { u0: IZQ, u1: DER, ...FILAS_B.display }, on: null },
-  { id: "secuencia", titulo: "1 SECUENCIA", etiqueta: "QUÉ SUENA", fila: "secuencia", rect: { u0: IZQ, u1: DER, ...FILAS_B.secuencia }, on: null },
-  { id: "patron",    titulo: "PATRÓN", etiqueta: "DE FÁBRICA", fila: "abajo", rect: { u0: IZQ, u1: IZQ + ANCHO_PATRON, ...FILAS_B.abajo }, on: null },
-  { id: "voz",       titulo: "2 VOZ", etiqueta: "CÓMO SUENA", fila: "abajo", rect: { u0: IZQ + ANCHO_PATRON + GAP, u1: IZQ + ANCHO_PATRON + GAP + ANCHO_VOZ, ...FILAS_B.abajo }, on: null },
-  { id: "salida",    titulo: "3 SALIDA", etiqueta: "CUÁNTO SUENA", fila: "abajo", rect: { u0: IZQ + ANCHO_PATRON + GAP + ANCHO_VOZ + GAP, u1: DER, ...FILAS_B.abajo }, on: "b_on" },
-];
+// Z100: la fila de abajo suma el módulo 4 CARA (a la derecha). Para que entre sin agrandar el panel (el marco ya mide
+// 0,85 m de fondo, el límite) se angostan PATRÓN (pads × 0,75), VOZ (perillas × 0,70, ONDA × 0,85) y SALIDA (mismos
+// controles). Con conCara false (DBG_ATRIL_BAJO.MODULO_CARA) vuelve el layout de Z99.
+const ANCHOS_Z99 = { patron: 0.40, voz: 0.65 }, ANCHOS_Z100 = { patron: 0.255, voz: 0.49, salida: 0.27 };
+export const LAYOUT_B = { conCara: true };
+export const MODULOS_B: ModuloB[] = [];
+function armarModulos(conCara: boolean): void {
+  const A = conCara ? ANCHOS_Z100 : ANCHOS_Z99;
+  const u1Pat = IZQ + A.patron, u1Voz = u1Pat + GAP + A.voz;
+  const u1Sal = conCara ? u1Voz + GAP + ANCHOS_Z100.salida : DER;
+  MODULOS_B.length = 0;
+  MODULOS_B.push(
+    { id: "display",   titulo: "", etiqueta: "", fila: "display", rect: { u0: IZQ, u1: DER, ...FILAS_B.display }, on: null },
+    { id: "secuencia", titulo: "1 SECUENCIA", etiqueta: "QUÉ SUENA", fila: "secuencia", rect: { u0: IZQ, u1: DER, ...FILAS_B.secuencia }, on: null },
+    { id: "patron",    titulo: "PATRÓN", etiqueta: "DE FÁBRICA", fila: "abajo", rect: { u0: IZQ, u1: u1Pat, ...FILAS_B.abajo }, on: null },
+    { id: "voz",       titulo: "2 VOZ", etiqueta: "CÓMO SUENA", fila: "abajo", rect: { u0: u1Pat + GAP, u1: u1Voz, ...FILAS_B.abajo }, on: null },
+    { id: "salida",    titulo: "3 SALIDA", etiqueta: "CUÁNTO SUENA", fila: "abajo", rect: { u0: u1Voz + GAP, u1: u1Sal, ...FILAS_B.abajo }, on: "b_on" },
+  );
+  if (conCara) MODULOS_B.push({ id: "cara", titulo: "4 CARA", etiqueta: "TU GESTO", fila: "abajo", rect: { u0: u1Sal + GAP, u1: DER, ...FILAS_B.abajo }, on: "b_cara_on" });
+}
+armarModulos(true);
 export function moduloB(id: string): ModuloB { const m = MODULOS_B.find(x => x.id === id); if (!m) throw new Error(`módulo ${id}`); return m; }
 export function posOnB(m: ModuloB): { u: number; v: number } { return { u: m.rect.u1 - ON_DX, v: m.rect.v1 - BANDA_TITULO / 2 }; }
 
 // ── medidas ──
 export const PAD_B = { w: 0.100, d: 0.056 };               // el pad de IM-40 (las teclas de la secuencia lo escalan)
 export const ESC = { nota: 0.45, acento: 0.45, desliz: 0.45, paso: 0.6, perilla: 0.75 };
+/** Z100: escalas de la fila de abajo con el módulo CARA (sin él, las de Z99). */
+export const ESC_CARA = { patron: 0.75, onda: 0.85, perilla: 0.70, anchoOnda: 0.10 };
+/** Z100: módulo CARA: tecla CALIBRAR y luz CARA DETECTADA (columna izquierda) y 6 medidores (filas, a la derecha). */
+export const CARA_B = { columnaW: 0.090, nombreW: 0.112, segmentos: 10 };
+export const DESTINOS_CARA = ["CORTE", "RESONANCIA", "DECAY", "DISTORSIÓN", "ACENTO", "PATRÓN"] as const;
+export const NOMBRES_MEDIDOR = ["BOCA", "O", "SONRISA", "CEJAS", "CABECEO", "GUIÑO"] as const;
+export const textoMedidor = (i: number): string => `${NOMBRES_MEDIDOR[i]}→${DESTINOS_CARA[i]}`;
 export const SEQ = { etiquetaW: 0.085, numeros: 0.156, nota: 0.122, acento: 0.078, desliz: 0.040, paso: -0.003 };
 export const FADER_B = { rail: 0.12, v: -0.20 };
 export const VU_B = { segmentos: 14, u: 0, v0: -0.29, v1: -0.115, ancho: 0.024 };   // u se fija en construir()
@@ -72,21 +92,54 @@ function construir(escalaPasos: number): PosCtrlB[] {
     L.push({ id: `b_paso${k}`, u, v: SEQ.paso, forma: "pad", tipo: "toggle", etiqueta: "", nombreLargo: `PASO ${n}`, modulo: "secuencia", escala: ESC.paso * ep, paso: k });
   }
   // PATRÓN: 3 × 2 (los 5 de fábrica + PATRÓN LIMPIO)
+  const cc = LAYOUT_B.conCara;
   const pa = moduloB("patron").rect, wp = (pa.u1 - pa.u0 - 0.024) / 3, up = (i: number) => pa.u0 + 0.012 + wp * (i + 0.5);
   const vf1 = pa.v1 - BANDA_TITULO - 0.040, vf2 = vf1 - 0.096;
-  PATRONES_B.forEach((nm, i) => L.push({ id: `b_pat_${nm}`, u: up(i % 3), v: i < 3 ? vf1 : vf2, forma: "pad", tipo: "toggle", etiqueta: nm, nombreLargo: `PATRÓN ${nm}`, modulo: "patron", escala: 1, paso: -1 }));
+  const escPat = cc ? ESC_CARA.patron : 1;
+  PATRONES_B.forEach((nm, i) => L.push({ id: `b_pat_${nm}`, u: up(i % 3), v: i < 3 ? vf1 : vf2, forma: "pad", tipo: "toggle", etiqueta: nm, nombreLargo: `PATRÓN ${nm}`, modulo: "patron", escala: escPat, paso: -1 }));
   L.push({ id: "b_limpio", u: up(2), v: vf2, forma: "normal", tipo: "button", etiqueta: "LIMPIO", nombreLargo: "PATRÓN LIMPIO", modulo: "patron", escala: 1, paso: -1 });
   // VOZ: ONDA (2 pads apilados) + 8 perillas en 2 filas de 4
-  const vz = moduloB("voz").rect, wo = 0.125, wk = (vz.u1 - vz.u0 - 0.024 - wo) / 4;
-  ONDAS_B.forEach(([id, , et], i) => L.push({ id, u: vz.u0 + 0.012 + wo / 2, v: i === 0 ? vf1 : vf2, forma: "pad", tipo: "toggle", etiqueta: et, nombreLargo: `ONDA ${et}`, modulo: "voz", escala: 1, paso: -1 }));
-  const vk1 = vz.v1 - BANDA_TITULO - RADIO_MARCAS_OUT * ESC.perilla - 0.0045, vk2 = vk1 - 0.099;
-  PERILLAS_B.forEach(([pid, et], i) => L.push({ id: `b_p_${pid}`, u: vz.u0 + 0.012 + wo + wk * ((i % 4) + 0.5), v: i < 4 ? vk1 : vk2, forma: "normal", tipo: "knob", etiqueta: et, nombreLargo: et, modulo: "voz", escala: ESC.perilla, paso: -1 }));
+  const vz = moduloB("voz").rect, wo = cc ? ESC_CARA.anchoOnda : 0.125, wk = (vz.u1 - vz.u0 - 0.024 - wo) / 4;
+  const escOnda = cc ? ESC_CARA.onda : 1, escPer = cc ? ESC_CARA.perilla : ESC.perilla;
+  ONDAS_B.forEach(([id, , et], i) => L.push({ id, u: vz.u0 + 0.012 + wo / 2, v: i === 0 ? vf1 : vf2, forma: "pad", tipo: "toggle", etiqueta: et, nombreLargo: `ONDA ${et}`, modulo: "voz", escala: escOnda, paso: -1 }));
+  const vk1 = vz.v1 - BANDA_TITULO - RADIO_MARCAS_OUT * escPer - 0.0045, vk2 = vk1 - 0.099;
+  PERILLAS_B.forEach(([pid, et], i) => L.push({ id: `b_p_${pid}`, u: vz.u0 + 0.012 + wo + wk * ((i % 4) + 0.5), v: i < 4 ? vk1 : vk2, forma: "normal", tipo: "knob", etiqueta: et, nombreLargo: et, modulo: "voz", escala: escPer, paso: -1 }));
   // SALIDA: VOLUMEN, VU y ON
   const sa = moduloB("salida").rect;
   L.push({ id: "b_vol", u: sa.u0 + 0.090, v: FADER_B.v, forma: "normal", tipo: "slider", etiqueta: "VOLUMEN", nombreLargo: "VOLUMEN", modulo: "salida", escala: 1, paso: -1 });
   L.push({ id: "b_on", u: posOnB(moduloB("salida")).u, v: posOnB(moduloB("salida")).v, forma: "pastilla", tipo: "toggle", etiqueta: "ON", nombreLargo: "SALIDA DEL BAJO", modulo: "salida", escala: 1, paso: -1 });
   VU_B.u = sa.u0 + 0.190;
+  // Z100: CARA: pastilla CARA ON (banda de título) y tecla CALIBRAR (columna izquierda; abajo, la luz CARA DETECTADA)
+  if (cc) {
+    const ca = moduloB("cara");
+    L.push({ id: "b_cara_on", u: posOnB(ca).u, v: posOnB(ca).v, forma: "pastilla", tipo: "toggle", etiqueta: "ON", nombreLargo: "CARA", modulo: "cara", escala: 1, paso: -1 });
+    L.push({ id: "b_cara_cal", u: luzCaraB().u, v: ca.rect.v1 - BANDA_TITULO - 0.046, forma: "normal", tipo: "button", etiqueta: "CALIBRAR", nombreLargo: "CALIBRAR CARA", modulo: "cara", escala: 1, paso: -1 });
+  }
   return L;
+}
+/** Z100: luz CARA DETECTADA (centro). */
+export function luzCaraB(): { u: number; v: number; r: number } {
+  const ca = moduloB("cara").rect;
+  return { u: ca.u0 + 0.012 + CARA_B.columnaW / 2, v: ca.v0 + 0.068, r: 0.011 };
+}
+/** Z100: área de los medidores y fila i (centro v, alto, u del inicio de la barra). */
+export function medidoresCaraB(): { u0: number; u1: number; v0: number; v1: number; filaH: number; barraU0: number } {
+  const ca = moduloB("cara").rect;
+  const u0 = ca.u0 + 0.012 + CARA_B.columnaW + 0.006, u1 = ca.u1 - 0.012;
+  const v1 = ca.v1 - BANDA_TITULO - 0.006, v0 = ca.v0 + 0.006;
+  return { u0, u1, v0, v1, filaH: (v1 - v0) / 6, barraU0: u0 + CARA_B.nombreW + 0.004 };
+}
+/** Rectángulo de la barra de LEDs del medidor i (0…5). */
+export function barraMedidorB(i: number): Rect {
+  const m = medidoresCaraB(), vc = m.v1 - m.filaH * (i + 0.5), h = Math.min(0.016, m.filaH * 0.5);
+  return { u0: m.barraU0, u1: m.u1, v0: vc - h / 2, v1: vc + h / 2 };
+}
+/** Z100: rehace módulos y posiciones con o sin el módulo CARA (LecternSystem lo llama al cargar con DBG_ATRIL_BAJO.MODULO_CARA). */
+export function configurarLayoutB(conCara: boolean, escalaPasos = 1): void {
+  if (LAYOUT_B.conCara === conCara) return;
+  LAYOUT_B.conCara = conCara;
+  armarModulos(conCara);
+  POSICIONES_B = construir(escalaPasos);
 }
 export let POSICIONES_B: PosCtrlB[] = construir(1);
 /** Rehace las posiciones con ESCALA_PASOS (al remontar el atril). */
@@ -160,13 +213,23 @@ export function textosB(escala: number, numerados = true): Texto[] {
   for (const p of POSICIONES_B) {
     if (!p.etiqueta || p.forma === "pastilla") continue;
     const m = moduloB(p.modulo);
-    const colW = p.modulo === "voz" && p.tipo === "knob" ? (m.rect.u1 - m.rect.u0 - 0.024 - 0.125) / 4 : p.modulo === "salida" ? 0.16 : (m.rect.u1 - m.rect.u0 - 0.024) / 3;
+    const wo = LAYOUT_B.conCara ? ESC_CARA.anchoOnda : 0.125;
+    const colW = p.modulo === "voz" && p.tipo === "knob" ? (m.rect.u1 - m.rect.u0 - 0.024 - wo) / 4 : p.modulo === "salida" ? 0.16 : p.modulo === "cara" ? CARA_B.columnaW : (m.rect.u1 - m.rect.u0 - 0.024) / 3;
     const r = radioB(p);
     const anchoLibre = Math.min(2 * Math.min(p.u - m.rect.u0, m.rect.u1 - p.u) - 0.006, colW - 0.012);
     const altoLibre = p.tipo === "slider" ? 0.02 : p.v - r - 0.008 - (m.rect.v0 + 0.003);
     const alto = Math.min(ALTO_B.etiqueta * e, anchoLibre / (p.etiqueta.length * ANCHO_CHAR), altoLibre);
     const v = p.tipo === "slider" ? FADER_B.v - FADER_B.rail / 2 - HUELLA.THUMB_D / 2 - 0.003 - alto / 2 : p.v - r - 0.008 - alto / 2;
     add(`e_${p.id}`, p.etiqueta, p.u, v, alto, "centro", m.fila);
+  }
+  // Z100: CARA: "DETECTADA" bajo la luz y los nombres de los medidores ("BOCA→CORTE"…), a la izquierda de cada barra
+  if (LAYOUT_B.conCara) {
+    const ca = moduloB("cara").rect, luz = luzCaraB(), md = medidoresCaraB();
+    const et = "DETECTADA", altoL = Math.min(ALTO_B.etiqueta * e, (CARA_B.columnaW - 0.012) / (et.length * ANCHO_CHAR), luz.v - luz.r - 0.006 - (ca.v0 + 0.003));
+    add("e_cara_det", et, luz.u, luz.v - luz.r - 0.006 - altoL / 2, altoL, "centro", "abajo");
+    let maxLen = 0; for (let i = 0; i < 6; i++) maxLen = Math.max(maxLen, textoMedidor(i).length);
+    const altoM = Math.min(ALTO_B.fila * e, (CARA_B.nombreW - 0.002) / (maxLen * ANCHO_CHAR), md.filaH * 0.62);
+    for (let i = 0; i < 6; i++) add(`m_cara${i}`, textoMedidor(i), md.u0, md.v1 - md.filaH * (i + 0.5), altoM, "izq", "abajo");
   }
   return T;
 }
@@ -210,9 +273,9 @@ export { LEGIBLE_MIN, escalaEfectiva };
 
 // ── equipo ──
 export const NOMBRE_EQUIPO_B = "BAJO ÁCIDO BA-40";
-export const DESCRIPCION_EQUIPO_B = "SINTETIZADOR DE BAJO · 3 MÓDULOS";
+export const DESCRIPCION_EQUIPO_B = "SINTETIZADOR DE BAJO · 4 MÓDULOS";   // Z100: + CARA (era "3 MÓDULOS")
 export const TEXTO_PLACA_B = (marca: string) => `${NOMBRE_EQUIPO_B} · ${marca} · ${DESCRIPCION_EQUIPO_B}`;
-export const LEYENDA_FILAS_B = "1 SECUENCIA · 2 VOZ · 3 SALIDA";
+export const LEYENDA_FILAS_B = "1 SECUENCIA · 2 VOZ · 3 SALIDA · 4 CARA";   // Z100: + 4 CARA
 /** Pose frente al atril (para el checkpoint): a distM del atril, del lado de su frente (local +Z). */
 export function poseFrenteAtrilBajo(x: number, z: number, yaw: number, distM: number) {
   const d = Math.max(0.3, distM);

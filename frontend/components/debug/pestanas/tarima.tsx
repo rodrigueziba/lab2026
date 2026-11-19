@@ -2,7 +2,7 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_BAJO, DBG_ATRIL_BAJO, DBG_INSTRUMENTOS } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_BAJO, DBG_ATRIL_BAJO, DBG_INSTRUMENTOS, DBG_CARA } from "@/lib/debugConfig";
 import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent, modoActual } from "@/lib/consentTarimaAcciones";   // Z91
 import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit, alternarPanelCuadro, panelCuadroVisible } from "@/lib/vivo/publicarLiveKit";   // Z92 · Z94b
 import { sesionIdNavegador } from "@/lib/vivo/vivoAcciones";   // Z92
@@ -17,6 +17,8 @@ import { restaurarLucesEscena } from "@/lib/lucesEscenaAcciones";    // Z97b
 import { radioCaja, radioArco, pasoArcoActual, indiceMaxArco, poseInstrumento, enArco } from "@/lib/instrumentosPose";   // Z99b
 import { ORDEN_SLOTS, INDICE_MAX } from "@/lib/instrumentosDisposicion";                   // Z99b
 import { irAInstrumento } from "@/lib/checkpointsAcciones";                                // Z99b
+import { CARA, EST as EST_CARA, encenderCara, apagarCara, calibrarCara, olvidarCalibracion } from "@/lib/caraBajo";   // Z100
+import { NOMBRES_GESTO } from "@/lib/cara";                                                  // Z100
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
 import { useDbg } from "../contexto";
 import { RITMOS, playRitmos, pausaRitmos, borrarRitmos, cargarEjemploHouse, setBpmRitmos, setSwingRitmos, setPasosRitmos, probarVoz, guardarRitmos } from "@/lib/ritmosMotor"; // Z80
@@ -840,6 +842,74 @@ export function SecInstrumentosArcoZ99b() {
               </div>
             );
           })}
+    </>
+  );
+}
+
+/** Z100: edita una entrada del mapa gesto → parámetro (DBG_CARA.MAPA, objeto de módulo que lee la cara en vivo). */
+function editarMapaCara(j: number, campo: "activo" | "param" | "salMin" | "salMax", v: boolean | string | number): void {
+  const m = DBG_CARA.MAPA[j] as Record<string, unknown> | undefined;
+  if (m) m[campo] = v;
+}
+
+// sección: cara-bajo-z100
+export function SecCaraBajoZ100() {
+  // Z100: tocar el BA-40 con la cara (lib/caraBajo.ts). Estado 4 veces por segundo.
+  const C = DBG_CARA;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const modulables = PARAMS_BAJO.filter(d => d.modulable).map(d => d.id);
+  return (
+    <>
+          <span style={LABEL}>Cara del BA-40 Z100 <span style={NOTE}>(MediaPipe en un worker; el video de la cara no sale de la máquina: a SILLAS solo viaja el audio y la imagen procesada del domo)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{CARA.on ? "ON" : "off"} · {CARA.estado}{CARA.linea ? ` · «${CARA.linea}»` : ""} · fuente {CARA.fuente || "-"} · modelo {CARA.rutas || "-"} · rostro {EST_CARA.detectada ? "sí" : "no"}</span></div>
+          <div style={{ ...ROW, ...NOTE }}><span>caraBajo: hilo principal {CARA.msHilo.toFixed(3)} ms/cuadro · ida y vuelta {CARA.msIdaVuelta.toFixed(1)} ms · {CARA.fpsReal.toFixed(1)} cuadros/s · enviados {CARA.enviados} · recibidos {CARA.recibidos} · descartados {CARA.descartados} · acentos {CARA.acentos} · guiños {CARA.guinos}</span></div>
+          <div style={{ ...ROW, ...NOTE }}><span>{NOMBRES_GESTO.map((n, i) => `${n} ${EST_CARA.gestos[i].toFixed(2)}`).join(" · ")}</span></div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); if (CARA.on) apagarCara(); else encenderCara(); toca(); }}>{CARA.on ? "Apagar CARA" : "Encender CARA"}</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); calibrarCara(); toca(); }}>Calibrar</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); olvidarCalibracion(); toca(); }}>Olvidar calibración</button>
+          </div>
+          {([["SIN_CALIBRAR", "límites por defecto aunque haya calibración guardada"], ["ACTIVO_SOLO_EN_ATRIL", "se apaga al salir del modo atril del BA-40"], ["CARA_PRIORIDAD_MANUAL", "arrastrar una perilla tomada manda mientras se arrastra"],
+            ["CABECEO_ACENTO", "cabeceo → acento forzado"], ["GUINO_PATRON", "guiño → siguiente patrón"], ["MODELO_LOCAL", "/alight/mediapipe/ primero (vale al encender)"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); C[k] = !C[k]; toca(); }}>{C[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([["FPS_CARA", 5, 30, 1, "cuadros/s al worker"], ["CARA_MINCUTOFF", 0.1, 5, 0.1, "1 euro: corte en reposo (Hz)"], ["CARA_BETA", 0, 3, 0.05, "1 euro: corte × velocidad"],
+            ["CARA_DCUTOFF", 0.1, 5, 0.1, "1 euro: corte de la velocidad"], ["CARA_RANGO_MIN", 0.01, 0.3, 0.01, "rango mínimo calibrado"], ["CARA_ACENTO_UMBRAL", 0.3, 5, 0.1, "cabeceo: rad/s"],
+            ["CARA_ACENTO_REFRACTARIO_MS", 100, 1500, 50, "cabeceo: ms"], ["CARA_GUINO_CERRADO", 0.3, 0.95, 0.05, "guiño: ojo cerrado >"], ["CARA_GUINO_ABIERTO", 0.05, 0.6, 0.05, "guiño: el otro <"],
+            ["CARA_GUINO_MIN_MS", 40, 600, 10, "guiño: sostenido ms"], ["CARA_GUINO_REFRACTARIO_MS", 200, 3000, 50, "guiño: ms"], ["CAL_PASO_S", 1, 5, 0.5, "s por paso de calibración"],
+            ["ANCHO_CUADRO", 160, 640, 16, "px del cuadro al worker"], ["ALTO_CUADRO", 120, 480, 12, "px"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{C[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={C[k]} onChange={ev => { C[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
+          <span style={LABEL}>Mapa gesto → parámetro <span style={NOTE}>(salida 0…1 del parámetro; CORTE con su curva exponencial)</span></span>
+          {C.MAPA.map((m, j) => (
+            <div key={j} style={ROW}>
+              <button style={{ ...INPUT, opacity: m.activo ? 1 : 0.5 }} onClick={ev => { ev.currentTarget.blur(); editarMapaCara(j, "activo", !m.activo); toca(); }}>{NOMBRES_GESTO[m.gesto]}</button>
+              <select style={INPUT} value={m.param} onChange={ev => { editarMapaCara(j, "param", ev.target.value); toca(); }}>{modulables.map(id => <option key={id} value={id}>{id}</option>)}</select>
+              <span style={NOTE}>{m.salMin.toFixed(2)}</span>
+              <input type="range" min={0} max={1} step={0.05} style={{ flex: 1 }} value={m.salMin} onChange={ev => { editarMapaCara(j, "salMin", parseFloat(ev.target.value)); toca(); }} />
+              <span style={NOTE}>{m.salMax.toFixed(2)}</span>
+              <input type="range" min={0} max={1} step={0.05} style={{ flex: 1 }} value={m.salMax} onChange={ev => { editarMapaCara(j, "salMax", parseFloat(ev.target.value)); toca(); }} />
+            </div>
+          ))}
+          <span style={LABEL}>Simular cara <span style={NOTE}>(sin cámara ni worker: los sliders entran por el mismo camino que los blendshapes; mové CABECEO rápido para el acento, GUIÑO arriba para cambiar de patrón)</span></span>
+          <div style={ROW}>
+            <span>SIMULAR</span>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); C.SIMULAR = !C.SIMULAR; if (C.SIMULAR) { if (CARA.on) apagarCara(); encenderCara(); } else apagarCara(); toca(); }}>{C.SIMULAR ? "ON" : "off"}</button>
+          </div>
+          {(["SIM_BOCA", "SIM_O", "SIM_SONRISA", "SIM_CEJAS", "SIM_CABECEO", "SIM_GUINO"] as const).map(k => (
+            <div key={k} style={ROW}>
+              <span>{k.slice(4)} <span style={NOTE}>{C[k].toFixed(2)}</span></span>
+              <input type="range" min={0} max={1} step={0.01} style={{ flex: 1 }} value={C[k]} onChange={ev => { C[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
     </>
   );
 }

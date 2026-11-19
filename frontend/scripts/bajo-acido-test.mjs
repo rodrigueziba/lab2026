@@ -146,14 +146,15 @@ console.log('\n(h) layout del atril BA-40');
   for (const p of P) if (!S.dentro(B.huellaB(p), B.moduloB(p.modulo).rect)) mal.push('fuera ' + p.id);
   for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) if (S.seSuperponen(B.huellaB(P[i]), B.huellaB(P[j]))) mal.push(P[i].id + '↔' + P[j].id);
   const vu = B.rectVuB(); if (!S.dentro(vu, B.moduloB('salida').rect)) mal.push('VU fuera'); for (const p of P) if (S.seSuperponen(vu, B.huellaB(p))) mal.push('VU↔' + p.id);
-  check(P.length === 16 * 4 + 6 + 2 + 8 + 2 && mal.length === 0, `${P.length} controles (64 de SECUENCIA, 6 de PATRÓN, 10 de VOZ, 2 de SALIDA) y el VU: dentro del panel, sin colisiones${mal.length ? ': ' + mal.slice(0, 6).join(', ') : ''}`);
+  // Z100: + 2 de CARA (CARA ON y CALIBRAR); los medidores y la luz se prueban en scripts/cara-test.mjs
+  check(P.length === 16 * 4 + 6 + 2 + 8 + 2 + 2 && mal.length === 0, `${P.length} controles (64 de SECUENCIA, 6 de PATRÓN, 10 de VOZ, 2 de SALIDA, 2 de CARA) y el VU: dentro del panel, sin colisiones${mal.length ? ': ' + mal.slice(0, 6).join(', ') : ''}`);
   const cols = [0, 1, 2, 3].map(f => P.filter(p => p.modulo === 'secuencia').slice(f).filter((_, i) => i % 4 === 0).map(p => p.u.toFixed(4)).join());
   check(cols.every(c => c === cols[0]), 'las 4 filas de la SECUENCIA (NOTA, ACENTO, DESLIZ, PASO) alineadas en las mismas 16 columnas');
   for (const esc of [0.7, 1, 1.15]) {
     const T = B.textosB(esc), m2 = [];
     for (const t of T) {
       const r = S.rectTexto(t);
-      const m = t.fila === 'display' ? B.moduloB('display') : M.find(mm => t.id === `t_${mm.id}` || t.id === `g_${mm.id}`) ?? (/^[fn]_/.test(t.id) ? B.moduloB('secuencia') : B.moduloB(B.posB(t.id.slice(2))?.modulo ?? 'salida'));
+      const m = t.fila === 'display' ? B.moduloB('display') : M.find(mm => t.id === `t_${mm.id}` || t.id === `g_${mm.id}`) ?? (/^[fn]_/.test(t.id) ? B.moduloB('secuencia') : /^(m_cara|e_cara_det)/.test(t.id) ? B.moduloB('cara') : B.moduloB(B.posB(t.id.slice(2))?.modulo ?? 'salida'));   // Z100: textos de CARA
       if (!S.dentro(r, m.rect)) m2.push(t.id + ' fuera de ' + m.id);
       if (t.fila === 'display' && r.u1 > B.DISPLAY_TEXTO_U1) m2.push(t.id + ' sobre la curva');
       for (const p of P) if (S.seSuperponen(r, B.huellaB(p))) m2.push(t.id + '↔' + p.id);
@@ -169,7 +170,7 @@ console.log('\n(h) layout del atril BA-40');
   }
   check(/legibilidadMinimaB\(geoAtril\(\), cp, escalaEfectiva\(DBG_ATRIL_BAJO\.ETIQUETA_ESCALA/.test(LS) && /const conPasadas = nuevoSonido \|\| imagenPanel \|\| esBajo;/.test(LS),
     'fitLecternCamera: el BA-40 busca como el de sonido y exige legibilidadMinimaB');
-  check(B.TEXTO_PLACA_B("IN-GO'S WAN INC.") === "BAJO ÁCIDO BA-40 · IN-GO'S WAN INC. · SINTETIZADOR DE BAJO · 3 MÓDULOS" && B.LEYENDA_FILAS_B === '1 SECUENCIA · 2 VOZ · 3 SALIDA', 'placa y leyenda'); }
+  check(B.TEXTO_PLACA_B("IN-GO'S WAN INC.") === "BAJO ÁCIDO BA-40 · IN-GO'S WAN INC. · SINTETIZADOR DE BAJO · 4 MÓDULOS" && B.LEYENDA_FILAS_B === '1 SECUENCIA · 2 VOZ · 3 SALIDA · 4 CARA', 'placa y leyenda (Z100: 4 módulos, + 4 CARA)'); }
 
 console.log('\n(i) sin allocations en el reloj y en el dibujo del display');
 { const reloj = ['alPasoReloj', 'oyenteNucleo', 'nota', 'soltar', 'envFiltro', 'cancelarYMantener'].map(n => cuerpo(MOTOR, n)).join('\n');
@@ -181,7 +182,7 @@ console.log('\n(i) sin allocations en el reloj y en el dibujo del display');
   check(dib.length > 600 && !prohibido.test(sinComentarios(dib)), 'dibujo del display (texto y curva del filtro): sin new, template strings ni arreglos nuevos');
   check(/const _k = new Int32Array\(8\), _t = new Float64Array\(8\), _tiempos = new Float64Array\(N_PASOS\)/.test(MOTOR) && /const _curva = new Float32Array\(N_CURVA\), _curvaPico = new Float32Array\(N_CURVA\);/.test(COMP),
     'arreglos preasignados a nivel de módulo (pasos, tiempos y curvas)');
-  check(/if \(u\.ver !== BAJO\.version\) calcularCurvas\(\);/.test(COMP) && /if \(!tocaActualizar\(ahora, u\.ms, DBG_ATRIL_BAJO\.VU_HZ\)\) return;[\s\S]*?if \(!enPantalla\(g, camera\)\) return;/.test(COMP),
+  check(/if \(u\.ver !== BAJO\.version( \|\| u\.vc !== BAJO\.versionCara)?\) calcularCurvas\(\);/.test(COMP)   /* Z100: también con la cara */ && /if \(!tocaActualizar\(ahora, u\.ms, DBG_ATRIL_BAJO\.VU_HZ\)\) return;[\s\S]*?if \(!enPantalla\(g, camera\)\) return;/.test(COMP),
     'el display se redibuja solo si algo cambió, ≤ VU_HZ y con el atril en pantalla; la curva solo cuando cambian los parámetros');
   check(/const curvaSaturacion|function curvaSaturacion/.test(MOTOR) && /shaper\.curve = curvaSaturacion\(\);/.test(cuerpo(MOTOR, 'crearVoz')), 'la curva de distorsión se calcula una vez, al crear la voz');
   check(/osc\.start\(\);/.test(cuerpo(MOTOR, 'crearVoz')) && !/createOscillator|createGain|createBiquadFilter/.test(reloj), 'una sola voz: los nodos se crean al armarla, nunca por nota'); }
@@ -191,7 +192,7 @@ console.log('\n(j) limpieza');
   check(/_desuscribir\?\.\(\); _desuscribir = null;/.test(lib) && /pararRelojPropio\(\);/.test(lib) && /liberarVoz\(\);/.test(lib), 'liberarBajo: se desuscribe del reloj, para el reloj propio y libera la voz');
   check(/clearInterval\(_motorPropio\)/.test(prop) && /detener\(_relojPropio\)/.test(prop), 'el temporizador del reloj propio se cancela');
   check(/v\.osc\.stop\(\)/.test(voz) && /n\.disconnect\(\)/.test(voz) && /v\.analizador/.test(voz), 'la voz: el oscilador se detiene y se desconectan todos los nodos (incluido el analizador del VU)');
-  check(/const limpiar = instalarBajo\(\);[\s\S]{0,80}return \(\) => \{ limpiar\(\); ATRIL_BAJO\.visible = false; \};/.test(LS), 'el atril instala el motor al montar y lo libera al desmontar');
+  check(/const limpiar = instalarBajo\(\);[\s\S]{0,80}return \(\) => \{ (liberarCara\(\); )?limpiar\(\); ATRIL_BAJO\.visible = false; \};/.test(LS)   /* Z100: antes libera la cara */, 'el atril instala el motor al montar y lo libera al desmontar');
   check(/useEffect\(\(\) => \(\) => \{ r\.tex\.dispose\(\); r\.mat\.dispose\(\); r\.geo\.dispose\(\); r\.marcoGeo\.dispose\(\); r\.marcoMat\.dispose\(\); \}, \[r\]\);/.test(COMP), 'el display libera textura, material y geometrías');
   check(/on\.connect\(entradaBus\(\)\)/.test(MOTOR) && !/vizAudio/.test(sinComentarios(MOTOR)) && !/obtenerSalidaTransmisible/.test(sinComentarios(MOTOR)), 'la salida entra al bus maestro (se escucha, la analiza el visualizador y viaja a SILLAS); SILLAS y la transmisión no se tocan'); }
 

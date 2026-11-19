@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Z100: MediaPipe copiado de node_modules (código de terceros minificado; scripts/mediapipe-local.mjs)
+    "public/alight/mediapipe/**",
   ]),
 ]);
 

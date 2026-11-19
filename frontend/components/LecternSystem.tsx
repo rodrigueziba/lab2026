@@ -35,12 +35,14 @@ import { radio } from "@/lib/visualizadorTarima";                               
 import {
   POSICIONES_B, PERILLAS_B, PATRONES_B, ONDAS_B, ATRIL_BAJO, legibilidadMinimaB, NOMBRE_EQUIPO_B, DESCRIPCION_EQUIPO_B, TEXTO_PLACA_B,
   LEYENDA_FILAS_B, type PosCtrlB,
+  configurarLayoutB, LAYOUT_B,   // Z100: módulo CARA
 } from "@/lib/atrilBajo";
+import { CARA, encenderCara, apagarCara, calibrarCara, tickCara, liberarCara } from "@/lib/caraBajo";   // Z100: tocar el BA-40 con la cara
 import {
   BAJO, PATRON_BAJO, PARAMS as PARAMS_B, instalarBajo, tickBajo, editarPaso, cargarPatron, patronLimpio, setParamBajo, aplicarParamsBajo,
 } from "@/lib/audio/bajoAcido";
 import { PARAMS_BAJO, aNormal, deNormal, valorParam, indiceParam, nombreNota, type NombrePatron } from "@/lib/bajoAcido";
-import { DisplayBajo, VuBajo, buildSilkscreenBajo, mostrarEnDisplayBajo, escalaActualBajo } from "./AtrilBajoNuevo";
+import { DisplayBajo, VuBajo, CaraBajo, buildSilkscreenBajo, mostrarEnDisplayBajo, escalaActualBajo } from "./AtrilBajoNuevo";
 import { poseAtrilBajo, GEO_INSTRUMENTOS } from "@/lib/instrumentosPose";                      // Z99b: posición única de los instrumentos
 import { FUENTE_TARIMA } from "@/lib/fuenteVideoTarima";                               // Z98
 import { DisplayImagen, buildSilkscreenImagen, mostrarEnDisplayImagen, escalaActualImagen, ROTULOS_VERTICALES_I, ROTULOS_NUMEROS_I } from "./AtrilImagenNuevo";
@@ -877,6 +879,7 @@ interface CtrlDef {
   nombreLargo?: string;      // Z96: lo que muestra el display al tocarlo
   escala?: number;           // Z99: perillas y pads más chicos (BA-40: NOTA, ACENTO, DESLIZ, PASO, VOZ)
   marcaPaso?: number;        // Z99: tecla PASO k del BA-40: marca del paso que está sonando
+  paramIdx?: number;         // Z100: perilla de un parámetro modulable del BA-40 (índice en PARAMS_BAJO): luz "tomado por la cara"
   min: number;
   max: number;
   initial: number;
@@ -934,14 +937,25 @@ function MotorBajo() {
   useEffect(() => {
     const limpiar = instalarBajo();
     ATRIL_BAJO.visible = true;
-    return () => { limpiar(); ATRIL_BAJO.visible = false; };
+    return () => { liberarCara(); limpiar(); ATRIL_BAJO.visible = false; };   // Z100: worker, cuadros y stream propio de la cara
   }, []);
   useFrame(() => {
     tickBajo();
+    // Z100: la cara (manda cuadros al worker o corre la simulación); prioridad manual: qué perilla se arrastra
+    const d = _drag.def;
+    CARA.arrastreIdx = d && _drag.type === "knob" && d.paramIdx !== undefined ? d.paramIdx : -1;
+    tickCara(INTERACT_STATE.mode === "bass");
+    const caraOn = CARA.on ? 1 : 0;
+    if (ctrlState.b_cara_on !== undefined && ctrlState.b_cara_on !== caraOn) ctrlState.b_cara_on = caraOn;   // sin cámara: se apaga sola
     if (BAJO.version !== ver.current) { ver.current = BAJO.version; sincronizarBajo(); }
   });
   return null;
 }
+// Z100: ¿la cara manda sobre el parámetro i? (cara encendida, fuente "cara" activa y con valor). Sin allocations.
+function caraTomaParam(i: number): boolean { return CARA.on && PARAMS_B.caraActiva && Number.isFinite(PARAMS_B.cara[i]); }
+function valorParamIdx(i: number): number { const d = PARAMS_BAJO[i]; return caraTomaParam(i) ? deNormal(d, PARAMS_B.cara[i]) : PARAMS_B.manual[i]; }
+const TOMADO_GEO = new THREE.RingGeometry(0.0445, 0.0495, 40);
+const TOMADO_MAT = new THREE.MeshBasicMaterial({ color: "#FF9A1F", toneMapped: false, side: THREE.DoubleSide });
 const ONDAS_NOMBRE = ["SENO", "TRIÁNGULO", "CUADRADA", "SIERRA"];
 const DESTINOS_NOMBRE = ["VOLUMEN", "FILTRO", "PITCH"];
 
@@ -1274,10 +1288,15 @@ function defBajo(p: PosCtrlB): CtrlDef {
   const onda = ONDAS_B.find(o => o[0] === p.id);
   if (onda) return { ...base, type: "toggle", min: 0, max: 1, initial: 0, onActivate: () => { DBG_BAJO.ONDA = onda[1]; aplicarParamsBajo(); sincronizarBajo(); } };
   if (p.id.startsWith("b_p_")) { const pid = p.id.slice(4), d = PARAMS_BAJO[indiceParam(pid)];
-    return { ...base, type: "knob", color: "mustard", min: 0, max: 1, initial: aNormal(d, d.defecto), onActivate: (v) => { setParamBajo(pid, deNormal(d, v), "manual"); } }; }
+    return { ...base, type: "knob", color: "mustard", min: 0, max: 1, initial: aNormal(d, d.defecto), paramIdx: d.modulable ? indiceParam(pid) : undefined,
+      onActivate: (v) => { setParamBajo(pid, deNormal(d, v), "manual"); } }; }
+  // Z100: módulo CARA: pastilla CARA ON y tecla CALIBRAR
+  if (p.id === "b_cara_on") return { ...base, type: "toggle", min: 0, max: 1, initial: 0, onActivate: (v) => { if (v > 0.5) encenderCara(); else apagarCara(); } };
+  if (p.id === "b_cara_cal") return { ...base, type: "button", min: 0, max: 1, initial: 0, onActivate: (v) => { if (v > 0.5) calibrarCara(); } };
   if (p.id === "b_vol") return { ...base, type: "slider", orientation: "v", railLen: 0.12, min: 0, max: 1, initial: DBG_BAJO.VOLUMEN, onActivate: (v) => { setParamBajo("volumen", v, "manual"); } };
   return { ...base, type: "toggle", min: 0, max: 1, initial: 1, onActivate: (v) => { DBG_BAJO.ON = v > 0.5; aplicarParamsBajo(); } };   // b_on
 }
+configurarLayoutB(DBG_ATRIL_BAJO.MODULO_CARA);   // Z100: con o sin el módulo CARA (antes de armar los controles)
 export const CONTROLES_BAJO: CtrlDef[] = POSICIONES_B.map(defBajo);
 const _posBajo = new Map<string, PosCtrlB>(POSICIONES_B.map(p => [p.id, p]));
 const _radioPat = [0, 0, 0, 0, 0], _radioOnda = [0, 0];
@@ -1292,6 +1311,7 @@ function sincronizarBajo(): void {
   for (const [pid] of PERILLAS_B) ctrlState[`b_p_${pid}`] = aNormal(PARAMS_BAJO[indiceParam(pid)], PARAMS_B.manual[indiceParam(pid)]);
   ctrlState.b_vol = PARAMS_B.manual[indiceParam("volumen")];
   ctrlState.b_on = DBG_BAJO.ON ? 1 : 0;
+  if (LAYOUT_B.conCara) ctrlState.b_cara_on = CARA.on ? 1 : 0;   // Z100
 }
 sincronizarBajo();
 /** Texto del display del BA-40 al tocar un control (se arma solo en el gesto del usuario). */
@@ -1309,6 +1329,8 @@ function textoBajo(id: string, def: CtrlDef): string {
     return `${p.nombreLargo} ${(r * 10).toFixed(1)}`;
   }
   if (id === "b_vol") return `VOLUMEN ${(v * 10).toFixed(1)}`;
+  if (id === "b_cara_on") return v > 0.5 ? "CARA ON · PEDIR CÁMARA" : "CARA OFF · VUELVEN LAS PERILLAS";   // Z100
+  if (id === "b_cara_cal") return "CALIBRAR CARA · SEGUÍ EL DISPLAY";
   return p.nombreLargo;
 }
 /** Z96: cambia el diseño o la escala de etiquetas desde el menú (LecternSystem remonta el atril o rehace la serigrafía). */
@@ -1411,6 +1433,7 @@ function CtrlMesh({
   const playSonandoRef = useRef<boolean | null>(null);
   const playTex = useMemo(() => def.forma === "play" ? texPlayGrande() : null, [def.forma]);
   const marcaRef = useRef<THREE.Mesh>(null);   // Z99: paso que suena (BA-40)
+  const tomadoRef = useRef<THREE.Mesh>(null);  // Z100: aro "tomado por la cara" (perillas modulables del BA-40)
   useEffect(() => () => { playTex?.dispose(); }, [playTex]);
 
   const register = (mesh: THREE.Mesh | null) => {
@@ -1454,8 +1477,13 @@ function CtrlMesh({
     // L2: rotation.y = π − θ where θ = −135° + 270°×norm (CW from 12:00 = back/up)
     // min(0)→7:30 (lower-left), mid(0.5)→12:00 (top), max(1)→4:30 (lower-right)
     if (def.type === "knob") {
+      // Z100: perilla tomada por la cara: muestra el valor que suena (el de la cara) y enciende su aro; el manual no cambia
+      let n = norm;
+      const tomada = def.paramIdx !== undefined && caraTomaParam(def.paramIdx);
+      if (tomada) n = aNormal(PARAMS_BAJO[def.paramIdx!], valorParamIdx(def.paramIdx!));
+      if (tomadoRef.current) tomadoRef.current.visible = tomada;
       if (knobRotRef.current) {
-        const angle = Math.PI * 1.75 - norm * Math.PI * 1.5;
+        const angle = Math.PI * 1.75 - n * Math.PI * 1.5;
         knobRotRef.current.rotation.y = angle;
       }
       return;
@@ -1722,6 +1750,10 @@ function CtrlMesh({
           <cylinderGeometry args={[KNOB_SKIRT_R, KNOB_SKIRT_R, KNOB_SKIRT_H, 32]} />
           <primitive object={knobMat} attach="material" />
         </mesh>
+        {/* Z100: aro ámbar "tomado por la cara" alrededor de la falda (oculto salvo que CARA mande sobre este parámetro) */}
+        {def.paramIdx !== undefined && (
+          <mesh ref={tomadoRef} position={[0, 0.0012, 0]} rotation={[-Math.PI / 2, 0, 0]} geometry={TOMADO_GEO} material={TOMADO_MAT} visible={false} />
+        )}
         {/* Rotating group: body (frustum) + indicator line */}
         <group ref={knobRotRef} position={[0, KNOB_SKIRT_H, 0]}>
           {/* Frustum body */}
@@ -2455,7 +2487,7 @@ function Lectern({
               <MargenRotulos modo={DBG_ATRIL_SONIDO.ROTULOS_MODO === "margen" ? "margen" : "barra"} />
             )}
             {/* Z99: BA-40: display con la curva del filtro, VU de SALIDA y placa de la barra (leyenda 1 · 2 · 3) */}
-            {side === "bajo" && <><DisplayBajo /><VuBajo /></>}
+            {side === "bajo" && <><DisplayBajo /><VuBajo />{LAYOUT_B.conCara && <CaraBajo />}</>}
             {side === "bajo" && <PlacaBarraSonido texto={TEXTO_PLACA_BAJO} leyenda={LEYENDA_FILAS_B} conLeyenda={DBG_ATRIL_BAJO.ROTULOS_FILA} />}
             {/* Z97: atril de imagen: display, placa de la barra y rótulos DOMO · IMAGEN */}
             {side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO && <DisplayImagen />}

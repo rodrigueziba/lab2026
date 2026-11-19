@@ -224,6 +224,32 @@ export function valorParam(st: EstadoParams, id: string): number {
 }
 export function activarCara(st: EstadoParams, on: boolean): void { st.caraActiva = on; if (!on) st.cara.fill(NaN); st.version++; }
 export function restaurarParams(st: EstadoParams): void { for (let i = 0; i < PARAMS_BAJO.length; i++) st.manual[i] = PARAMS_BAJO[i].defecto; st.cara.fill(NaN); st.version++; }
+/** Z100: suelta un parámetro de la cara (prioridad manual mientras se arrastra su perilla): vuelve a sonar el manual. */
+export function liberarParamCara(st: EstadoParams, id: string): boolean {
+  const i = indiceParam(id);
+  if (i < 0 || !Number.isFinite(st.cara[i])) return false;
+  st.cara[i] = NaN; st.version++;
+  return true;
+}
+
+// ── Z100: gestos de la cara que actúan sobre la secuencia ──
+/** Siguiente patrón de fábrica en orden (después del último vuelve al primero; desde LIMPIO o uno desconocido, el primero). */
+export function siguienteNombrePatron(actual: string): NombrePatron {
+  const i = (NOMBRES_PATRON as string[]).indexOf(actual);
+  return NOMBRES_PATRON[(i + 1) % NOMBRES_PATRON.length];
+}
+/** Acento forzado pendiente (lo arma el cabeceo). */
+export interface AcentoForzado { pendiente: boolean; aplicados: number }
+export function crearAcentoForzado(): AcentoForzado { return { pendiente: false, aplicados: 0 }; }
+/**
+ * Si hay un acento forzado pendiente y este paso dispara una NOTA, la acentúa y lo consume (solo esa nota). No toca el
+ * patrón: modifica el evento (copia de trabajo), nunca PATRON_BAJO. Silencios y notas ligadas no lo consumen.
+ */
+export function aplicarAcentoForzado(ev: EventoPaso, a: AcentoForzado): boolean {
+  if (!a.pendiente || ev.tipo !== EV_NOTA) return false;
+  ev.acento = true; a.pendiente = false; a.aplicados++;
+  return true;
+}
 
 // ── radios del atril (uno encendido por grupo) ──
 export function radioBajo(opciones: readonly string[], elegida: string, out: number[]): number[] {

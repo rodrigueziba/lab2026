@@ -27,13 +27,17 @@ import {
   N_PASOS, crearPatronBajo, cargarFabrica, limpiarPatron, copiarPatron, patronesIguales, eventoPaso, pasosEnVentana, pasoSonando,
   midiAFrecuencia, nivelNota, aperturaNota, corteConEnvolvente, qDeResonancia, crearParams, setParam, valorParam, restaurarParams,
   PARAMS_BAJO, EV_SILENCIO, EV_LIGADA, NOMBRES_PATRON, type NombrePatron, type EventoPaso, type FuenteParam,
+  activarCara, liberarParamCara, siguienteNombrePatron, crearAcentoForzado, aplicarAcentoForzado,   // Z100
 } from "@/lib/bajoAcido";
 
 /** Estado leído por el atril, el display y el menú. version sube con cada cambio del patrón o de un parámetro. */
 export const BAJO = {
   version: 0, patron: "" as string, editado: false, sonando: false, pasoSonando: -1, ultimaNota: -1,
   notas: 0, vozLista: false,
+  versionCara: 0,   // Z100: sube con cada valor de la cara (la curva del display la sigue sin resincronizar los controles)
 };
+/** Z100: acento forzado de la próxima nota (cabeceo). */
+export const ACENTO_FORZADO = crearAcentoForzado();
 export const PATRON_BAJO = crearPatronBajo();
 const _fabrica = crearPatronBajo();
 export const PARAMS = crearParams();
@@ -155,6 +159,7 @@ function alPasoReloj(pasoReloj: number, t: number, _compas: number, durS: number
     if (!DBG_BAJO.ON) continue;
     eventoPaso(PATRON_BAJO, k, _ev);
     if (_ev.tipo === EV_SILENCIO) { if (v.sostenida) soltar(v, tk); continue; }
+    aplicarAcentoForzado(_ev, ACENTO_FORZADO);   // Z100: cabeceo → acento de esta nota (el patrón no cambia)
     nota(v, _ev, tk, d16);
   }
 }
@@ -193,6 +198,7 @@ export function liberarBajo(): void {
   pararRelojPropio();
   liberarVoz();
   _tiempos.fill(-1e9); BAJO.pasoSonando = -1; BAJO.sonando = false;
+  ACENTO_FORZADO.pendiente = false;   // Z100
 }
 
 function pararRelojPropio(): void {
@@ -239,8 +245,30 @@ export function editarPaso(campo: "activo" | "nota" | "acento" | "desliz", k: nu
 /** setParam con fuente ("manual" desde el atril y el menú; "cara" en Z100). Aplica al instante si la voz existe. */
 export function setParamBajo(id: string, valor: number, fuente: FuenteParam = "manual"): boolean {
   const ok = setParam(PARAMS, id, valor, fuente);
-  if (ok) { BAJO.version++; const ctx = contextoNucleo(); if (_voz && ctx) aplicarParams(_voz, ctx.currentTime); }
+  // Z100: la cara sube versionCara (no version): la curva del display la sigue sin resincronizar los 86 controles
+  if (ok) { if (fuente === "cara") BAJO.versionCara++; else BAJO.version++; const ctx = contextoNucleo(); if (_voz && ctx) aplicarParams(_voz, ctx.currentTime); }
   return ok;
+}
+// ── Z100: la cara (lib/caraBajo.ts) ──
+/** Enciende o apaga la fuente "cara" (activarCara de Z99, tal cual). Al apagar vuelve el valor manual. */
+export function activarCaraBajo(on: boolean): void {
+  activarCara(PARAMS, on);
+  BAJO.versionCara++;
+  const ctx = contextoNucleo(); if (_voz && ctx) aplicarParams(_voz, ctx.currentTime);
+}
+/** Prioridad manual: suelta un parámetro de la cara mientras se arrastra su perilla. */
+export function liberarParamCaraBajo(id: string): void {
+  if (!liberarParamCara(PARAMS, id)) return;
+  BAJO.versionCara++;
+  const ctx = contextoNucleo(); if (_voz && ctx) aplicarParams(_voz, ctx.currentTime);
+}
+/** Cabeceo: la próxima nota (no silencio ni ligada) sale acentuada; el patrón guardado no cambia. */
+export function forzarAcentoProximaNota(): void { ACENTO_FORZADO.pendiente = true; }
+/** Guiño: siguiente patrón de fábrica (CHICAGO → RAGA → DEEP → TECHNO → MINIMAL → CHICAGO); queda como no editado. */
+export function siguientePatronBajo(): NombrePatron {
+  const nm = siguienteNombrePatron(BAJO.patron);
+  cargarPatron(nm);   // BAJO.editado = false y version++: el atril resincroniza los pads (MotorBajo)
+  return nm;
 }
 export function aplicarParamsBajo(): void { const ctx = contextoNucleo(); if (_voz && ctx) aplicarParams(_voz, ctx.currentTime); BAJO.version++; }
 /** Analizador del VU del atril (null hasta que suene la primera vez). */

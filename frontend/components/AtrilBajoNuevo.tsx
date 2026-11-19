@@ -12,8 +12,9 @@ import { BAJO, PARAMS, analizadorBajo, bpmBajo } from "@/lib/audio/bajoAcido";
 import { valorParam, qDeResonancia, curvaFiltro, aperturaNota, corteConEnvolvente, lineaBajo1 } from "@/lib/bajoAcido";
 import {
   MODULOS_B, POSICIONES_B, FADER_B, VU_B, SEQ, CURVA_B, DISPLAY_TEXTO_U1, moduloB, textosB, numerosPerillaB, numerosFaderB,
-  altosDisplayB, uPaso, anchoColumnaPaso, FILAS_SEQ,
+  altosDisplayB, uPaso, anchoColumnaPaso, FILAS_SEQ, LAYOUT_B, CARA_B, luzCaraB, medidoresCaraB, barraMedidorB,
 } from "@/lib/atrilBajo";
+import { CARA, EST as EST_CARA } from "@/lib/caraBajo";   // Z100
 import { BANDA_TITULO, DISPLAY_PAD, DISPLAY_INTERLINEA, RADIO_MARCAS_IN, RADIO_MARCAS_OUT, HUELLA, ESCALA_FADER, escalaEfectiva, tocaActualizar } from "@/lib/atrilSonido";
 import { FRANJAS_PLACA } from "@/lib/marca";
 import { VuSonido } from "./AtrilSonidoNuevo";
@@ -101,6 +102,13 @@ export async function buildSilkscreenBajo(dims: { CW: number; CD: number }): Pro
     c.fillStyle = `${CREMA}0.9)`; c.textAlign = "center"; c.textBaseline = "middle";
     for (const n of numerosFaderB(p)) { c.font = `bold ${Math.round(n.alto * ppmY)}px monospace`; c.fillText(n.texto, X(n.u), Y(n.v)); }
   }
+  // Z100: CARA: marco de cada medidor (los LEDs los dibuja CaraBajo) y aro de la luz CARA DETECTADA
+  if (LAYOUT_B.conCara) {
+    c.strokeStyle = `${CREMA}0.35)`; c.lineWidth = 2;
+    for (let i = 0; i < 6; i++) { const b = barraMedidorB(i); c.strokeRect(X(b.u0 - 0.003), Y(b.v1 + 0.003), (b.u1 - b.u0 + 0.006) * ppmX, (b.v1 - b.v0 + 0.006) * ppmY); }
+    const l = luzCaraB();
+    c.beginPath(); c.arc(X(l.u), Y(l.v), (l.r + 0.004) * ppmX, 0, Math.PI * 2); c.stroke();
+  }
   // marco del VU
   c.strokeStyle = `${CREMA}0.35)`; c.lineWidth = 2;
   c.strokeRect(X(VU_B.u - VU_B.ancho / 2 - 0.004), Y(VU_B.v1 + 0.006), (VU_B.ancho + 0.008) * ppmX, (VU_B.v1 - VU_B.v0 + 0.012) * ppmY);
@@ -183,7 +191,7 @@ export function DisplayBajo() {
     const marcoMat = new THREE.MeshStandardMaterial({ color: "#E8DCC4", roughness: 0.85, metalness: 0 });
     return { d, w, h, cw, ch, cv, tex, mat, geo, marcoGeo, marcoMat };
   }, []);
-  const ult = useRef({ ms: -1e9, ver: -1, val: -2, esc: -1, son: -1, on: -1, bpm: -1, l1: "" });
+  const ult = useRef({ ms: -1e9, ver: -1, val: -2, esc: -1, son: -1, on: -1, bpm: -1, l1: "", vc: -1, cv: -1 });
   useEffect(() => () => { r.tex.dispose(); r.mat.dispose(); r.geo.dispose(); r.marcoGeo.dispose(); r.marcoMat.dispose(); }, [r]);
 
   useFrame(({ camera }) => {
@@ -195,12 +203,13 @@ export function DisplayBajo() {
     if (!enPantalla(g, camera)) return;
     const val = ahora < DISPLAY_BAJO.hasta ? DISPLAY_BAJO.version : -1, esc = escalaActualBajo();
     const son = BAJO.sonando ? 1 : 0, on = DBG_BAJO.ON ? 1 : 0, bpm = Math.round(bpmBajo());
-    if (u.ver === BAJO.version && u.val === val && u.esc === esc && u.son === son && u.on === on && u.bpm === bpm) return;
+    // Z100: la curva sigue también a la cara (BAJO.versionCara) y la línea 2 muestra el estado de CARA (CARA.version)
+    if (u.ver === BAJO.version && u.val === val && u.esc === esc && u.son === son && u.on === on && u.bpm === bpm && u.vc === BAJO.versionCara && u.cv === CARA.version) return;
     const cambioEstado = u.ver !== BAJO.version || u.son !== son || u.on !== on || u.bpm !== bpm;
-    if (u.ver !== BAJO.version) calcularCurvas();
-    u.ver = BAJO.version; u.val = val; u.esc = esc; u.son = son; u.on = on; u.bpm = bpm;
+    if (u.ver !== BAJO.version || u.vc !== BAJO.versionCara) calcularCurvas();
+    u.ver = BAJO.version; u.val = val; u.esc = esc; u.son = son; u.on = on; u.bpm = bpm; u.vc = BAJO.versionCara; u.cv = CARA.version;
     if (cambioEstado || !u.l1) u.l1 = lineaBajo1(BAJO.patron, BAJO.editado, bpm, !on ? "silencio" : son ? "sonando" : "parado");
-    dibujarDisplayBajo(r, u.l1, val >= 0 ? DISPLAY_BAJO.texto : TEXTO_REPOSO, esc);
+    dibujarDisplayBajo(r, u.l1, val >= 0 ? DISPLAY_BAJO.texto : CARA.linea ? CARA.linea : TEXTO_REPOSO, esc);
   });
 
   const cu = (r.d.u0 + r.d.u1) / 2, cvv = (r.d.v0 + r.d.v1) / 2;
@@ -216,3 +225,66 @@ const TEXTO_REPOSO = "PLAY: EN LA CAJA DE RITMOS · Q SALE";
 // ── VU del bajo: el de SN-40 con su geometría y su analizador (referencias estables) ──
 const hzVu = () => DBG_ATRIL_BAJO.VU_HZ;
 export function VuBajo() { return <VuSonido vu={VU_B} analizador={analizadorBajo} hz={hzVu} />; }
+
+// ── Z100: módulo CARA: 6 medidores de LEDs (BOCA, O, SONRISA, CEJAS, CABECEO, GUIÑO) y la luz CARA DETECTADA ──
+// Los medidores son una textura de canvas sobre las barras (10 segmentos ámbar por fila, como el VU); se redibujan solo
+// cuando cambia algún segmento encendido, ≤ VU_HZ y con el atril en pantalla. Sin allocations por cuadro.
+const _segs = new Int8Array(6).fill(-1);
+const LED_ON = "#FF9A1F", LED_OFF = "rgba(255,154,31,0.10)", LED_FONDO = "#140A00";
+export function CaraBajo() {
+  const grupoRef = useRef<THREE.Group>(null);
+  const luzMatRef = useRef<THREE.MeshStandardMaterial>(null);
+  const r = useMemo(() => {
+    const md = medidoresCaraB(), w = md.u1 - md.barraU0, h = md.v1 - md.v0;
+    const cw = 512, ch = Math.max(64, Math.round((cw * h) / w));
+    const cv = document.createElement("canvas"); cv.width = cw; cv.height = ch;
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+    const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, transparent: true });
+    const geo = new THREE.PlaneGeometry(w, h);
+    return { md, w, h, cw, ch, cv, tex, mat, geo };
+  }, []);
+  const ultMs = useRef(-1e9);
+  useEffect(() => { _segs.fill(-1); return () => { r.tex.dispose(); r.mat.dispose(); r.geo.dispose(); }; }, [r]);
+
+  useFrame(({ camera }) => {
+    const g = grupoRef.current;
+    if (!g) return;
+    if (luzMatRef.current) luzMatRef.current.emissiveIntensity = CARA.on && EST_CARA.detectada ? 2.4 : 0.04;
+    const ahora = performance.now();
+    if (!tocaActualizar(ahora, ultMs.current, DBG_ATRIL_BAJO.VU_HZ)) return;
+    ultMs.current = ahora;
+    if (!enPantalla(g, camera)) return;
+    let cambio = false;
+    for (let i = 0; i < 6; i++) {
+      const n = CARA.on ? Math.round(Math.max(0, Math.min(1, EST_CARA.gestos[i])) * CARA_B.segmentos) : 0;
+      if (n !== _segs[i]) { _segs[i] = n; cambio = true; }
+    }
+    if (cambio) dibujarMedidores(r);
+  });
+
+  const luz = luzCaraB(), cu = (r.md.barraU0 + r.md.u1) / 2, cvv = (r.md.v0 + r.md.v1) / 2;
+  return (
+    <group ref={grupoRef}>
+      <mesh position={[cu, 0.0045, -cvv]} rotation={[-Math.PI / 2, 0, 0]} geometry={r.geo} material={r.mat} />
+      {/* luz CARA DETECTADA */}
+      <mesh position={[luz.u, 0.004, -luz.v]}>
+        <cylinderGeometry args={[luz.r, luz.r, 0.006, 20]} />
+        <meshStandardMaterial ref={luzMatRef} color="#3A1A00" emissive="#FF9A1F" emissiveIntensity={0.04} roughness={0.5} />
+      </mesh>
+    </group>
+  );
+}
+function dibujarMedidores(r: { md: ReturnType<typeof medidoresCaraB>; cw: number; ch: number; cv: HTMLCanvasElement; tex: THREE.CanvasTexture }): void {
+  const c = r.cv.getContext("2d");
+  if (!c) return;
+  c.clearRect(0, 0, r.cw, r.ch);
+  const ppmX = r.cw / (r.md.u1 - r.md.barraU0), ppmY = r.ch / (r.md.v1 - r.md.v0), n = CARA_B.segmentos;
+  for (let i = 0; i < 6; i++) {
+    const b = barraMedidorB(i);
+    const y0 = (r.md.v1 - b.v1) * ppmY, hh = (b.v1 - b.v0) * ppmY, ws = (b.u1 - b.u0) * ppmX / n;
+    c.fillStyle = LED_FONDO; c.fillRect(0, y0, r.cw, hh);
+    for (let k = 0; k < n; k++) { c.fillStyle = k < _segs[i] ? LED_ON : LED_OFF; c.fillRect(k * ws + 2, y0 + 2, ws - 4, hh - 4); }
+  }
+  r.tex.needsUpdate = true;
+}

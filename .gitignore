@@ -24,3 +24,4 @@ secrets.json
 CONTEXTO_PROYECTO.txt
 # Z90: reportes finales de cada tarea (copia local para el usuario; pueden incluir rutas y notas de trabajo, no se versionan)
 reportes/
+public/alight/mediapipe/

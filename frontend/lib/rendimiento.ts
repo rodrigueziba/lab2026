@@ -151,6 +151,7 @@ export const SISTEMAS = [
   { id: "transmisionTarima", etiqueta: "transmisión de la tarima", como: "Z92: pauseUpstream de las pistas de LiveKit (sin codificar ni enviar; sigue conectada). Sin transmisión activa no cambia nada" },
   { id: "videoTransmitidoTarima", etiqueta: "video transmitido (procesado)", como: "Z94: no dibuja el pase plano del domo ni lo copia al canvas transmisible (se publica el último cuadro). Sin transmisión activa no cambia nada" },
   { id: "recepcionTarima", etiqueta: "recepción de la tarima", como: "Z93: des-suscribe el audio y el video de LiveKit sin desconectar (sin decodificar ni subir la textura; el domo muestra estática). Sin sesión recibida no cambia nada" },
+  { id: "caraBajo", etiqueta: "cara del BA-40", como: "Z100: no manda cuadros al worker de MediaPipe (la cara queda quieta en su último valor). Sin CARA encendida no cambia nada. El costo en el hilo principal por cuadro está en «Cara del BA-40 Z100»" },
   { id: "tiempoDetenido", etiqueta: "tiempo detenido", como: "Z86: desarmado (sin captura del historial ni estela) y uTiempoK = 0 (la rama del pase final no se ejecuta)" },
   // Z72: partes del shader del domo (uniforms uPerf* de dome.frag.glsl: ramas por uniform, como uPerfAnillos)
   { id: "domoFluido",    etiqueta: "domo: fluir de color",  como: "dome.frag.glsl: uPerfFluido salta el fluido de los bloques azul y naranja (Z61/Z63)" },
