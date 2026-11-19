@@ -168,7 +168,7 @@ console.log('\n(h) layout del atril BA-40');
     const p = B.buscarPoseBajo(g, a, S.escalaEfectiva(1, true, a));
     check(!!p && p.pasada < 3 && p.legible >= S.LEGIBLE_MIN, `${nom}: cámara del modo atril fov ${p?.fov}° h ${p?.height.toFixed(2)} d ${p?.dist.toFixed(2)} pitch ${p?.pitch}° → texto más lejano ${(100 * (p?.legible ?? 0)).toFixed(2)} %`);
   }
-  check(/legibilidadMinimaB\(geoAtril\(\), cp, escalaEfectiva\(DBG_ATRIL_BAJO\.ETIQUETA_ESCALA/.test(LS) && /const conPasadas = nuevoSonido \|\| imagenPanel \|\| esBajo;/.test(LS),
+  check(/legibilidadMinimaB\(geoAtril\(\), cp, escalaEfectiva\(DBG_ATRIL_BAJO\.ETIQUETA_ESCALA/.test(LS) && /const conPasadas = nuevoSonido \|\| imagenPanel \|\| esBajo( \|\| esSinte)?;/   /* Z101: + SY-40 */.test(LS),
     'fitLecternCamera: el BA-40 busca como el de sonido y exige legibilidadMinimaB');
   check(B.TEXTO_PLACA_B("IN-GO'S WAN INC.") === "BAJO ÁCIDO BA-40 · IN-GO'S WAN INC. · SINTETIZADOR DE BAJO · 4 MÓDULOS" && B.LEYENDA_FILAS_B === '1 SECUENCIA · 2 VOZ · 3 SALIDA · 4 CARA', 'placa y leyenda (Z100: 4 módulos, + 4 CARA)'); }
 

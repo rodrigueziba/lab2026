@@ -1814,6 +1814,75 @@ export const DBG_CARA = {
   SIM_BOCA: 0, SIM_O: 0, SIM_SONRISA: 0, SIM_CEJAS: 0, SIM_CABECEO: 0, SIM_GUINO: 0,   // 0…1 (CABECEO = pitch 0…0,6 rad)
 };
 
+// ── Z101: SINTETIZADOR SY-40 (motor lib/audio/sinte.ts, lógica pura lib/sinte.ts, atril lib/atrilSinte.ts) ──
+// Los rangos de cada parámetro están en PARAMS_SINTE (lib/sinte.ts); acá van los valores por defecto (los del sonido
+// inicial si el sonido no lo fija) y los topes que aplica el motor.
+export const DBG_SINTE = {
+  ACTIVO:                 true,     // false = sin sinte (no crea voces ni se suscribe al reloj) — vale al montar
+  SINTE_VOCES:            6,        // voces preasignadas (polifonía); al cambiarlo se rehacen al próximo silencio — vale al reiniciar
+  SINTE_MIDI:             false,    // Web MIDI (navigator.requestMIDIAccess): pide permiso al montar el atril — vale al montar
+  LOOKAHEAD_S:            0.01,     // margen de programación de las notas en vivo (s): suenan en ahora + esto (el arpegiador usa la anticipación del reloj del núcleo) — live
+  ON:                     true,     // ON del módulo TECLADO Y SALIDA (silencia sin soltar las voces) — live
+  SONIDO_INICIAL:         "PAD" as string,   // vale al cargar
+  OCTAVA:                 4,        // octava de la tecla DO del teclado (DO4 = MIDI 60) — live
+  OCTAVA_MIN:             1,
+  OCTAVA_MAX:             7,
+  // topes del motor
+  CORTE_MIN:              40,       // Hz
+  CORTE_MAX:              12000,    // Hz
+  RES_MAX:                14,       // Q máximo del filtro (RESONANCIA 1)
+  ENV_OCTAVAS:            5,        // cuánto abre el corte MOD. ENV. al máximo (octavas)
+  RUIDO_MAX:              0.45,     // nivel del ruido con RUIDO 1 (relativo a un oscilador)
+  LFO_AFIN_CENTS:         60,       // vibrato con PROFUNDIDAD 1 (centésimas, ±)
+  LFO_CORTE_CENTS:        2400,     // barrido del corte con PROFUNDIDAD 1 (centésimas, ±: 2 octavas)
+  LFO_VOL_MAX:            0.8,      // trémolo con PROFUNDIDAD 1 (fracción del volumen)
+  ECO_REALIM_MAX:         0.85,     // tope de la realimentación del eco (no se descontrola)
+  ECO_FILTRO_HZ:          3200,     // filtro suave (pasa-bajos) dentro del lazo del eco
+  ECO_MAX_S:              2.0,      // tiempo máximo del eco (s)
+  NIVEL_VOZ:              0.15,     // pico de cada voz (6 voces con SUB y VOLUMEN 7 no saturan el bus)
+  ARP_GATE:               0.8,      // fracción del paso del arpegiador que suena cada nota
+  ARP_SEMILLA:            0xA21,    // semilla del patrón AZAR (fija: determinista)
+  ARP_ON:                 false,    // ARPEGIADOR — live
+  ARP_PATRON:             0,        // 0 ARRIBA, 1 ABAJO, 2 IDA Y VUELTA, 3 AZAR — live
+  ARP_VELOCIDAD:          0,        // 0 = 1/16, 1 = 1/8, 2 = 1/4 — live
+  ARP_OCTAVAS:            1,        // 1…3 — live
+  // valores por defecto de cada parámetro (PARAMS_SINTE: id → clave)
+  ONDA1:                  2,        // 0 SENO, 1 TRIÁNGULO, 2 SIERRA, 3 CUADRADA
+  ONDA2:                  2,
+  DESAFINE:               8,        // centésimas entre OSC1 y OSC2
+  MEZCLA:                 0.5,      // 0 = solo OSC1 · 1 = solo OSC2
+  SUB:                    0.3,
+  SUB_ONDA:               0,        // 0 CUADRADA, 1 SENO
+  RUIDO:                  0,
+  CORTE:                  2400,     // Hz
+  RESONANCIA:             0.25,
+  MOD_ENV:                0.35,
+  SEGUIMIENTO:            0.5,      // seguimiento de tecla del corte (1 = el corte sube una octava por octava)
+  ATAQUE:                 0.01,     // s (envolvente de amplitud)
+  DECAY:                  0.3,      // s
+  SOSTENIDO:              0.7,      // 0…1
+  RELEASE:                0.4,      // s
+  F_ATAQUE:               0.01,     // s (envolvente del filtro)
+  F_DECAY:                0.4,
+  F_SOSTENIDO:            0.3,
+  F_RELEASE:              0.4,
+  LFO_VELOCIDAD:          5,        // Hz
+  LFO_PROFUNDIDAD:        0,
+  LFO_DESTINO:            0,        // 0 AFINACIÓN, 1 CORTE, 2 VOLUMEN
+  ECO_TIEMPO:             1,        // 0 = 1/8, 1 = 1/4, 2 = 1/4 con puntillo (sincronizado con el BPM de la caja)
+  ECO_REALIM:             0.35,
+  ECO_MEZCLA:             0,
+  VOLUMEN:                0.7,
+};
+export const DBG_ATRIL_SINTE = {
+  ETIQUETA_ESCALA:        1.0,      // multiplica títulos y etiquetas — live (rehace la serigrafía)
+  ETIQUETA_AUTO_ASPECTO:  true,     // proporción < 1,6: hasta × 1,15 — live
+  DISPLAY_VALOR_S:        2.5,      // s que el display muestra el control tocado — live
+  VU_HZ:                  30,       // tope de actualización del VU y del display — live
+  ROTULOS_FILA:           true,     // leyenda "1 SONIDOS · 2 TIMBRE · …" en la placa y números en los títulos — live
+  ROTULOS_MODO:           "barra" as string,   // "barra" (leyenda en la placa de la barra) — live
+};
+
 // ── Z87: fuente de video de la tarima y visualizador de ondas sin webcam (lib/ondasTarima.ts, lib/fuenteVideoTarima.ts) ──
 // (DBG_ONDAS ya existe: son las ondas por kick del domo de SILLAS, Z52; por eso este se llama DBG_ONDAS_TARIMA.)
 export const DBG_ONDAS_TARIMA = {

@@ -9,6 +9,7 @@ import {
   type PoseSlot, type PasoArco,
 } from "@/lib/instrumentosDisposicion";
 import { ATRIL_BAJO } from "@/lib/atrilBajo";
+import { ATRIL_SINTE } from "@/lib/atrilSinte";   // Z101
 
 /** Geometría de la tarima y del atril de sonido (la registra LecternSystem al cargar; estos son los valores de hoy). */
 export const GEO_INSTRUMENTOS = { atrilX: 1.6, tarimaMedia: 3.192 / 2, tarimaH: 0.267 };
@@ -98,5 +99,18 @@ export function poseAtrilBajo(out: PoseSlot): PoseSlot {
   }
   if (ok) { ATRIL_BAJO.x = out.x; ATRIL_BAJO.z = out.z; ATRIL_BAJO.yaw = out.yaw; }
   else { out.x = ATRIL_BAJO.x; out.z = ATRIL_BAJO.z; out.yaw = ATRIL_BAJO.yaw; }
+  return out;
+}
+
+/** Z101: índice del SINTETIZADOR SY-40 en el arco: el lado opuesto al BA-40 (reservado en Z99b). */
+export const INDICE_SINTE = -1;
+/**
+ * Z101: pose del SY-40. Única fuente: poseInstrumento(−1) (con "arco", el arco; con "linea", el slot de la línea de Z88
+ * que corresponde a −1). La usan el atril y su pedestal, el aviso "E", la tecla E, la cámara del modo atril y el
+ * checkpoint. Escribe ATRIL_SINTE (la posición viva que leen el aviso "E" y la tecla E).
+ */
+export function poseAtrilSinte(out: PoseSlot): PoseSlot {
+  if (poseInstrumento(INDICE_SINTE, out)) { ATRIL_SINTE.x = out.x; ATRIL_SINTE.z = out.z; ATRIL_SINTE.yaw = out.yaw; }
+  else { out.x = ATRIL_SINTE.x; out.z = ATRIL_SINTE.z; out.yaw = ATRIL_SINTE.yaw; }
   return out;
 }

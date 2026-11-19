@@ -51,6 +51,8 @@ import { poseFrenteAtrilImagen } from "@/lib/atrilImagen";            // Z97
 import { restaurarLucesEscena } from "@/lib/lucesEscenaAcciones";    // Z97b
 import { poseFrenteAtrilBajo } from "@/lib/atrilBajo";               // Z99
 import { poseAtrilBajo, poseInstrumento } from "@/lib/instrumentosPose";   // Z99b: posición única (arco / línea)
+import { poseAtrilSinte } from "@/lib/instrumentosPose";                    // Z101: SY-40 (poseInstrumento(−1))
+import { poseFrenteAtrilSinte } from "@/lib/atrilSinte";                     // Z101
 import { detenerPresencia } from "@/lib/vivo/vivoAcciones";
 import { detenerLiveKit } from "@/lib/vivo/publicarLiveKit";
 
@@ -59,6 +61,7 @@ export const HOST = { montajes: 0, frames: 0 };
 
 let _camara: THREE.Camera | null = null;
 const _poseBajo = { x: 0, z: 0, yaw: 0 };   // Z99b
+const _poseSinte = { x: 0, z: 0, yaw: 0 };  // Z101
 /** Z99b: pone la cámara a 1 m del instrumento del índice k del arco (0 = caja), mirándolo. Para el menú de debug. */
 export function irAInstrumento(k: number): boolean {
   if (!_camara || !poseInstrumento(k, _poseBajo)) return false;
@@ -291,6 +294,16 @@ export const ACCIONES_CHECKPOINT: Record<string, Accion> = {
     if (!_camara) return false;
     const b = poseAtrilBajo(_poseBajo);
     const p = poseFrenteAtrilBajo(b.x, b.z, b.yaw, 1.0);
+    _camara.position.set(p.x, 1.6, p.z);
+    _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
+    return true;
+  },
+
+  // Z101: a 1 m del SY-40, mirándolo; su pose sale de la función única (poseInstrumento(−1)), no de ATRIL_SINTE
+  frenteAtrilSinte: () => {
+    if (!_camara) return false;
+    const y = poseAtrilSinte(_poseSinte);
+    const p = poseFrenteAtrilSinte(y.x, y.z, y.yaw, 1.0);
     _camara.position.set(p.x, 1.6, p.z);
     _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
     return true;

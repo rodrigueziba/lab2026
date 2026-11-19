@@ -22,7 +22,7 @@ export const N_SLOTS_ARCO = 2 * INDICE_MAX + 1;
 export const ORDEN_SLOTS: Readonly<Record<number, { id: string; nombre: string; ocupado: boolean } | null>> = {
   [-3]: null,
   [-2]: null,
-  [-1]: { id: "sintetizador", nombre: "SINTETIZADOR SY-40 (Z101, reservado)", ocupado: false },
+  [-1]: { id: "sintetizador", nombre: "SINTETIZADOR SY-40", ocupado: true },   // Z101
   [0]:  { id: "ritmos",       nombre: "CAJA DE RITMOS", ocupado: true },
   [1]:  { id: "bajo",         nombre: "BAJO ÁCIDO BA-40", ocupado: true },
   [2]:  { id: "sampler",      nombre: "SAMPLER SM-40 (Z102, reservado)", ocupado: false },

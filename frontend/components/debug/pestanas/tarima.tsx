@@ -2,7 +2,7 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_BAJO, DBG_ATRIL_BAJO, DBG_INSTRUMENTOS, DBG_CARA } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_BAJO, DBG_ATRIL_BAJO, DBG_INSTRUMENTOS, DBG_CARA, DBG_SINTE, DBG_ATRIL_SINTE } from "@/lib/debugConfig";
 import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent, modoActual } from "@/lib/consentTarimaAcciones";   // Z91
 import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit, alternarPanelCuadro, panelCuadroVisible } from "@/lib/vivo/publicarLiveKit";   // Z92 · Z94b
 import { sesionIdNavegador } from "@/lib/vivo/vivoAcciones";   // Z92
@@ -19,6 +19,8 @@ import { ORDEN_SLOTS, INDICE_MAX } from "@/lib/instrumentosDisposicion";        
 import { irAInstrumento } from "@/lib/checkpointsAcciones";                                // Z99b
 import { CARA, EST as EST_CARA, encenderCara, apagarCara, calibrarCara, olvidarCalibracion } from "@/lib/caraBajo";   // Z100
 import { NOMBRES_GESTO } from "@/lib/cara";                                                  // Z100
+import { SINTE, PARAMS_SY, VOCES, MANTENIDAS, ARP, cargarSonidoSinte, setParamSinte, aplicarOpcionesSinte, silenciarYReiniciarSinte, notaAbajo, notaArriba, bpmSinte } from "@/lib/audio/sinte";   // Z101
+import { PARAMS_SINTE, NOMBRES_SONIDO, PATRONES_ARP, VELOCIDADES_ARP, nombreSonido, nombreNota as nombreNotaSinte, indiceParam as indiceParamSinte } from "@/lib/sinte";   // Z101
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
 import { useDbg } from "../contexto";
 import { RITMOS, playRitmos, pausaRitmos, borrarRitmos, cargarEjemploHouse, setBpmRitmos, setSwingRitmos, setPasosRitmos, probarVoz, guardarRitmos } from "@/lib/ritmosMotor"; // Z80
@@ -910,6 +912,82 @@ export function SecCaraBajoZ100() {
               <input type="range" min={0} max={1} step={0.01} style={{ flex: 1 }} value={C[k]} onChange={ev => { C[k] = parseFloat(ev.target.value); toca(); }} />
             </div>
           ))}
+    </>
+  );
+}
+
+// sección: sinte-z101
+export function SecSinteZ101() {
+  // Z101: SINTETIZADOR SY-40 (motor lib/audio/sinte.ts). Estado 4 veces por segundo.
+  const S = DBG_SINTE, A = DBG_ATRIL_SINTE;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const avisar = (remontar: boolean) => window.dispatchEvent(new CustomEvent("alight:atril-sinte-cambio", { detail: { remontar } }));
+  const probarNota = () => { const n = 12 * (S.OCTAVA + 1); notaAbajo(n); setTimeout(() => notaArriba(n), 600); };
+  const mant: string[] = []; for (let i = 0; i < MANTENIDAS.n; i++) mant.push(nombreNotaSinte(MANTENIDAS.notas[i]));
+  return (
+    <>
+          <span style={LABEL}>Sintetizador Z101 <span style={NOTE}>(SY-40 · probar con el checkpoint «Atril del sintetizador» o ?cp=atril_sinte · E entra, Q sale · piano: R 5 T 6 Y U 8 I 9 O 0 P [ = ] · el arpegiador suena con el play de la caja)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>voces activas {SINTE.vocesActivas}/{VOCES.n} · sonido {nombreSonido(SINTE.sonido)}{SINTE.editado ? " (editado)" : ""} · nota {SINTE.ultimaNota >= 0 ? nombreNotaSinte(SINTE.ultimaNota) : "-"} · teclas {mant.length ? mant.join(" ") : "-"} · arpegiador {S.ARP_ON ? (SINTE.arpActivo ? `ARPEGIANDO ${PATRONES_ARP[S.ARP_PATRON]} ${VELOCIDADES_ARP[S.ARP_VELOCIDAD]} ×${S.ARP_OCTAVAS} (paso ${ARP.pasos})` : "esperando el play de la caja") : "off"} · {Math.round(bpmSinte())} BPM · octava {S.OCTAVA} · notas {SINTE.notas} · robos {SINTE.robos} · grafo {SINTE.listo ? "listo" : "sin crear (nace con la primera nota)"}</span></div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); silenciarYReiniciarSinte(); toca(); }}>Silenciar y reiniciar sinte</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); probarNota(); toca(); }}>Probar nota DO{S.OCTAVA}</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); irAInstrumento(-1); }}>Ir al SY-40</button>
+          </div>
+          <div style={ROW}>
+            <span>SONIDO</span>
+            {NOMBRES_SONIDO.map(nm => <button key={nm} style={{ ...INPUT, opacity: SINTE.sonido === nm ? 1 : 0.5 }} onClick={() => { cargarSonidoSinte(nm); toca(); }}>{nombreSonido(nm)}</button>)}
+          </div>
+          {([["ACTIVO", "off = sin sinte (vale al remontar)"], ["ON", "ON del módulo TECLADO Y SALIDA"], ["ARP_ON", "arpegiador (suena con el play de la caja)"], ["SINTE_MIDI", "Web MIDI: pide permiso (vale al remontar el atril)"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); S[k] = !S[k]; aplicarOpcionesSinte(); if (k === "ACTIVO" || k === "SINTE_MIDI") avisar(true); toca(); }}>{S[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          <div style={ROW}>
+            <span>ARP_PATRON</span>
+            {PATRONES_ARP.map((nm, i) => <button key={nm} style={{ ...INPUT, opacity: S.ARP_PATRON === i ? 1 : 0.5 }} onClick={() => { S.ARP_PATRON = i; aplicarOpcionesSinte(); toca(); }}>{nm}</button>)}
+          </div>
+          <div style={ROW}>
+            <span>ARP_VELOCIDAD</span>
+            {VELOCIDADES_ARP.map((nm, i) => <button key={nm} style={{ ...INPUT, opacity: S.ARP_VELOCIDAD === i ? 1 : 0.5 }} onClick={() => { S.ARP_VELOCIDAD = i; aplicarOpcionesSinte(); toca(); }}>{nm}</button>)}
+            <span>OCT.</span>
+            {[1, 2, 3].map(n => <button key={n} style={{ ...INPUT, opacity: S.ARP_OCTAVAS === n ? 1 : 0.5 }} onClick={() => { S.ARP_OCTAVAS = n; aplicarOpcionesSinte(); toca(); }}>{n}</button>)}
+          </div>
+          {([["SINTE_VOCES", 1, 12, 1, "polifonía (vale al «Silenciar y reiniciar»)"], ["OCTAVA", 1, 7, 1, "octava de la tecla DO"], ["LOOKAHEAD_S", 0, 0.1, 0.005, "margen de las notas en vivo (s)"],
+            ["CORTE_MIN", 20, 300, 5, "Hz"], ["CORTE_MAX", 2000, 18000, 100, "Hz"], ["RES_MAX", 2, 30, 0.5, "Q máximo"], ["ENV_OCTAVAS", 0, 8, 0.1, "octavas de MOD. ENV."],
+            ["RUIDO_MAX", 0, 1, 0.05, "nivel del ruido con RUIDO 10"], ["LFO_AFIN_CENTS", 0, 200, 5, "vibrato (centésimas)"], ["LFO_CORTE_CENTS", 0, 4800, 100, "barrido del corte (centésimas)"],
+            ["LFO_VOL_MAX", 0, 1, 0.05, "trémolo"], ["ECO_REALIM_MAX", 0, 0.85, 0.01, "tope de la realimentación"], ["ECO_FILTRO_HZ", 500, 8000, 100, "filtro del lazo del eco"],
+            ["ECO_MAX_S", 0.5, 3, 0.1, "tiempo máximo del eco (s)"], ["NIVEL_VOZ", 0.05, 0.5, 0.01, "pico de cada voz"], ["ARP_GATE", 0.1, 0.98, 0.02, "fracción del paso que suena"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{S[k].toFixed(st < 1 ? 3 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={S[k]} onChange={ev => { S[k] = parseFloat(ev.target.value); aplicarOpcionesSinte(); toca(); }} />
+            </div>
+          ))}
+          {/* parámetros del motor: van por setParamSinte(id, valor, "manual") (los mismos que mueve el atril) */}
+          {PARAMS_SINTE.map(d => (
+            <div key={d.id} style={ROW}>
+              <span>{d.nombre} <span style={NOTE}>{PARAMS_SY.manual[indiceParamSinte(d.id)].toFixed(d.max > 50 ? 0 : d.curva === "paso" ? 0 : 3)} {d.unidad}</span></span>
+              <input type="range" min={d.min} max={d.max} step={d.curva === "paso" ? 1 : (d.max - d.min) / 400} style={{ flex: 1 }} value={PARAMS_SY.manual[indiceParamSinte(d.id)]}
+                onChange={ev => { setParamSinte(d.id, parseFloat(ev.target.value), "manual"); toca(); }} />
+            </div>
+          ))}
+          <span style={LABEL}>Atril SY-40</span>
+          {([["ETIQUETA_ESCALA", 0.7, 1.4, 0.05, "títulos y etiquetas (rehace la serigrafía)"], ["DISPLAY_VALOR_S", 0.5, 8, 0.5, "s del control tocado en el display"], ["VU_HZ", 5, 60, 1, "tope del VU y del display"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{A[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={A[k]}
+                onChange={ev => { A[k] = parseFloat(ev.target.value); toca(); }} onPointerUp={() => avisar(false)} onKeyUp={() => avisar(false)} />
+            </div>
+          ))}
+          {([["ROTULOS_FILA", "leyenda 1 SONIDOS · 2 TIMBRE · … y números en los títulos"], ["ETIQUETA_AUTO_ASPECTO", "proporción < 1,6: etiquetas hasta × 1,15"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); A[k] = !A[k]; avisar(false); toca(); }}>{A[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          <div style={{ ...ROW, ...NOTE }}><span>ROTULOS_MODO {A.ROTULOS_MODO} (leyenda en la placa de la barra) · doble clic en perillas y fader: el valor del sonido cargado · en el modo del SY-40 no hay atajos Z–M (el teclado es el piano)</span></div>
     </>
   );
 }

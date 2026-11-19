@@ -53,8 +53,8 @@ check(!/^import /m.test(PURO), 'lib/instrumentosDisposicion.ts sin imports (lóg
 check(I.DISPOSICION === 'arco' && I.RADIO_M === 0 && I.SEPARACION_M === 2 && I.ARCO_MAX_GRADOS === 150 && I.MIRAR_AL_CENTRO === true && I.GUIA === false && AB.INDICE_ARCO === 1,
   'DBG_INSTRUMENTOS: arco, RADIO_M 0 (auto), SEPARACION_M 2,0, ARCO_MAX_GRADOS 150, MIRAR_AL_CENTRO, guía oculta; DBG_ATRIL_BAJO.INDICE_ARCO +1');
 check(D.ORDEN_SLOTS[0]?.id === 'ritmos' && D.ORDEN_SLOTS[1]?.id === 'bajo' && D.ORDEN_SLOTS[-1]?.id === 'sintetizador' && D.ORDEN_SLOTS[2]?.id === 'sampler'
-  && !D.ORDEN_SLOTS[-1].ocupado && !D.ORDEN_SLOTS[2].ocupado && D.ORDEN_SLOTS[3] === null && D.ORDEN_SLOTS[-2] === null && D.ORDEN_SLOTS[-3] === null,
-  'orden: 0 caja, +1 BA-40, −1 SY-40 (reservado), +2 SM-40 (reservado), resto libres');
+  && D.ORDEN_SLOTS[-1].ocupado && !D.ORDEN_SLOTS[2].ocupado && D.ORDEN_SLOTS[3] === null && D.ORDEN_SLOTS[-2] === null && D.ORDEN_SLOTS[-3] === null,
+  'orden: 0 caja, +1 BA-40, −1 SY-40 (Z101: ocupado), +2 SM-40 (reservado), resto libres');
 console.log(`  · centro de la tarima (${eje.cx}, ${eje.cz}) · eje hacia (${eje.ux}, ${eje.uz}) · caja en (${f(caja.x)}, ${f(caja.z)}) yaw ${f(grados(caja.yaw), 1)}° · radio ${f(R0, 4)} m`);
 
 const pose = { x: 0, z: 0, yaw: 0 };

@@ -22,7 +22,8 @@ export type CheckpointId =
   | "sillas_recibir" | "tarima_compartir"   // Z95: prueba de la transmisión en vivo con dos ventanas
   | "atril_sonido"                           // Z96: probar el atril de sonido rediseñado
   | "atril_imagen"                           // Z97: probar el atril de imagen rediseñado
-  | "atril_bajo";                            // Z99: probar el BAJO ÁCIDO BA-40
+  | "atril_bajo"                             // Z99: probar el BAJO ÁCIDO BA-40
+  | "atril_sinte";                           // Z101: probar el SINTETIZADOR SY-40
 
 /** ["accion", ...args] */
 export type Paso = readonly [string, ...(string | number)[]];
@@ -106,6 +107,10 @@ export const CHECKPOINTS: readonly Checkpoint[] = [
   { id: "atril_bajo", nombre: "Atril del bajo", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
       ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["esperarFrames", 3], ["frenteAtrilBajo"], ["esperarFrames", 2]],
     descripcion: "Atriles afuera (sin diálogo ni transmisión), frente al BAJO ÁCIDO BA-40: tocá play en la caja de ritmos y apretá E en el bajo." },
+  // Z101: igual, frente al SINTETIZADOR SY-40 (índice −1 del arco, el lado opuesto al BA-40)
+  { id: "atril_sinte", nombre: "Atril del sintetizador", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
+      ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["esperarFrames", 3], ["frenteAtrilSinte"], ["esperarFrames", 2]],
+    descripcion: "Atriles afuera (sin diálogo ni transmisión), frente al SINTETIZADOR SY-40: apretá E y tocá con las teclas R 5 T 6 Y U… o los pads; play en la caja para el arpegiador." },
 ];
 
 /**

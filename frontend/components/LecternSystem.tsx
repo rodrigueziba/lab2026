@@ -18,7 +18,7 @@ import {
   nextTrack, prevTrack, initAudio, loadPlaylist, playTrack,   // Z79: togglePlayPause ahora va por lib/playTarimaAcciones
   playUIClick,
 } from "@/lib/audioEngine";
-import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_ONDAS_TARIMA, DBG_BAJO, DBG_ATRIL_BAJO } from "@/lib/debugConfig";
+import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_ONDAS_TARIMA, DBG_BAJO, DBG_ATRIL_BAJO, DBG_SINTE, DBG_ATRIL_SINTE } from "@/lib/debugConfig";
 // Z96: atril de sonido rediseñado ("SONIDO SN-40"): layout como datos (lib/atrilSonido.ts) y piezas (AtrilSonidoNuevo.tsx)
 import {
   POSICIONES as POS_SONIDO_NUEVO, FADER_RAIL, GRANDE_ESCALA, PLAY_W, PLAY_D, textoValor, camaraAtril, legibilidadMinima,
@@ -44,6 +44,14 @@ import {
 import { PARAMS_BAJO, aNormal, deNormal, valorParam, indiceParam, nombreNota, type NombrePatron } from "@/lib/bajoAcido";
 import { DisplayBajo, VuBajo, CaraBajo, buildSilkscreenBajo, mostrarEnDisplayBajo, escalaActualBajo } from "./AtrilBajoNuevo";
 import { poseAtrilBajo, GEO_INSTRUMENTOS } from "@/lib/instrumentosPose";                      // Z99b: posición única de los instrumentos
+// Z101: SINTETIZADOR SY-40 (cuarto atril, índice −1 del arco de instrumentos: el lado opuesto al BA-40)
+import { POSICIONES_Y, PERILLAS_TIMBRE, PERILLAS_FILTRO, PARAMS_ENV, ATRIL_SINTE, legibilidadMinimaY, NOMBRE_EQUIPO_Y, DESCRIPCION_EQUIPO_Y, TEXTO_PLACA_Y, LEYENDA_FILAS_Y, type PosCtrlY } from "@/lib/atrilSinte";
+import { poseAtrilSinte } from "@/lib/instrumentosPose";
+import {
+  SINTE, PARAMS_SY, instalarSinte, tickSinte, cargarSonidoSinte, setParamSinte, aplicarOpcionesSinte, notaAbajo, notaArriba, notaDeSemitono,
+} from "@/lib/audio/sinte";
+import { PARAMS_SINTE, SONIDOS, NOMBRES_SONIDO, FORMAS, DESTINOS_LFO, NOMBRES_TIEMPO_ECO, PATRONES_ARP, VELOCIDADES_ARP, aNormal as aNormalY, deNormal as deNormalY, valorIdx as valorIdxY, indiceParam as indiceParamY, nombreNota as nombreNotaY, nombreSonido, radioSinte, tiempoEcoS, type NombreSonido } from "@/lib/sinte";
+import { DisplaySinte, VuSinte, TecladoSinte, buildSilkscreenSinte, mostrarEnDisplaySinte, escalaActualSinte } from "./AtrilSinteNuevo";
 import { FUENTE_TARIMA } from "@/lib/fuenteVideoTarima";                               // Z98
 import { DisplayImagen, buildSilkscreenImagen, mostrarEnDisplayImagen, escalaActualImagen, ROTULOS_VERTICALES_I, ROTULOS_NUMEROS_I } from "./AtrilImagenNuevo";
 import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
@@ -624,13 +632,14 @@ const K1_LABEL_MIN_PX = 12;  // minimum label pixel height at 1080 px viewport
 const K1_DOME_R = 27.5;      // FaceDome sphere radius (DOME_R - 0.5)
 
 // Z99: lado del atril: "left" (IM-40), "right" (SN-40) o "bajo" (BA-40, en un slot de instrumentos detrás de la tarima)
-type Lado = "left" | "right" | "bajo";
+type Lado = "left" | "right" | "bajo" | "sinte";   // Z101: "sinte" = SY-40
 const _poseLado = { x: 0, z: 0, yaw: 0 };
 /** Posición (x, z) y yaw (local +Z = frente, mirando al usuario) de cada atril. El cuerpo va a la altura de la tarima. */
 function poseLado(side: Lado): { x: number; z: number; yaw: number } {
   if (side === "bajo") {
     return poseAtrilBajo(_poseLado);   // Z99b: arco (INDICE_ARCO) o línea de Z88 (SLOT); escribe ATRIL_BAJO
   }
+  if (side === "sinte") return poseAtrilSinte(_poseLado);   // Z101: solo poseInstrumento(−1); escribe ATRIL_SINTE
   const sign = side === "left" ? -1 : 1;
   const flip = (side === "left" ? DBG_LECTERNS.yawFlipLeft : DBG_LECTERNS.yawFlipRight) ? Math.PI : 0;
   _poseLado.x = sign * LECTERN_PLACE_X; _poseLado.z = 0;
@@ -685,7 +694,8 @@ function fitLecternCamera(
   const modoImagen = isImage && !(nuevoImagen && DBG_ATRIL_VIDEO.CAMARA !== "domo");
   const imagenPanel = nuevoImagen && !modoImagen;
   const esBajo = side === "bajo";   // Z99: el BA-40 busca como el de sonido y exige su legibilidad
-  const conPasadas = nuevoSonido || imagenPanel || esBajo;
+  const esSinte = side === "sinte";  // Z101: el SY-40, igual (con legibilidadMinimaY)
+  const conPasadas = nuevoSonido || imagenPanel || esBajo || esSinte;
   const exigirLegible = conPasadas && pasada < 3;
   const anchoMinNdc = conPasadas && pasada === 2 ? 1.30 : 1.70;
   const dbgCfg  = isImage ? DBG_CAM_IMAGE : DBG_CAM_SOUND;
@@ -783,7 +793,9 @@ function fitLecternCamera(
             // ── Z96: texto más lejano del diseño nuevo ≥ LEGIBLE_MIN (proyección real sobre la placa inclinada) ──
             if (exigirLegible) {
               const cp = camaraAtril(geoAtril(), fovDeg, height, dist, pitchDeg, aspect);
-              const leg = esBajo
+              const leg = esSinte
+                ? legibilidadMinimaY(geoAtril(), cp, escalaEfectiva(DBG_ATRIL_SINTE.ETIQUETA_ESCALA, DBG_ATRIL_SINTE.ETIQUETA_AUTO_ASPECTO, aspect)).min
+                : esBajo
                 ? legibilidadMinimaB(geoAtril(), cp, escalaEfectiva(DBG_ATRIL_BAJO.ETIQUETA_ESCALA, DBG_ATRIL_BAJO.ETIQUETA_AUTO_ASPECTO, aspect)).min
                 : isImage
                 ? legibilidadMinimaI(geoAtril(), cp, escalaEfectiva(DBG_ATRIL_VIDEO.ETIQUETA_ESCALA, DBG_ATRIL_VIDEO.ETIQUETA_AUTO_ASPECTO, aspect)).min
@@ -845,7 +857,8 @@ export function reshuffleKeys() {
 function buildKeyMap(side: Lado) {
   if (_keyMapSide === side) return;  // already built for this side
   _keyMapSide = side;
-  const controls = side === "left" ? controlesImagen() : side === "bajo" ? CONTROLES_BAJO : SOUND_CONTROLS;   // Z97 · Z99
+  if (side === "sinte") { _keyMap.clear(); return; }   // Z101: sin atajos Z–M en el SY-40 (el teclado es el piano): sin letras en sus controles
+  const controls = side === "left" ? controlesImagen() : side === "bajo" ? CONTROLES_BAJO : SOUND_CONTROLS;   // Z97 · Z99 (Z101: el SY-40 no tiene atajos)
   const btns = controls.filter(c => c.type === "button" || c.type === "toggle");
   const rng  = seededRand(_keySeed + (side === "left" ? 0 : side === "bajo" ? 2000 : 1000));
   const idxs = btns.map((_, i) => i).sort(() => rng() - 0.5).slice(0, KEY_LETTERS.length);
@@ -880,6 +893,8 @@ interface CtrlDef {
   escala?: number;           // Z99: perillas y pads más chicos (BA-40: NOTA, ACENTO, DESLIZ, PASO, VOZ)
   marcaPaso?: number;        // Z99: tecla PASO k del BA-40: marca del paso que está sonando
   paramIdx?: number;         // Z100: perilla de un parámetro modulable del BA-40 (índice en PARAMS_BAJO): luz "tomado por la cara"
+  onSoltar?: () => void;     // Z101: al soltar el puntero (teclas del SY-40: la nota se sostiene mientras se aprieta)
+  defecto?: () => number;    // Z101: valor del doble clic (SY-40: el del sonido cargado, así deja de estar EDITADO)
   min: number;
   max: number;
   initial: number;
@@ -922,6 +937,8 @@ function setCtrl(id: string, v: number, def: CtrlDef) {
   }
   // Z99: display del BA-40
   if (id.startsWith("b_") && (def.type !== "button" || ctrlState[id] > 0.5)) mostrarEnDisplayBajo(textoBajo(id, def));
+  // Z101: display del SY-40
+  if (id.startsWith("y_") && (def.type !== "button" || ctrlState[id] > 0.5)) mostrarEnDisplaySinte(textoSinte(id, def));
   storeNotify();
 }
 const _posSonido = new Map<string, PosCtrl>(POS_SONIDO_NUEVO.map(p => [p.id, p]));
@@ -1333,6 +1350,118 @@ function textoBajo(id: string, def: CtrlDef): string {
   if (id === "b_cara_cal") return "CALIBRAR CARA · SEGUÍ EL DISPLAY";
   return p.nombreLargo;
 }
+// ── Z101: controles del SY-40 (layout en lib/atrilSinte.ts; acciones en lib/audio/sinte.ts) ──
+// Perillas de 0 a 1 (normalizado; CORTE, envolventes y LFO VELOC. con curva exponencial): el motor recibe el valor real con
+// setParamSinte(id, valor, "manual"). Pads radio: sonidos, formas, destino del LFO, tiempo del eco y arpegiador. Teclas:
+// "button" que tocan la nota al apretar (onActivate) y la sueltan al soltar el puntero (onSoltar). Doble clic en una
+// perilla: vuelve al valor del sonido cargado (deja de estar EDITADO).
+let _envSel: "vol" | "filtro" = "vol";   // qué envolvente editan las 4 perillas de ENVOLVENTE
+const _teclaPad = new Int16Array(15).fill(-1);   // nota con la que bajó cada tecla del atril (la octava puede cambiar)
+const defParamY = (pid: string) => PARAMS_SINTE[indiceParamY(pid)];
+function valorSonidoY(pid: string): number {
+  const s = (SONIDOS as Record<string, Record<string, number>>)[SINTE.sonido], d = defParamY(pid);
+  return pid === "volumen" ? DBG_SINTE.VOLUMEN : s && s[pid] !== undefined ? s[pid] : d.defecto;
+}
+function defSinte(p: PosCtrlY): CtrlDef {
+  const base = { id: p.id, label: p.etiqueta, px: p.u, py: p.v, nombreLargo: p.nombreLargo, escala: p.escala, forma: p.forma as FormaCtrl };
+  const radioY = (accion: () => void): CtrlDef => ({ ...base, type: "toggle", min: 0, max: 1, initial: 0, onActivate: () => { accion(); sincronizarSinte(); } });
+  if (p.id.startsWith("y_son_")) { const nm = p.id.slice(6) as NombreSonido; return radioY(() => cargarSonidoSinte(nm)); }
+  const forma = /^y_o([12])_(\d)$/.exec(p.id);
+  if (forma) return radioY(() => { setParamSinte(`onda${forma[1]}`, Number(forma[2]), "manual"); });
+  if (p.id.startsWith("y_p_")) { const pid = p.id.slice(4), d = defParamY(pid);
+    return { ...base, type: "knob", color: "mustard", min: 0, max: 1, initial: aNormalY(d, d.defecto),
+      onActivate: (v) => { setParamSinte(pid, deNormalY(d, v), "manual"); }, defecto: () => aNormalY(d, valorSonidoY(pid)) }; }
+  if (p.id.startsWith("y_env_")) { const i = Number(p.id.slice(6)), d0 = defParamY(PARAMS_ENV.vol[i]);
+    return { ...base, type: "knob", color: "mustard", min: 0, max: 1, initial: aNormalY(d0, d0.defecto),
+      onActivate: (v) => { const pid = PARAMS_ENV[_envSel][i]; setParamSinte(pid, deNormalY(defParamY(pid), v), "manual"); },
+      defecto: () => { const pid = PARAMS_ENV[_envSel][i]; return aNormalY(defParamY(pid), valorSonidoY(pid)); } }; }
+  if (p.id === "y_envsel_vol" || p.id === "y_envsel_filtro") { const sel = p.id === "y_envsel_vol" ? "vol" : "filtro"; return radioY(() => { _envSel = sel; }); }
+  if (p.id.startsWith("y_lfo_")) { const i = Number(p.id.slice(6)); return radioY(() => { setParamSinte("lfoDestino", i, "manual"); }); }
+  if (p.id.startsWith("y_eco_")) { const i = Number(p.id.slice(6)); return radioY(() => { setParamSinte("ecoTiempo", i, "manual"); }); }
+  if (p.id === "y_arp_on") return { ...base, type: "toggle", min: 0, max: 1, initial: DBG_SINTE.ARP_ON ? 1 : 0, onActivate: (v) => { DBG_SINTE.ARP_ON = v > 0.5; aplicarOpcionesSinte(); } };
+  if (p.id.startsWith("y_arp_pat_")) { const i = Number(p.id.slice(10)); return radioY(() => { DBG_SINTE.ARP_PATRON = i; aplicarOpcionesSinte(); }); }
+  if (p.id.startsWith("y_arp_vel_")) { const i = Number(p.id.slice(10)); return radioY(() => { DBG_SINTE.ARP_VELOCIDAD = i; aplicarOpcionesSinte(); }); }
+  if (p.id.startsWith("y_arp_oct_")) { const n = Number(p.id.slice(10)); return radioY(() => { DBG_SINTE.ARP_OCTAVAS = n; aplicarOpcionesSinte(); }); }
+  if (p.id.startsWith("y_tecla_")) { const st = Number(p.id.slice(8));
+    return { ...base, type: "button", min: 0, max: 1, initial: 0,
+      onActivate: (v) => { if (v > 0.5 && _teclaPad[st] < 0) { _teclaPad[st] = notaDeSemitono(st); notaAbajo(_teclaPad[st]); } },
+      onSoltar: () => { if (_teclaPad[st] >= 0) { notaArriba(_teclaPad[st]); _teclaPad[st] = -1; } } }; }
+  if (p.id === "y_oct_mas" || p.id === "y_oct_menos") { const dd = p.id === "y_oct_mas" ? 1 : -1;
+    return { ...base, type: "button", min: 0, max: 1, initial: 0, onActivate: (v) => { if (v > 0.5) { DBG_SINTE.OCTAVA += dd; aplicarOpcionesSinte(); } } }; }
+  if (p.id === "y_vol") return { ...base, type: "slider", orientation: "v", railLen: 0.12, min: 0, max: 1, initial: DBG_SINTE.VOLUMEN,
+    onActivate: (v) => { setParamSinte("volumen", v, "manual"); }, defecto: () => DBG_SINTE.VOLUMEN };
+  return { ...base, type: "toggle", min: 0, max: 1, initial: 1, onActivate: (v) => { DBG_SINTE.ON = v > 0.5; aplicarOpcionesSinte(); } };   // y_on
+}
+export const CONTROLES_SINTE: CtrlDef[] = POSICIONES_Y.map(defSinte);
+const _posSinte = new Map<string, PosCtrlY>(POSICIONES_Y.map(p => [p.id, p]));
+const _radioSon = [0, 0, 0, 0, 0, 0], _radio4 = [0, 0, 0, 0], _radio3 = [0, 0, 0];
+const PERILLAS_Y_IDS: string[] = [...[...PERILLAS_TIMBRE, ...PERILLAS_FILTRO].map(([pid]) => pid as string), "lfoVel", "lfoProf", "ecoRealim", "ecoMezcla"];
+/** Estado de los controles del SY-40 desde el motor (sonido, parámetros, opciones): al cargar, al tocar y desde el menú. */
+function sincronizarSinte(): void {
+  const man = (pid: string) => PARAMS_SY.manual[indiceParamY(pid)];
+  radioSinte(NOMBRES_SONIDO.length, (NOMBRES_SONIDO as string[]).indexOf(SINTE.sonido), _radioSon).forEach((v, i) => { ctrlState[`y_son_${NOMBRES_SONIDO[i]}`] = v; });
+  for (const o of [1, 2]) radioSinte(4, Math.round(man(`onda${o}`)), _radio4).forEach((v, i) => { ctrlState[`y_o${o}_${i}`] = v; });
+  for (const pid of PERILLAS_Y_IDS) ctrlState[`y_p_${pid}`] = aNormalY(defParamY(pid), man(pid));
+  PARAMS_ENV[_envSel].forEach((pid, i) => { ctrlState[`y_env_${i}`] = aNormalY(defParamY(pid), man(pid)); });
+  ctrlState.y_envsel_vol = _envSel === "vol" ? 1 : 0; ctrlState.y_envsel_filtro = _envSel === "filtro" ? 1 : 0;
+  radioSinte(3, Math.round(man("lfoDestino")), _radio3).forEach((v, i) => { ctrlState[`y_lfo_${i}`] = v; });
+  radioSinte(3, Math.round(man("ecoTiempo")), _radio3).forEach((v, i) => { ctrlState[`y_eco_${i}`] = v; });
+  ctrlState.y_arp_on = DBG_SINTE.ARP_ON ? 1 : 0;
+  radioSinte(4, Math.round(DBG_SINTE.ARP_PATRON), _radio4).forEach((v, i) => { ctrlState[`y_arp_pat_${i}`] = v; });
+  radioSinte(3, Math.round(DBG_SINTE.ARP_VELOCIDAD), _radio3).forEach((v, i) => { ctrlState[`y_arp_vel_${i}`] = v; });
+  radioSinte(3, Math.round(DBG_SINTE.ARP_OCTAVAS) - 1, _radio3).forEach((v, i) => { ctrlState[`y_arp_oct_${i + 1}`] = v; });
+  ctrlState.y_vol = man("volumen");
+  ctrlState.y_on = DBG_SINTE.ON ? 1 : 0;
+}
+sincronizarSinte();
+/** Texto del display del SY-40 al tocar un control (se arma solo en el gesto del usuario). */
+function textoSinte(id: string, def: CtrlDef): string {
+  const p = _posSinte.get(id);
+  if (!p) return def.label;
+  const v = ctrlState[id] ?? def.initial;
+  const valor = (pid: string, nombre: string): string => {
+    const d = defParamY(pid), r = valorIdxY(PARAMS_SY, indiceParamY(pid));
+    if (pid === "corte") return `${nombre} ${Math.round(r)} HZ`;
+    if (pid === "desafine") return `${nombre} ${Math.round(r)} CENT.`;
+    if (pid === "lfoVel") return `${nombre} ${r.toFixed(2)} HZ`;
+    if (d.unidad === "s") return `${nombre} ${r.toFixed(2)} S`;
+    return `${nombre} ${(aNormalY(d, r) * 10).toFixed(1)}`;
+  };
+  if (id.startsWith("y_p_")) return valor(id.slice(4), p.nombreLargo);
+  if (id.startsWith("y_env_")) { const i = Number(id.slice(6)); return valor(PARAMS_ENV[_envSel][i], `ENV. ${_envSel === "vol" ? "VOLUMEN" : "FILTRO"} · ${p.nombreLargo}`); }
+  if (id.startsWith("y_tecla_")) return `NOTA ${nombreNotaY(notaDeSemitono(Number(id.slice(8))))}`;
+  if (id.startsWith("y_eco_")) { const i = Number(id.slice(6)); return `ECO ${NOMBRES_TIEMPO_ECO[i]} = ${Math.round(tiempoEcoS(DBG_RITMOS.BPM, i, DBG_SINTE.ECO_MAX_S) * 1000)} MS`; }
+  if (id.startsWith("y_lfo_")) return `LFO DESTINO ${DESTINOS_LFO[Number(id.slice(6))]}`;
+  if (id.startsWith("y_o1_") || id.startsWith("y_o2_")) return `OSC ${id[3]} ${FORMAS[Number(id.slice(5))]}`;
+  if (id.startsWith("y_son_")) return `SONIDO ${nombreSonido(id.slice(6))}`;
+  if (id.startsWith("y_arp_pat_")) return `ARPEGIO ${PATRONES_ARP[Number(id.slice(10))]}`;
+  if (id.startsWith("y_arp_vel_")) return `ARPEGIO ${VELOCIDADES_ARP[Number(id.slice(10))]}`;
+  if (id === "y_arp_on") return v > 0.5 ? (SINTE.arpActivo ? "ARPEGIADOR ON · MANTENÉ UN ACORDE" : "ARPEGIADOR ON · TOCÁ PLAY EN LA CAJA") : "ARPEGIADOR OFF";
+  if (id === "y_oct_mas" || id === "y_oct_menos") return `OCTAVA ${DBG_SINTE.OCTAVA} · LA TECLA DO ES DO${DBG_SINTE.OCTAVA}`;
+  if (id === "y_vol") return `VOLUMEN ${(v * 10).toFixed(1)}`;
+  if (id === "y_on") return `SALIDA DEL SINTE ${v > 0.5 ? "ON" : "OFF"}`;
+  return p.nombreLargo;
+}
+/**
+ * Z101: motor del SY-40 montado con su atril: se suscribe al reloj del núcleo al montar y libera todo al desmontar; en
+ * cada cuadro sigue el transporte de la caja (arpegiar o tocar directo) y, si algo cambió desde afuera (menú), resincroniza
+ * los controles. TecladoSinte: el piano de la computadora y MIDI.
+ */
+function MotorSinte() {
+  const ver = useRef(-1);
+  useEffect(() => {
+    const limpiar = instalarSinte();
+    ATRIL_SINTE.visible = true;
+    return () => { _teclaPad.fill(-1); limpiar(); ATRIL_SINTE.visible = false; };
+  }, []);
+  useFrame(() => {
+    tickSinte();
+    if (SINTE.version !== ver.current) { ver.current = SINTE.version; sincronizarSinte(); }
+  });
+  return <TecladoSinte />;
+}
+const TEXTO_PLACA_SINTE = TEXTO_PLACA_Y(NOMBRE_EMPRESA_MAYUS);   // Z101
+
 /** Z96: cambia el diseño o la escala de etiquetas desde el menú (LecternSystem remonta el atril o rehace la serigrafía). */
 export function cambiarAtrilSonido(remontar: boolean): void {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("alight:atril-sonido-cambio", { detail: { remontar } }));
@@ -2224,13 +2353,15 @@ function LecternBody({ side, silkV = 0 }: { side: Lado; silkV?: number }) {
   const nuevoSonido = side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO;
   const nuevoImagen = side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO;   // Z97
   const esBajo = side === "bajo";                                        // Z99
+  const esSinte = side === "sinte";                                      // Z101
   useEffect(() => {
     if (LABEL_MODE !== "silkscreen") return;
     let cancelled = false;
     let propia: THREE.CanvasTexture | null = null;
-    (nuevoSonido ? buildSilkscreenSonido({ CW: CPANEL_W, CD: CPANEL_D, KNOB_SKIRT_R, THUMB_W })
+    (esSinte ? buildSilkscreenSinte({ CW: CPANEL_W, CD: CPANEL_D })   // Z101
+      : (nuevoSonido ? buildSilkscreenSonido({ CW: CPANEL_W, CD: CPANEL_D, KNOB_SKIRT_R, THUMB_W })
       : nuevoImagen ? buildSilkscreenImagen({ CW: CPANEL_W, CD: CPANEL_D })
-      : side === "bajo" ? buildSilkscreenBajo({ CW: CPANEL_W, CD: CPANEL_D }) : buildSilkscreen(side)).then(tex => {
+      : side === "bajo" ? buildSilkscreenBajo({ CW: CPANEL_W, CD: CPANEL_D }) : buildSilkscreen(side as "left" | "right"))).then(tex => {
       if (cancelled) { tex.dispose(); return; }
       propia = tex;
       if (silkMatRef.current) {
@@ -2242,7 +2373,7 @@ function LecternBody({ side, silkV = 0 }: { side: Lado; silkV?: number }) {
       cancelled = true;
       if (propia) { if (silkMatRef.current?.map === propia) silkMatRef.current.map = null; propia.dispose(); }
     };
-  }, [side, nuevoSonido, nuevoImagen, esBajo, silkV]);
+  }, [side, nuevoSonido, nuevoImagen, esBajo, esSinte, silkV]);
 
   return (
     <group>
@@ -2257,11 +2388,12 @@ function LecternBody({ side, silkV = 0 }: { side: Lado; silkV?: number }) {
         <primitive object={CHROME_MAT} attach="material" />
       </mesh>
       {/* J5: retro branded apron between the legs (front / user side) */}
-      <LecternApron side={side === "bajo" ? "right" : side} topY={LEG_H - 0.03} />
+      <LecternApron side={side === "bajo" || side === "sinte" ? "right" : side} topY={LEG_H - 0.03} />
       {/* Z96: placa con el nombre del equipo en la cara frontal del mueble (como la CR-80) */}
       {nuevoSonido && <PlacaFrenteSonido y={LEG_H - 0.03 - 0.12} z={0.0135} ancho={0.80} />}
       {nuevoImagen && <PlacaFrenteSonido y={LEG_H - 0.03 - 0.12} z={0.0135} ancho={0.80} nombre={NOMBRE_EQUIPO_I} descripcion={DESCRIPCION_EQUIPO_I} />}
       {esBajo && <PlacaFrenteSonido y={LEG_H - 0.03 - 0.12} z={0.0135} ancho={0.80} nombre={NOMBRE_EQUIPO_B} descripcion={DESCRIPCION_EQUIPO_B} />}
+      {esSinte && <PlacaFrenteSonido y={LEG_H - 0.03 - 0.12} z={0.0135} ancho={0.80} nombre={NOMBRE_EQUIPO_Y} descripcion={DESCRIPCION_EQUIPO_Y} />}
 
       {/* ── Top plate group: tilted, front (+Z) lower, back (-Z) higher ───── */}
       {/* Pivot at local +Z = front edge; rotation.x = +TILT_RAD lowers +Z */}
@@ -2306,7 +2438,7 @@ function LecternBody({ side, silkV = 0 }: { side: Lado; silkV?: number }) {
             </mesh>
           )}
           {/* J5: retro brand guard on the rear bar's user-facing side */}
-          <LecternRearStrip side={side === "bajo" ? "right" : side} faceZ={-(OUTER_D / 2 - REAR_BAR_D)} plateTopY={PANEL_T / 2} height={REAR_BAR_EXTRA} />
+          <LecternRearStrip side={side === "bajo" || side === "sinte" ? "right" : side} faceZ={-(OUTER_D / 2 - REAR_BAR_D)} plateTopY={PANEL_T / 2} height={REAR_BAR_EXTRA} />
         </group>
       </group>
     </group>
@@ -2333,7 +2465,7 @@ function Lectern({
 
   // Dev: verify front dot-product with toCenter > 0.99
   useEffect(() => {
-    if (process.env.NODE_ENV !== "development" || side === "bajo") return;
+    if (process.env.NODE_ENV !== "development" || side === "bajo" || side === "sinte") return;
     const frontWorld = new THREE.Vector2(Math.sin(yaw), Math.cos(yaw)); // local +Z in XZ
     const toCenter2D = new THREE.Vector2(-sign, 0);                     // unit vec toward center
     const dot = frontWorld.dot(toCenter2D);
@@ -2373,6 +2505,12 @@ function Lectern({
       poseRef.current.position.set(p.x, TARIMA_H_REF, p.z);
       poseRef.current.rotation.set(0, p.yaw, 0);
     }
+    // Z101: el SY-40 igual, con poseInstrumento(−1)
+    if (side === "sinte" && poseRef.current) {
+      const p = poseLado("sinte");
+      poseRef.current.position.set(p.x, TARIMA_H_REF, p.z);
+      poseRef.current.rotation.set(0, p.yaw, 0);
+    }
   });
 
   // Reverse lookup: controlId → keyLetter (only when this side is active)
@@ -2394,6 +2532,13 @@ function Lectern({
           </mesh>
         )}
         {side === "bajo" && <MotorBajo />}
+        {/* Z101: el SY-40 también está fuera de la tarima (índice −1 del arco): pedestal y motor */}
+        {side === "sinte" && (
+          <mesh position={[0, -TARIMA_H_REF / 2, 0]} material={PEDESTAL_MAT}>
+            <boxGeometry args={[OUTER_W * 0.92, TARIMA_H_REF, OUTER_D * 0.92]} />
+          </mesh>
+        )}
+        {side === "sinte" && <MotorSinte />}
 
         {/* SpotLight: above and slightly toward user (local +Z), aimed at plate centre */}
         <spotLight
@@ -2411,7 +2556,7 @@ function Lectern({
         <group position={[0, LEG_H, PANEL_D / 2]} rotation={[TILT_RAD, 0, 0]}>
           <group position={[0, PANEL_T + CPANEL_T, -PANEL_D / 2]}>
             {/* J3: section frames + labels — skipped in silkscreen mode */}
-            {LABEL_MODE === "mesh" && (side === "left" ? IMAGE_SECTIONS : side === "bajo" ? [] : SOUND_SECTIONS).map(sec => {
+            {LABEL_MODE === "mesh" && (side === "left" ? IMAGE_SECTIONS : side === "bajo" || side === "sinte" ? [] : SOUND_SECTIONS).map(sec => {
               const vBack  = sec.band === "B" ? BAND_B_V_BACK  : BAND_A_V_BACK;
               const vFront = sec.band === "A" ? -0.02 : BAND_B_V_FRONT;
               const zBack  = -vBack;
@@ -2459,7 +2604,7 @@ function Lectern({
             })}
             {/* J3 debug: cell grid overlay */}
             {process.env.NODE_ENV === "development" && DBG_LECTERNS.showSections &&
-              (side === "left" ? IMAGE_SECTIONS : side === "bajo" ? [] : SOUND_SECTIONS).flatMap(sec =>
+              (side === "left" ? IMAGE_SECTIONS : side === "bajo" || side === "sinte" ? [] : SOUND_SECTIONS).flatMap(sec =>
                 (sec.band === "AB" ? [] :
                   [sec.band === "A" ? ROW1_V_A : ROW1_V_B, sec.band === "A" ? ROW2_V_A : ROW2_V_B]
                 ).flatMap(v =>
@@ -2489,6 +2634,9 @@ function Lectern({
             {/* Z99: BA-40: display con la curva del filtro, VU de SALIDA y placa de la barra (leyenda 1 · 2 · 3) */}
             {side === "bajo" && <><DisplayBajo /><VuBajo />{LAYOUT_B.conCara && <CaraBajo />}</>}
             {side === "bajo" && <PlacaBarraSonido texto={TEXTO_PLACA_BAJO} leyenda={LEYENDA_FILAS_B} conLeyenda={DBG_ATRIL_BAJO.ROTULOS_FILA} />}
+            {/* Z101: SY-40: display con la onda y el filtro, VU y placa de la barra (leyenda 1 · 2 · 3 · 4 · 5) */}
+            {side === "sinte" && <><DisplaySinte /><VuSinte /></>}
+            {side === "sinte" && <PlacaBarraSonido texto={TEXTO_PLACA_SINTE} leyenda={LEYENDA_FILAS_Y} conLeyenda={DBG_ATRIL_SINTE.ROTULOS_FILA} />}
             {/* Z97: atril de imagen: display, placa de la barra y rótulos DOMO · IMAGEN */}
             {side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO && <DisplayImagen />}
             {side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO && (
@@ -2648,6 +2796,13 @@ function InteractionHandler() {
         return;
       }
 
+      // Z101: doble clic en una perilla o el fader del SY-40 → el valor del sonido cargado (CtrlDef.defecto)
+      if ((def.type === "knob" || def.type === "slider") && def.defecto && esDobleClic(_dobleClic, def.id, performance.now())) {
+        setCtrl(def.id, def.defecto(), def);
+        playUIClick(900, 0.08);
+        return;
+      }
+
       // Z96: doble clic / doble toque sobre una perilla o el fader del atril de sonido → valor por defecto
       // Z97: también perillas y faders del atril de imagen nuevo (vuelven a su valor inicial)
       if ((def.type === "knob" || def.type === "slider")
@@ -2671,7 +2826,7 @@ function InteractionHandler() {
         } else {
           _pressAt[def.id] = performance.now();
           setCtrl(def.id, 1, def);
-          playUIClick(1200, 0.12);
+          if (!def.onSoltar) playUIClick(1200, 0.12);   // Z101: las teclas del SY-40 suenan como notas, sin el clic
           setTimeout(() => setCtrl(def.id, 0, def), 120);
           // Hold-repeat for ±-step buttons
           // Z97b: con el diseño nuevo, una pulsación = un paso (LUZ_REPETIR_AL_MANTENER true = como antes)
@@ -2717,6 +2872,7 @@ function InteractionHandler() {
       if (e.pointerId !== _drag.pointerId) return;
       try { canvas.releasePointerCapture(e.pointerId); } catch {}
       if (_drag.holdTimer) { clearInterval(_drag.holdTimer); _drag.holdTimer = null; }
+      _drag.def?.onSoltar?.();   // Z101: tecla del SY-40 → suelta la nota
       _drag.type = "none";
       LECTERN_DBG.dragType = "none";
       LECTERN_DBG.knobTooltip = null;
@@ -2733,10 +2889,11 @@ function InteractionHandler() {
       if (e.pointerId !== _drag.pointerId) return;
       try { canvas.releasePointerCapture(e.pointerId); } catch {}
       if (_drag.holdTimer) { clearInterval(_drag.holdTimer); _drag.holdTimer = null; }
+      _drag.def?.onSoltar?.();   // Z101
       _drag.type = "none"; LECTERN_DBG.dragType = "none";
       _drag.def = null; _drag.pointerId = -1;
       canvas.style.cursor = _hoveredId ? getCursorStyle(
-        ([...IMAGE_CONTROLS_NUEVO, ...IMAGE_CONTROLS, ...SOUND_CONTROLS, ...CONTROLES_BAJO].find(c => c.id === _hoveredId)?.type ?? "button")
+        ([...IMAGE_CONTROLS_NUEVO, ...IMAGE_CONTROLS, ...SOUND_CONTROLS, ...CONTROLES_BAJO, ...CONTROLES_SINTE].find(c => c.id === _hoveredId)?.type ?? "button")
       ) : "";
     };
 
@@ -2874,18 +3031,19 @@ export default function LecternSystem() {
     window.addEventListener("alight:atril-sonido-cambio", on);
     window.addEventListener("alight:atril-imagen-cambio", on);   // Z97
     window.addEventListener("alight:atril-bajo-cambio", on);     // Z99
+    window.addEventListener("alight:atril-sinte-cambio", on);    // Z101
     // Z97b: "Restaurar luces del domo" y checkpoints: la perilla INTENS. y la tecla EXTRA vuelven con los valores
     const onLuces = () => { ctrlState.dom_int = STORE.lights.globalIntensity; ctrlState.dom_star = 0; };
     window.addEventListener("alight:luces-restauradas", onLuces);
     window.addEventListener("alight:visualizador-cambio", sincronizarVis);   // Z98: estilo y paleta cambiados desde el menú
     // Z96b: con ETIQUETA_AUTO_ASPECTO, si al cambiar el tamaño de la ventana cambia la escala efectiva, se rehace la serigrafía
-    let escPrev = escalaActual(), escPrevI = escalaActualImagen(), escPrevB = escalaActualBajo();
+    let escPrev = escalaActual(), escPrevI = escalaActualImagen(), escPrevB = escalaActualBajo(), escPrevY = escalaActualSinte();
     const onResize = () => {
-      const e = escalaActual(), ei = escalaActualImagen(), eb = escalaActualBajo();
-      if (Math.abs(e - escPrev) > 0.005 || Math.abs(ei - escPrevI) > 0.005 || Math.abs(eb - escPrevB) > 0.005) { escPrev = e; escPrevI = ei; escPrevB = eb; setSilkV(v => v + 1); }
+      const e = escalaActual(), ei = escalaActualImagen(), eb = escalaActualBajo(), ey = escalaActualSinte();
+      if (Math.abs(e - escPrev) > 0.005 || Math.abs(ei - escPrevI) > 0.005 || Math.abs(eb - escPrevB) > 0.005 || Math.abs(ey - escPrevY) > 0.005) { escPrev = e; escPrevI = ei; escPrevB = eb; escPrevY = ey; setSilkV(v => v + 1); }
     };
     window.addEventListener("resize", onResize);
-    return () => { window.removeEventListener("alight:atril-sonido-cambio", on); window.removeEventListener("alight:atril-imagen-cambio", on); window.removeEventListener("alight:atril-bajo-cambio", on); window.removeEventListener("alight:luces-restauradas", onLuces); window.removeEventListener("alight:visualizador-cambio", sincronizarVis); window.removeEventListener("resize", onResize); };
+    return () => { window.removeEventListener("alight:atril-sonido-cambio", on); window.removeEventListener("alight:atril-imagen-cambio", on); window.removeEventListener("alight:atril-bajo-cambio", on); window.removeEventListener("alight:atril-sinte-cambio", on); window.removeEventListener("alight:luces-restauradas", onLuces); window.removeEventListener("alight:visualizador-cambio", sincronizarVis); window.removeEventListener("resize", onResize); };
   }, []);
 
   // I1: flip lectern orientation (debug)
@@ -2921,7 +3079,7 @@ export default function LecternSystem() {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         if (INTERACT_STATE.mode === "none" || INTERACT_STATE.mode === "ritmos") return;   // Z80: la caja de ritmos tiene pose fija
-        const side: Lado = INTERACT_STATE.mode === "image" ? "left" : INTERACT_STATE.mode === "bass" ? "bajo" : "right";   // Z99
+        const side: Lado = INTERACT_STATE.mode === "image" ? "left" : INTERACT_STATE.mode === "bass" ? "bajo" : INTERACT_STATE.mode === "synth" ? "sinte" : "right";   // Z99 · Z101
         const aspect = window.innerWidth / window.innerHeight;
         const result = fitLecternCamera(side, aspect);
         const cam    = camera as THREE.PerspectiveCamera;
@@ -2955,7 +3113,9 @@ export default function LecternSystem() {
         const dRitmos  = ATRIL_RITMOS.visible ? Math.hypot(camera.position.x - ATRIL_RITMOS.x, camera.position.z - ATRIL_RITMOS.z) : Infinity;
         // Z99: el BA-40 (slot de instrumentos detrás de la tarima)
         const dBajo    = ATRIL_BAJO.visible ? Math.hypot(camera.position.x - ATRIL_BAJO.x, camera.position.z - ATRIL_BAJO.z) : Infinity;
-        if (dRitmos < INTERACT_RANGE && dRitmos < Math.min(dLeft, dRight, dBajo)) {
+        // Z101: el SY-40 (índice −1 del arco; ATRIL_SINTE lo escribe poseAtrilSinte cada cuadro)
+        const dSinte   = ATRIL_SINTE.visible ? Math.hypot(camera.position.x - ATRIL_SINTE.x, camera.position.z - ATRIL_SINTE.z) : Infinity;
+        if (dRitmos < INTERACT_RANGE && dRitmos < Math.min(dLeft, dRight, dBajo, dSinte)) {
           INTERACT_STATE.mode = "ritmos";
           const cam = camera as THREE.PerspectiveCamera;
           INTERACT_STATE.camSaved = {
@@ -2974,12 +3134,13 @@ export default function LecternSystem() {
           return;
         }
         let side: Lado | null = null;
-        if (dBajo < INTERACT_RANGE && dBajo < Math.min(dLeft, dRight)) side = "bajo";   // Z99
+        if (dSinte < INTERACT_RANGE && dSinte < Math.min(dLeft, dRight, dBajo)) side = "sinte";   // Z101
+        else if (dBajo < INTERACT_RANGE && dBajo < Math.min(dLeft, dRight)) side = "bajo";   // Z99
         else if (dLeft  < INTERACT_RANGE) side = "left";
         else if (dRight < INTERACT_RANGE) side = "right";
         if (!side) return;
 
-        INTERACT_STATE.mode = side === "left" ? "image" : side === "bajo" ? "bass" : "sound";
+        INTERACT_STATE.mode = side === "left" ? "image" : side === "bajo" ? "bass" : side === "sinte" ? "synth" : "sound";
 
         // Save camera
         const cam = camera as THREE.PerspectiveCamera;
@@ -3023,6 +3184,7 @@ export default function LecternSystem() {
 
       // ── Keyboard shortcuts Z–M (only inside lectern mode) ─────────────────
       if (INTERACT_STATE.mode === "none" || INTERACT_STATE.mode === "ritmos") return;   // Z80: sin atajos Z–M en la caja de ritmos
+      if (INTERACT_STATE.mode === "synth") return;   // Z101: en el SY-40 el teclado es el piano (X queda para cortar la transmisión)
       if (!KEY_LETTERS.includes(key as KeyLetter)) return;
       const id = _keyMap.get(key as KeyLetter);
       if (!id) return;
@@ -3059,6 +3221,8 @@ export default function LecternSystem() {
       <Lectern key={`sonido-${disenoV}`} side="right" controls={controlesSonido()} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} silkV={silkV} />
       {/* Z99: BAJO ÁCIDO BA-40, en el slot de instrumentos junto a la caja de ritmos; sale con los otros dos */}
       {DBG_BAJO.ACTIVO && <Lectern key={`bajo-${disenoV}`} side="bajo" controls={CONTROLES_BAJO} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} silkV={silkV} />}
+      {/* Z101: SINTETIZADOR SY-40, índice −1 del arco (el lado opuesto al BA-40); sale con los demás */}
+      {DBG_SINTE.ACTIVO && <Lectern key={`sinte-${disenoV}`} side="sinte" controls={CONTROLES_SINTE} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} silkV={silkV} />}
       <InteractionHandler />
       {/* Z79: slots de los atriles de instrumentos (detrás del atril de sonido; marcadores con DBG_PLAY.MOSTRAR_SLOTS) */}
       <SlotsAtriles atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} anchoM={OUTER_W} profM={OUTER_D} />

@@ -101,13 +101,13 @@ for (const asp of [1.6, 16 / 10 + 0.06, 16 / 9, 1.9]) {
   check(p && p.legible >= A.LEGIBLE_MIN, `pantallas muy anchas (2,1): sin pose con la búsqueda de hoy; la 2.ª pasada (ancho relajado) da ${(p.legible * 100).toFixed(2)} %`); }
 // Z97: la misma exigencia, compartida con el atril de imagen nuevo (legibilidadMinimaI en la rama isImage)
 check(/: legibilidadMinima\(geoAtril\(\), cp, escalaEfectiva\(DBG_ATRIL_SONIDO\.ETIQUETA_ESCALA, DBG_ATRIL_SONIDO\.ETIQUETA_AUTO_ASPECTO, aspect\)\)\.min;\s*if \(leg < LEGIBLE_MIN\) continue;/.test(LS)
-  && /const conPasadas = nuevoSonido \|\| imagenPanel( \|\| esBajo)?;/.test(LS) && /if \(conPasadas && pasada < 3\) return fitLecternCamera\(side, aspect, pasada \+ 1\);/.test(LS),
+  && /const conPasadas = nuevoSonido \|\| imagenPanel( \|\| esBajo)?( \|\| esSinte)?;/.test(LS) && /if \(conPasadas && pasada < 3\) return fitLecternCamera\(side, aspect, pasada \+ 1\);/.test(LS),
   'fitLecternCamera exige la legibilidad con el diseño nuevo (y vuelve a la búsqueda anterior si no hay pose)');
 
 console.log('\n(f) el flag recupera el layout anterior');
 check(/function controlesSonido\(\): CtrlDef\[\] \{ return DBG_ATRIL_SONIDO\.DISENO_NUEVO \? SOUND_CONTROLS_NUEVO : SOUND_CONTROLS; \}/.test(LS), 'DISENO_NUEVO false → SOUND_CONTROLS de J3 (sin tocar)');
 check(/side === "right" && !DBG_ATRIL_SONIDO\.DISENO_NUEVO && <PlayGrande \/>/.test(LS), '…con el botón grande de Z79');
-check(/\(nuevoSonido \? buildSilkscreenSonido\(\{[^}]*\}\)\s*: nuevoImagen \? buildSilkscreenImagen\(\{[^}]*\}\)(\s*: side === \"bajo\" \? buildSilkscreenBajo\(\{[^}]*\}\))? : buildSilkscreen\(side\)\)/.test(LS), '…y la serigrafía anterior (buildSilkscreen intacta)');
+check(/\(nuevoSonido \? buildSilkscreenSonido\(\{[^}]*\}\)\s*: nuevoImagen \? buildSilkscreenImagen\(\{[^}]*\}\)(\s*: side === \"bajo\" \? buildSilkscreenBajo\(\{[^}]*\}\))? : buildSilkscreen\(side( as "left" \| "right")?\)\)/.test(LS), '…y la serigrafía anterior (buildSilkscreen intacta)');
 check(/const SOUND_SECTIONS: SecDef\[\] = \[/.test(LS) && /validateLayout\(SOUND_CONTROLS, SOUND_SECTIONS\);/.test(LS), 'el código viejo sigue (secciones y validación)');
 check(/key=\{`sonido-\$\{disenoV\}`\}/.test(LS), 'cambiar el flag remonta el atril de sonido (mallas y serigrafía limpias)');
 // Z97: el atril de imagen tiene su propio rediseño (scripts/atril-imagen-test.mjs); con DBG_ATRIL_VIDEO.DISENO_NUEVO false es el de antes
@@ -242,7 +242,7 @@ console.log('\nZ96b (g) ajuste por proporción de pantalla');
   const T = A.textos(1.15), malos = [];
   for (const t of T) { const r = A.rectTexto(t); for (const p of A.POSICIONES) if (A.seSuperponen(r, A.huella(p))) malos.push(t.id); }
   check(malos.length === 0, 'a × 1,15 ningún texto pisa controles (el acotado por lugar lo evita)');
-  check(/escPrev = e;( escPrevI = ei;)?( escPrevB = eb;)? setSilkV\(v => v \+ 1\);/.test(LS) && /window\.removeEventListener\("resize", onResize\)/.test(LS), 'al cambiar el tamaño de la ventana, si cambia la escala se rehace la serigrafía (y se quita el listener)'); }
+  check(/escPrev = e;( escPrevI = ei;)?( escPrevB = eb;)?( escPrevY = ey;)? setSilkV\(v => v \+ 1\);/.test(LS) && /window\.removeEventListener\("resize", onResize\)/.test(LS), 'al cambiar el tamaño de la ventana, si cambia la escala se rehace la serigrafía (y se quita el listener)'); }
 
 console.log('\nZ96b (h) el flag recupera el diseño anterior con sus 28 controles');
 { check(/function controlesSonido\(\): CtrlDef\[\] \{ return DBG_ATRIL_SONIDO\.DISENO_NUEVO \? SOUND_CONTROLS_NUEVO : SOUND_CONTROLS; \}/.test(LS) && ORIG.length === 28, 'DISENO_NUEVO false → SOUND_CONTROLS (28 controles originales)');
