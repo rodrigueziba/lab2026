@@ -1887,6 +1887,41 @@ export const DBG_ATRIL_SINTE = {
   ROTULOS_MODO:           "barra" as string,   // "barra" (leyenda en la placa de la barra) — live
 };
 
+// ── Z103: SAMPLER SM-40 (motor lib/audio/sampler.ts, lógica pura lib/sampler.ts, atril lib/atrilSampler.ts) ──
+export const DBG_SAMPLER = {
+  ACTIVO:                  true,     // false = sin sampler (no crea el grafo ni se suscribe al reloj) — vale al montar
+  SAMPLER_VOCES:           8,        // ranuras base preasignadas (una por pad); el grupo es max(VOCES, MAX_SIMULTANEAS) — vale al reiniciar
+  SAMPLER_MAX_SIMULTANEAS: 12,       // tope de fuentes vivas a la vez (la nueva roba la más antigua con ~8 ms de caída) — live
+  SAMPLER_MAX_S:           8,        // duración máxima de una grabación (corte automático) — live
+  QUANT:                   0,        // 0 OFF, 1 = 1/16, 2 = 1/4, 3 = COMPÁS (solo con la caja sonando) — live
+  ON:                      true,     // ON del módulo SALIDA — live
+  CORTE_MIN:               200,      // Hz (rango del filtro de salida)
+  CORTE_MAX:               16000,    // Hz
+  RES_MAX:                 4,        // Q máximo del filtro de salida (suave: oscurece sin silbar)
+  ROBO_S:                  0.008,    // caída de una fuente robada o soltada (s)
+  LOOKAHEAD_S:             0.005,    // margen de los disparos inmediatos (s)
+  FUENTE_GRAB:             0,        // 0 MIC, 1 MEZCLA — live
+  // valores por defecto (PARAMS_SAMPLER: id → clave); los por pad valen para los 8 (el DRON de fábrica arranca con LOOP)
+  CORTE:                   7000,     // Hz
+  RESONANCIA:              0.15,
+  VOLUMEN:                 0.75,
+  AFINACION:               0,        // semitonos
+  INICIO:                  0,
+  FIN:                     1,
+  VOL_PAD:                 0.8,
+  LOOP:                    0,
+  REVERSA:                 0,
+  MODO:                    0,        // 0 DISPARO, 1 MIENTRAS
+};
+export const DBG_ATRIL_SAMPLER = {
+  ETIQUETA_ESCALA:        1.0,      // multiplica títulos y etiquetas — live (rehace la serigrafía)
+  ETIQUETA_AUTO_ASPECTO:  true,     // proporción < 1,6: hasta × 1,15 — live
+  DISPLAY_VALOR_S:        2.5,      // s que el display muestra el control tocado — live
+  VU_HZ:                  30,       // tope de actualización del VU, el display y las luces — live
+  ROTULOS_FILA:           true,     // leyenda "1 PADS · 2 GRABAR · 3 EDITAR PAD · 4 SALIDA" en la placa y números en los títulos — live
+  ROTULOS_MODO:           "barra" as string,   // "barra" (leyenda en la placa de la barra) — live
+};
+
 // ── Z87: fuente de video de la tarima y visualizador de ondas sin webcam (lib/ondasTarima.ts, lib/fuenteVideoTarima.ts) ──
 // (DBG_ONDAS ya existe: son las ondas por kick del domo de SILLAS, Z52; por eso este se llama DBG_ONDAS_TARIMA.)
 export const DBG_ONDAS_TARIMA = {

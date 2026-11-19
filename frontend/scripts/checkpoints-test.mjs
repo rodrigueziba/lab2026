@@ -52,6 +52,7 @@ instalarAcciones({
   frenteAtrilImagen: () => { MUNDO.frenteAtril = true; return true; },
   frenteAtrilBajo: () => { MUNDO.frenteAtril = true; return true; },
   frenteAtrilSinte: () => { MUNDO.frenteAtril = true; return true; },   // Z101
+  frenteAtrilSampler: () => { MUNDO.frenteAtril = true; return true; },   // Z103
 });
 // un frame del mundo: remontaje pedido → monta en el frame siguiente; zonas del Player; diálogo bajo la luz
 function frame(dt = 1 / 60) {
@@ -67,7 +68,7 @@ function frame(dt = 1 / 60) {
 const hasta = (cond, max = 2000) => { let n = 0; while (!cond() && n++ < max) frame(); return n; };
 
 console.log('\nregistro');
-check(CHECKPOINTS.length === 22, `22 checkpoints (Z48: + dia_mediodia, dia_atardecer, dia_noche · Z54: + dia_prisma_sube, dia_flor, dia_prisma_baja · Z95: + sillas_recibir, tarima_compartir · Z96: + atril_sonido · Z97: + atril_imagen · Z99: + atril_bajo · Z101: + atril_sinte): ${CHECKPOINTS.map(c => c.id).join(', ')}`);
+check(CHECKPOINTS.length === 23, `23 checkpoints (Z103: + atril_sampler · Z48: + dia_mediodia, dia_atardecer, dia_noche · Z54: + dia_prisma_sube, dia_flor, dia_prisma_baja · Z95: + sillas_recibir, tarima_compartir · Z96: + atril_sonido · Z97: + atril_imagen · Z99: + atril_bajo · Z101: + atril_sinte): ${CHECKPOINTS.map(c => c.id).join(', ')}`);
 check(CHECKPOINTS.every(c => c.pasos[0][0] === 'base' && c.pasos[1][0] === 'remontar' && c.pasos[2][0] === 'base' && c.pasos[3][0] === 'spawn'), 'todos empiezan por base → remontar → base → spawn');
 check(!irACheckpoint('no_existe') && CK_STATE.fase === 'inactivo', 'id inexistente: false y no hace nada');
 

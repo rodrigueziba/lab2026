@@ -328,7 +328,7 @@ console.log('\n(h) layout del atril SY-40');
     const p = Y.buscarPoseSinte(g, a, S.escalaEfectiva(1, true, a));
     check(!!p && p.pasada < 3 && p.legible >= S.LEGIBLE_MIN, `${nom}: cámara del modo atril fov ${p?.fov}° h ${p?.height.toFixed(2)} d ${p?.dist.toFixed(2)} pitch ${p?.pitch}° → texto más lejano ${(100 * (p?.legible ?? 0)).toFixed(2)} % (≥ 2,5 %)`);
   }
-  check(/legibilidadMinimaY\(geoAtril\(\), cp, escalaEfectiva\(DBG_ATRIL_SINTE\.ETIQUETA_ESCALA/.test(LS) && /const conPasadas = nuevoSonido \|\| imagenPanel \|\| esBajo \|\| esSinte;/.test(LS),
+  check(/legibilidadMinimaY\(geoAtril\(\), cp, escalaEfectiva\(DBG_ATRIL_SINTE\.ETIQUETA_ESCALA/.test(LS) && /const conPasadas = nuevoSonido \|\| imagenPanel \|\| esBajo \|\| esSinte( \|\| esSampler)?;/   /* Z103: + SM-40 */.test(LS),
     'fitLecternCamera: el SY-40 busca como el de sonido y exige legibilidadMinimaY');
   check(Y.TEXTO_PLACA_Y("IN-GO'S WAN INC.") === "SINTETIZADOR SY-40 · IN-GO'S WAN INC. · SINTETIZADOR POLIFÓNICO · 5 MÓDULOS" && /TEXTO_PLACA_Y\(NOMBRE_EMPRESA_MAYUS\)/.test(LS)
     && /<PlacaBarraSonido texto=\{TEXTO_PLACA_SINTE\} leyenda=\{LEYENDA_FILAS_Y\}/.test(LS) && /esSinte && <PlacaFrenteSonido [^\n]*nombre=\{NOMBRE_EQUIPO_Y\}/.test(LS),

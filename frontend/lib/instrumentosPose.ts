@@ -10,6 +10,7 @@ import {
 } from "@/lib/instrumentosDisposicion";
 import { ATRIL_BAJO } from "@/lib/atrilBajo";
 import { ATRIL_SINTE } from "@/lib/atrilSinte";   // Z101
+import { ATRIL_SAMPLER } from "@/lib/atrilSampler";   // Z103
 
 /** Geometría de la tarima y del atril de sonido (la registra LecternSystem al cargar; estos son los valores de hoy). */
 export const GEO_INSTRUMENTOS = { atrilX: 1.6, tarimaMedia: 3.192 / 2, tarimaH: 0.267 };
@@ -112,5 +113,18 @@ export const INDICE_SINTE = -1;
 export function poseAtrilSinte(out: PoseSlot): PoseSlot {
   if (poseInstrumento(INDICE_SINTE, out)) { ATRIL_SINTE.x = out.x; ATRIL_SINTE.z = out.z; ATRIL_SINTE.yaw = out.yaw; }
   else { out.x = ATRIL_SINTE.x; out.z = ATRIL_SINTE.z; out.yaw = ATRIL_SINTE.yaw; }
+  return out;
+}
+
+/** Z103: índice del SAMPLER SM-40 en el arco (reservado en Z99b). */
+export const INDICE_SAMPLER = 2;
+/**
+ * Z103: pose del SM-40. Única fuente: poseInstrumento(2) (con "arco", el arco; con "linea", el slot de la línea de Z88
+ * que corresponde a +2). La usan el atril y su pedestal, el aviso "E", la tecla E, la cámara del modo atril y el
+ * checkpoint. Escribe ATRIL_SAMPLER (la posición viva que leen el aviso "E" y la tecla E).
+ */
+export function poseAtrilSampler(out: PoseSlot): PoseSlot {
+  if (poseInstrumento(INDICE_SAMPLER, out)) { ATRIL_SAMPLER.x = out.x; ATRIL_SAMPLER.z = out.z; ATRIL_SAMPLER.yaw = out.yaw; }
+  else { out.x = ATRIL_SAMPLER.x; out.z = ATRIL_SAMPLER.z; out.yaw = ATRIL_SAMPLER.yaw; }
   return out;
 }

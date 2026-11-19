@@ -23,7 +23,8 @@ export type CheckpointId =
   | "atril_sonido"                           // Z96: probar el atril de sonido rediseñado
   | "atril_imagen"                           // Z97: probar el atril de imagen rediseñado
   | "atril_bajo"                             // Z99: probar el BAJO ÁCIDO BA-40
-  | "atril_sinte";                           // Z101: probar el SINTETIZADOR SY-40
+  | "atril_sinte"                            // Z101: probar el SINTETIZADOR SY-40
+  | "atril_sampler";                         // Z103: probar el SAMPLER SM-40
 
 /** ["accion", ...args] */
 export type Paso = readonly [string, ...(string | number)[]];
@@ -107,6 +108,10 @@ export const CHECKPOINTS: readonly Checkpoint[] = [
   { id: "atril_bajo", nombre: "Atril del bajo", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
       ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["esperarFrames", 3], ["frenteAtrilBajo"], ["esperarFrames", 2]],
     descripcion: "Atriles afuera (sin diálogo ni transmisión), frente al BAJO ÁCIDO BA-40: tocá play en la caja de ritmos y apretá E en el bajo." },
+  // Z103: igual, frente al SAMPLER SM-40 (índice +2 del arco)
+  { id: "atril_sampler", nombre: "Atril del sampler", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
+      ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["esperarFrames", 3], ["frenteAtrilSampler"], ["esperarFrames", 2]],
+    descripcion: "Atriles afuera (sin diálogo ni transmisión), frente al SAMPLER SM-40: apretá E y tocá los pads con F G H J / V B N M; grabar es opcional." },
   // Z101: igual, frente al SINTETIZADOR SY-40 (índice −1 del arco, el lado opuesto al BA-40)
   { id: "atril_sinte", nombre: "Atril del sintetizador", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
       ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["esperarFrames", 3], ["frenteAtrilSinte"], ["esperarFrames", 2]],

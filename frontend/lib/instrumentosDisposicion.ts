@@ -25,7 +25,7 @@ export const ORDEN_SLOTS: Readonly<Record<number, { id: string; nombre: string; 
   [-1]: { id: "sintetizador", nombre: "SINTETIZADOR SY-40", ocupado: true },   // Z101
   [0]:  { id: "ritmos",       nombre: "CAJA DE RITMOS", ocupado: true },
   [1]:  { id: "bajo",         nombre: "BAJO ÁCIDO BA-40", ocupado: true },
-  [2]:  { id: "sampler",      nombre: "SAMPLER SM-40 (Z102, reservado)", ocupado: false },
+  [2]:  { id: "sampler",      nombre: "SAMPLER SM-40", ocupado: true },   // Z103
   [3]:  null,
 };
 

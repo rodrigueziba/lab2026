@@ -2,7 +2,7 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_BAJO, DBG_ATRIL_BAJO, DBG_INSTRUMENTOS, DBG_CARA, DBG_SINTE, DBG_ATRIL_SINTE } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_BAJO, DBG_ATRIL_BAJO, DBG_INSTRUMENTOS, DBG_CARA, DBG_SINTE, DBG_ATRIL_SINTE, DBG_SAMPLER, DBG_ATRIL_SAMPLER } from "@/lib/debugConfig";
 import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent, modoActual } from "@/lib/consentTarimaAcciones";   // Z91
 import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit, alternarPanelCuadro, panelCuadroVisible } from "@/lib/vivo/publicarLiveKit";   // Z92 · Z94b
 import { sesionIdNavegador } from "@/lib/vivo/vivoAcciones";   // Z92
@@ -20,6 +20,8 @@ import { irAInstrumento } from "@/lib/checkpointsAcciones";                     
 import { CARA, EST as EST_CARA, encenderCara, apagarCara, calibrarCara, olvidarCalibracion } from "@/lib/caraBajo";   // Z100
 import { NOMBRES_GESTO } from "@/lib/cara";                                                  // Z100
 import { SINTE, PARAMS_SY, VOCES, MANTENIDAS, ARP, cargarSonidoSinte, setParamSinte, aplicarOpcionesSinte, silenciarYReiniciarSinte, notaAbajo, notaArriba, bpmSinte } from "@/lib/audio/sinte";   // Z101
+import { SAMPLER, EST as EST_SAMPLER, RANURAS, silenciarYReiniciarSampler, padAbajo, padArriba, seleccionarPad, setParamSampler, aplicarOpcionesSampler, grabar, pararGrabacion, borrarPad } from "@/lib/audio/sampler";   // Z103
+import { PARAMS_SAMPLER, QUANTS, FUENTES_GRAB, N_PADS, manualIdx as manualIdxSampler } from "@/lib/sampler";   // Z103
 import { PARAMS_SINTE, NOMBRES_SONIDO, PATRONES_ARP, VELOCIDADES_ARP, nombreSonido, nombreNota as nombreNotaSinte, indiceParam as indiceParamSinte } from "@/lib/sinte";   // Z101
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
 import { useDbg } from "../contexto";
@@ -989,6 +991,78 @@ export function SecSinteZ101() {
             </div>
           ))}
           <div style={{ ...ROW, ...NOTE }}><span>ROTULOS_MODO {A.ROTULOS_MODO} (leyenda en la placa de la barra) · doble clic en perillas y fader: el valor del sonido cargado · en el modo del SY-40 no hay atajos Z–M (el teclado es el piano)</span></div>
+    </>
+  );
+}
+
+// sección: sampler-z103
+export function SecSamplerZ103() {
+  // Z103: SAMPLER SM-40 (motor lib/audio/sampler.ts). Estado 4 veces por segundo.
+  const S = DBG_SAMPLER, A = DBG_ATRIL_SAMPLER;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const avisar = (remontar: boolean) => window.dispatchEvent(new CustomEvent("alight:atril-sampler-cambio", { detail: { remontar } }));
+  const sel = EST_SAMPLER.sel;
+  const probar = () => { const p = sel; padAbajo(p); setTimeout(() => padArriba(p), 700); };
+  return (
+    <>
+          <span style={LABEL}>Sampler Z103 <span style={NOTE}>(SM-40 · probar con el checkpoint «Atril del sampler» o ?cp=atril_sampler · E entra, Q sale · pads: F G H J / V B N M · todo queda solo en memoria: nada se sube ni se guarda)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>pad {sel + 1} {SAMPLER.nombres[sel]}{SAMPLER.grabado[sel] ? " (grabado)" : ""} · voces vivas {SAMPLER.vivas}/{S.SAMPLER_MAX_SIMULTANEAS} (ranuras {RANURAS.n}) · grabación {SAMPLER.estadoGrab}{SAMPLER.estadoGrab === "grabando" ? ` ${SAMPLER.grabS.toFixed(1)} s` : ""} · memoria de muestras {(SAMPLER.memoriaBytes / 1048576).toFixed(2)} MB · disparos {SAMPLER.disparos} · robos {SAMPLER.robos} · grafo {SAMPLER.listo ? "listo" : "sin crear (nace con la primera acción)"}</span></div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); silenciarYReiniciarSampler(); toca(); }}>Silenciar y reiniciar sampler</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); irAInstrumento(2); }}>Ir al SM-40</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); probar(); toca(); }}>Probar pad {sel + 1}</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); if (SAMPLER.estadoGrab === "libre") grabar(); else pararGrabacion(); toca(); }}>{SAMPLER.estadoGrab === "libre" ? "Grabar" : "Parar"}</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); borrarPad(); toca(); }}>Borrar pad {sel + 1}</button>
+          </div>
+          <div style={ROW}>
+            <span>PAD</span>
+            {Array.from({ length: N_PADS }, (_, i) => <button key={i} style={{ ...INPUT, opacity: sel === i ? 1 : 0.5 }} onClick={() => { seleccionarPad(i); toca(); }}>{i + 1} {SAMPLER.nombres[i]}</button>)}
+          </div>
+          <div style={ROW}>
+            <span>QUANT</span>
+            {QUANTS.map((q, i) => <button key={q} style={{ ...INPUT, opacity: S.QUANT === i ? 1 : 0.5 }} onClick={() => { S.QUANT = i; aplicarOpcionesSampler(); toca(); }}>{q}</button>)}
+            <span>FUENTE</span>
+            {FUENTES_GRAB.map((q, i) => <button key={q} style={{ ...INPUT, opacity: S.FUENTE_GRAB === i ? 1 : 0.5 }} onClick={() => { S.FUENTE_GRAB = i; aplicarOpcionesSampler(); toca(); }}>{q}</button>)}
+          </div>
+          {([["ACTIVO", "off = sin sampler (vale al remontar)"], ["ON", "ON del módulo SALIDA"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); S[k] = !S[k]; aplicarOpcionesSampler(); if (k === "ACTIVO") avisar(true); toca(); }}>{S[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([["SAMPLER_VOCES", 1, 16, 1, "ranuras base (vale al «Silenciar y reiniciar»)"], ["SAMPLER_MAX_SIMULTANEAS", 1, 32, 1, "tope de fuentes vivas"], ["SAMPLER_MAX_S", 1, 20, 0.5, "duración máxima de una grabación (s)"],
+            ["CORTE_MIN", 50, 1000, 10, "Hz"], ["CORTE_MAX", 2000, 20000, 100, "Hz"], ["RES_MAX", 0.6, 12, 0.1, "Q máximo del filtro de salida"], ["ROBO_S", 0.002, 0.05, 0.001, "caída de una fuente robada o soltada (s)"],
+            ["LOOKAHEAD_S", 0, 0.1, 0.005, "margen de los disparos inmediatos (s)"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{S[k].toFixed(st < 1 ? 3 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={S[k]} onChange={ev => { S[k] = parseFloat(ev.target.value); aplicarOpcionesSampler(); toca(); }} />
+            </div>
+          ))}
+          {/* parámetros (globales y del pad seleccionado): van por setParamSampler(id, valor, "manual"), los mismos que mueve el atril */}
+          {PARAMS_SAMPLER.map((d, i) => (
+            <div key={d.id} style={ROW}>
+              <span>{d.porPad ? `PAD ${sel + 1} ` : ""}{d.nombre} <span style={NOTE}>{manualIdxSampler(EST_SAMPLER, i, sel).toFixed(d.max > 50 ? 0 : 2)}</span></span>
+              <input type="range" min={d.min} max={d.max} step={d.curva === "paso" ? 1 : (d.max - d.min) / 400} style={{ flex: 1 }} value={manualIdxSampler(EST_SAMPLER, i, sel)}
+                onChange={ev => { setParamSampler(d.id, parseFloat(ev.target.value), "manual"); toca(); }} />
+            </div>
+          ))}
+          <span style={LABEL}>Atril SM-40</span>
+          {([["ETIQUETA_ESCALA", 0.7, 1.4, 0.05, "títulos y etiquetas (rehace la serigrafía)"], ["DISPLAY_VALOR_S", 0.5, 8, 0.5, "s del control tocado en el display"], ["VU_HZ", 5, 60, 1, "tope del VU, el display y las luces"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{A[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={A[k]}
+                onChange={ev => { A[k] = parseFloat(ev.target.value); toca(); }} onPointerUp={() => avisar(false)} onKeyUp={() => avisar(false)} />
+            </div>
+          ))}
+          {([["ROTULOS_FILA", "leyenda 1 PADS · 2 GRABAR · 3 EDITAR PAD · 4 SALIDA y números en los títulos"], ["ETIQUETA_AUTO_ASPECTO", "proporción < 1,6: etiquetas hasta × 1,15"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); A[k] = !A[k]; avisar(false); toca(); }}>{A[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          <div style={{ ...ROW, ...NOTE }}><span>ROTULOS_MODO {A.ROTULOS_MODO} · en el modo del SM-40 no hay atajos Z–M (V B N M son pads; X sigue cortando la transmisión)</span></div>
     </>
   );
 }
