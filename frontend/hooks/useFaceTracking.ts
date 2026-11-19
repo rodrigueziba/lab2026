@@ -13,6 +13,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { LIVE_TEX_REF, FACE_TEX_REF } from "@/lib/faceShared";
 import { DBG_FACE } from "@/lib/debugConfig";
+import { marcarCamaraOk, marcarCamaraFallo } from "@/lib/fuenteVideoTarima";   // Z87
+import { motivoDeError } from "@/lib/ondasTarima";                               // Z87
 
 export type FaceStatus = "idle" | "requesting" | "denied" | "capturing" | "captured" | "error";
 
@@ -206,7 +208,8 @@ export function useFaceTracking() {
   }, [takeBestFrame]);
 
   const start = useCallback(async () => {
-    if (status !== "idle") return;
+    if (status !== "idle" && status !== "denied") return;   // Z87: "denied" permite reintentar (alight:camara-reintentar)
+    const reintento = status === "denied";
     setStatus("requesting");
 
     let stream: MediaStream;
@@ -216,11 +219,15 @@ export function useFaceTracking() {
         video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
-    } catch {
+    } catch (err) {
+      // Z87: motivo para la fuente de video de la tarima (sin dispositivo, denegado, sin soporte): pasa a las ondas
+      const soporta = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+      marcarCamaraFallo(motivoDeError((err as { name?: string } | null)?.name ?? "", soporta));
       setStatus("denied");
-      window.dispatchEvent(new CustomEvent("alight:face-captured"));
+      if (!reintento) window.dispatchEvent(new CustomEvent("alight:face-captured"));   // la secuencia sigue (una vez)
       return;
     }
+    marcarCamaraOk();   // Z87
 
     const video = videoRef.current!;
     video.srcObject = stream;
@@ -262,6 +269,13 @@ export function useFaceTracking() {
       // MediaPipe no disponible — captura por timeout ya programada
     }
   }, [status, takeBestFrame, startDetectionLoop]);
+
+  // Z87: reintentar la cámara sin recargar (botón del menú, permiso concedido o cámara conectada)
+  useEffect(() => {
+    const onReintentar = () => { if (status === "denied") void start(); };
+    window.addEventListener("alight:camara-reintentar", onReintentar);
+    return () => window.removeEventListener("alight:camara-reintentar", onReintentar);
+  }, [status, start]);
 
   return { snapshot, status, start };
 }

@@ -8,12 +8,13 @@
 // (o la sesión). Ganchos para tareas futuras: MONO_VIVO.sonido / .video (alejandoseTrasCerca, peso, estado) y
 // MONO_VIVO.haySesion; aceptarTransmision() para DBG_MONO_VIVO.REQUIERE_ACEPTACION.
 
-import { DBG_MONO_VIVO, DEBUG_ENABLED, DBG_SILLAS, DBG_PASTO } from "@/lib/debugConfig";
+import { DBG_MONO_VIVO, DBG_LIVEKIT_RECIBIR, DEBUG_ENABLED, DBG_SILLAS, DBG_PASTO } from "@/lib/debugConfig";
 import { RELOJ as RELOJ_EXP } from "@/lib/relojExperiencia";
 import { SESSION, setSession, MockRemoteSession } from "@/lib/remoteSession";
 import { SesionPrueba } from "@/lib/sesionPrueba";
 import { N5_STATE, contextoViz, setMezclaRemota, leerMezclaRemota } from "@/lib/vizAudio";
 import { crearMono, reiniciarMono, tickPar, mezclaEqualPower, pesoEfectivo, type Mono } from "@/lib/monolitosVivo";
+import { tickFuenteVivo, soltarFuenteVivo } from "@/lib/vivo/vivoAcciones";   // Z89: presencia de Supabase (DBG_VIVO.FUENTE)
 
 export const MONO_VIVO = {
   sonido: crearMono() as Mono,
@@ -44,17 +45,26 @@ export function tickMonolitosVivo(dSonido: number, dVideo: number, op: number, d
   if (M.forzar === "sonido") dSonido = 0;
   else if (M.forzar === "video") dVideo = 0;
   M.forzar = "";
+  tickFuenteVivo(op > 0.001);   // Z89: con FUENTE "supabase", SESSION.status sale de la presencia (solo se suscribe si se ven los monolitos)
   M.haySesion = SESSION.status === "active";
   tickPar(M.sonido, M.video, dSonido, dVideo, dt, DBG_MONO_VIVO);
 
   // mezcla de audio (monolito de sonido), escalada por la opacidad de los monolitos como en N5
   const peso = pesoEfectivo(M.sonido.peso, M.haySesion, DBG_MONO_VIVO.REQUIERE_ACEPTACION, M.aceptada) * Math.max(0, Math.min(1, op));
   M.pesoRemotoSonido = peso;
+  // Z93: recepción real (SesionLiveKit): conecta y suscribe según la aceptación y los pesos (kSonido, kVideo)
+  SESSION.tickMedios?.(M.aceptada, peso, M.video.peso * Math.max(0, Math.min(1, op)));
   mezclaEqualPower(peso, _mez);
   const ctx = contextoViz();
-  const nodo = M.haySesion && ctx ? SESSION.getAudio(ctx) : null;
-  setMezclaRemota(_mez.orig, _mez.rem, nodo, M.haySesion ? DBG_MONO_VIVO.SESION_GANANCIA : DBG_MONO_VIVO.RUIDO_GANANCIA,
-    DBG_MONO_VIVO.RUIDO_TIPO === "rosa" ? "rosa" : "blanco");
+  let nodo = M.haySesion && ctx ? SESSION.getAudio(ctx) : null;
+  let nivel = M.haySesion ? DBG_MONO_VIVO.SESION_GANANCIA : DBG_MONO_VIVO.RUIDO_GANANCIA;
+  const sn = SESSION.senal;
+  if (M.haySesion && sn && !sn.audio) {
+    // Z93: sesión viva sin audio real todavía → estática como sin sesión; en señal débil, estática al DEBIL_MEZCLA sin cortar lo propio
+    nodo = null; nivel = DBG_MONO_VIVO.RUIDO_GANANCIA;
+    if (sn.debil) { _mez.orig = 1; _mez.rem = peso * Math.max(0, Math.min(1, DBG_LIVEKIT_RECIBIR.DEBIL_MEZCLA)); }
+  }
+  setMezclaRemota(_mez.orig, _mez.rem, nodo, nivel, DBG_MONO_VIVO.RUIDO_TIPO === "rosa" ? "rosa" : "blanco");
   N5_STATE.rightProximity = peso;
   N5_STATE.leftProximity = M.video.peso * Math.max(0, Math.min(1, op));
 
@@ -107,6 +117,7 @@ export function modoN5(): void { if (_activo) { _activo = false; soltarMonolitos
 /** Al desmontar los monolitos o volver a N5: audio propio entero y overlay fuera. */
 export function soltarMonolitosVivo(): void {
   setMezclaRemota(1, 0, null, 0);
+  soltarFuenteVivo();   // Z89: cierra el canal del oyente (con FUENTE "mock" no hace nada)
   if (_ov) { _ov.remove(); _ov = null; }
 }
 

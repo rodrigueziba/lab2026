@@ -9,11 +9,11 @@ import { SecDiagonalspot, SecHacesN3R2V1, SecLucesDelVisualizadorZ42, SecU6aAnil
 import { SecCheckpointsZ40, SecEfectosDelDialogoZ29, SecCaminoLuzZ28, SecDialogoZ27, SecLuzHuidaZ76 } from "./pestanas/narrativa";
 import { SecDebugOverlays } from "./pestanas/otros";
 import { SecPanelesSillas, SecAcercamientoZ8, SecPrioridadZ10ProyectoAbiertoSobreLas, SecVideoEtapa1, SecFocoZ19SubpanelAgrandado, SecSubpanelesZ4HistoriaGaleriaFicha } from "./pestanas/paneles";
-import { SecMonolitosN5V1V2V3, SecPastoZ64, SecPastoExtensionZ74, SecMonolitosVivoZ82, SecAvisoVivoZ85 } from "./pestanas/pasto";
+import { SecMonolitosN5V1V2V3, SecPastoZ64, SecPastoExtensionZ74, SecMonolitosVivoZ82, SecAvisoVivoZ85, SecSesionVivoZ89, SecRecepcionLiveKitZ93 } from "./pestanas/pasto";
 import { SecRendimientoZ66, SecPostProcesoR4 } from "./pestanas/rendimiento";
 import { SecSecuenciaSillas, SecIconosDelPisoZ23, SecLayoutZ41, SecRelojDeLaExperienciaZ39, SecMovimientoZ34 } from "./pestanas/sala";
 import { SecSolN3, SecOndasPorKickZ52, SecSolNuevoZ51 } from "./pestanas/sol";
-import { SecStars, SecDome, SecSectorEffects, SecLecterns, SecRetroAtriles, SecFaceCapture, SecAudio, SecExtraLights, SecAudioNucleoZ78, SecPlayTarimaZ79, SecCajaRitmosZ80 } from "./pestanas/tarima";
+import { SecStars, SecDome, SecSectorEffects, SecLecterns, SecRetroAtriles, SecFaceCapture, SecAudio, SecExtraLights, SecAudioNucleoZ78, SecPlayTarimaZ79, SecCajaRitmosZ80, SecOndasTarimaZ87, SecConsentTarimaZ91, SecLiveKitZ92, SecAtrilSonidoZ96, SecAtrilImagenZ97, SecBajoZ99 } from "./pestanas/tarima";
 import { SecTelonN6, SecInicioZ24, SecTextoDelTelonZ46, SecDestelloDeCortinaF1, SecEntradaTrasElTelonZ59 } from "./pestanas/telon";
 import { SecSimbolosN3, SecAudioBandasN4, SecReaccionT3Audio, SecU10bReaccionAlSonido, SecU11CameraFeedback, SecU2AgcAmplitudes, SecDomoVivoZ83, SecTiempoDetenidoZ84 } from "./pestanas/visualizador";
 import { SecPanoramaSvg, SecAmanecerViejo, SecLegado, SecPrism, SecControlesSinEfecto } from "./pestanas/obsoletos";
@@ -72,9 +72,17 @@ export const COMPONENTES_SECCION: Record<string, ComponentType> = {
   "play-tarima-z79": SecPlayTarimaZ79,
   "monolitos-vivo-z82": SecMonolitosVivoZ82,
   "aviso-vivo-z85": SecAvisoVivoZ85,
+  "sesion-vivo-z89": SecSesionVivoZ89,
+  "recepcion-livekit-z93": SecRecepcionLiveKitZ93,
   "domo-vivo-z83": SecDomoVivoZ83,
   "tiempo-detenido-z84": SecTiempoDetenidoZ84,
   "caja-ritmos-z80": SecCajaRitmosZ80,
+  "ondas-tarima-z87": SecOndasTarimaZ87,
+  "consent-tarima-z91": SecConsentTarimaZ91,
+  "livekit-z92": SecLiveKitZ92,
+  "atril-sonido-z96": SecAtrilSonidoZ96,
+  "atril-imagen-z97": SecAtrilImagenZ97,
+  "bajo-acido-z99": SecBajoZ99,
   "extra-lights": SecExtraLights,
   "telon-n6": SecTelonN6,
   "inicio-z24": SecInicioZ24,

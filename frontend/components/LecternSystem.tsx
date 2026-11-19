@@ -18,12 +18,39 @@ import {
   nextTrack, prevTrack, initAudio, loadPlaylist, playTrack,   // Z79: togglePlayPause ahora va por lib/playTarimaAcciones
   playUIClick,
 } from "@/lib/audioEngine";
-import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS } from "@/lib/debugConfig";
+import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_ONDAS_TARIMA, DBG_BAJO, DBG_ATRIL_BAJO } from "@/lib/debugConfig";
+// Z96: atril de sonido rediseñado ("SONIDO SN-40"): layout como datos (lib/atrilSonido.ts) y piezas (AtrilSonidoNuevo.tsx)
+import {
+  POSICIONES as POS_SONIDO_NUEVO, FADER_RAIL, GRANDE_ESCALA, PLAY_W, PLAY_D, textoValor, camaraAtril, legibilidadMinima,
+  LEGIBLE_MIN, esDobleClic, escalaEfectiva, type FormaCtrl, type GeoAtril, type PosCtrl,
+  TECLA_PLAY, layoutTeclaPlay,   // Z97b
+} from "@/lib/atrilSonido";
+import { DisplaySonido, VuSonido, PlacaFrenteSonido, buildSilkscreenSonido, mostrarEnDisplay, PlacaBarraSonido, MargenRotulos, escalaActual } from "./AtrilSonidoNuevo";
+// Z97: atril de imagen rediseñado ("IMAGEN IM-40")
+import { RADIO_ESTILO_I, RADIO_PALETA_I, POSICIONES_I, legibilidadMinimaI, NOMBRE_EQUIPO_I, DESCRIPCION_EQUIPO_I, TEXTO_PLACA_I, LEYENDA_FILAS_I, type PosCtrlI } from "@/lib/atrilImagen";
+import { DOMO_EFECTOS, fijarPad } from "@/lib/domoEfectos";
+import { LUZ_ESCENA, acotarNivel, pasoNivel, textoNivel } from "@/lib/lucesEscena";   // Z97b
+import { radio } from "@/lib/visualizadorTarima";                                      // Z98
+// Z99: BAJO ÁCIDO BA-40 (tercer atril, en el slot de instrumentos junto a la caja de ritmos)
+import {
+  POSICIONES_B, PERILLAS_B, PATRONES_B, ONDAS_B, ATRIL_BAJO, legibilidadMinimaB, NOMBRE_EQUIPO_B, DESCRIPCION_EQUIPO_B, TEXTO_PLACA_B,
+  LEYENDA_FILAS_B, type PosCtrlB,
+} from "@/lib/atrilBajo";
+import {
+  BAJO, PATRON_BAJO, PARAMS as PARAMS_B, instalarBajo, tickBajo, editarPaso, cargarPatron, patronLimpio, setParamBajo, aplicarParamsBajo,
+} from "@/lib/audio/bajoAcido";
+import { PARAMS_BAJO, aNormal, deNormal, valorParam, indiceParam, nombreNota, type NombrePatron } from "@/lib/bajoAcido";
+import { DisplayBajo, VuBajo, buildSilkscreenBajo, mostrarEnDisplayBajo, escalaActualBajo } from "./AtrilBajoNuevo";
+import type { Slot } from "@/lib/playTarima";
+import { FUENTE_TARIMA } from "@/lib/fuenteVideoTarima";                               // Z98
+import { DisplayImagen, buildSilkscreenImagen, mostrarEnDisplayImagen, escalaActualImagen, ROTULOS_VERTICALES_I, ROTULOS_NUMEROS_I } from "./AtrilImagenNuevo";
+import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
 import { PLAY_TARIMA } from "@/lib/playTarima";                                              // Z79
 import { alternarPlay, instalarEstadoPlay, prepararSinAutoplay } from "@/lib/playTarimaAcciones"; // Z79
-import { PlayGrande, SlotsAtriles } from "./PlayTarima";                                       // Z79
+import { PlayGrande, SlotsAtriles, slotsActuales } from "./PlayTarima";                                       // Z79
 import { TARIMA_W } from "./Tarima";                                                         // Z79: slots
 import CajaRitmos from "./CajaRitmos";                                                       // Z80
+import { atrilesPermitidosAhora } from "@/lib/consentTarimaAcciones";                         // Z93a
 import SistemaPerf from "./SistemaPerf";                                                     // Z80: benchmark
 import { ATRIL_RITMOS } from "@/lib/ritmos";                                                  // Z80: tecla E
 import { activaAccion } from "@/lib/atrilesClick";                                             // Z81
@@ -192,6 +219,44 @@ function labelTex(text: string): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(cv);
   _labelCache.set(text, tex);
   return tex;
+}
+
+// ── Z96: pantalla del PLAY/PAUSA grande (una textura por estado, por instancia; se liberan al desmontar) ──
+const PLAY_TECLA_MAT = new THREE.MeshStandardMaterial({ color: "#C0552F", roughness: 0.75, metalness: 0 });
+/** Z96b: marca de valor de las perillas del diseño nuevo (oscura, mate). */
+const MARCA_PERILLA_MAT = new THREE.MeshStandardMaterial({ color: "#14100c", roughness: 0.9, metalness: 0 });
+/** Z96b: la tecla muestra un texto FIJO ("PLAY / PAUSA" con ▶❚❚); el estado lo dicen su luz y el display. */
+export const TEXTO_TECLA_PLAY = "PLAY / PAUSA";
+export const LUZ_PLAY = { sonando: "#2E9E5B", pausa: "#FF9A1F", pulsoHz: 0.8 };
+/** Intensidad de la luz del PLAY: verde 2,2 ± 0,5 con pulso suave reproduciendo; ámbar 0,25 (apagada) en pausa. */
+export function intensidadLuzPlay(sonando: boolean, ahoraMs: number): number {
+  return sonando ? 2.2 + 0.5 * Math.sin((ahoraMs / 1000) * Math.PI * 2 * LUZ_PLAY.pulsoHz) : 0.25;
+}
+function texPlayGrande(): THREE.CanvasTexture {
+  const w = 1024, h = 256, cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  const c = cv.getContext("2d")!;
+  c.fillStyle = "#2A1400"; c.fillRect(0, 0, w, h);
+  c.fillStyle = "rgba(255,154,31,0.08)";
+  for (let y = 0; y < h; y += 5) c.fillRect(0, y, w, 2);
+  c.fillStyle = "#FF9A1F"; c.shadowColor = "rgba(255,154,31,0.7)"; c.shadowBlur = 14;
+  // Z97b: el texto se mide (measureText) y ícono, separación y fuente se escalan juntos hasta que todo entra con 6 % de
+  // margen por lado (antes: 112 px desde x 270 → terminaba en ~1103 px de 1024 y se cortaba la "A")
+  c.textBaseline = "middle"; c.textAlign = "left";
+  c.font = `bold ${TECLA_PLAY.pxBase}px monospace`;
+  const L = layoutTeclaPlay(c.measureText(TEXTO_TECLA_PLAY).width / TECLA_PLAY.pxBase);
+  let px = L.px;
+  c.font = `bold ${px}px monospace`;
+  const limite = w * (1 - TECLA_PLAY.margen) - L.xTexto;
+  while (px > 20 && c.measureText(TEXTO_TECLA_PLAY).width > limite) { px--; c.font = `bold ${px}px monospace`; }
+  // ícono combinado ▶❚❚ (las medidas de antes, escaladas por L.s y centradas en la altura)
+  const s = L.s, x = L.xIcono, y0 = h / 2 - (TECLA_PLAY.iconoAlto * s) / 2;
+  c.beginPath(); c.moveTo(x, y0); c.lineTo(x + 90 * s, h / 2); c.lineTo(x, y0 + TECLA_PLAY.iconoAlto * s); c.closePath(); c.fill();
+  c.fillRect(x + 108 * s, y0, 26 * s, TECLA_PLAY.iconoAlto * s); c.fillRect(x + 148 * s, y0, 26 * s, TECLA_PLAY.iconoAlto * s);
+  c.fillText(TEXTO_TECLA_PLAY, L.xTexto, h / 2 + 4);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 // ── Keycap texture ────────────────────────────────────────────────────────────
@@ -480,7 +545,7 @@ function zoneTitleTex(text: string): THREE.CanvasTexture {
 }
 
 // ── Lights-indicator canvas draw — K3: shows globalIntensity ──────────────────
-function drawLightsIndicator(cv: HTMLCanvasElement, intensity: number): void {
+function drawLightsIndicator(cv: HTMLCanvasElement, intensity: number, extra = false): void {
   const ctx = cv.getContext("2d")!;
   const w = cv.width, h = cv.height;
   ctx.clearRect(0, 0, w, h);
@@ -488,10 +553,15 @@ function drawLightsIndicator(cv: HTMLCanvasElement, intensity: number): void {
   ctx.fillStyle = pal.indBg;
   ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = pal.indFg;
-  ctx.font = `bold ${Math.floor(h * 0.62)}px monospace`;
+  // Z97b: valor real y "+EX" con EXTRA encendida; el tamaño se ajusta al ancho medido (6 % de margen por lado)
+  const txt = textoNivel(intensity, extra);
+  let px = Math.floor(h * 0.62);
+  ctx.font = `bold ${px}px monospace`;
+  const ancho = ctx.measureText(txt).width;
+  if (ancho > w * 0.88) { px = Math.floor(px * (w * 0.88) / ancho); ctx.font = `bold ${px}px monospace`; }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(intensity.toFixed(1), w / 2, h / 2);
+  ctx.fillText(txt, w / 2, h / 2);
 }
 
 // ── E3: drag / hover module-level state ───────────────────────────────────────
@@ -522,6 +592,7 @@ const _drag = {
   holdTimer: null    as ReturnType<typeof setInterval> | null,
 };
 let _hoveredId: string | null = null;
+const _dobleClic = { id: "", t: -1e9 };   // Z96
 
 function getCursorStyle(
   type: CtrlDef["type"] | "press" | "slide_h" | "slide_v" | "rotate",
@@ -548,20 +619,37 @@ function getCursorStyle(
 const K1_LABEL_MIN_PX = 12;  // minimum label pixel height at 1080 px viewport
 const K1_DOME_R = 27.5;      // FaceDome sphere radius (DOME_R - 0.5)
 
+// Z99: lado del atril: "left" (IM-40), "right" (SN-40) o "bajo" (BA-40, en un slot de instrumentos detrás de la tarima)
+type Lado = "left" | "right" | "bajo";
+const _slotsBajo: Slot[] = [];
+const _poseLado = { x: 0, z: 0, yaw: 0 };
+/** Posición (x, z) y yaw (local +Z = frente, mirando al usuario) de cada atril. El cuerpo va a la altura de la tarima. */
+function poseLado(side: Lado): { x: number; z: number; yaw: number } {
+  if (side === "bajo") {
+    const sl = slotsActuales(LECTERN_PLACE_X, TARIMA_W / 2, TARIMA_H_REF, _slotsBajo)[Math.max(0, Math.floor(DBG_ATRIL_BAJO.SLOT))];
+    if (sl) { ATRIL_BAJO.x = sl.x; ATRIL_BAJO.z = sl.z; ATRIL_BAJO.yaw = sl.yaw; }
+    _poseLado.x = ATRIL_BAJO.x; _poseLado.z = ATRIL_BAJO.z; _poseLado.yaw = ATRIL_BAJO.yaw;
+    return _poseLado;
+  }
+  const sign = side === "left" ? -1 : 1;
+  const flip = (side === "left" ? DBG_LECTERNS.yawFlipLeft : DBG_LECTERNS.yawFlipRight) ? Math.PI : 0;
+  _poseLado.x = sign * LECTERN_PLACE_X; _poseLado.z = 0;
+  _poseLado.yaw = Math.atan2(-sign * LECTERN_PLACE_X, 0) + LECTERN_YAW_OFFSET_RAD + flip;
+  return _poseLado;
+}
+
 // Build pose from fixed fov/height/dist/pitch (used for debug overrides)
 function _makePose(
-  side: "left" | "right",
+  side: Lado,
   fovDeg: number,
   height: number,
   dist: number,
   pitchDeg: number,
 ): { pos: [number,number,number]; quat: [number,number,number,number]; fovDeg: number } {
-  const sign = side === "left" ? -1 : 1;
-  const flip = (side === "left" ? DBG_LECTERNS.yawFlipLeft : DBG_LECTERNS.yawFlipRight) ? Math.PI : 0;
-  const yaw  = Math.atan2(-sign * LECTERN_PLACE_X, 0) + LECTERN_YAW_OFFSET_RAD + flip;
+  const pl = poseLado(side);   // Z99
   const lecternM = new THREE.Matrix4()
-    .makeTranslation(sign * LECTERN_PLACE_X, TARIMA_H_REF, 0)
-    .multiply(new THREE.Matrix4().makeRotationY(yaw));
+    .makeTranslation(pl.x, TARIMA_H_REF, pl.z)
+    .multiply(new THREE.Matrix4().makeRotationY(pl.yaw));
   const plateM = lecternM.clone()
     .multiply(new THREE.Matrix4().makeTranslation(0, LEG_H, PANEL_D / 2))
     .multiply(new THREE.Matrix4().makeRotationX(TILT_RAD))
@@ -575,11 +663,31 @@ function _makePose(
   return { pos: [camPos.x, camPos.y, camPos.z], quat: [q.x, q.y, q.z, q.w], fovDeg };
 }
 
+// Z96: geometría del atril para la legibilidad (lib/atrilSonido.ts, la misma transformación que plateM)
+let _geoAtril: GeoAtril | null = null;
+function geoAtril(): GeoAtril { return _geoAtril ?? (_geoAtril = { LEG_H, PANEL_W, PANEL_D, PANEL_T, CPANEL_T, TILT_RAD, LBL_H, ROW1_V_A }); }
+
+/**
+ * Z96: con el diseño nuevo del atril de sonido, tres pasadas: (1) igual que antes + texto más lejano ≥ LEGIBLE_MIN de la
+ * altura de la pantalla; (2) lo mismo con el ancho mínimo del panel relajado (85 % → 65 %); (3) la búsqueda anterior,
+ * sin la exigencia. Recién después, la pose fija de siempre. Con el diseño viejo: solo la búsqueda anterior.
+ */
 function fitLecternCamera(
-  side: "left" | "right",
+  side: Lado,
   aspect: number,
+  pasada = 1,
 ): { pos: [number,number,number]; quat: [number,number,number,number]; fovDeg: number } {
   const isImage = side === "left";
+  const nuevoSonido = !isImage && DBG_ATRIL_SONIDO.DISENO_NUEVO;
+  // Z97: atril de imagen nuevo con CAMARA "panel": busca como el de sonido (mira el panel) y exige la legibilidad;
+  // con "domo", la cámara de siempre (más el pedido de legibilidad, que con ella no se alcanza: cae a la de siempre)
+  const nuevoImagen = isImage && DBG_ATRIL_VIDEO.DISENO_NUEVO;
+  const modoImagen = isImage && !(nuevoImagen && DBG_ATRIL_VIDEO.CAMARA !== "domo");
+  const imagenPanel = nuevoImagen && !modoImagen;
+  const esBajo = side === "bajo";   // Z99: el BA-40 busca como el de sonido y exige su legibilidad
+  const conPasadas = nuevoSonido || imagenPanel || esBajo;
+  const exigirLegible = conPasadas && pasada < 3;
+  const anchoMinNdc = conPasadas && pasada === 2 ? 1.30 : 1.70;
   const dbgCfg  = isImage ? DBG_CAM_IMAGE : DBG_CAM_SOUND;
 
   // Debug override: bypass search
@@ -588,12 +696,10 @@ function fitLecternCamera(
   }
 
   // ── Geometry setup ──────────────────────────────────────────────────────────
-  const sign = side === "left" ? -1 : 1;
-  const flip = (side === "left" ? DBG_LECTERNS.yawFlipLeft : DBG_LECTERNS.yawFlipRight) ? Math.PI : 0;
-  const yaw  = Math.atan2(-sign * LECTERN_PLACE_X, 0) + LECTERN_YAW_OFFSET_RAD + flip;
+  const pl = poseLado(side);   // Z99
   const lecternM = new THREE.Matrix4()
-    .makeTranslation(sign * LECTERN_PLACE_X, TARIMA_H_REF, 0)
-    .multiply(new THREE.Matrix4().makeRotationY(yaw));
+    .makeTranslation(pl.x, TARIMA_H_REF, pl.z)
+    .multiply(new THREE.Matrix4().makeRotationY(pl.yaw));
   const plateM = lecternM.clone()
     .multiply(new THREE.Matrix4().makeTranslation(0, LEG_H, PANEL_D / 2))
     .multiply(new THREE.Matrix4().makeRotationX(TILT_RAD))
@@ -612,19 +718,19 @@ function fitLecternCamera(
   const farLabelWorld = new THREE.Vector3(0, LBL_H / 2, ROW1_V_A).applyMatrix4(plateM);
 
   // ── Search parameters ───────────────────────────────────────────────────────
-  const fovsToTry = isImage
+  const fovsToTry = modoImagen
     ? [75, 80, 85, 90]
     : [60, 65, 70, 75, 80, 85, 90];
 
   const heightStep = 0.05;
   const distStep   = 0.05;
   const pitchStep  = 1;
-  const hMin = isImage ? 0.80 : 0.70;
+  const hMin = modoImagen ? 0.80 : 0.70;
   const hMax = 1.30;
   const dMin = 0.50;
   const dMax = 1.20;
-  const pMin = isImage ? -35 : -60;
-  const pMax = isImage ? -10 : -25;
+  const pMin = modoImagen ? -35 : -60;
+  const pMax = modoImagen ? -10 : -25;
 
   const testCam = new THREE.PerspectiveCamera(75, aspect, 0.05, 200);
 
@@ -664,15 +770,26 @@ function fitLecternCamera(
           // ── Constraint: front edge ≥ 8% above bottom (NDC y ≥ -0.84) ─────
           if (Math.min(ndcs[2].y, ndcs[3].y) < -0.84) continue;
 
-          if (!isImage) {
+          if (!modoImagen) {
             // ── Sound: plate ≥ 85% of frame width ────────────────────────────
             const ndcXs = ndcs.map(n => n.x);
-            if (Math.max(...ndcXs) - Math.min(...ndcXs) < 1.70) continue;
+            if (Math.max(...ndcXs) - Math.min(...ndcXs) < anchoMinNdc) continue;
 
             // ── Sound: label pixel height ≥ K1_LABEL_MIN_PX ──────────────────
             const lDist = farLabelWorld.distanceTo(camPos);
             const px = (LBL_H / (2 * lDist * Math.tan(fovRad / 2))) * 1080;
             if (px < K1_LABEL_MIN_PX) continue;
+
+            // ── Z96: texto más lejano del diseño nuevo ≥ LEGIBLE_MIN (proyección real sobre la placa inclinada) ──
+            if (exigirLegible) {
+              const cp = camaraAtril(geoAtril(), fovDeg, height, dist, pitchDeg, aspect);
+              const leg = esBajo
+                ? legibilidadMinimaB(geoAtril(), cp, escalaEfectiva(DBG_ATRIL_BAJO.ETIQUETA_ESCALA, DBG_ATRIL_BAJO.ETIQUETA_AUTO_ASPECTO, aspect)).min
+                : isImage
+                ? legibilidadMinimaI(geoAtril(), cp, escalaEfectiva(DBG_ATRIL_VIDEO.ETIQUETA_ESCALA, DBG_ATRIL_VIDEO.ETIQUETA_AUTO_ASPECTO, aspect)).min
+                : legibilidadMinima(geoAtril(), cp, escalaEfectiva(DBG_ATRIL_SONIDO.ETIQUETA_ESCALA, DBG_ATRIL_SONIDO.ETIQUETA_AUTO_ASPECTO, aspect)).min;
+              if (leg < LEGIBLE_MIN) continue;
+            }
           } else {
             // ── Image: dome visibility (6×3 grid, top 30% of screen, ≥70%) ──
             const GRID_X = [-5/6, -3/6, -1/6, 1/6, 3/6, 5/6];
@@ -701,8 +818,9 @@ function fitLecternCamera(
     }
 
     if (bestPose) return bestPose;
-    if (fovDeg >= 90) console.warn(`[K1 fit] No pose found for side=${side} at fov=90°`);
+    if (fovDeg >= 90 && (!conPasadas || pasada === 3)) console.warn(`[K1 fit] No pose found for side=${side} at fov=90°`);
   }
+  if (conPasadas && pasada < 3) return fitLecternCamera(side, aspect, pasada + 1);   // Z96 (Z97: también imagen "panel")
 
   // Final fallback: use initial values from spec
   return _makePose(side, isImage ? 75 : 60, isImage ? 0.9 : 0.8, isImage ? 0.75 : 0.8, isImage ? -22 : -45);
@@ -712,7 +830,7 @@ function fitLecternCamera(
 const KEY_LETTERS = ["z","x","c","v","b","n","m"] as const;
 type KeyLetter = typeof KEY_LETTERS[number];
 let _keyMap    = new Map<KeyLetter, string>();  // letter → controlId
-let _keyMapSide: "left" | "right" | null = null;
+let _keyMapSide: Lado | null = null;
 let _keySeed   = Math.floor(Math.random() * 0xffff);
 
 function seededRand(seed: number) {
@@ -724,12 +842,12 @@ export function reshuffleKeys() {
   _keySeed = Math.floor(Math.random() * 0xffff);
 }
 
-function buildKeyMap(side: "left" | "right") {
+function buildKeyMap(side: Lado) {
   if (_keyMapSide === side) return;  // already built for this side
   _keyMapSide = side;
-  const controls = side === "left" ? IMAGE_CONTROLS : SOUND_CONTROLS;
+  const controls = side === "left" ? controlesImagen() : side === "bajo" ? CONTROLES_BAJO : SOUND_CONTROLS;   // Z97 · Z99
   const btns = controls.filter(c => c.type === "button" || c.type === "toggle");
-  const rng  = seededRand(_keySeed + (side === "left" ? 0 : 1000));
+  const rng  = seededRand(_keySeed + (side === "left" ? 0 : side === "bajo" ? 2000 : 1000));
   const idxs = btns.map((_, i) => i).sort(() => rng() - 0.5).slice(0, KEY_LETTERS.length);
   _keyMap.clear();
   KEY_LETTERS.forEach((letter, i) => {
@@ -757,6 +875,10 @@ interface CtrlDef {
   orientation?: "h" | "v";  // slider axis; "h" default (along u), "v" along v
   color?: "green" | "amber" | "chrome" | "blue" | "mustard";
   icon?: IconName;           // J3: drawn on button/toggle top face; "volume" on slider marks ends
+  forma?: FormaCtrl;         // Z96: "pastilla" (ON del módulo), "play" (PLAY/PAUSA grande), "grande" (perilla CORTE)
+  nombreLargo?: string;      // Z96: lo que muestra el display al tocarlo
+  escala?: number;           // Z99: perillas y pads más chicos (BA-40: NOTA, ACENTO, DESLIZ, PASO, VOZ)
+  marcaPaso?: number;        // Z99: tecla PASO k del BA-40: marca del paso que está sonando
   min: number;
   max: number;
   initial: number;
@@ -778,8 +900,52 @@ function setCtrl(id: string, v: number, def: CtrlDef) {
     LECTERN_DBG.hudLabel  = `${def.label}: ${val.toFixed(dec)}`;
     LECTERN_DBG.hudExpiry = performance.now() + 1200;
   }
+  // Z96: el display del atril de sonido muestra el control tocado (nombre y valor) durante DISPLAY_VALOR_S
+  if (DBG_ATRIL_SONIDO.DISENO_NUEVO && id.startsWith("s_")) {
+    const p = _posSonido.get(id);
+    if (p && (def.type !== "button" || ctrlState[id] > 0.5)) {
+      const nombre = id === "s_lfo_wf" ? `LFO ONDA ${ONDAS_NOMBRE[_lfoWfIdx % 4]}` : id === "s_lfo_tg" ? `LFO DESTINO ${DESTINOS_NOMBRE[_lfoTgIdx % 3]}` : p.nombreLargo;
+      mostrarEnDisplay(textoValor(nombre, def.type as "button" | "toggle" | "slider" | "knob", ctrlState[id], def.min, def.max));
+    }
+  }
+  // Z97: lo mismo en el display del atril de imagen
+  if (DBG_ATRIL_VIDEO.DISENO_NUEVO && _posImagen?.has(id)) {
+    const p = _posImagen.get(id)!;
+    if (def.type !== "button" || ctrlState[id] > 0.5) {
+      mostrarEnDisplayImagen(id === "dom_rot_s" ? `${p.nombreLargo} ${ctrlState[id].toFixed(1)} s`
+        // Z98: pads del VISUALIZADOR: "VISUALIZADOR CASCADA" / "PALETA IDENTIDAD"; con cámara, aclara que se ve sin ella
+        : id.startsWith("vis_") && def.type === "toggle" ? (FUENTE_TARIMA.eleccion.tipo === "webcam" ? `${p.nombreLargo} · SE VE SIN CÁMARA` : p.nombreLargo)
+        : id === "vis_color_v" ? `${p.nombreLargo} ${ctrlState[id].toFixed(2)} CICLOS/S`
+        : textoValor(p.nombreLargo, def.type as "button" | "toggle" | "slider" | "knob", ctrlState[id], def.min, def.max));
+    }
+  }
+  // Z99: display del BA-40
+  if (id.startsWith("b_") && (def.type !== "button" || ctrlState[id] > 0.5)) mostrarEnDisplayBajo(textoBajo(id, def));
   storeNotify();
 }
+const _posSonido = new Map<string, PosCtrl>(POS_SONIDO_NUEVO.map(p => [p.id, p]));
+const TEXTO_PLACA_IMAGEN = TEXTO_PLACA_I(NOMBRE_EMPRESA_MAYUS);   // Z97
+const TEXTO_PLACA_BAJO = TEXTO_PLACA_B(NOMBRE_EMPRESA_MAYUS);      // Z99
+const PEDESTAL_MAT = new THREE.MeshStandardMaterial({ color: "#3A3B3C", roughness: 0.9, metalness: 0 });   // Z99: carbón mate
+/**
+ * Z99: motor del BA-40 montado con su atril: se suscribe al reloj del núcleo al montar y libera todo al desmontar; en cada
+ * cuadro sigue el transporte de la caja de ritmos y, si el patrón cambió desde afuera (menú), resincroniza los controles.
+ */
+function MotorBajo() {
+  const ver = useRef(-1);
+  useEffect(() => {
+    const limpiar = instalarBajo();
+    ATRIL_BAJO.visible = true;
+    return () => { limpiar(); ATRIL_BAJO.visible = false; };
+  }, []);
+  useFrame(() => {
+    tickBajo();
+    if (BAJO.version !== ver.current) { ver.current = BAJO.version; sincronizarBajo(); }
+  });
+  return null;
+}
+const ONDAS_NOMBRE = ["SENO", "TRIÁNGULO", "CUADRADA", "SIERRA"];
+const DESTINOS_NOMBRE = ["VOLUMEN", "FILTRO", "PITCH"];
 
 // ── Single control mesh constants (must precede validateLayout + controls arrays) ─
 const BTN_R     = 0.030;   // half-size for hit zone
@@ -1015,6 +1181,143 @@ validateLayout(SOUND_CONTROLS, SOUND_SECTIONS);
 // Initialise defaults
 [...IMAGE_CONTROLS, ...SOUND_CONTROLS].forEach(c => { ctrlState[c.id] = c.initial; });
 
+// Z96: layout nuevo del atril de sonido = los MISMOS controles (mismo id, mismo onActivate, mismo rango) en otra
+// posición, con su etiqueta y su forma; el estado (ctrlState) es el mismo, así que cambiar de diseño no pierde valores.
+export const SOUND_CONTROLS_NUEVO: CtrlDef[] = SOUND_CONTROLS.map(d => {
+  const p = POS_SONIDO_NUEVO.find(x => x.id === d.id);
+  if (!p) return d;
+  return { ...d, px: p.u, py: p.v, label: p.etiqueta, forma: p.forma, nombreLargo: p.nombreLargo,
+    ...(d.type === "knob" ? { color: "mustard" as const } : {}),   // Z96b: todas las perillas mostaza (las de los filtros venían negras de J3)
+    ...(d.id === "s_vol" ? { railLen: FADER_RAIL } : {}) };
+});
+function controlesSonido(): CtrlDef[] { return DBG_ATRIL_SONIDO.DISENO_NUEVO ? SOUND_CONTROLS_NUEVO : SOUND_CONTROLS; }
+
+// Z97: controles NUEVOS del atril de imagen (pads de efectos, AUTO, VELOC. de la rotación y los ON de EFECTOS e IMAGEN).
+// Escriben DOMO_EFECTOS (lib/domoEfectos.ts); FaceDome lo aplica a uE0..uE6 y a los ajustes de imagen (uniforms que
+// comparte el pase de transmisión, así que SILLAS ve lo mismo).
+const marcar = () => { DOMO_EFECTOS.version++; };
+export const IMAGE_CONTROLS_EXTRA: CtrlDef[] = [
+  ...Array.from({ length: 7 }, (_, i): CtrlDef => ({ id: `dom_fx${i}`, type: "toggle", label: `FX${i}`, px: 0, py: 0,
+    min: 0, max: 1, initial: (DBG_ATRIL_VIDEO.PADS_INICIO >> i) & 1, onActivate: (v) => fijarPad(DOMO_EFECTOS, i, v > 0.5) })),
+  { id: "dom_auto",  type: "toggle", label: "AUTO", px: 0, py: 0, min: 0, max: 1, initial: 1, onActivate: (v) => { DOMO_EFECTOS.auto = v > 0.5; DOMO_EFECTOS.acum = 0; marcar(); } },
+  { id: "dom_rot_s", type: "knob", label: "VELOC.", px: 0, py: 0, min: DBG_ATRIL_VIDEO.VELOC_MIN_S, max: DBG_ATRIL_VIDEO.VELOC_MAX_S, initial: DBG_ATRIL_VIDEO.VELOC_DEFECTO_S,
+    onActivate: (v) => { DOMO_EFECTOS.rotS = v; marcar(); } },
+  { id: "dom_fx_on", type: "toggle", label: "ON", px: 0, py: 0, min: 0, max: 1, initial: 1, onActivate: (v) => { DOMO_EFECTOS.on = v > 0.5; marcar(); } },
+  { id: "wcam_on",   type: "toggle", label: "ON", px: 0, py: 0, min: 0, max: 1, initial: 1, onActivate: (v) => { DOMO_EFECTOS.imagenOn = v > 0.5; } },
+  // Z98: VISUALIZADOR (sin cámara · se transmite): radios de ESTILO y PALETA (uno encendido por grupo) y VEL. COLOR
+  { id: "vis_cascada",   type: "toggle", label: "CASCADA",   px: 0, py: 0, min: 0, max: 1, initial: 0, onActivate: () => elegirVis("estilo", "cascada") },
+  { id: "vis_xy",        type: "toggle", label: "XY",        px: 0, py: 0, min: 0, max: 1, initial: 0, onActivate: () => elegirVis("estilo", "xy") },
+  { id: "vis_ambar",     type: "toggle", label: "ÁMBAR",     px: 0, py: 0, min: 0, max: 1, initial: 0, onActivate: () => elegirVis("paleta", "ambar") },
+  { id: "vis_fosforo",   type: "toggle", label: "FÓSFORO",   px: 0, py: 0, min: 0, max: 1, initial: 0, onActivate: () => elegirVis("paleta", "fosforo") },
+  { id: "vis_identidad", type: "toggle", label: "IDENTIDAD", px: 0, py: 0, min: 0, max: 1, initial: 0, onActivate: () => elegirVis("paleta", "identidad") },
+  { id: "vis_color_v",   type: "knob",   label: "VEL. COLOR", px: 0, py: 0, min: 0, max: 0.6, initial: DBG_ONDAS_TARIMA.COLOR_VELOC,
+    onActivate: (v) => { DBG_ONDAS_TARIMA.COLOR_VELOC = v; } },
+];
+/** Z98: elige estilo o paleta del visualizador y deja encendido un solo pad por grupo (también si se aprieta el ya elegido). */
+function elegirVis(grupo: "estilo" | "paleta", valor: string): void {
+  if (grupo === "estilo") DBG_ONDAS_TARIMA.ESTILO = valor; else DBG_ONDAS_TARIMA.PALETA = valor;
+  sincronizarVis();
+}
+const _radioE = [0, 0], _radioP = [0, 0, 0];
+/** Pads del VISUALIZADOR según DBG_ONDAS_TARIMA (al cargar, al tocar un pad y cuando cambia desde el menú de debug). */
+function sincronizarVis(): void {
+  radio(RADIO_ESTILO_I.map(r => r[1]), DBG_ONDAS_TARIMA.ESTILO, _radioE).forEach((v, i) => { ctrlState[RADIO_ESTILO_I[i][0]] = v; });
+  radio(RADIO_PALETA_I.map(r => r[1]), DBG_ONDAS_TARIMA.PALETA, _radioP).forEach((v, i) => { ctrlState[RADIO_PALETA_I[i][0]] = v; });
+  ctrlState.vis_color_v = DBG_ONDAS_TARIMA.COLOR_VELOC;
+}
+IMAGE_CONTROLS_EXTRA.forEach(c => { ctrlState[c.id] = c.initial; });
+sincronizarVis();   // Z98
+DOMO_EFECTOS.mascara = DBG_ATRIL_VIDEO.PADS_INICIO & 0x7f;
+DOMO_EFECTOS.rotS = DBG_ATRIL_VIDEO.VELOC_DEFECTO_S;
+/** Layout nuevo del atril de imagen: los controles que siguen (mismo id, acción y rango) + los nuevos, en otra posición. */
+export const IMAGE_CONTROLS_NUEVO: CtrlDef[] = POSICIONES_I.map((p: PosCtrlI) => {
+  const d = IMAGE_CONTROLS.find(c => c.id === p.id) ?? IMAGE_CONTROLS_EXTRA.find(c => c.id === p.id)!;
+  return { ...d, px: p.u, py: p.v, label: p.etiqueta, nombreLargo: p.nombreLargo,
+    forma: (p.forma === "indicador" ? undefined : p.forma) as FormaCtrl | undefined,
+    type: p.tipo,                                                  // FOV pasa de fader a perilla
+    ...(p.tipo === "knob" ? { color: "mustard" as const } : {}),
+    ...(p.tipo === "slider" ? { railLen: 0.20, orientation: "v" as const } : {}) };
+});
+// Z97b: luces de ESCENA del diseño nuevo (lib/lucesEscena.ts): LUZ ± un paso acotado por pulsación, EXTRA on/off sin
+// acumular, INTENS. en [LUZ_MIN, LUZ_MAX]. La perilla INTENS. sigue al nivel. El diseño anterior queda como estaba
+// (más el tope final, que vale para los dos).
+function luzPaso(signo: 1 | -1): void {
+  STORE.lights.globalIntensity = pasoNivel(STORE.lights.globalIntensity, signo, DBG_ATRIL_VIDEO);
+  ctrlState.dom_int = STORE.lights.globalIntensity;
+  storeNotify();
+}
+const LUZ_NUEVO: Record<string, Partial<CtrlDef>> = {
+  dom_minus: { onActivate: () => luzPaso(-1) },
+  dom_plus:  { onActivate: () => luzPaso(1) },
+  dom_star:  { type: "toggle", initial: 0, onActivate: (v) => { LUZ_ESCENA.extra = v > 0.5; LUZ_ESCENA.version++; storeNotify(); } },
+  dom_int:   { min: DBG_ATRIL_VIDEO.LUZ_MIN, max: DBG_ATRIL_VIDEO.LUZ_MAX, initial: DBG_ATRIL_VIDEO.LUZ_DEFECTO,
+               onActivate: (v) => { STORE.lights.globalIntensity = acotarNivel(v, DBG_ATRIL_VIDEO); storeNotify(); } },
+  lights_ind: { initial: DBG_ATRIL_VIDEO.LUZ_DEFECTO },
+};
+IMAGE_CONTROLS_NUEVO.forEach((d, i) => { const o = LUZ_NUEVO[d.id]; if (o) IMAGE_CONTROLS_NUEVO[i] = { ...d, ...o }; });
+function controlesImagen(): CtrlDef[] { return DBG_ATRIL_VIDEO.DISENO_NUEVO ? IMAGE_CONTROLS_NUEVO : IMAGE_CONTROLS; }
+const _posImagen = new Map<string, PosCtrlI>(POSICIONES_I.map(p => [p.id, p]));
+
+// ── Z99: controles del BA-40 (layout en lib/atrilBajo.ts; acciones en lib/audio/bajoAcido.ts) ──
+// Las perillas de VOZ van de 0 a 1 (normalizado: CORTE y DECAY con curva exponencial) y el motor recibe el valor real con
+// setParamBajo(id, valor, "manual"); la fuente "cara" (Z100) moverá los mismos parámetros sin tocar estos controles.
+function defBajo(p: PosCtrlB): CtrlDef {
+  const base = { id: p.id, label: p.etiqueta, px: p.u, py: p.v, nombreLargo: p.nombreLargo, escala: p.escala, forma: p.forma as FormaCtrl };
+  const k = p.paso;
+  if (p.id.startsWith("b_nota")) return { ...base, type: "knob", color: "mustard", min: 0, max: 24, initial: PATRON_BAJO.nota[k],
+    onActivate: (v) => editarPaso("nota", k, v) };
+  for (const campo of ["acento", "desliz", "paso"] as const) {
+    if (p.id === `b_${campo}${k}`) return { ...base, type: "toggle", min: 0, max: 1, initial: 0, marcaPaso: campo === "paso" ? k : undefined,
+      onActivate: (v) => editarPaso(campo === "paso" ? "activo" : campo, k, v) };
+  }
+  if (p.id.startsWith("b_pat_")) { const nm = p.id.slice(6) as NombrePatron;
+    return { ...base, type: "toggle", min: 0, max: 1, initial: 0, onActivate: () => { cargarPatron(nm); sincronizarBajo(); } }; }
+  if (p.id === "b_limpio") return { ...base, type: "button", min: 0, max: 1, initial: 0, onActivate: (v) => { if (v > 0.5) { patronLimpio(); sincronizarBajo(); } } };
+  const onda = ONDAS_B.find(o => o[0] === p.id);
+  if (onda) return { ...base, type: "toggle", min: 0, max: 1, initial: 0, onActivate: () => { DBG_BAJO.ONDA = onda[1]; aplicarParamsBajo(); sincronizarBajo(); } };
+  if (p.id.startsWith("b_p_")) { const pid = p.id.slice(4), d = PARAMS_BAJO[indiceParam(pid)];
+    return { ...base, type: "knob", color: "mustard", min: 0, max: 1, initial: aNormal(d, d.defecto), onActivate: (v) => { setParamBajo(pid, deNormal(d, v), "manual"); } }; }
+  if (p.id === "b_vol") return { ...base, type: "slider", orientation: "v", railLen: 0.12, min: 0, max: 1, initial: DBG_BAJO.VOLUMEN, onActivate: (v) => { setParamBajo("volumen", v, "manual"); } };
+  return { ...base, type: "toggle", min: 0, max: 1, initial: 1, onActivate: (v) => { DBG_BAJO.ON = v > 0.5; aplicarParamsBajo(); } };   // b_on
+}
+export const CONTROLES_BAJO: CtrlDef[] = POSICIONES_B.map(defBajo);
+const _posBajo = new Map<string, PosCtrlB>(POSICIONES_B.map(p => [p.id, p]));
+const _radioPat = [0, 0, 0, 0, 0], _radioOnda = [0, 0];
+/** Estado de los controles del BA-40 desde el motor (patrón, parámetros, onda, ON): al cargar, al editar y desde el menú. */
+function sincronizarBajo(): void {
+  for (let k = 0; k < 16; k++) {
+    ctrlState[`b_nota${k}`] = PATRON_BAJO.nota[k]; ctrlState[`b_acento${k}`] = PATRON_BAJO.acento[k];
+    ctrlState[`b_desliz${k}`] = PATRON_BAJO.desliz[k]; ctrlState[`b_paso${k}`] = PATRON_BAJO.activo[k];
+  }
+  radio(PATRONES_B as readonly string[], BAJO.patron, _radioPat).forEach((v, i) => { ctrlState[`b_pat_${PATRONES_B[i]}`] = (PATRONES_B as readonly string[]).includes(BAJO.patron) ? v : 0; });
+  radio(ONDAS_B.map(o => o[1]), DBG_BAJO.ONDA, _radioOnda).forEach((v, i) => { ctrlState[ONDAS_B[i][0]] = v; });
+  for (const [pid] of PERILLAS_B) ctrlState[`b_p_${pid}`] = aNormal(PARAMS_BAJO[indiceParam(pid)], PARAMS_B.manual[indiceParam(pid)]);
+  ctrlState.b_vol = PARAMS_B.manual[indiceParam("volumen")];
+  ctrlState.b_on = DBG_BAJO.ON ? 1 : 0;
+}
+sincronizarBajo();
+/** Texto del display del BA-40 al tocar un control (se arma solo en el gesto del usuario). */
+function textoBajo(id: string, def: CtrlDef): string {
+  const p = _posBajo.get(id);
+  if (!p) return def.label;
+  const v = ctrlState[id] ?? def.initial;
+  if (id.startsWith("b_nota")) return `${p.nombreLargo} ${nombreNota(DBG_BAJO.RAIZ_MIDI + Math.round(v))}`;
+  if (id.startsWith("b_acento") || id.startsWith("b_desliz") || id.startsWith("b_paso") || id === "b_on") return `${p.nombreLargo} ${v > 0.5 ? "ON" : "OFF"}`;
+  if (id.startsWith("b_p_")) {
+    const pid = id.slice(4), r = valorParam(PARAMS_B, pid);
+    if (pid === "corte") return `CORTE ${Math.round(r)} HZ`;
+    if (pid === "decay" || pid === "desliz") return `${p.nombreLargo} ${r.toFixed(2)} S`;
+    if (pid === "afinacion") return `AFINACIÓN ${r >= 0 ? "+" : ""}${Math.round(r)} ST`;
+    return `${p.nombreLargo} ${(r * 10).toFixed(1)}`;
+  }
+  if (id === "b_vol") return `VOLUMEN ${(v * 10).toFixed(1)}`;
+  return p.nombreLargo;
+}
+/** Z96: cambia el diseño o la escala de etiquetas desde el menú (LecternSystem remonta el atril o rehace la serigrafía). */
+export function cambiarAtrilSonido(remontar: boolean): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("alight:atril-sonido-cambio", { detail: { remontar } }));
+}
+
 // K2: dev direction tests — run from console: window.__lecternTests()
 export function runControlDirectionTests(): void {
   if (typeof window === "undefined") return;
@@ -1102,6 +1405,15 @@ function CtrlMesh({
   const overlayMatRef  = useRef<THREE.MeshBasicMaterial | null>(null);
   const haloMatRef     = useRef<THREE.MeshBasicMaterial | null>(null);
   const keycapMatRef   = useRef<THREE.MeshStandardMaterial | null>(null);
+  // Z96: PLAY/PAUSA grande (forma "play") y ON en pastilla (forma "pastilla")
+  const playGrupoRef   = useRef<THREE.Group>(null);
+  const playTeclaRef   = useRef<THREE.Group>(null);
+  const playPantRef    = useRef<THREE.MeshBasicMaterial | null>(null);
+  const playLuzRef     = useRef<THREE.MeshStandardMaterial | null>(null);
+  const playSonandoRef = useRef<boolean | null>(null);
+  const playTex = useMemo(() => def.forma === "play" ? texPlayGrande() : null, [def.forma]);
+  const marcaRef = useRef<THREE.Mesh>(null);   // Z99: paso que suena (BA-40)
+  useEffect(() => () => { playTex?.dispose(); }, [playTex]);
 
   const register = (mesh: THREE.Mesh | null) => {
     if (!mesh || meshesRef.current.includes(mesh)) return;
@@ -1128,9 +1440,11 @@ function CtrlMesh({
       RETRO_CRT.uTime.value = clock.elapsedTime;
       // K3: show globalIntensity instead of extras count
       const intensity = STORE.lights.globalIntensity;
-      if (Math.abs(intensity - indLastVal.current) > 0.001 && indCanvasRef.current && indTexRef.current) {
-        indLastVal.current = intensity;
-        drawLightsIndicator(indCanvasRef.current, intensity);
+      const extra = DBG_ATRIL_VIDEO.DISENO_NUEVO && LUZ_ESCENA.extra;   // Z97b: "+EX" en la lectura
+      const clave = intensity + (extra ? 1000 : 0);
+      if (Math.abs(clave - indLastVal.current) > 0.001 && indCanvasRef.current && indTexRef.current) {
+        indLastVal.current = clave;
+        drawLightsIndicator(indCanvasRef.current, intensity, extra);
         indTexRef.current.needsUpdate = true;
       }
       return;
@@ -1146,6 +1460,29 @@ function CtrlMesh({
         const angle = Math.PI * 1.75 - norm * Math.PI * 1.5;
         knobRotRef.current.rotation.y = angle;
       }
+      return;
+    }
+
+    // Z96: ON en pastilla (sin palanca: solo la luz)
+    if (def.forma === "pastilla" || def.forma === "pad") {   // Z97: el pad de efecto también es "solo la luz"
+      if (ledMatRef.current) ledMatRef.current.emissiveIntensity = v > 0.5 ? 2.4 : 0.04;
+      if (marcaRef.current) marcaRef.current.visible = BAJO.pasoSonando === def.marcaPaso;   // Z99
+      return;
+    }
+    // Z96: PLAY/PAUSA grande: escala en vivo, hundido al apretar, pantalla y luz según PLAY_TARIMA.sonando
+    if (def.forma === "play") {
+      if (playGrupoRef.current) playGrupoRef.current.scale.setScalar(Math.max(0.3, DBG_ATRIL_SONIDO.PLAY_ESCALA));
+      const ms = performance.now() - (_pressAt[def.id] ?? -1e9);
+      let hund = 0;
+      if (ms < 220) { const t = ms / 220; hund = t < 0.2 ? 0.007 * t / 0.2 : 0.007 * Math.max(0, Math.exp(-6 * (t - 0.2)) * Math.cos(Math.PI * 2 * (t - 0.2))); }
+      if (playTeclaRef.current) playTeclaRef.current.position.y = -hund;
+      // Z96b: la LUZ dice el estado (verde con pulso suave reproduciendo · ámbar apagada en pausa); el texto es fijo
+      const s = PLAY_TARIMA.sonando;
+      if (s !== playSonandoRef.current) {
+        playSonandoRef.current = s;
+        if (playLuzRef.current) playLuzRef.current.emissive.set(s ? LUZ_PLAY.sonando : LUZ_PLAY.pausa);
+      }
+      if (playLuzRef.current) playLuzRef.current.emissiveIntensity = intensidadLuzPlay(s, performance.now());
       return;
     }
 
@@ -1266,6 +1603,13 @@ function CtrlMesh({
           <planeGeometry args={[DW - 0.012, DD - 0.010]} />
           <primitive object={indMat} attach="material" />
         </mesh>
+        {/* Z97b: NIVEL del diseño nuevo recibe el doble clic (vuelve al nivel por defecto) */}
+        {def.id === "lights_ind" && DBG_ATRIL_VIDEO.DISENO_NUEVO && (
+          <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, DH / 2, 0]} visible={false}>
+            <boxGeometry args={[DW, DH + 0.006, DD]} />
+            <meshBasicMaterial transparent opacity={0} />
+          </mesh>
+        )}
         {LABEL_MODE === "mesh" && (
           <mesh position={[0, 0.001, lblZ]} rotation={LBL_ROT}>
             <planeGeometry args={[LBL_W, LBL_H]} />
@@ -1374,7 +1718,7 @@ function CtrlMesh({
       return { x: Math.sin(angle) * r, z: -Math.cos(angle) * r, isEnd };
     });
     return (
-      <group position={[def.px, surfY, -def.py]}>
+      <group position={[def.px, surfY, -def.py]} scale={def.forma === "grande" ? GRANDE_ESCALA : (def.escala ?? 1)}>
         {/* Skirt: flat disk below body */}
         <mesh position={[0, KNOB_SKIRT_H / 2 - 0.001, 0]}>
           <cylinderGeometry args={[KNOB_SKIRT_R, KNOB_SKIRT_R, KNOB_SKIRT_H, 32]} />
@@ -1387,11 +1731,24 @@ function CtrlMesh({
             <cylinderGeometry args={[KNOB_R, KNOB_BOT_R, KNOB_H, 32]} />
             <primitive object={knobMat} attach="material" />
           </mesh>
-          {/* Indicator line on top face */}
-          <mesh position={[0, KNOB_H / 2 + 0.001, indCtrZ]}>
-            <boxGeometry args={[0.004, 0.002, indLen]} />
-            <primitive object={SILK_MAT} attach="material" />
-          </mesh>
+          {/* Indicator line on top face · Z96b: en el diseño nuevo, marca oscura gruesa con punto en la punta (contrasta con la tapa mostaza) */}
+          {def.forma ? (
+            <>
+              <mesh position={[0, KNOB_H / 2 + 0.0012, indCtrZ]}>
+                <boxGeometry args={[0.0075, 0.0024, indLen]} />
+                <primitive object={MARCA_PERILLA_MAT} attach="material" />
+              </mesh>
+              <mesh position={[0, KNOB_H / 2 + 0.0014, KNOB_R * 0.80]}>
+                <cylinderGeometry args={[0.0058, 0.0058, 0.0028, 16]} />
+                <primitive object={MARCA_PERILLA_MAT} attach="material" />
+              </mesh>
+            </>
+          ) : (
+            <mesh position={[0, KNOB_H / 2 + 0.001, indCtrZ]}>
+              <boxGeometry args={[0.004, 0.002, indLen]} />
+              <primitive object={SILK_MAT} attach="material" />
+            </mesh>
+          )}
         </group>
         {/* Fixed scale marks — hidden in silkscreen mode */}
         {LABEL_MODE === "mesh" && arcMarks.map((p, i) => (
@@ -1414,6 +1771,100 @@ function CtrlMesh({
               polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
           </mesh>
         )}
+      </group>
+    );
+  }
+
+  // ── Z96: ON en pastilla con luz (arriba a la derecha de la banda de título del módulo) ──
+  if (def.type === "toggle" && def.forma === "pastilla") {
+    return (
+      <group position={[def.px, surfY, -def.py]}>
+        <mesh position={[0, 0.004, 0]}>
+          <boxGeometry args={[0.058, 0.008, 0.026]} />
+          <primitive object={ROCKER_BASE_DARK_MAT} attach="material" />
+        </mesh>
+        {/* lente ámbar: se enciende con el módulo */}
+        <mesh position={[0, 0.0095, 0]}>
+          <boxGeometry args={[0.046, 0.004, 0.018]} />
+          <meshStandardMaterial ref={ledMatRef} color="#3A1A00" emissive={lecternPalette().ledToggle} emissiveIntensity={0.04} roughness={0.5} />
+        </mesh>
+        <mesh position={[0, 0.0118, 0]} rotation={LBL_ROT}>
+          <planeGeometry args={[0.040, 0.0125]} />
+          <meshBasicMaterial map={labelTex("ON")} transparent alphaTest={0.05} depthWrite={false} toneMapped={false}
+            polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+        </mesh>
+        <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, 0.006, 0]} visible={false}>
+          <boxGeometry args={[0.058 * HIT_PAD, 0.016, 0.026 * HIT_PAD]} />
+          <meshBasicMaterial transparent opacity={0} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // ── Z97: pad de efecto (tecla crema con luz en el borde lejano; el nombre va serigrafiado debajo) ──
+  if (def.type === "toggle" && def.forma === "pad") {
+    return (
+      <group position={[def.px, surfY, -def.py]} scale={def.escala ?? 1}>
+        {/* Z99: marca del paso que está sonando (teclas PASO del BA-40) */}
+        {def.marcaPaso !== undefined && (
+          <mesh ref={marcaRef} position={[0, 0.0185, -0.0215]} visible={false}>
+            <boxGeometry args={[0.060, 0.004, 0.010]} />
+            <meshBasicMaterial color="#F4EFE0" toneMapped={false} />
+          </mesh>
+        )}
+        <mesh position={[0, 0.004, 0]}>
+          <boxGeometry args={[0.100, 0.008, 0.056]} />
+          <primitive object={ROCKER_BASE_DARK_MAT} attach="material" />
+        </mesh>
+        <mesh position={[0, 0.0125, 0.004]}>
+          <boxGeometry args={[0.090, 0.009, 0.040]} />
+          <primitive object={PUSHBTN_MAT} attach="material" />
+        </mesh>
+        <mesh position={[0, 0.0100, -0.0215]}>
+          <boxGeometry args={[0.080, 0.004, 0.007]} />
+          <meshStandardMaterial ref={ledMatRef} color="#3A1A00" emissive={lecternPalette().ledToggle} emissiveIntensity={0.04} roughness={0.5} />
+        </mesh>
+        <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, 0.008, 0]} visible={false}>
+          <boxGeometry args={[0.100, 0.020, 0.056]} />
+          <meshBasicMaterial transparent opacity={0} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // ── Z96: PLAY/PAUSA grande (rectangular, con pantalla y luz propia) ──
+  if (def.forma === "play") {
+    const BW = PLAY_W, BD = PLAY_D;
+    return (
+      <group position={[def.px, surfY, -def.py]}>
+        <group ref={playGrupoRef}>
+          {/* marco carbón */}
+          <mesh position={[0, 0.005, 0]}>
+            <boxGeometry args={[BW, 0.010, BD]} />
+            <meshStandardMaterial color="#3A3B3C" roughness={0.85} metalness={0.05} />
+          </mesh>
+          <group ref={playTeclaRef}>
+            {/* tecla óxido */}
+            <mesh position={[0, 0.018, 0]}>
+              <boxGeometry args={[BW - 0.014, 0.016, BD - 0.014]} />
+              <primitive object={PLAY_TECLA_MAT} attach="material" />
+            </mesh>
+            {/* pantalla ▶ PLAY / ❚❚ PAUSA */}
+            <mesh position={[0, 0.0265, 0.004]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[BW - 0.040, BD - 0.034]} />
+              <meshBasicMaterial ref={m => { playPantRef.current = m; }} map={playTex ?? null} toneMapped={false} />
+            </mesh>
+            {/* luz propia (franja del lado lejano): verde = reproduciendo · ámbar = en pausa */}
+            <mesh position={[0, 0.0268, -(BD - 0.014) / 2 + 0.008]}>
+              <boxGeometry args={[BW - 0.040, 0.002, 0.007]} />
+              <meshStandardMaterial ref={m => { playLuzRef.current = m; }} color="#1a1000" emissive="#FF9A1F" emissiveIntensity={0.9} />
+            </mesh>
+          </group>
+          <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, 0.014, 0]} visible={false}>
+            <boxGeometry args={[BW, 0.030, BD]} />
+            <meshBasicMaterial transparent opacity={0} />
+          </mesh>
+        </group>
       </group>
     );
   }
@@ -1726,7 +2177,7 @@ if (typeof window !== "undefined") {
 }
 
 // ── Lectern geometry ──────────────────────────────────────────────────────────
-function LecternBody({ side }: { side: "left" | "right" }) {
+function LecternBody({ side, silkV = 0 }: { side: Lado; silkV?: number }) {
   const { gl } = useThree();
   const sign   = side === "left" ? -1 : 1;
   const silkMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
@@ -1738,18 +2189,30 @@ function LecternBody({ side }: { side: "left" | "right" }) {
   }, [gl]);
 
   // L3: build silkscreen canvas texture and apply to the plane
+  // Z96: el atril de sonido con DISENO_NUEVO usa su propia serigrafía; se rehace con silkV (ETIQUETA_ESCALA) y la
+  // textura anterior se libera (también al desmontar)
+  const nuevoSonido = side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO;
+  const nuevoImagen = side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO;   // Z97
+  const esBajo = side === "bajo";                                        // Z99
   useEffect(() => {
     if (LABEL_MODE !== "silkscreen") return;
     let cancelled = false;
-    buildSilkscreen(side).then(tex => {
+    let propia: THREE.CanvasTexture | null = null;
+    (nuevoSonido ? buildSilkscreenSonido({ CW: CPANEL_W, CD: CPANEL_D, KNOB_SKIRT_R, THUMB_W })
+      : nuevoImagen ? buildSilkscreenImagen({ CW: CPANEL_W, CD: CPANEL_D })
+      : side === "bajo" ? buildSilkscreenBajo({ CW: CPANEL_W, CD: CPANEL_D }) : buildSilkscreen(side)).then(tex => {
       if (cancelled) { tex.dispose(); return; }
+      propia = tex;
       if (silkMatRef.current) {
         silkMatRef.current.map = tex;
         silkMatRef.current.needsUpdate = true;
       }
     });
-    return () => { cancelled = true; };
-  }, [side]);
+    return () => {
+      cancelled = true;
+      if (propia) { if (silkMatRef.current?.map === propia) silkMatRef.current.map = null; propia.dispose(); }
+    };
+  }, [side, nuevoSonido, nuevoImagen, esBajo, silkV]);
 
   return (
     <group>
@@ -1764,7 +2227,11 @@ function LecternBody({ side }: { side: "left" | "right" }) {
         <primitive object={CHROME_MAT} attach="material" />
       </mesh>
       {/* J5: retro branded apron between the legs (front / user side) */}
-      <LecternApron side={side} topY={LEG_H - 0.03} />
+      <LecternApron side={side === "bajo" ? "right" : side} topY={LEG_H - 0.03} />
+      {/* Z96: placa con el nombre del equipo en la cara frontal del mueble (como la CR-80) */}
+      {nuevoSonido && <PlacaFrenteSonido y={LEG_H - 0.03 - 0.12} z={0.0135} ancho={0.80} />}
+      {nuevoImagen && <PlacaFrenteSonido y={LEG_H - 0.03 - 0.12} z={0.0135} ancho={0.80} nombre={NOMBRE_EQUIPO_I} descripcion={DESCRIPCION_EQUIPO_I} />}
+      {esBajo && <PlacaFrenteSonido y={LEG_H - 0.03 - 0.12} z={0.0135} ancho={0.80} nombre={NOMBRE_EQUIPO_B} descripcion={DESCRIPCION_EQUIPO_B} />}
 
       {/* ── Top plate group: tilted, front (+Z) lower, back (-Z) higher ───── */}
       {/* Pivot at local +Z = front edge; rotation.x = +TILT_RAD lowers +Z */}
@@ -1809,7 +2276,7 @@ function LecternBody({ side }: { side: "left" | "right" }) {
             </mesh>
           )}
           {/* J5: retro brand guard on the rear bar's user-facing side */}
-          <LecternRearStrip side={side} faceZ={-(OUTER_D / 2 - REAR_BAR_D)} plateTopY={PANEL_T / 2} height={REAR_BAR_EXTRA} />
+          <LecternRearStrip side={side === "bajo" ? "right" : side} faceZ={-(OUTER_D / 2 - REAR_BAR_D)} plateTopY={PANEL_T / 2} height={REAR_BAR_EXTRA} />
         </group>
       </group>
     </group>
@@ -1818,24 +2285,25 @@ function LecternBody({ side }: { side: "left" | "right" }) {
 
 // ── Full lectern ──────────────────────────────────────────────────────────────
 function Lectern({
-  side, controls, appearProgress, keyVersion, flipVersion,
+  side, controls, appearProgress, keyVersion, flipVersion, silkV = 0,
 }: {
-  side: "left" | "right";
+  side: Lado;
   controls: CtrlDef[];
   appearProgress: React.MutableRefObject<number>;
   keyVersion: number;
   flipVersion: number;
+  silkV?: number;
 }) {
   const groupRef  = useRef<THREE.Group>(null);
   const meshesRef = useRef<THREE.Mesh[]>([]);
   const sign      = side === "left" ? -1 : 1;
-  // I1: local +Z faces center; yaw = atan2(toCenter.x, toCenter.z)
-  const flip = (side === "left" ? DBG_LECTERNS.yawFlipLeft : DBG_LECTERNS.yawFlipRight) ? Math.PI : 0;
-  const yaw  = Math.atan2(-sign * LECTERN_PLACE_X, 0) + LECTERN_YAW_OFFSET_RAD + flip;
+  // I1: local +Z faces center; yaw = atan2(toCenter.x, toCenter.z) · Z99: poseLado (el BA-40 va en su slot)
+  const pl   = poseLado(side);
+  const posX = pl.x, posZ = pl.z, yaw = pl.yaw;
 
   // Dev: verify front dot-product with toCenter > 0.99
   useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
+    if (process.env.NODE_ENV !== "development" || side === "bajo") return;
     const frontWorld = new THREE.Vector2(Math.sin(yaw), Math.cos(yaw)); // local +Z in XZ
     const toCenter2D = new THREE.Vector2(-sign, 0);                     // unit vec toward center
     const dot = frontWorld.dot(toCenter2D);
@@ -1856,6 +2324,14 @@ function Lectern({
     }
   });
 
+  // Z96: al desmontar (p. ej. cambiar el diseño del atril de sonido), sus mallas de impacto dejan de ser clickeables
+  useEffect(() => () => {
+    const ex = (window as unknown as { __lecternMeshes?: THREE.Mesh[] }).__lecternMeshes;
+    if (!ex) return;
+    for (const m of meshesRef.current) { const i = ex.indexOf(m); if (i >= 0) ex.splice(i, 1); }
+    meshesRef.current.length = 0;
+  }, []);
+
   useFrame(() => {
     if (!groupRef.current) return;
     const ease = 1 - Math.pow(1 - appearProgress.current, 3);
@@ -1872,8 +2348,15 @@ function Lectern({
 
   return (
     <group ref={groupRef}>
-      <group position={[sign * LECTERN_PLACE_X, TARIMA_H_REF, 0]} rotation={[0, yaw, 0]}>
-        <LecternBody side={side} />
+      <group position={[posX, TARIMA_H_REF, posZ]} rotation={[0, yaw, 0]}>
+        <LecternBody side={side} silkV={silkV} />
+        {/* Z99: el BA-40 está fuera de la tarima: pedestal desde el piso hasta la altura de la tarima, y su motor */}
+        {side === "bajo" && (
+          <mesh position={[0, -TARIMA_H_REF / 2, 0]} material={PEDESTAL_MAT}>
+            <boxGeometry args={[OUTER_W * 0.92, TARIMA_H_REF, OUTER_D * 0.92]} />
+          </mesh>
+        )}
+        {side === "bajo" && <MotorBajo />}
 
         {/* SpotLight: above and slightly toward user (local +Z), aimed at plate centre */}
         <spotLight
@@ -1891,7 +2374,7 @@ function Lectern({
         <group position={[0, LEG_H, PANEL_D / 2]} rotation={[TILT_RAD, 0, 0]}>
           <group position={[0, PANEL_T + CPANEL_T, -PANEL_D / 2]}>
             {/* J3: section frames + labels — skipped in silkscreen mode */}
-            {LABEL_MODE === "mesh" && (side === "left" ? IMAGE_SECTIONS : SOUND_SECTIONS).map(sec => {
+            {LABEL_MODE === "mesh" && (side === "left" ? IMAGE_SECTIONS : side === "bajo" ? [] : SOUND_SECTIONS).map(sec => {
               const vBack  = sec.band === "B" ? BAND_B_V_BACK  : BAND_A_V_BACK;
               const vFront = sec.band === "A" ? -0.02 : BAND_B_V_FRONT;
               const zBack  = -vBack;
@@ -1939,7 +2422,7 @@ function Lectern({
             })}
             {/* J3 debug: cell grid overlay */}
             {process.env.NODE_ENV === "development" && DBG_LECTERNS.showSections &&
-              (side === "left" ? IMAGE_SECTIONS : SOUND_SECTIONS).flatMap(sec =>
+              (side === "left" ? IMAGE_SECTIONS : side === "bajo" ? [] : SOUND_SECTIONS).flatMap(sec =>
                 (sec.band === "AB" ? [] :
                   [sec.band === "A" ? ROW1_V_A : ROW1_V_B, sec.band === "A" ? ROW2_V_A : ROW2_V_B]
                 ).flatMap(v =>
@@ -1956,7 +2439,28 @@ function Lectern({
               )
             }
             {/* Z79: botón grande de PLAY en la franja libre del centro del atril de sonido */}
-            {side === "right" && <PlayGrande />}
+            {side === "right" && !DBG_ATRIL_SONIDO.DISENO_NUEVO && <PlayGrande />}
+            {/* Z96: display ámbar (franja lejana) y VU de la columna SALIDA del diseño nuevo */}
+            {side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO && <><DisplaySonido /><VuSonido /></>}
+            {/* Z96b: placa del equipo sobre la barra trasera (la ve la cámara del atril) y rótulos de fila */}
+            {side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO && (
+              <PlacaBarraSonido conLeyenda={DBG_ATRIL_SONIDO.ROTULOS_FILA && DBG_ATRIL_SONIDO.ROTULOS_MODO !== "margen"} />
+            )}
+            {side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO && DBG_ATRIL_SONIDO.ROTULOS_FILA && (
+              <MargenRotulos modo={DBG_ATRIL_SONIDO.ROTULOS_MODO === "margen" ? "margen" : "barra"} />
+            )}
+            {/* Z99: BA-40: display con la curva del filtro, VU de SALIDA y placa de la barra (leyenda 1 · 2 · 3) */}
+            {side === "bajo" && <><DisplayBajo /><VuBajo /></>}
+            {side === "bajo" && <PlacaBarraSonido texto={TEXTO_PLACA_BAJO} leyenda={LEYENDA_FILAS_B} conLeyenda={DBG_ATRIL_BAJO.ROTULOS_FILA} />}
+            {/* Z97: atril de imagen: display, placa de la barra y rótulos DOMO · IMAGEN */}
+            {side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO && <DisplayImagen />}
+            {side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO && (
+              <PlacaBarraSonido texto={TEXTO_PLACA_IMAGEN} leyenda={LEYENDA_FILAS_I}
+                conLeyenda={DBG_ATRIL_VIDEO.ROTULOS_FILA && DBG_ATRIL_VIDEO.ROTULOS_MODO === "barra"} />
+            )}
+            {side === "left" && DBG_ATRIL_VIDEO.DISENO_NUEVO && DBG_ATRIL_VIDEO.ROTULOS_FILA && (
+              <MargenRotulos modo={DBG_ATRIL_VIDEO.ROTULOS_MODO === "barra" ? "barra" : "margen"} verticales={ROTULOS_VERTICALES_I} numeros={ROTULOS_NUMEROS_I} />
+            )}
             {controls.map(def => (
               <CtrlMesh
                 key={def.id}
@@ -2023,7 +2527,7 @@ function InteractionHandler() {
       const hits = localRc.current.intersectObjects(meshes, false);
       if (!hits.length) return null;
       const def = hits[0].object.userData.controlDef as CtrlDef | undefined;
-      if (!def || def.type === "indicator") return null;
+      if (!def || (def.type === "indicator" && def.id !== "lights_ind")) return null;   // Z97b: NIVEL acepta doble clic
       return { mesh: hits[0].object as THREE.Mesh, def, point: hits[0].point };
     }
 
@@ -2096,6 +2600,27 @@ function InteractionHandler() {
         return;
       }
 
+      // Z97b: la lectura NIVEL no se arrastra; doble clic / doble toque → nivel por defecto
+      if (def.type === "indicator") {
+        if (def.id === "lights_ind" && DBG_ATRIL_VIDEO.DISENO_NUEVO && esDobleClic(_dobleClic, def.id, performance.now())) {
+          STORE.lights.globalIntensity = acotarNivel(DBG_ATRIL_VIDEO.LUZ_DEFECTO, DBG_ATRIL_VIDEO);
+          ctrlState.dom_int = STORE.lights.globalIntensity;
+          storeNotify();
+          playUIClick(900, 0.08);
+        }
+        return;
+      }
+
+      // Z96: doble clic / doble toque sobre una perilla o el fader del atril de sonido → valor por defecto
+      // Z97: también perillas y faders del atril de imagen nuevo (vuelven a su valor inicial)
+      if ((def.type === "knob" || def.type === "slider")
+          && ((DBG_ATRIL_SONIDO.DISENO_NUEVO && def.id.startsWith("s_")) || (DBG_ATRIL_VIDEO.DISENO_NUEVO && _posImagen.has(def.id)) || def.id.startsWith("b_"))   // Z99: BA-40
+          && esDobleClic(_dobleClic, def.id, performance.now())) {
+        setCtrl(def.id, def.initial, def);
+        playUIClick(900, 0.08);
+        return;
+      }
+
       canvas.setPointerCapture(e.pointerId);
       _drag.pointerId = e.pointerId;
       _drag.def = def;
@@ -2112,7 +2637,8 @@ function InteractionHandler() {
           playUIClick(1200, 0.12);
           setTimeout(() => setCtrl(def.id, 0, def), 120);
           // Hold-repeat for ±-step buttons
-          if (def.id === "dom_minus" || def.id === "dom_plus") {
+          // Z97b: con el diseño nuevo, una pulsación = un paso (LUZ_REPETIR_AL_MANTENER true = como antes)
+          if ((def.id === "dom_minus" || def.id === "dom_plus") && (!DBG_ATRIL_VIDEO.DISENO_NUEVO || DBG_ATRIL_VIDEO.LUZ_REPETIR_AL_MANTENER)) {
             _drag.holdTimer = setInterval(() => {
               setCtrl(def.id, 1, def);
               setTimeout(() => setCtrl(def.id, 0, def), 60);
@@ -2173,7 +2699,7 @@ function InteractionHandler() {
       _drag.type = "none"; LECTERN_DBG.dragType = "none";
       _drag.def = null; _drag.pointerId = -1;
       canvas.style.cursor = _hoveredId ? getCursorStyle(
-        ([...IMAGE_CONTROLS, ...SOUND_CONTROLS].find(c => c.id === _hoveredId)?.type ?? "button")
+        ([...IMAGE_CONTROLS_NUEVO, ...IMAGE_CONTROLS, ...SOUND_CONTROLS, ...CONTROLES_BAJO].find(c => c.id === _hoveredId)?.type ?? "button")
       ) : "";
     };
 
@@ -2252,6 +2778,9 @@ export default function LecternSystem() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;   // Z40: se cancela al desmontar
     const onPeople = () => {
+      // Z91: los pide el consentimiento (lib/consentTarimaAcciones.ts) tras la elección.
+      // Z93a: con ATRILES_TRAS_CONSENTIMIENTO false vuelve el temporizador de J1 aunque el consentimiento esté activo.
+      if (DBG_CONSENT.ACTIVO && DBG_CONSENT.ATRILES_TRAS_CONSENTIMIENTO) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => { timer = null; requestLecterns(); }, LECTERNS_AFTER_PEOPLE_MS);
     };
@@ -2265,6 +2794,7 @@ export default function LecternSystem() {
   // J1: listen to request-lecterns (today fired by timer, future: ink.js dialog)
   useEffect(() => {
     const onRequest = () => {
+      if (!atrilesPermitidosAhora()) return;   // Z93a: no antes de la elección del consentimiento (que los vuelve a pedir)
       setVisible(true);
       appearStart.current = Date.now();
       window.dispatchEvent(new CustomEvent("alight:lecterns-visible"));
@@ -2295,6 +2825,30 @@ export default function LecternSystem() {
     const onErr = () => { lockPendingRef.current = false; };
     document.addEventListener("pointerlockerror", onErr);
     return () => document.removeEventListener("pointerlockerror", onErr);
+  }, []);
+
+  // Z96: menú del atril de sonido: diseño (remonta) o escala de etiquetas (rehace la serigrafía)
+  const [disenoV, setDisenoV] = useState(0);
+  const [silkV, setSilkV] = useState(0);
+  useEffect(() => {
+    const on = (e: Event) => {
+      if ((e as CustomEvent<{ remontar?: boolean }>).detail?.remontar) setDisenoV(v => v + 1); else setSilkV(v => v + 1);
+    };
+    window.addEventListener("alight:atril-sonido-cambio", on);
+    window.addEventListener("alight:atril-imagen-cambio", on);   // Z97
+    window.addEventListener("alight:atril-bajo-cambio", on);     // Z99
+    // Z97b: "Restaurar luces del domo" y checkpoints: la perilla INTENS. y la tecla EXTRA vuelven con los valores
+    const onLuces = () => { ctrlState.dom_int = STORE.lights.globalIntensity; ctrlState.dom_star = 0; };
+    window.addEventListener("alight:luces-restauradas", onLuces);
+    window.addEventListener("alight:visualizador-cambio", sincronizarVis);   // Z98: estilo y paleta cambiados desde el menú
+    // Z96b: con ETIQUETA_AUTO_ASPECTO, si al cambiar el tamaño de la ventana cambia la escala efectiva, se rehace la serigrafía
+    let escPrev = escalaActual(), escPrevI = escalaActualImagen(), escPrevB = escalaActualBajo();
+    const onResize = () => {
+      const e = escalaActual(), ei = escalaActualImagen(), eb = escalaActualBajo();
+      if (Math.abs(e - escPrev) > 0.005 || Math.abs(ei - escPrevI) > 0.005 || Math.abs(eb - escPrevB) > 0.005) { escPrev = e; escPrevI = ei; escPrevB = eb; setSilkV(v => v + 1); }
+    };
+    window.addEventListener("resize", onResize);
+    return () => { window.removeEventListener("alight:atril-sonido-cambio", on); window.removeEventListener("alight:atril-imagen-cambio", on); window.removeEventListener("alight:atril-bajo-cambio", on); window.removeEventListener("alight:luces-restauradas", onLuces); window.removeEventListener("alight:visualizador-cambio", sincronizarVis); window.removeEventListener("resize", onResize); };
   }, []);
 
   // I1: flip lectern orientation (debug)
@@ -2330,7 +2884,7 @@ export default function LecternSystem() {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         if (INTERACT_STATE.mode === "none" || INTERACT_STATE.mode === "ritmos") return;   // Z80: la caja de ritmos tiene pose fija
-        const side   = INTERACT_STATE.mode === "image" ? "left" : "right";
+        const side: Lado = INTERACT_STATE.mode === "image" ? "left" : INTERACT_STATE.mode === "bass" ? "bajo" : "right";   // Z99
         const aspect = window.innerWidth / window.innerHeight;
         const result = fitLecternCamera(side, aspect);
         const cam    = camera as THREE.PerspectiveCamera;
@@ -2362,7 +2916,9 @@ export default function LecternSystem() {
         const dRight   = camera.position.distanceTo(rightPos);
         // Z80: atril de la caja de ritmos (slot de Z79), si salió del piso y es el más cercano
         const dRitmos  = ATRIL_RITMOS.visible ? Math.hypot(camera.position.x - ATRIL_RITMOS.x, camera.position.z - ATRIL_RITMOS.z) : Infinity;
-        if (dRitmos < INTERACT_RANGE && dRitmos < Math.min(dLeft, dRight)) {
+        // Z99: el BA-40 (slot de instrumentos detrás de la tarima)
+        const dBajo    = ATRIL_BAJO.visible ? Math.hypot(camera.position.x - ATRIL_BAJO.x, camera.position.z - ATRIL_BAJO.z) : Infinity;
+        if (dRitmos < INTERACT_RANGE && dRitmos < Math.min(dLeft, dRight, dBajo)) {
           INTERACT_STATE.mode = "ritmos";
           const cam = camera as THREE.PerspectiveCamera;
           INTERACT_STATE.camSaved = {
@@ -2380,12 +2936,13 @@ export default function LecternSystem() {
           window.dispatchEvent(new CustomEvent("alight:lectern-mode", { detail: { mode: INTERACT_STATE.mode } }));
           return;
         }
-        let side: "left" | "right" | null = null;
-        if (dLeft  < INTERACT_RANGE) side = "left";
+        let side: Lado | null = null;
+        if (dBajo < INTERACT_RANGE && dBajo < Math.min(dLeft, dRight)) side = "bajo";   // Z99
+        else if (dLeft  < INTERACT_RANGE) side = "left";
         else if (dRight < INTERACT_RANGE) side = "right";
         if (!side) return;
 
-        INTERACT_STATE.mode = side === "left" ? "image" : "sound";
+        INTERACT_STATE.mode = side === "left" ? "image" : side === "bajo" ? "bass" : "sound";
 
         // Save camera
         const cam = camera as THREE.PerspectiveCamera;
@@ -2432,7 +2989,8 @@ export default function LecternSystem() {
       if (!KEY_LETTERS.includes(key as KeyLetter)) return;
       const id = _keyMap.get(key as KeyLetter);
       if (!id) return;
-      const allCtrl = [...IMAGE_CONTROLS, ...SOUND_CONTROLS];
+      const allCtrl = [...controlesImagen(), ...SOUND_CONTROLS, ...CONTROLES_BAJO];   // Z97 · Z99
+      if (e.repeat && id.startsWith("dom_")) return;   // Z97b: mantener la tecla no repite las teclas de luz ni los pads
       const def = allCtrl.find(c => c.id === id);
       if (!def) return;
       const cur = ctrlVal(id, def.initial);
@@ -2458,13 +3016,18 @@ export default function LecternSystem() {
 
   return (
     <>
-      <Lectern side="left"  controls={IMAGE_CONTROLS} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} />
-      <Lectern side="right" controls={SOUND_CONTROLS}  appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} />
+      {/* Z97: la key remonta el atril de imagen al cambiar DBG_ATRIL_VIDEO.DISENO_NUEVO */}
+      <Lectern key={`imagen-${disenoV}`} side="left" controls={controlesImagen()} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} silkV={silkV} />
+      {/* Z96: la key remonta el atril de sonido al cambiar DISENO_NUEVO (mallas y serigrafía limpias) */}
+      <Lectern key={`sonido-${disenoV}`} side="right" controls={controlesSonido()} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} silkV={silkV} />
+      {/* Z99: BAJO ÁCIDO BA-40, en el slot de instrumentos junto a la caja de ritmos; sale con los otros dos */}
+      {DBG_BAJO.ACTIVO && <Lectern key={`bajo-${disenoV}`} side="bajo" controls={CONTROLES_BAJO} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} silkV={silkV} />}
       <InteractionHandler />
       {/* Z79: slots de los atriles de instrumentos (detrás del atril de sonido; marcadores con DBG_PLAY.MOSTRAR_SLOTS) */}
       <SlotsAtriles atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} anchoM={OUTER_W} profM={OUTER_D} />
-      {/* Z80: caja de ritmos en su slot (sale del piso al apretar play del atril de sonido) */}
-      {DBG_RITMOS.ACTIVO && <SistemaPerf id="ritmos"><CajaRitmos atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} /></SistemaPerf>}
+      {/* Z80: caja de ritmos en su slot (sale del piso al apretar play del atril de sonido) · Z88: por defecto sale con
+          los atriles (mismo instante, inicioRef) y va detrás de la tarima (DBG_RITMOS.UBICACION) */}
+      {DBG_RITMOS.ACTIVO && <SistemaPerf id="ritmos"><CajaRitmos atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} inicioRef={appearStart} /></SistemaPerf>}
     </>
   );
 }

@@ -21,6 +21,7 @@ export interface PasoDialogo {
 
 export const RUTA_DIALOGO_LUZ = "/alight/dialogo/dialogo-luz.json";
 export const RUTA_AVISO_VIVO = "/alight/dialogo/aviso-vivo.json";   // Z85: docs/dialogos/aviso-vivo.ink
+export const RUTA_TARIMA_EXPONERSE = "/alight/dialogo/tarima-exponerse.json";   // Z91: docs/dialogos/tarima-exponerse.ink
 // versión contra la caché del navegador: id de build si existe, si no el momento de carga del módulo
 const VERSION = process.env.NEXT_PUBLIC_BUILD_ID ?? Date.now().toString(36);
 

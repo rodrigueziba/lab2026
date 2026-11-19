@@ -75,6 +75,7 @@ Referencia: tecnología de *Alien* (1979), cartelería de cintas VHS/Beta. Hardw
 - No leas ni modifiques archivos `.env*`.
 - Si no podés abrir el navegador para verificar (en algunas PCs no hay Playwright con WebGL), decilo en el reporte y validá leyendo el código; no afirmes que "se ve bien".
 - Reporte final: archivos tocados, causa (con evidencia), valores anteriores y nuevos, decisiones tuyas que yo deba revisar, supuestos, y qué tengo que probar yo.
+- Al terminar cada tarea, además de responder, guardá el reporte final completo y sin resumir, con el mismo texto que le entregás al usuario, en `reportes/Zxx.md` (xx = número de la tarea). Si la carpeta no existe, creala. No la commitees (está en `.gitignore`).
 - Si algo sobre cómo debe sentirse la experiencia es ambiguo, preguntame antes de decidir. Si trabajás sin que yo esté mirando, tomá la lectura más razonable y decí cuál tomaste.
 
 ## Diálogos (ink)

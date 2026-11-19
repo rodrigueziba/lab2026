@@ -36,7 +36,22 @@ import { resetFoco } from "@/lib/focoSubpanel";
 import { LUZ_STATE, actualizarPosLuz } from "@/lib/caminoLuz";
 import { consumirHuidaVisita } from "@/lib/luzMovimiento"; // Z76
 import { PRISM_POS_UNIFORM, PRISM_RAINBOW_UNIFORM, PRISM_ROT_UNIFORM } from "@/lib/prismUniforms";
-import { ZONA_TARIMA, zonaSillasEn, centroSillasEn } from "@/lib/layoutSala"; // Z41
+import { ZONA_TARIMA, zonaSillasEn, centroSillasEn, monolitoEn } from "@/lib/layoutSala"; // Z41
+// Z95: checkpoints de la transmisión en vivo
+import { DBG_SILLAS } from "@/lib/debugConfig";
+import { posicionRecibir } from "@/lib/checkpoints";
+import { completarCuarto } from "@/lib/pasto";
+import { MONO_PASTO } from "@/lib/monolitosPasto";
+import { reiniciarDecisionAviso } from "@/lib/avisoVivoAcciones";
+import { reiniciarMonolitosVivo } from "@/lib/monolitosVivoAcciones";
+import { mostrarEleccionAhora, atajoSinCompartir } from "@/lib/consentTarimaAcciones";
+import { LECTERN_OUTWARD_OFFSET_M } from "@/lib/debugConfig";
+import { ATRIL_X_BASE, poseFrenteAtril } from "@/lib/atrilSonido";   // Z96
+import { poseFrenteAtrilImagen } from "@/lib/atrilImagen";            // Z97
+import { restaurarLucesEscena } from "@/lib/lucesEscenaAcciones";    // Z97b
+import { ATRIL_BAJO, poseFrenteAtrilBajo } from "@/lib/atrilBajo";   // Z99
+import { detenerPresencia } from "@/lib/vivo/vivoAcciones";
+import { detenerLiveKit } from "@/lib/vivo/publicarLiveKit";
 
 /** Montajes del anfitrión (CheckpointsHost): el paso "remontar" espera uno nuevo. */
 export const HOST = { montajes: 0, frames: 0 };
@@ -71,6 +86,10 @@ const atrilSonando = (): boolean => !STORE.audio.paused;
 function limpiezaBase(): void {
   soltarEscucha();
   cerrarDialogo();
+  // Z95: sin transmisión ni presencia colgadas del checkpoint anterior (el remontaje suelta el resto: consentimiento,
+  // oyente y recepción de LiveKit al desmontarse sus hosts)
+  detenerLiveKit();
+  detenerPresencia();
   // efectos (Z29): alarma fuera y luces al 100 % ya (sin fundido)
   window.dispatchEvent(new CustomEvent("alight:debug-detener-alarma"));
   EFECTOS_STATE.alarmaActiva = false;
@@ -115,6 +134,7 @@ function limpiezaBase(): void {
   // atriles (TARIMA): FOV e intensidad global a sus valores de arranque
   STORE.cam.fov = 90;
   STORE.lights.globalIntensity = 1.0;
+  restaurarLucesEscena();   // Z97b: nivel por defecto, EXTRA apagada y sin luces extra acumuladas
 }
 
 // Z41: zonas desde lib/layoutSala.ts (siguen a DBG_LAYOUT), salidas reutilizadas
@@ -125,6 +145,8 @@ function irAZonaSillas(): void { zonaSillasEn(DBG_LAYOUT, _zona); colocar(_zona.
 /** Sobre la tarima (ZONA_LUZ) mirando a las sillas. */
 function irAZonaTarima(): void { centroSillasEn(DBG_LAYOUT, _sillas); colocar(ZONA_TARIMA.x, ZONA_TARIMA.z, _sillas.x, _sillas.z); }
 
+const _mono = { x: 0, z: 0 };                                    // Z95
+const _pos = { x: 0, z: 0, mirarX: 0, mirarZ: 0 };              // Z95
 let _montajesAntes = 0;
 let _amanecerEmitido = false;
 
@@ -209,6 +231,60 @@ export const ACCIONES_CHECKPOINT: Record<string, Accion> = {
 
   // estado final de juego_alarma (Z29): premio guardado, luces encendidas, sobre la tarima con la zona
   // TARIMA bloqueada hasta alejarse (como después del premio)
+  // ── Z95 ──
+  // los 4 cuartos del pasto completos y los monolitos ya arriba (sin la subida)
+  pastoCompleto: () => { for (let i = 0; i < 4; i++) completarCuarto(PASTO, i); MONO_PASTO.k = 1; return true; },
+  // Pasto calcula la posición de los monolitos en su useFrame: se espera a que estén arriba y ubicados
+  esperarMonolitos: () => MONO_PASTO.k >= 0.99 && MONO_PASTO.xR !== MONO_PASTO.xL,
+  // a RECIBIR_DIST_M del monolito de SONIDO (derecho), del lado de las sillas, mirándolo
+  frenteMonolitos: () => {
+    if (!_camara) return false;
+    const usaPasto = MONO_PASTO.k > 0 && MONO_PASTO.xR !== MONO_PASTO.xL;
+    if (usaPasto) { _mono.x = MONO_PASTO.xR; _mono.z = MONO_PASTO.z; } else monolitoEn(1, DBG_SILLAS.monolithDistM, DBG_LAYOUT, _mono);
+    posicionRecibir(_mono, DBG_CHECKPOINTS.RECIBIR_DIST_M, _pos);
+    colocar(_pos.x, _pos.z, _pos.mirarX, _pos.mirarZ);
+    return true;
+  },
+  // el aviso al espectador vuelve a preguntar (no se saltea la aceptación) y los monolitos arrancan de cero
+  avisoListo: () => { reiniciarDecisionAviso(); reiniciarMonolitosVivo(); return true; },
+  // el domo de la tarima aparece ya (FaceDome escucha el evento)
+  forzarDomo: () => { window.dispatchEvent(new CustomEvent("alight:debug-mostrar-domo")); return true; },
+  // lo mismo que el botón "Mostrar elección ahora": texto 2 con Compartir / No compartir (hay que elegir igual)
+  mostrarEleccion: () => { mostrarEleccionAhora(); return true; },
+  // ── Z96 ──
+  // "No compartir" en silencio (sin terminal ni transmisión) y espera a que salgan los atriles
+  atrilesSinConsentimiento: (_p, ctx) => {
+    if (ctx.primera) { escuchar("alight:lecterns-visible"); atajoSinCompartir(); }
+    if (_esperado.visto) { soltarEscucha(); return true; }
+    return false;
+  },
+  // frente al atril de sonido, a 1 m (dentro de INTERACT_RANGE 1,8 m; el de imagen queda a más de 2 m), mirando su panel
+  frenteAtrilSonido: () => {
+    if (!_camara) return false;
+    const p = poseFrenteAtril(ATRIL_X_BASE + LECTERN_OUTWARD_OFFSET_M, 1.0);
+    _camara.position.set(p.x, 1.6, p.z);
+    _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
+    return true;
+  },
+
+  // Z97: a 1 m del atril de imagen (izquierda), mirándolo; el de sonido queda a ~2,2 m (fuera del rango de E)
+  frenteAtrilImagen: () => {
+    if (!_camara) return false;
+    const p = poseFrenteAtrilImagen(ATRIL_X_BASE + LECTERN_OUTWARD_OFFSET_M, 1.0);
+    _camara.position.set(p.x, 1.6, p.z);
+    _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
+    return true;
+  },
+
+  // Z99: a 1 m del BA-40, mirándolo (su posición la escribe LecternSystem desde el slot de instrumentos)
+  frenteAtrilBajo: () => {
+    if (!_camara) return false;
+    const p = poseFrenteAtrilBajo(ATRIL_BAJO.x, ATRIL_BAJO.z, ATRIL_BAJO.yaw, 1.0);
+    _camara.position.set(p.x, 1.6, p.z);
+    _camara.lookAt(p.mirarX, p.mirarY, p.mirarZ);
+    return true;
+  },
+
   premio: () => {
     guardarPremio();
     EFECTOS_STATE.bloqueaZonaTarima = true;

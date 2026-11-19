@@ -16,7 +16,10 @@ import Curtain from "./Curtain";
 import TelonTexto from "./TelonTexto"; // Z46: texto proyectado sobre el telón
 import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from "./LecternSystem";
 import { ATRIL_RITMOS } from "@/lib/ritmos";   // Z80: aviso "Tocar E" del atril de la caja de ritmos
+import { ATRIL_BAJO } from "@/lib/atrilBajo";                                                // Z99
 import AvisoVivoHost from "./AvisoVivoHost";   // Z85
+import ConsentTarimaHost from "./ConsentTarimaHost";   // Z91
+import VideoTransmitidoTarima from "./VideoTransmitidoTarima";   // Z94
 import LecternHUD from "./LecternHUD";
 import DebugMenu from "./DebugMenu";
 import CurtainFlash from "./CurtainFlash"; // F1: destello al atravesar el telón
@@ -33,7 +36,10 @@ import { moverConLimites } from "@/lib/caminoLuz"; // Z28: límites sala ∪ ext
 import { EFECTOS_STATE } from "@/lib/dialogo/efectosEstado"; // Z29: bloqueo de la zona TARIMA en juego_alarma
 import { posicionInicial, aplicarSpawn } from "@/lib/inicioEscena"; // Z24/Z25
 import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizActivated } from "@/lib/alightStore";
-import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV, DBG_SECUENCIA, DBG_LAYOUT, DBG_TELON_TEXTO, DBG_RENDIMIENTO } from "@/lib/debugConfig";
+import { LUZ_ESCENA, multSpot, factorTope } from "@/lib/lucesEscena";          // Z97b
+import { aporteViejasActual } from "@/lib/lucesEscenaAcciones";               // Z97b
+import LuzExtraEscena from "@/components/LuzExtraEscena";                     // Z97b
+import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV, DBG_SECUENCIA, DBG_LAYOUT, DBG_TELON_TEXTO, DBG_RENDIMIENTO, DBG_ATRIL_VIDEO } from "@/lib/debugConfig";
 import { crearEspera, type Espera } from "@/lib/relojExperiencia"; // Z39
 import { cancelarSecuencia } from "@/lib/secuenciaSillas"; // Z39
 import { ZONA_TARIMA, ZONA_SILLAS_BASE, zonaSillasEn } from "@/lib/layoutSala"; // Z41
@@ -168,7 +174,9 @@ function Room() {
 // ── C1: DiagonalSpot — responds to STORE.lights.globalIntensity + SILLAS global scale ──
 function DiagonalSpot() {
   const [intensity, setIntensity] = useState(DBG_SPOTLIGHT.intensity * DBG_SILLAS.globalLightScale);
-  useEffect(() => storeSubscribe(() => setIntensity(DBG_SPOTLIGHT.intensity * STORE.lights.globalIntensity * DBG_SILLAS.globalLightScale)), []);
+  // Z97b: el nivel pasa por el tope final (multSpot: nivel × k; con nivel 1 y sin EXTRA, igual que antes)
+  useEffect(() => storeSubscribe(() => setIntensity(DBG_SPOTLIGHT.intensity
+    * multSpot(STORE.lights.globalIntensity, DBG_ATRIL_VIDEO.DISENO_NUEVO && LUZ_ESCENA.extra, aporteViejasActual(), DBG_ATRIL_VIDEO) * DBG_SILLAS.globalLightScale)), []);
   return (
     <SpotLight
       position={[9, 18, 10]}
@@ -188,10 +196,12 @@ function DiagonalSpot() {
 function DynamicLights() {
   const [lights, setLights] = useState(STORE.lights.extras.slice());
   useEffect(() => storeSubscribe(() => setLights([...STORE.lights.extras])), []);
+  // Z97b: las luces extra del diseño anterior también respetan LUZ_TOPE_FINAL
+  const kTope = factorTope(STORE.lights.globalIntensity, DBG_ATRIL_VIDEO.DISENO_NUEVO && LUZ_ESCENA.extra, aporteViejasActual(), DBG_ATRIL_VIDEO);
   return (
     <>
       {lights.map((l, i) => (
-        <pointLight key={i} color={l.color} intensity={l.intensity} position={l.position} />
+        <pointLight key={i} color={l.color} intensity={l.intensity * kTope} position={l.position} />
       ))}
     </>
   );
@@ -462,6 +472,7 @@ function Player() {
       if (dL < LECTERN_PROMPT_M) near = "image";
       else if (dR < LECTERN_PROMPT_M) near = "sound";
       else if (ATRIL_RITMOS.visible && Math.hypot(cam.position.x - ATRIL_RITMOS.x, cam.position.z - ATRIL_RITMOS.z) < LECTERN_PROMPT_M) near = "sound";   // Z80: caja de ritmos
+      else if (ATRIL_BAJO.visible && Math.hypot(cam.position.x - ATRIL_BAJO.x, cam.position.z - ATRIL_BAJO.z) < LECTERN_PROMPT_M) near = "sound";   // Z99: BA-40
       if (near !== nearLectern.current) {
         nearLectern.current = near;
         window.dispatchEvent(new CustomEvent("alight:near-lectern", { detail: { which: near } }));
@@ -521,6 +532,7 @@ function Scene() {
       <LuzLejana />
       <Room />
       <DiagonalSpot />
+      <LuzExtraEscena />{/* Z97b: EXTRA del atril de imagen (siempre montada, 0 apagada) */}
       <Tarima />
       <Chairs />
       {path !== "tarima" && <Prism />}
@@ -530,6 +542,8 @@ function Scene() {
       {path !== "sillas" && <FaceDome />}
       {path !== "sillas" && <WatcherEye />}
       {path !== "sillas" && <LecternSystem />}
+      {path !== "sillas" && <ConsentTarimaHost />}{/* Z91: consentimiento para transmitir, EN VIVO y corte */}
+      {path !== "sillas" && <VideoTransmitidoTarima />}{/* Z94: imagen procesada del domo para la transmisión */}
       {path !== "sillas" && <DynamicLights />}
       <Player />
       <BigMeshScanner />

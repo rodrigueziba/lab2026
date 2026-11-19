@@ -746,6 +746,51 @@ export const DBG_LECTERNS = {
   debugOverlays:    false,  // L5: show lectern status line — off by default
 };
 
+// ── Z96: atril de SONIDO rediseñado ("SONIDO SN-40": lib/atrilSonido.ts, components/AtrilSonidoNuevo.tsx) ──
+// DISENO_NUEVO false = layout anterior (J3) tal cual. El atril de imagen no cambia.
+export const DBG_ATRIL_SONIDO = {
+  DISENO_NUEVO:    true,    // — live (redibuja el atril)
+  PLAY_ESCALA:     1.0,     // PLAY/PAUSA grande: 1 = 32 × 8,2 cm (23 % del ancho del panel) — live
+  ETIQUETA_ESCALA: 1.0,     // multiplica el alto de títulos y etiquetas (los lejanos ya son más grandes) — live (redibuja la serigrafía)
+  DISPLAY_VALOR_S: 2.5,     // s que el display muestra el control tocado (nombre y valor) antes de volver al estado — live
+  VU_HZ:           30,      // tope de actualización del VU y del display (solo con el atril en pantalla) — live
+  // Z96b
+  VU_SEG_AMBAR_DESDE:   9,      // de 14 segmentos: 0…8 verdes, 9…11 ámbar — live
+  VU_SEG_ROJO_DESDE:    12,     // 12 y 13 rojos (los últimos 2) — live
+  VU_PICO_RETENCION_MS: 800,    // el pico se queda arriba esto y después baja un segmento por tick — live
+  ROTULOS_FILA:         true,   // rótulos de fila (EFECTOS · TONO · TRANSPORTE) — live (rehace la placa)
+  ROTULOS_MODO:         "barra" as string,   // "barra" (leyenda numerada en la barra + números en el margen) | "margen" (verticales; TRANSPORTE no llega a 2 %) — live
+  ETIQUETA_AUTO_ASPECTO: true,  // proporción < 1,6: ETIQUETA_ESCALA sube hasta × 1,15 (acotada por lugar) — live (rehace la serigrafía)
+};
+
+// ── Z97: atril de IMAGEN rediseñado ("IMAGEN IM-40": lib/atrilImagen.ts, lib/domoEfectos.ts, components/AtrilImagenNuevo.tsx) ──
+// DISENO_NUEVO false = atril de imagen anterior (J3) tal cual, con la rotación fija de 5 s. El atril de sonido no cambia.
+export const DBG_ATRIL_VIDEO = {
+  DISENO_NUEVO:          true,    // — live (redibuja el atril)
+  ETIQUETA_ESCALA:       1.0,     // multiplica títulos y etiquetas — live (rehace la serigrafía)
+  ETIQUETA_AUTO_ASPECTO: true,    // proporción < 1,6: hasta × 1,15 (acotado por lugar) — live
+  DISPLAY_VALOR_S:       2.5,     // s que el display muestra el control tocado — live
+  VELOC_MIN_S:           1,       // rango de VELOC. (s entre pasos de la rotación AUTO) — live
+  VELOC_MAX_S:           10,      // — live
+  VELOC_DEFECTO_S:       5,       // como la rotación de hoy (vale al cargar) — live
+  ROTULOS_FILA:          true,    // rótulos de fila DOMO · IMAGEN — live
+  ROTULOS_MODO:          "margen" as string,   // "margen" (verticales) | "barra" (leyenda numerada en la placa) — live
+  PADS_INICIO:           0x7f,    // pads encendidos al cargar (bit i = efecto i; 0x7f = los 7, como hoy) — vale al cargar
+  // Cámara de la tecla E: "panel" = mira el panel (texto lejano ≥ 2,5 %; el domo queda fuera de cuadro) · "domo" = la de
+  // hoy (el domo ocupa ~10 % de arriba de la pantalla, texto lejano 1,4 %). Vale al entrar con E.
+  CAMARA:                "panel" as string,
+  // Z97b: luces de ESCENA (lib/lucesEscena.ts). Nivel = STORE.lights.globalIntensity (multiplica el DiagonalSpot).
+  LUZ_MIN:               0,       // nivel mínimo (LUZ -, INTENS.) — live
+  LUZ_MAX:               3,       // nivel máximo (LUZ +, INTENS.; el rango que ya tenía la perilla) — live
+  LUZ_PASO:              0.2,     // cuánto mueve cada pulsación de LUZ - / LUZ + — live
+  LUZ_DEFECTO:           1.0,     // valor al cargar, con doble clic, en checkpoints y con "Restaurar luces del domo" — live
+  LUZ_TOPE_FINAL:        3.0,     // tope del aporte total (nivel + EXTRA + luces extra del diseño anterior): ninguna combinación lo pasa — live
+  EXTRA_APORTE:          0.6,     // cuánto suma la tecla EXTRA encendida (una sola luz fija; no acumula) — live
+  EXTRA_REF_CD:          100,     // candelas de luz puntual que equivalen a 1 de aporte (EXTRA = 60 cd; antes 200 cd × hasta 12) — live
+  EXTRA_COLOR:           "#FFB060" as string,   // luz cálida, sobre la tarima — live
+  LUZ_REPETIR_AL_MANTENER: false, // true = LUZ ± repiten cada 120 ms mientras se mantienen apretadas (como antes) — live
+};
+
 // ── J5: retro skin (cassette futurism) for TARIMA lecterns ───────────────────
 export const DBG_RETRO = {
   lecterns:  true,   // J5: beige/carbón + desgaste — live (rótulos/teclas: reload)
@@ -898,6 +943,7 @@ export const DBG_SECUENCIA = {
 export const DBG_CHECKPOINTS = {
   HABILITADOS:    true,   // false = el menú y ?checkpoint= no hacen nada (el efecto de ink ir_checkpoint sigue) — live
   ADELANTO_S:     1.0,    // s de reloj de la experiencia que se adelantan por frame para llegar a sala_activa — live
+  RECIBIR_DIST_M: 5,      // Z95: "sillas_recibir": distancia al monolito de sonido (fuera de RADIO_INICIO_M = 3 m) — live
 };
 
 // ── Z41: layout de sillas, zona SILLAS, público y monolitos (lib/layoutSala.ts) ──
@@ -1046,6 +1092,11 @@ export const DBG_RENDIMIENTO = {
     domoFluido: true, domoSol: true, domoOndas: true, domoEstrellas: true, domoPortal: true, domoSiluetas: true,
     ritmos: true, videoDomo: true,   // Z80 caja de ritmos · Z83 video en el domo
     tiempoDetenido: true,            // Z86: historial, estela y efecto del tiempo detenido
+    ondasTarima: true,               // Z87: dibujo del canvas de ondas de la tarima
+    visualizadorTarima: true,        // Z98: visualizador retro (cascada / XY) del canvas de la tarima (false = queda el último cuadro)
+    transmisionTarima: true,         // Z92: subida a LiveKit (false = pauseUpstream: sin codificar ni enviar)
+    videoTransmitidoTarima: true,    // Z94: pase plano del domo + copia al canvas transmisible (false = queda el último cuadro)
+    recepcionTarima:   true,         // Z93: recepción en SILLAS (false = des-suscribe audio y video sin desconectar)
   } as Record<string, boolean>,
 };
 
@@ -1088,6 +1139,7 @@ export const DBG_ENTRADA = {
   MODO:                   "linea_sillas" as string,
   MARGEN_LINEA_SILLAS_M:  1.0,    // Z75: metros más allá del borde exterior de la fila (hacia la izquierda de la mirada) — live
   DIST_MIN_OBJETOS_M:     0.6,    // Z75: distancia mínima a la tarima, a las sillas y a las zonas SILLAS/TARIMA (si no, se ajusta lo mínimo) — live
+  YAW_EXTRA_DEG:          30,     // Z88: giro final hacia la DERECHA del usuario (+ = horario visto desde arriba); la posición se calcula con YAW_DEG; no aplica en "manual" — live
 };
 
 export const DBG_LAYOUT = {
@@ -1468,7 +1520,9 @@ export const DBG_PLAY = {
   BOTON_V:             0.0,     // 0 = franja libre entre las dos bandas de controles — live
   BOTON_ELEV:          0.012,   // alto de la base sobre el panel (m) — live
   MOSTRAR_SLOTS:       false,   // marcadores de debug de los slots de los atriles de instrumentos — live
-  APARECER_TRAS_PLAY:  true,    // los atriles de instrumentos saldrán del piso al apretar play (todavía sin implementar)
+  APARECER_TRAS_PLAY:  false,   // Z88 (antes true): false = la caja de ritmos (y los futuros instrumentos) salen con los atriles; true = al apretar play (Z80) — live
+  // Z88: con DBG_RITMOS.UBICACION "detras_tarima" los slots van en línea detrás de la tarima (eje sillas → tarima), el
+  // de la caja en el centro; SLOTS_DIST_M y SLOTS_ARCO_GRADOS solo valen con "slot_atril"
   SLOTS_N:             4,       // cantidad de slots — live
   SLOTS_DIST_M:        2.0,     // distancia detrás del atril de sonido (m) — live (Z80: 1,4 → 2,0: con 1,4 quedaba un pasillo de 0,5 m entre atriles)
   SLOTS_SEP_M:         1.7,     // separación entre slots (m) — live
@@ -1484,7 +1538,9 @@ export const DBG_PLAY = {
 export const DBG_RITMOS = {
   ACTIVO:            true,     // false = no se monta ni suena — live
   MOSTRAR:           "tras_play" as string,   // "tras_play" (con DBG_PLAY.APARECER_TRAS_PLAY) | "siempre" — live
-  SLOT:              1,        // slot de Z79 (0…SLOTS_N − 1) — live
+  SLOT:              1,        // slot de Z79 (0…SLOTS_N − 1); Z88: en "detras_tarima" este slot va al centro, sobre el eje — live
+  UBICACION:         "detras_tarima" as string,   // Z88: "detras_tarima" (eje sillas → tarima, del lado opuesto) | "slot_atril" (Z80: detrás del atril de sonido) — live
+  DIST_DETRAS_M:     2.0,      // Z88: metros desde el borde de la tarima opuesto a las sillas (detras_tarima) — live
   PASOS:             16,       // 8 | 12 | 16 | 32 por vuelta (= un compás) — live (reinicia el reloj)
   PISTAS:            ["kick", "clap", "hatC", "hatA", "shaker", "perc"] as string[],   // anillos de adentro hacia afuera
   BPM:               120,      // 60…180 (parámetro ritmos.bpm de Z78) — live
@@ -1522,6 +1578,22 @@ export const DBG_MONO_VIVO = {
   SESION_GANANCIA:     1.0,     // nivel del audio de la sesión con peso 1 — live
   REQUIERE_ACEPTACION: false,   // true: sin mezcla remota hasta que el espectador acepte (aceptarTransmision()) — live
   OVERLAY:             false,   // estados, pesos y contadores (abajo a la izquierda) — live
+};
+
+// ── Z89: presencia de la sesión en vivo con Supabase Realtime (lib/vivo/presencia.ts, canalSupabase.ts, vivoAcciones.ts) ──
+// Sin medios: solo "hay alguien en la tarima". FUENTE "mock" = Z82–Z86 tal cual; "supabase" = MONO_VIVO.haySesion sale
+// de la presencia (audio y video = patrones de prueba mientras no haya medios). Canal público con la clave anónima.
+export const DBG_VIVO = {
+  // Z93 (antes "mock"): "auto" = "livekit" si hay variables de Supabase (presencia); si el token de LiveKit da 503, cae a
+  // "mock" por el resto de la página. "livekit" = presencia + audio y video REALES de la tarima (lib/vivo/recibirLiveKit.ts).
+  FUENTE:           "auto" as string,   // "auto" | "livekit" | "supabase" | "mock" — live
+  CANAL:            "alight-tarima-v1" as string,   // nombre del canal de Realtime (vale al conectar) — live
+  LATIDO_S:         5,       // el publicador sube su contador cada esto — live
+  TIMEOUT_S:        15,      // el oyente deja de contar una sesión sin cambio de latido durante esto (reloj local) — live
+  REINTENTO_S:      1,       // Z95 (antes 2): primera espera tras un error; se duplica en cada intento (1, 2, 4, 8, 15) — live
+  REINTENTO_MAX_S:  15,      // Z95 (antes 60): tope de la espera entre reintentos — live
+  MAX_REINTENTOS:   8,       // Z95: reintentos seguidos (cada uno con un canal NUEVO); después "agotado" hasta "Reintentar presencia" — live
+  CIERRE_SIN_USO_S: 10,      // el oyente cierra el canal tras esto sin que haga falta (monolitos fuera) — live
 };
 
 // ── Z83: el domo de SILLAS muestra la sesión en vivo de la tarima o estática (lib/domoVivo.ts, lib/domoVivoAcciones.ts) ──
@@ -1588,9 +1660,131 @@ export const DBG_TIEMPO = {
 
 // ── Z85: aviso al espectador antes de recibir la transmisión en vivo (lib/avisoVivo.ts, lib/avisoVivoAcciones.ts) ──
 // Texto: docs/dialogos/aviso-vivo.ink (npm run ink:build). Usa la terminal de diálogo de la narrativa.
+// ── Z93: recepción de la tarima en SILLAS por LiveKit (lib/vivo/recibirCiclo.ts, lib/vivo/recibirLiveKit.ts) ──
+// Conecta solo con aviso aceptado + sesión viva (presencia) + fuente real, y con algún monolito pidiendo medios.
+export const DBG_LIVEKIT_RECIBIR = {
+  ESPERA_DESUSCRIBIR_S:    2,      // peso en 0 durante esto → des-suscribe la pista (y sin ninguna, desconecta) — live
+  SENAL_DEBIL_S:           5,      // suscrito sin medios durante esto → "señal débil" — live
+  DEBIL_MEZCLA:            0.3,    // en señal débil: estática a este nivel sobre lo propio (audio y domo), sin cortar lo propio — live
+  CONTORNO_ELEMENTO_AUDIO: true,   // Chrome: la pista remota también en un <audio> SILENCIADO para que fluya por Web Audio (vale al suscribir) — live
+  REINTENTO_BASE_S:        1,      // primera espera tras perder la conexión; se duplica en cada intento — live
+  REINTENTO_MAX_S:         15,     // tope de la espera — live
+  MAX_REINTENTOS:          6,      // después → "error" hasta que la sesión o la aceptación cambien — live
+};
+
 export const DBG_AVISO_VIVO = {
   ACTIVO:            true,    // false = como antes, sin aviso — live
   SOLO_UNA_VEZ:      true,    // una vez por sesión del navegador (sessionStorage alight:aviso-vivo) — live
   CIERRE_MS:         600,     // tras elegir, la terminal se cierra — live
   ESPERA_CIERRE_MS:  300,     // "Prefiero salir de acá": si la pestaña no se cerró en este tiempo, pantalla final — live
+};
+
+// ── Z91: consentimiento para exponerse y transmitir al elegir la tarima (lib/consentTarima.ts, lib/consentTarimaAcciones.ts,
+// docs/dialogos/tarima-exponerse.ink). ACTIVO = false → como antes: atriles a LECTERNS_AFTER_PEOPLE_MS sin preguntas ni publicar. ──
+export const DBG_CONSENT = {
+  ACTIVO:             true,   // se lee al aparecer las figuras (alight:people-visible) — live
+  ESPERA_INICIAL_S:   8,      // figuras en escena → primer texto — live
+  ESPERA_ENTRE_S:     8,      // fin del primer texto → texto con la elección — live
+  CIERRE_TEXTO_S:     3,      // el primer texto queda en la terminal esto después de terminar de escribirse — live
+  CIERRE_MS:          600,    // tras elegir, la terminal se cierra — live
+  RECORDAR_EN_SESION: false,  // Z93a (antes true): true = la elección se recuerda en sessionStorage y al recargar NO repregunta
+                              // (los atriles salen con las figuras, sin textos: era la causa del reporte de Z93a) — live
+  RECORDAR_TRANSMISION: false, // Z92: al recargar, una transmisión NO se reanuda sola (se vuelve a preguntar); true = Z91 — live
+  DURACION_MAX_S:     300,    // límite de la transmisión (reloj real: no se detiene con la pausa central) — live
+  AVISO_FIN_S:        30,     // aviso "La transmisión termina en N s" antes del límite — live
+  // Z93a: orden de la tarima (lib/consentTarima.ts tickSubida)
+  ATRILES_TRAS_CONSENTIMIENTO: true, // atriles y caja de ritmos SOLO tras la elección; false = como antes (J1: a LECTERNS_AFTER_PEOPLE_MS de las figuras) — live
+  ESPERA_FIGURAS_MAX_S: 30,   // si las figuras no salen (permiso de cámara sin responder), el flujo arranca igual esto después de elegir la tarima — live
+  SALIDA_EXTRA_M:     0.5,    // bajar de la tarima = alejarse más que el radio de la zona + esto (histéresis); cancela antes de elegir — live
+};
+
+// ── Z92: video y audio de la tarima por LiveKit Cloud tras "Compartir mi sesión." (lib/vivo/publicarLiveKit.ts,
+// lib/vivo/liveKitCiclo.ts, app/api/livekit/token/route.ts). ACTIVO = false → como Z91 (solo presencia). ──
+export const DBG_LIVEKIT = {
+  ACTIVO:     true,                // — live (vale al elegir compartir)
+  SALA:       "alight-tarima-v1",  // SOLO informativo: la sala la fija el servidor (LIVEKIT_SALA o este valor)
+  VIDEO_FPS:  15,                  // captureStream del canvas de ondas / tope de la webcam (vale al publicar)
+  VIDEO_KBPS: 500,                 // bitrate máximo del video (vale al publicar)
+  AUDIO_KBPS: 64,                  // bitrate del audio estéreo (vale al publicar)
+  // Z94: qué video se publica. "procesado" = la imagen del domo de la tarima con sus efectos y el atril de imagen
+  // (components/VideoTransmitidoTarima.tsx); "cruda" = Z92 (clon de la webcam u ondas); "ondas" = canvas de ondas (pruebas).
+  // Si el pase procesado no está disponible al iniciar, cae a "cruda" y lo dice la línea de estado.
+  FUENTE_VIDEO:       "procesado" as string,   // "procesado" | "cruda" | "ondas" (vale al publicar)
+  PROCESADO_ANCHO:    640,         // canvas transmisible (vale al publicar)
+  PROCESADO_ALTO:     360,
+  PROCESADO_ESPEJO:   false,       // espeja en horizontal la copia plana (el domo se ve desde adentro) — live
+  PROCESADO_TIMEOUT_S: 3,          // Z94b: sin lecturas en esto desde el inicio, o sin cuadros nuevos esto seguido → "cruda" en caliente — live
+  PROCESADO_REINTENTO_S: 10,       // Z94c: en "cruda", cada esto se prueba el procesado en segundo plano — live
+  PROCESADO_MAX_REINTENTOS: 5,     // Z94c: tope de pruebas por transmisión; después queda en "cruda" — live
+  PROCESADO_CONFIRMAR_S: 2,        // Z94c: la prueba debe dar cuadros esto seguido para volver a "procesado" — live
+  PROCESADO_LECTURA_MAX_MS: 1000,  // Z94c: una lectura asíncrona que tarda más se da por colgada (y se libera el turno) — live
+  PROCESADO_SRGB:     true,        // codifica a sRGB (en pantalla lo hace el OutputPass; acá el pase va directo al canvas) — live
+};
+
+// ── Z99: BAJO ÁCIDO (motor lib/audio/bajoAcido.ts, lógica lib/bajoAcido.ts) y su atril BA-40 (lib/atrilBajo.ts) ──
+export const DBG_BAJO = {
+  ACTIVO:                 true,     // false = sin bajo (no se suscribe al reloj ni crea la voz) — vale al montar
+  RAIZ_MIDI:              36,       // C2: nota 0 de los pasos (0…24 semitonos encima) — live
+  TEMPO_HEREDADO:         true,     // true = reloj y tempo de la caja de ritmos (núcleo); false = reloj propio con BPM — live
+  BPM:                    124,      // solo con TEMPO_HEREDADO false — live
+  LOOKAHEAD_S:            0.1,      // reloj propio: anticipo de programación (s) — live
+  INTERVALO_S:            0.025,    // reloj propio: cada cuánto despierta el programador (s) — vale al arrancar
+  FILTRO_FRECUENCIA_MIN:  60,       // Hz (rango de CORTE) — live
+  FILTRO_FRECUENCIA_MAX:  6000,     // Hz — live
+  RES_MAX:                18,       // Q máximo de la etapa resonante — live
+  ENV_OCTAVAS:            4,        // cuánto sube el corte con MOD. ENV. al máximo (octavas) — live
+  GATE:                   0.55,     // fracción del paso que dura una nota sin desliz — live
+  ONDA:                   "sierra" as string,   // "sierra" | "cuadrada" (defecto) — live
+  ON:                     true,     // ON del módulo SALIDA (silencia sin parar el reloj) — live
+  PATRON_INICIAL:         "CHICAGO" as string,  // vale al cargar
+  // valores por defecto de cada parámetro (los rangos están en PARAMS_BAJO de lib/bajoAcido.ts)
+  AFINACION:              0,        // semitonos
+  CORTE:                  420,      // Hz
+  RESONANCIA:             0.6,      // 0…1
+  MOD_ENV:                0.6,      // 0…1
+  DECAY:                  0.3,      // s
+  ACENTO:                 0.6,      // 0…1
+  DESLIZ:                 0.06,     // s
+  DISTORSION:             0.15,     // 0…1
+  VOLUMEN:                0.7,      // 0…1
+};
+export const DBG_ATRIL_BAJO = {
+  SLOT:                   0,        // slot de instrumentos detrás de la tarima (Z88; 0 = el de al lado de la caja, lado del atril de sonido) — live
+  ETIQUETA_ESCALA:        1.0,      // multiplica títulos y etiquetas — live (rehace la serigrafía)
+  ETIQUETA_AUTO_ASPECTO:  true,     // proporción < 1,6: hasta × 1,15 — live
+  DISPLAY_VALOR_S:        2.5,      // s que el display muestra el control tocado — live
+  VU_HZ:                  30,       // tope de actualización del VU y del display — live
+  ROTULOS_FILA:           true,     // leyenda "1 SECUENCIA · 2 VOZ · 3 SALIDA" en la placa y números en los títulos — live
+  ROTULOS_MODO:           "barra" as string,   // "barra" (leyenda en la placa de la barra) — live
+  ESCALA_PASOS:           1.0,      // tamaño de las teclas PASO (0,8…1,2) — vale al remontar
+};
+
+// ── Z87: fuente de video de la tarima y visualizador de ondas sin webcam (lib/ondasTarima.ts, lib/fuenteVideoTarima.ts) ──
+// (DBG_ONDAS ya existe: son las ondas por kick del domo de SILLAS, Z52; por eso este se llama DBG_ONDAS_TARIMA.)
+export const DBG_ONDAS_TARIMA = {
+  MODO:          "auto" as string,     // "auto" (sin webcam → ondas) | "webcam" | "ondas" (forzar) — live
+  FPS:           30,                   // cuadros por segundo del canvas de ondas — live
+  // Z98: visualizador nuevo: "cascada" | "xy" (los de Z87 "onda" | "espectro" | "ambos" siguen funcionando) — live
+  ESTILO:        "cascada" as string,
+  // Z98: "ambar" | "fosforo" | "identidad" (franjas de las placas, lib/marca.ts); Z87: "verde" | "cian" — live
+  PALETA:        "ambar" as string,
+  GROSOR:        3,                    // px del trazo (canvas de 640×360) — live
+  PERSISTENCIA:  0.82,                 // estela: cuánto queda del cuadro anterior (0 = sin estela) — live
+  SENSIBILIDAD:  2.5,                  // ganancia sobre el analizador maestro — live
+  PUNTOS:        256,                  // puntos de la forma de onda — live
+  BARRAS:        48,                   // barras del espectro — live
+  // ── Z98: visualizador retro (lib/visualizadorTarima.ts y visualizadorTarimaDibujo.ts) ──
+  VISUALIZADOR_NUEVO: true,            // false = el dibujo de Z87 tal cual (onda / espectro) — live
+  LINEAS:        24,                   // CASCADA: líneas del historial (vale al cambiar: rehace el buffer) — live
+  COLUMNAS:      96,                   // CASCADA: puntos por línea (frecuencias) — live
+  SUBIDA:        0.6,                  // suavizado: cuánto sube por cuadro hacia un valor mayor (0…1) — live
+  BAJADA:        0.12,                 // suavizado: cuánto baja por cuadro (lento) — live
+  FREC_MIN:      0.006,                // fracción del espectro donde empieza el eje (≈ 140 Hz con fft 2048 a 48 kHz) — live
+  FREC_SUAVE:    0.75,                 // 0 = eje lineal · 1 = logarítmico — live
+  XY_MODO:       "auto" as string,     // "auto" (estéreo si los canales difieren; si no, retardo) | "estereo" | "retardo" — live
+  XY_RETARDO:    10,                   // muestras de retardo para Y en mono (8…12) — live
+  XY_PUNTOS:     512,                  // puntos de la figura — live
+  XY_PERSISTENCIA: 0.86,               // estela de fósforo del XY (0 = sin estela) — live
+  COLOR_VELOC:   0.15,                 // IDENTIDAD: ciclos por segundo de los colores sobre las ondas — live
+  ROTULO:        true,                 // rótulo de esquina "CASCADA · ÁMBAR" — live
 };

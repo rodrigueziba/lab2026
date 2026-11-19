@@ -10,8 +10,9 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DBG_PLAY, DEBUG_ENABLED } from "@/lib/debugConfig";
-import { PLAY_TARIMA, slotsInstrumentos, alturaPedestal, type Slot } from "@/lib/playTarima";
+import { DBG_PLAY, DBG_RITMOS, DBG_LAYOUT, DEBUG_ENABLED } from "@/lib/debugConfig";
+import { PLAY_TARIMA, alturaPedestal, slotsSegunUbicacion, ejeDetrasTarima, type Slot, type EjeTarima } from "@/lib/playTarima";
+import { TARIMA_CENTRO, centroSillasEn } from "@/lib/layoutSala";
 import { alternarPlay, playTarima, pausaTarima, estadoContextoTarima } from "@/lib/playTarimaAcciones";
 import { createStripeBandTex } from "@/lib/retro/decals";
 import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
@@ -152,6 +153,19 @@ export function PlayGrande() {
 
 const MAX_SLOTS = 12;
 
+// Z88: slots según DBG_RITMOS.UBICACION ("detras_tarima": eje sillas → tarima, en vivo con DBG_LAYOUT; "slot_atril":
+// Z79). Lo usan SlotsAtriles y CajaRitmos. Objetos de módulo reutilizados: sin allocations por frame.
+const _sillasC = { x: 0, z: 0 };
+export const EJE_TARIMA: EjeTarima = { cx: 0, cz: 0, ux: 0, uz: 1 };
+/** x del atril de sonido (para el menú: distancia caja ↔ atril de sonido). */
+export const UBIC_SLOTS = { atrilX: 0 };
+export function slotsActuales(atrilX: number, tarimaMedia: number, tarimaH: number, out: Slot[]): Slot[] {
+  UBIC_SLOTS.atrilX = atrilX;
+  centroSillasEn(DBG_LAYOUT, _sillasC);
+  ejeDetrasTarima(TARIMA_CENTRO.x, TARIMA_CENTRO.z, _sillasC.x, _sillasC.z, EJE_TARIMA);
+  return slotsSegunUbicacion(DBG_PLAY, DBG_RITMOS, atrilX, EJE_TARIMA, tarimaMedia, tarimaH, out);
+}
+
 /** Marcadores de los slots (espacio de LecternSystem). anchoM/profM = huella de un atril. */
 export function SlotsAtriles({ atrilX, tarimaMedia, tarimaH, anchoM, profM }: {
   atrilX: number; tarimaMedia: number; tarimaH: number; anchoM: number; profM: number;
@@ -174,7 +188,7 @@ export function SlotsAtriles({ atrilX, tarimaMedia, tarimaH, anchoM, profM }: {
     if (!g) return;
     g.visible = DBG_PLAY.MOSTRAR_SLOTS;
     if (!g.visible) return;
-    const s = slotsInstrumentos(DBG_PLAY, atrilX, tarimaMedia, tarimaH, r.slots);
+    const s = slotsActuales(atrilX, tarimaMedia, tarimaH, r.slots);   // Z88: detrás de la tarima (o slot_atril)
     for (let i = 0; i < MAX_SLOTS; i++) {
       const o = slotsRef.current[i];
       if (!o) continue;

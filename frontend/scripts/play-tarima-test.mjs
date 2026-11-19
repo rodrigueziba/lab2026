@@ -17,7 +17,7 @@ const cerca = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
 console.log('\nbandera AUTOPLAY');
 check(P.AUTOPLAY === false && !arrancaSolo(P), 'por defecto la música NO arranca sola');
 check(arrancaSolo({ AUTOPLAY: true }), 'AUTOPLAY = true restaura el arranque automático');
-check(P.MOSTRAR_SLOTS === false && P.APARECER_TRAS_PLAY === true, 'MOSTRAR_SLOTS off (overlay oculto) y APARECER_TRAS_PLAY true');
+check(P.MOSTRAR_SLOTS === false && P.APARECER_TRAS_PLAY === false, 'MOSTRAR_SLOTS off (overlay oculto) y APARECER_TRAS_PLAY false (Z88: antes true; la caja sale con los atriles)');
 
 console.log('\ndecisiones del botón (alterna)');
 const E = (o = {}) => ({ motorListo: true, hayPistas: true, cargado: false, sonando: false, pausaCentral: false, ...o });

@@ -2,7 +2,8 @@
 // Z70: pestaña "Pasto y monolitos" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_SILLAS, DBG_PASTO, DBG_MONO_VIVO, DBG_AVISO_VIVO } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_PASTO, DBG_MONO_VIVO, DBG_AVISO_VIVO, DBG_VIVO, DBG_LIVEKIT_RECIBIR } from "@/lib/debugConfig";
+import { publicarPresencia, detenerPresencia, textoEstadoVivo, textoEstadoRecepcion, reintentarLiveKit, reintentarPresencia } from "@/lib/vivo/vivoAcciones";   // Z89 · Z93 · Z95
 import { mostrarAvisoAhora, reiniciarDecisionAviso, textoEstadoAviso } from "@/lib/avisoVivoAcciones";   // Z85
 import { simularSesionEnVivo, quitarSesion, forzarCerca, reiniciarMonolitosVivo, aceptarTransmision, textoEstadoMonolitos, MONO_VIVO } from "@/lib/monolitosVivoAcciones";   // Z82
 import { MONO_PASTO } from "@/lib/monolitosPasto";
@@ -269,6 +270,77 @@ export function SecAvisoVivoZ85() {
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={A[k]} onChange={ev => { A[k] = parseFloat(ev.target.value); toca(); }} />
             </div>
           ))}
+    </>
+  );
+}
+
+// sección: sesion-vivo-z89
+export function SecSesionVivoZ89() {
+  // Z89: presencia de la sesión en vivo con Supabase Realtime (sin medios). Estado 4 veces por segundo.
+  const V = DBG_VIVO;
+  const [, setTick] = useState(0);
+  const [res, setRes] = useState("");
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  return (
+    <>
+          <span style={LABEL}>Sesión en vivo (presencia) Z89 <span style={NOTE}>(live · Supabase Realtime, sin medios · canal público)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span style={{ whiteSpace: "pre-line" }}>{textoEstadoVivo()}</span></div>
+          <div style={ROW}>
+            <span>FUENTE <span style={NOTE}>mock = Z82–Z86 · supabase = presencia con patrones de prueba · livekit = presencia + medios reales (Z93) · auto = livekit si hay variables</span></span>
+            {(["auto", "livekit", "supabase", "mock"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, opacity: V.FUENTE === m ? 1 : 0.5 }} onClick={() => { V.FUENTE = m; toca(); }}>{m}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <span>CANAL <span style={NOTE}>vale al conectar</span></span>
+            <input style={{ ...INPUT, flex: 1 }} value={V.CANAL} maxLength={64}
+              onKeyDown={ev => ev.nativeEvent.stopPropagation()} onKeyUp={ev => ev.nativeEvent.stopPropagation()}   // escribir no mueve la cámara ni dispara la E
+              onChange={ev => { V.CANAL = ev.target.value.replace(/[^A-Za-z0-9_:-]/g, ""); toca(); }} />
+          </div>
+          {([["LATIDO_S", 1, 30, 0.5, "s entre latidos"], ["TIMEOUT_S", 3, 60, 1, "s sin latido → sin sesión"], ["REINTENTO_S", 0.5, 30, 0.5, "s (se duplica)"],
+            ["REINTENTO_MAX_S", 1, 300, 1, "s tope"], ["MAX_REINTENTOS", 0, 30, 1, "Z95: seguidos, cada uno con un canal nuevo"], ["CIERRE_SIN_USO_S", 0, 120, 1, "s sin monolitos → cierra el canal"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{V[k].toFixed(st < 1 ? 1 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={V[k]} onChange={ev => { V[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); const r = publicarPresencia({ modo: "privado", consentimiento: true }); setRes(r.ok ? `publicando ${r.sesionId.slice(0, 8)}…` : `rechazada: ${r.motivo}`); toca(); }}>Publicar presencia de prueba (consentimiento de prueba)</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); detenerPresencia(); setRes("detenida"); toca(); }}>Detener presencia</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); reintentarPresencia(); setRes("reintentando con canales nuevos"); toca(); }}>Reintentar presencia</button>
+          </div>
+          {res && <div style={{ ...ROW, ...NOTE }}><span>{res}</span></div>}
+    </>
+  );
+}
+
+// sección: recepcion-livekit-z93
+export function SecRecepcionLiveKitZ93() {
+  // Z93: recepción real de la tarima en SILLAS (LiveKit, rol "escuchar"). Estado 4 veces por segundo, sin datos sensibles.
+  const R = DBG_LIVEKIT_RECIBIR;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  return (
+    <>
+          <span style={LABEL}>Recepción LiveKit Z93 <span style={NOTE}>(live · SILLAS recibe audio y video de la tarima tras aceptar el aviso · DBG_VIVO.FUENTE auto/livekit)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoRecepcion()}</span></div>
+          <div style={ROW}>
+            <span>CONTORNO_ELEMENTO_AUDIO <span style={NOTE}>Chrome: la pista también en un audio silenciado (vale al suscribir)</span></span>
+            <button style={INPUT} onClick={() => { R.CONTORNO_ELEMENTO_AUDIO = !R.CONTORNO_ELEMENTO_AUDIO; toca(); }}>{R.CONTORNO_ELEMENTO_AUDIO ? "ON" : "off"}</button>
+          </div>
+          {([["ESPERA_DESUSCRIBIR_S", 0, 10, 0.5, "s con peso 0 → des-suscribe (sin ninguna: desconecta)"], ["SENAL_DEBIL_S", 1, 20, 0.5, "s suscrito sin medios → señal débil"],
+            ["DEBIL_MEZCLA", 0, 1, 0.05, "estática en señal débil (sin cortar lo propio)"], ["REINTENTO_BASE_S", 0.5, 10, 0.5, "s (se duplica)"],
+            ["REINTENTO_MAX_S", 1, 60, 1, "s tope"], ["MAX_REINTENTOS", 0, 20, 1, "después: error"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{R[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={R[k]} onChange={ev => { R[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); reintentarLiveKit(); toca(); }}>Volver a probar LiveKit (olvida el 503 de auto)</button>
+          </div>
     </>
   );
 }

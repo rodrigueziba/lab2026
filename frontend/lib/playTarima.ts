@@ -93,3 +93,69 @@ export function alturaPedestal(c: CfgPedestal, slotY: number, tarimaH: number): 
   if (v === "auto" || typeof v !== "number" || !Number.isFinite(v)) return Math.max(0, (Number.isFinite(tarimaH) ? tarimaH : 0) - (Number.isFinite(slotY) ? slotY : 0));
   return Math.max(0, Math.min(1.5, v));
 }
+
+// ── Z88: ubicación de la caja de ritmos y de los slots: "detras_tarima" (default) | "slot_atril" (Z79/Z80) ──
+// Eje = centro de la fila de sillas → centro de la tarima, prolongado: la caja va más allá del borde de la tarima
+// opuesto a las sillas, a DIST_DETRAS_M del borde, sobre el eje, mirando al centro de la tarima. Los slots, en línea
+// perpendicular al eje, separados SLOTS_SEP_M, con el slot de la caja (SLOT) en el centro (sobre el eje) y los demás
+// alternados: +1 hacia la derecha del eje visto desde las sillas (hoy +X, el lado del atril de sonido), −1, +2, −2…
+// SLOTS_ARCO_GRADOS y SLOTS_DIST_M solo valen en "slot_atril".
+export type UbicacionRitmos = "detras_tarima" | "slot_atril";
+export function ubicacionRitmos(v: string | undefined): UbicacionRitmos { return v === "slot_atril" ? "slot_atril" : "detras_tarima"; }
+export interface CfgUbicacion { UBICACION: string; DIST_DETRAS_M: number; SLOT: number }
+/** Centro de la tarima (cx, cz) y dirección unitaria (ux, uz) tarima → lado opuesto a las sillas. */
+export interface EjeTarima { cx: number; cz: number; ux: number; uz: number }
+
+/** Escribe el eje desde el centro de la tarima y el de la fila de sillas. Si coinciden, (0, 1) (hoy: sillas en −Z). */
+export function ejeDetrasTarima(tx: number, tz: number, sx: number, sz: number, out: EjeTarima): EjeTarima {
+  const dx = tx - sx, dz = tz - sz, l = Math.hypot(dx, dz);
+  out.cx = tx; out.cz = tz;
+  if (!(l > 1e-6)) { out.ux = 0; out.uz = 1; } else { out.ux = dx / l; out.uz = dz / l; }
+  return out;
+}
+/** Distancia del centro al borde de la tarima (cuadrada, alineada a los ejes, medio lado `media`) sobre la dirección u. */
+export function bordeTarimaSobreEje(ux: number, uz: number, media: number): number {
+  return Math.max(0, media) / Math.max(1e-6, Math.abs(ux), Math.abs(uz));
+}
+/** Múltiplo de SLOTS_SEP_M del slot i (el slot `centro` = 0; los demás 1, −1, 2, −2… en orden de índice). */
+export function desplazamientoSlot(i: number, centro: number): number {
+  if (i === centro) return 0;
+  const r = i < centro ? i + 1 : i;            // rango 1, 2, 3… saltando el centro
+  return r % 2 === 1 ? (r + 1) / 2 : -r / 2;
+}
+
+/** Slots detrás de la tarima (ver arriba). slotCentro = DBG_RITMOS.SLOT (se recorta a 0…n−1). */
+export function slotsDetrasTarima(c: CfgSlots, eje: EjeTarima, distDetras: number, slotCentro: number,
+  tarimaMedia: number, tarimaH: number, out: Slot[] = []): Slot[] {
+  const n = Math.max(0, Math.min(12, Math.floor(Number.isFinite(c.SLOTS_N) ? c.SLOTS_N : 0)));
+  const sep = Math.max(0, Number.isFinite(c.SLOTS_SEP_M) ? c.SLOTS_SEP_M : 1.7);
+  const dist = Math.max(0, Number.isFinite(distDetras) ? distDetras : 2);
+  const centro = Math.max(0, Math.min(n - 1, Math.floor(Number.isFinite(slotCentro) ? slotCentro : 0)));
+  const r0 = bordeTarimaSobreEje(eje.ux, eje.uz, tarimaMedia) + dist;
+  const bx = eje.cx + eje.ux * r0, bz = eje.cz + eje.uz * r0;
+  const px = eje.uz, pz = -eje.ux;             // perpendicular: derecha del eje mirando desde las sillas hacia la tarima
+  out.length = n;
+  for (let i = 0; i < n; i++) {
+    const k = desplazamientoSlot(i, centro) * sep;
+    const x = bx + px * k, z = bz + pz * k;
+    const sobre = Math.abs(x - eje.cx) <= tarimaMedia && Math.abs(z - eje.cz) <= tarimaMedia;
+    const s = out[i] ?? (out[i] = { x: 0, y: 0, z: 0, yaw: 0, sobreTarima: false });
+    s.x = x; s.z = z; s.sobreTarima = sobre;
+    s.y = sobre ? tarimaH : 0;
+    s.yaw = Math.atan2(eje.cx - x, eje.cz - z);  // local +Z mira al centro de la tarima
+  }
+  return out;
+}
+
+/** Slots según DBG_RITMOS.UBICACION: "detras_tarima" (Z88) o "slot_atril" (slotsInstrumentos de Z79, intacto). */
+export function slotsSegunUbicacion(c: CfgSlots, u: CfgUbicacion, atrilX: number, eje: EjeTarima,
+  tarimaMedia: number, tarimaH: number, out: Slot[] = []): Slot[] {
+  if (ubicacionRitmos(u.UBICACION) === "slot_atril") return slotsInstrumentos(c, atrilX, tarimaMedia, tarimaH, out);
+  return slotsDetrasTarima(c, eje, u.DIST_DETRAS_M, u.SLOT, tarimaMedia, tarimaH, out);
+}
+
+// ── Z88: ¿cuándo sale la caja? ──
+/** true = la caja sale con los atriles (su animación arranca con la de ellos); false = al apretar play (Z80). */
+export function cajaSaleConAtriles(aparecerTrasPlay: boolean, mostrar: string): boolean {
+  return mostrar === "siempre" || !aparecerTrasPlay;
+}

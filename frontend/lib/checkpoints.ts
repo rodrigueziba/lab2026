@@ -18,7 +18,11 @@ export type CheckpointId =
   | "inicio" | "exploracion" | "sillas_prisma" | "sala_activa" | "visualizador" | "amanecer_completo"
   | "tarima" | "tarima_vacia" | "luz_dialogo" | "premio"
   | "dia_mediodia" | "dia_atardecer" | "dia_noche"   // Z48
-  | "dia_prisma_sube" | "dia_flor" | "dia_prisma_baja";   // Z54
+  | "dia_prisma_sube" | "dia_flor" | "dia_prisma_baja"   // Z54
+  | "sillas_recibir" | "tarima_compartir"   // Z95: prueba de la transmisión en vivo con dos ventanas
+  | "atril_sonido"                           // Z96: probar el atril de sonido rediseñado
+  | "atril_imagen"                           // Z97: probar el atril de imagen rediseñado
+  | "atril_bajo";                            // Z99: probar el BAJO ÁCIDO BA-40
 
 /** ["accion", ...args] */
 export type Paso = readonly [string, ...(string | number)[]];
@@ -78,7 +82,50 @@ export const CHECKPOINTS: readonly Checkpoint[] = [
     descripcion: "Bajo la luz lejana: giro de cámara y terminal abierta en n_1." },
   { id: "premio", nombre: "Premio", pasos: [...EXPLORACION, ["premio"], ["esperarFrames", 2]],
     descripcion: "Después de juego_alarma: premio otorgado (1 h), luces encendidas, sobre la tarima." },
+  // Z95: SILLAS listo para RECIBIR: amanecer completo + pasto completo + monolitos arriba; a RECIBIR_DIST_M del monolito
+  // de sonido (derecho), del lado de las sillas, mirándolo (fuera de RADIO_INICIO_M). El aviso y la aceptación NO se
+  // saltean: la decisión del aviso se reinicia y aparece al entrar al radio.
+  { id: "sillas_recibir", nombre: "Sillas: recibir", pasos: [...VIZ, ["amanecerFinal"], ["esperarFrames", 2], ["pastoCompleto"],
+      ["esperarMonolitos", 10], ["frenteMonolitos"], ["avisoListo"], ["esperarFrames", 2]],
+    descripcion: "SILLAS con visualizador, música, pasto y monolitos; a ~5 m del monolito derecho, listo para el aviso de la transmisión." },
+  // Z95: TARIMA lista para COMPARTIR: domo ya visible (sin los 15 s), figuras en escena (cámara leída) y la elección
+  // del consentimiento abierta (lo mismo que "Mostrar elección ahora"); los atriles siguen esperando la elección.
+  { id: "tarima_compartir", nombre: "Tarima: compartir", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
+      ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["mostrarEleccion"], ["esperarDialogo", 10]],
+    descripcion: "Sobre la tarima con figuras y domo; el texto 2 del consentimiento abierto (Compartir / No compartir)." },
+  // Z96: figuras sentadas, atriles ya afuera SIN el diálogo y sin transmitir ("No compartir" en silencio), frente al atril
+  // de sonido a distancia de interacción, listo para apretar E
+  { id: "atril_sonido", nombre: "Atril de sonido", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
+      ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["frenteAtrilSonido"], ["esperarFrames", 2]],
+    descripcion: "Sobre la tarima con figuras y atriles (sin diálogo ni transmisión), frente al atril de sonido: apretá E." },
+  // Z97: igual que atril_sonido, pero frente al atril de imagen (izquierda)
+  { id: "atril_imagen", nombre: "Atril de imagen", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
+      ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["frenteAtrilImagen"], ["esperarFrames", 2]],
+    descripcion: "Sobre la tarima con figuras y atriles (sin diálogo ni transmisión), frente al atril de imagen: apretá E." },
+  // Z99: igual, frente al BA-40 (slot de instrumentos detrás de la tarima, junto a la caja de ritmos)
+  { id: "atril_bajo", nombre: "Atril del bajo", pasos: [...EXPLORACION, ["irATarima"], ["esperarEvento", "alight:chose-light", 5],
+      ["forzarDomo"], ["esperarEvento", "alight:people-visible", 60], ["atrilesSinConsentimiento"], ["esperarFrames", 3], ["frenteAtrilBajo"], ["esperarFrames", 2]],
+    descripcion: "Atriles afuera (sin diálogo ni transmisión), frente al BAJO ÁCIDO BA-40: tocá play en la caja de ritmos y apretá E en el bajo." },
 ];
+
+/**
+ * Z95: checkpoint pedido por la URL (?cp=<id> o ?checkpoint=<id>, Z40). Desconocido o vacío → null (se ignora, sin
+ * avisos). Puro (se prueba en Node).
+ */
+export function checkpointDeUrl(search: string): CheckpointId | null {
+  let id = "";
+  try { const q = new URLSearchParams(search || ""); id = (q.get("cp") || q.get("checkpoint") || "").trim(); } catch { id = ""; }
+  if (!id) return null;
+  const c = buscarCheckpoint(id);
+  return c ? c.id : null;
+}
+
+/** Z95: posición de "sillas_recibir": a distM del monolito, del lado de las sillas (z menor), mirándolo. */
+export function posicionRecibir(mono: { x: number; z: number }, distM: number, out: { x: number; z: number; mirarX: number; mirarZ: number }) {
+  const d = Math.max(0, Number.isFinite(distM) ? distM : 5);
+  out.x = mono.x; out.z = mono.z - d; out.mirarX = mono.x; out.mirarZ = mono.z;
+  return out;
+}
 
 export const TIMEOUT_PASO_S = 30;   // tope por paso si el paso no trae uno propio
 

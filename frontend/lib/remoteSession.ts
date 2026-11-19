@@ -15,6 +15,10 @@ export interface RemoteSession {
   /** Subscribe to watcher-count updates; returns unsubscribe function. */
   onWatchers(cb: (count: number) => void): () => void;
   dispose(): void;
+  /** Z93 (opcional): qué medios reales llegan. Sin este campo (mock, SesionPrueba) los medios están siempre "listos". */
+  readonly senal?: { audio: boolean; video: boolean; debil: boolean };
+  /** Z93 (opcional): un cuadro de la recepción (aceptación del aviso y pesos de los monolitos). */
+  tickMedios?(aceptada: boolean, kSonido: number, kVideo: number): void;
 }
 
 // ── MockRemoteSession ─────────────────────────────────────────────────────────
