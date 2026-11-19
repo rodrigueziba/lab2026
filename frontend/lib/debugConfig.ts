@@ -754,6 +754,13 @@ export const DBG_ATRIL_SONIDO = {
   ETIQUETA_ESCALA: 1.0,     // multiplica el alto de títulos y etiquetas (los lejanos ya son más grandes) — live (redibuja la serigrafía)
   DISPLAY_VALOR_S: 2.5,     // s que el display muestra el control tocado (nombre y valor) antes de volver al estado — live
   VU_HZ:           30,      // tope de actualización del VU y del display (solo con el atril en pantalla) — live
+  // Z96b
+  VU_SEG_AMBAR_DESDE:   9,      // de 14 segmentos: 0…8 verdes, 9…11 ámbar — live
+  VU_SEG_ROJO_DESDE:    12,     // 12 y 13 rojos (los últimos 2) — live
+  VU_PICO_RETENCION_MS: 800,    // el pico se queda arriba esto y después baja un segmento por tick — live
+  ROTULOS_FILA:         true,   // rótulos de fila (EFECTOS · TONO · TRANSPORTE) — live (rehace la placa)
+  ROTULOS_MODO:         "barra" as string,   // "barra" (leyenda numerada en la barra + números en el margen) | "margen" (verticales; TRANSPORTE no llega a 2 %) — live
+  ETIQUETA_AUTO_ASPECTO: true,  // proporción < 1,6: ETIQUETA_ESCALA sube hasta × 1,15 (acotada por lugar) — live (rehace la serigrafía)
 };
 
 // ── J5: retro skin (cassette futurism) for TARIMA lecterns ───────────────────

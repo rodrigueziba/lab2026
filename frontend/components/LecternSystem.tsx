@@ -22,9 +22,9 @@ import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_P
 // Z96: atril de sonido rediseñado ("SONIDO SN-40"): layout como datos (lib/atrilSonido.ts) y piezas (AtrilSonidoNuevo.tsx)
 import {
   POSICIONES as POS_SONIDO_NUEVO, FADER_RAIL, GRANDE_ESCALA, PLAY_W, PLAY_D, textoValor, camaraAtril, legibilidadMinima,
-  LEGIBLE_MIN, esDobleClic, type FormaCtrl, type GeoAtril, type PosCtrl,
+  LEGIBLE_MIN, esDobleClic, escalaEfectiva, type FormaCtrl, type GeoAtril, type PosCtrl,
 } from "@/lib/atrilSonido";
-import { DisplaySonido, VuSonido, PlacaFrenteSonido, buildSilkscreenSonido, mostrarEnDisplay } from "./AtrilSonidoNuevo";
+import { DisplaySonido, VuSonido, PlacaFrenteSonido, buildSilkscreenSonido, mostrarEnDisplay, PlacaBarraSonido, MargenRotulos, escalaActual } from "./AtrilSonidoNuevo";
 import { PLAY_TARIMA } from "@/lib/playTarima";                                              // Z79
 import { alternarPlay, instalarEstadoPlay, prepararSinAutoplay } from "@/lib/playTarimaAcciones"; // Z79
 import { PlayGrande, SlotsAtriles } from "./PlayTarima";                                       // Z79
@@ -203,19 +203,28 @@ function labelTex(text: string): THREE.CanvasTexture {
 
 // ── Z96: pantalla del PLAY/PAUSA grande (una textura por estado, por instancia; se liberan al desmontar) ──
 const PLAY_TECLA_MAT = new THREE.MeshStandardMaterial({ color: "#C0552F", roughness: 0.75, metalness: 0 });
-function texPlayGrande(sonando: boolean): THREE.CanvasTexture {
+/** Z96b: marca de valor de las perillas del diseño nuevo (oscura, mate). */
+const MARCA_PERILLA_MAT = new THREE.MeshStandardMaterial({ color: "#14100c", roughness: 0.9, metalness: 0 });
+/** Z96b: la tecla muestra un texto FIJO ("PLAY / PAUSA" con ▶❚❚); el estado lo dicen su luz y el display. */
+export const TEXTO_TECLA_PLAY = "PLAY / PAUSA";
+export const LUZ_PLAY = { sonando: "#2E9E5B", pausa: "#FF9A1F", pulsoHz: 0.8 };
+/** Intensidad de la luz del PLAY: verde 2,2 ± 0,5 con pulso suave reproduciendo; ámbar 0,25 (apagada) en pausa. */
+export function intensidadLuzPlay(sonando: boolean, ahoraMs: number): number {
+  return sonando ? 2.2 + 0.5 * Math.sin((ahoraMs / 1000) * Math.PI * 2 * LUZ_PLAY.pulsoHz) : 0.25;
+}
+function texPlayGrande(): THREE.CanvasTexture {
   const w = 1024, h = 256, cv = document.createElement("canvas");
   cv.width = w; cv.height = h;
   const c = cv.getContext("2d")!;
   c.fillStyle = "#2A1400"; c.fillRect(0, 0, w, h);
   c.fillStyle = "rgba(255,154,31,0.08)";
   for (let y = 0; y < h; y += 5) c.fillRect(0, y, w, 2);
-  c.fillStyle = sonando ? "#7CF0A8" : "#FF9A1F";
-  c.shadowColor = sonando ? "rgba(124,240,168,0.7)" : "rgba(255,154,31,0.7)"; c.shadowBlur = 16;
-  if (sonando) { c.fillRect(90, 58, 46, 140); c.fillRect(160, 58, 46, 140); }
-  else { c.beginPath(); c.moveTo(96, 50); c.lineTo(226, 128); c.lineTo(96, 206); c.closePath(); c.fill(); }
-  c.font = "bold 150px monospace"; c.textBaseline = "middle"; c.textAlign = "left";
-  c.fillText(sonando ? "PAUSA" : "PLAY", 290, 136);
+  c.fillStyle = "#FF9A1F"; c.shadowColor = "rgba(255,154,31,0.7)"; c.shadowBlur = 14;
+  // ícono combinado ▶❚❚
+  c.beginPath(); c.moveTo(60, 70); c.lineTo(150, 128); c.lineTo(60, 186); c.closePath(); c.fill();
+  c.fillRect(168, 70, 26, 116); c.fillRect(208, 70, 26, 116);
+  c.font = "bold 112px monospace"; c.textBaseline = "middle"; c.textAlign = "left";
+  c.fillText(TEXTO_TECLA_PLAY, 270, 132);
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -718,7 +727,7 @@ function fitLecternCamera(
             // ── Z96: texto más lejano del diseño nuevo ≥ LEGIBLE_MIN (proyección real sobre la placa inclinada) ──
             if (exigirLegible) {
               const cp = camaraAtril(geoAtril(), fovDeg, height, dist, pitchDeg, aspect);
-              if (legibilidadMinima(geoAtril(), cp, DBG_ATRIL_SONIDO.ETIQUETA_ESCALA).min < LEGIBLE_MIN) continue;
+              if (legibilidadMinima(geoAtril(), cp, escalaEfectiva(DBG_ATRIL_SONIDO.ETIQUETA_ESCALA, DBG_ATRIL_SONIDO.ETIQUETA_AUTO_ASPECTO, aspect)).min < LEGIBLE_MIN) continue;
             }
           } else {
             // ── Image: dome visibility (6×3 grid, top 30% of screen, ≥70%) ──
@@ -1082,6 +1091,7 @@ export const SOUND_CONTROLS_NUEVO: CtrlDef[] = SOUND_CONTROLS.map(d => {
   const p = POS_SONIDO_NUEVO.find(x => x.id === d.id);
   if (!p) return d;
   return { ...d, px: p.u, py: p.v, label: p.etiqueta, forma: p.forma, nombreLargo: p.nombreLargo,
+    ...(d.type === "knob" ? { color: "mustard" as const } : {}),   // Z96b: todas las perillas mostaza (las de los filtros venían negras de J3)
     ...(d.id === "s_vol" ? { railLen: FADER_RAIL } : {}) };
 });
 function controlesSonido(): CtrlDef[] { return DBG_ATRIL_SONIDO.DISENO_NUEVO ? SOUND_CONTROLS_NUEVO : SOUND_CONTROLS; }
@@ -1183,8 +1193,8 @@ function CtrlMesh({
   const playPantRef    = useRef<THREE.MeshBasicMaterial | null>(null);
   const playLuzRef     = useRef<THREE.MeshStandardMaterial | null>(null);
   const playSonandoRef = useRef<boolean | null>(null);
-  const playTex = useMemo(() => def.forma === "play" ? { play: texPlayGrande(false), pausa: texPlayGrande(true) } : null, [def.forma]);
-  useEffect(() => () => { playTex?.play.dispose(); playTex?.pausa.dispose(); }, [playTex]);
+  const playTex = useMemo(() => def.forma === "play" ? texPlayGrande() : null, [def.forma]);
+  useEffect(() => () => { playTex?.dispose(); }, [playTex]);
 
   const register = (mesh: THREE.Mesh | null) => {
     if (!mesh || meshesRef.current.includes(mesh)) return;
@@ -1244,13 +1254,13 @@ function CtrlMesh({
       let hund = 0;
       if (ms < 220) { const t = ms / 220; hund = t < 0.2 ? 0.007 * t / 0.2 : 0.007 * Math.max(0, Math.exp(-6 * (t - 0.2)) * Math.cos(Math.PI * 2 * (t - 0.2))); }
       if (playTeclaRef.current) playTeclaRef.current.position.y = -hund;
+      // Z96b: la LUZ dice el estado (verde con pulso suave reproduciendo · ámbar apagada en pausa); el texto es fijo
       const s = PLAY_TARIMA.sonando;
-      if (s !== playSonandoRef.current && playPantRef.current && playTex) {
+      if (s !== playSonandoRef.current) {
         playSonandoRef.current = s;
-        playPantRef.current.map = s ? playTex.pausa : playTex.play; playPantRef.current.needsUpdate = true;
-        if (playLuzRef.current) { playLuzRef.current.emissive.set(s ? "#2E9E5B" : "#FF9A1F"); }
+        if (playLuzRef.current) playLuzRef.current.emissive.set(s ? LUZ_PLAY.sonando : LUZ_PLAY.pausa);
       }
-      if (playLuzRef.current) playLuzRef.current.emissiveIntensity = s ? 2.6 : 0.9;
+      if (playLuzRef.current) playLuzRef.current.emissiveIntensity = intensidadLuzPlay(s, performance.now());
       return;
     }
 
@@ -1492,11 +1502,24 @@ function CtrlMesh({
             <cylinderGeometry args={[KNOB_R, KNOB_BOT_R, KNOB_H, 32]} />
             <primitive object={knobMat} attach="material" />
           </mesh>
-          {/* Indicator line on top face */}
-          <mesh position={[0, KNOB_H / 2 + 0.001, indCtrZ]}>
-            <boxGeometry args={[0.004, 0.002, indLen]} />
-            <primitive object={SILK_MAT} attach="material" />
-          </mesh>
+          {/* Indicator line on top face · Z96b: en el diseño nuevo, marca oscura gruesa con punto en la punta (contrasta con la tapa mostaza) */}
+          {def.forma ? (
+            <>
+              <mesh position={[0, KNOB_H / 2 + 0.0012, indCtrZ]}>
+                <boxGeometry args={[0.0075, 0.0024, indLen]} />
+                <primitive object={MARCA_PERILLA_MAT} attach="material" />
+              </mesh>
+              <mesh position={[0, KNOB_H / 2 + 0.0014, KNOB_R * 0.80]}>
+                <cylinderGeometry args={[0.0058, 0.0058, 0.0028, 16]} />
+                <primitive object={MARCA_PERILLA_MAT} attach="material" />
+              </mesh>
+            </>
+          ) : (
+            <mesh position={[0, KNOB_H / 2 + 0.001, indCtrZ]}>
+              <boxGeometry args={[0.004, 0.002, indLen]} />
+              <primitive object={SILK_MAT} attach="material" />
+            </mesh>
+          )}
         </group>
         {/* Fixed scale marks — hidden in silkscreen mode */}
         {LABEL_MODE === "mesh" && arcMarks.map((p, i) => (
@@ -1569,7 +1592,7 @@ function CtrlMesh({
             {/* pantalla ▶ PLAY / ❚❚ PAUSA */}
             <mesh position={[0, 0.0265, 0.004]} rotation={[-Math.PI / 2, 0, 0]}>
               <planeGeometry args={[BW - 0.040, BD - 0.034]} />
-              <meshBasicMaterial ref={m => { playPantRef.current = m; }} map={playTex?.play ?? null} toneMapped={false} />
+              <meshBasicMaterial ref={m => { playPantRef.current = m; }} map={playTex ?? null} toneMapped={false} />
             </mesh>
             {/* luz propia (franja del lado lejano): verde = reproduciendo · ámbar = en pausa */}
             <mesh position={[0, 0.0268, -(BD - 0.014) / 2 + 0.008]}>
@@ -2146,6 +2169,13 @@ function Lectern({
             {side === "right" && !DBG_ATRIL_SONIDO.DISENO_NUEVO && <PlayGrande />}
             {/* Z96: display ámbar (franja lejana) y VU de la columna SALIDA del diseño nuevo */}
             {side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO && <><DisplaySonido /><VuSonido /></>}
+            {/* Z96b: placa del equipo sobre la barra trasera (la ve la cámara del atril) y rótulos de fila */}
+            {side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO && (
+              <PlacaBarraSonido conLeyenda={DBG_ATRIL_SONIDO.ROTULOS_FILA && DBG_ATRIL_SONIDO.ROTULOS_MODO !== "margen"} />
+            )}
+            {side === "right" && DBG_ATRIL_SONIDO.DISENO_NUEVO && DBG_ATRIL_SONIDO.ROTULOS_FILA && (
+              <MargenRotulos modo={DBG_ATRIL_SONIDO.ROTULOS_MODO === "margen" ? "margen" : "barra"} />
+            )}
             {controls.map(def => (
               <CtrlMesh
                 key={def.id}
@@ -2506,7 +2536,11 @@ export default function LecternSystem() {
       if ((e as CustomEvent<{ remontar?: boolean }>).detail?.remontar) setDisenoV(v => v + 1); else setSilkV(v => v + 1);
     };
     window.addEventListener("alight:atril-sonido-cambio", on);
-    return () => window.removeEventListener("alight:atril-sonido-cambio", on);
+    // Z96b: con ETIQUETA_AUTO_ASPECTO, si al cambiar el tamaño de la ventana cambia la escala efectiva, se rehace la serigrafía
+    let escPrev = escalaActual();
+    const onResize = () => { const e = escalaActual(); if (Math.abs(e - escPrev) > 0.005) { escPrev = e; setSilkV(v => v + 1); } };
+    window.addEventListener("resize", onResize);
+    return () => { window.removeEventListener("alight:atril-sonido-cambio", on); window.removeEventListener("resize", onResize); };
   }, []);
 
   // I1: flip lectern orientation (debug)

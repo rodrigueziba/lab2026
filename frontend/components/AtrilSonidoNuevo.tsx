@@ -21,10 +21,18 @@ import { analizadorMaestro } from "@/lib/audio/nucleo";
 import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
 import {
   MODULOS, POSICIONES, VU, FADER_RAIL, FADER_V, GRANDE_ESCALA, BANDA_TITULO, BANDA_TITULO_TRANSPORTE,
-  DISPLAY_PAD, DISPLAY_INTERLINEA, RADIO_MARCAS_IN, RADIO_MARCAS_OUT, altosDisplay, textos, modulo, lineasDisplay, rms, nivelVu, balistica, tocaActualizar,
+  DISPLAY_PAD, DISPLAY_INTERLINEA, RADIO_MARCAS_IN, RADIO_MARCAS_OUT, altosDisplay, textos,
+  // Z96b
+  numerosPerilla, esPerilla, numerosFader, ESCALA_FADER, HUELLA, colorSegmento, tickPico, escalaEfectiva,
+  BARRA, PLACA_BARRA, TEXTO_PLACA, LEYENDA_FILAS, BARRA_2L, lineasBarra, rotulosFila, numerosFilaMargen, MARGEN_ROTULOS, FILAS, modulo, lineasDisplay, rms, nivelVu, balistica, tocaActualizar,
 } from "@/lib/atrilSonido";
 
 export const NOMBRE_EQUIPO = "SONIDO SN-40";
+/** Z96b: ETIQUETA_ESCALA efectiva (con el ajuste por proporción de pantalla). */
+export function escalaActual(): number {
+  const asp = typeof window === "undefined" ? 16 / 9 : window.innerWidth / Math.max(1, window.innerHeight);
+  return escalaEfectiva(DBG_ATRIL_SONIDO.ETIQUETA_ESCALA, DBG_ATRIL_SONIDO.ETIQUETA_AUTO_ASPECTO, asp);
+}
 export const DESCRIPCION_EQUIPO = "PROCESADOR DE SONIDO · 10 MÓDULOS";
 
 /** Lo escribe setCtrl (LecternSystem) al tocar un control del atril de sonido: el display lo muestra DISPLAY_VALOR_S. */
@@ -76,7 +84,7 @@ export async function buildSilkscreenSonido(dims: { CW: number; CD: number; KNOB
 
   // títulos y etiquetas (las líneas del display las dibuja el display)
   c.fillStyle = `${CREMA}0.95)`;
-  for (const t of textos(DBG_ATRIL_SONIDO.ETIQUETA_ESCALA)) {
+  for (const t of textos(escalaActual())) {
     if (t.fila === "display") continue;
     const px = Math.round(t.alto * ppmY);
     c.font = `bold ${px}px monospace`;
@@ -103,17 +111,24 @@ export async function buildSilkscreenSonido(dims: { CW: number; CD: number; KNOB
       c.lineTo(X(p.u + Math.sin(a) * rOut), Y(p.v + Math.cos(a) * rOut));
       c.stroke();
     }
+    // Z96b: mínimo y máximo impresos en los extremos ("0"/"10", o "MIN"/"MAX" en las de Hz)
+    if (esPerilla(p)) for (const n of numerosPerilla(p)) {
+      c.font = `bold ${Math.round(n.alto * ppmY)}px monospace`; c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillStyle = `${CREMA}0.9)`; c.fillText(n.texto, X(n.u), Y(n.v));
+    }
   }
-  // fader VOLUMEN: marcas 0…10 a la izquierda del riel
+  // fader VOLUMEN (Z96b): escala 0…10 a la izquierda del recorrido: marcas (largas en 0, 5 y 10) y números 0, 5, 10
   const vol = POSICIONES.find(p => p.id === "s_vol")!;
-  const xL = X(vol.u) - (dims.THUMB_W / 2 + 0.012) * ppmX;
+  const xMarca = X(vol.u - HUELLA.FADER_U - 0.004);   // borde derecho de las marcas (no las tapa el pomo)
   for (let i = 0; i <= 10; i++) {
     const v = FADER_V - FADER_RAIL / 2 + (i / 10) * FADER_RAIL;
     const mayor = i === 0 || i === 5 || i === 10;
-    c.fillStyle = mayor ? `${CREMA}0.85)` : `${CREMA}0.5)`;
-    c.fillRect(xL - (mayor ? 22 : 13), Y(v) - 1.5, mayor ? 22 : 13, 3);
-    if (mayor) { c.font = "30px monospace"; c.textAlign = "right"; c.textBaseline = "middle"; c.fillText(String(i), xL - 28, Y(v)); }
+    const largo = (mayor ? ESCALA_FADER.marcaLarga : ESCALA_FADER.marcaCorta) * ppmX;
+    c.fillStyle = mayor ? `${CREMA}0.9)` : `${CREMA}0.55)`;
+    c.fillRect(xMarca - largo, Y(v) - 2, largo, 4);
   }
+  c.fillStyle = `${CREMA}0.9)`; c.textAlign = "center"; c.textBaseline = "middle";
+  for (const n of numerosFader()) { c.font = `bold ${Math.round(n.alto * ppmY)}px monospace`; c.fillText(n.texto, X(n.u), Y(n.v)); }
   // VU: marco y escala en dB
   c.strokeStyle = `${CREMA}0.5)`; c.lineWidth = 2;
   c.strokeRect(X(VU.u - VU.ancho / 2 - 0.004), Y(VU.v1 + 0.006), (VU.ancho + 0.008) * ppmX, (VU.v1 - VU.v0 + 0.012) * ppmY);
@@ -147,7 +162,7 @@ export function DisplaySonido() {
     return { d, w, h, cw, ch, cv, tex, mat, geo, marcoGeo, marcoMat };
   }, []);
   // último contenido dibujado (campos numéricos: comparar no crea objetos ni strings)
-  const ult = useRef({ ms: -1e9, t: -2, dur: -2, son: -1, pista: -1, n: -1, a: -2, b: -2, lp: -1, val: -2 });
+  const ult = useRef({ ms: -1e9, t: -2, dur: -2, son: -1, pista: -1, n: -1, a: -2, b: -2, lp: -1, val: -2, esc: -1 });
 
   useEffect(() => () => { r.tex.dispose(); r.mat.dispose(); r.geo.dispose(); r.marcoGeo.dispose(); r.marcoMat.dispose(); }, [r]);
 
@@ -164,9 +179,10 @@ export function DisplaySonido() {
     const valor = ahora < DISPLAY_SONIDO.hasta ? DISPLAY_SONIDO.version : -1;
     // el texto se arma y se dibuja SOLO si algo cambió (≈ 1 vez por segundo)
     const u = ult.current, son = PLAY_TARIMA.sonando ? 1 : 0, a = Math.floor(sm.loopStart), b = Math.floor(sm.loopEnd), lp = sm.loopActive ? 1 : 0;
+    const esc = escalaActual();
     if (u.t === t && u.dur === dur && u.son === son && u.pista === STORE.audio.trackIndex && u.n === STORE.audio.tracks.length
-      && u.a === a && u.b === b && u.lp === lp && u.val === valor) return;
-    u.t = t; u.dur = dur; u.son = son; u.pista = STORE.audio.trackIndex; u.n = STORE.audio.tracks.length; u.a = a; u.b = b; u.lp = lp; u.val = valor;
+      && u.a === a && u.b === b && u.lp === lp && u.val === valor && u.esc === esc) return;
+    u.t = t; u.dur = dur; u.son = son; u.pista = STORE.audio.trackIndex; u.n = STORE.audio.tracks.length; u.a = a; u.b = b; u.lp = lp; u.val = valor; u.esc = esc;
     const url = STORE.audio.tracks[STORE.audio.trackIndex] ?? "";
     let pista = "";
     try { pista = decodeURIComponent(url.split("/").pop() ?? ""); } catch { pista = url.split("/").pop() ?? ""; }
@@ -185,7 +201,7 @@ export function DisplaySonido() {
 function dibujar(r: { cv: HTMLCanvasElement; tex: THREE.CanvasTexture; cw: number; ch: number; w: number; h: number }, l1: string, l2: string): void {
   const c = r.cv.getContext("2d");
   if (!c) return;
-  const ppm = r.cw / r.w, e = DBG_ATRIL_SONIDO.ETIQUETA_ESCALA;
+  const ppm = r.cw / r.w, e = escalaActual();
   c.fillStyle = "#2A1400"; c.fillRect(0, 0, r.cw, r.ch);
   c.fillStyle = "rgba(255,154,31,0.07)";
   for (let y = 0; y < r.ch; y += 4) c.fillRect(0, y, r.cw, 1);   // líneas de barrido
@@ -214,7 +230,8 @@ export function VuSonido() {
     ];
     return { n, alto, geo, apagado, encendido };
   }, []);
-  const st = useRef({ ms: -1e9, nivel: 0, buf: null as Float32Array | null, an: null as AnalyserNode | null, lit: -1 });
+  const st = useRef({ ms: -1e9, nivel: 0, buf: null as Float32Array | null, an: null as AnalyserNode | null, lit: -1, pico: -2,
+    p: { idx: -1, t: 0 }, ambar: -1, rojo: -1 });
 
   useEffect(() => () => { r.geo.dispose(); r.apagado.dispose(); r.encendido.forEach(m => m.dispose()); st.current.buf = null; st.current.an = null; }, [r]);
 
@@ -235,12 +252,15 @@ export function VuSonido() {
     }
     s.nivel = balistica(s.nivel, x, dt);
     const lit = Math.round(s.nivel * r.n);
-    if (lit === s.lit) return;   // solo cambia materiales si cambió el nivel
-    s.lit = lit;
+    // Z96b: pico con retención (VU_PICO_RETENCION_MS) que después baja de a un segmento por tick
+    tickPico(s.p, lit, ahora, DBG_ATRIL_SONIDO.VU_PICO_RETENCION_MS);
+    const A = DBG_ATRIL_SONIDO.VU_SEG_AMBAR_DESDE, R = DBG_ATRIL_SONIDO.VU_SEG_ROJO_DESDE;
+    if (lit === s.lit && s.p.idx === s.pico && A === s.ambar && R === s.rojo) return;   // solo cambia materiales si algo cambió
+    s.lit = lit; s.pico = s.p.idx; s.ambar = A; s.rojo = R;
     for (let i = 0; i < r.n; i++) {
       const m = segsRef.current[i];
       if (!m) continue;
-      const mat = i < lit ? r.encendido[i < r.n * 0.65 ? 0 : i < r.n * 0.86 ? 1 : 2] : r.apagado;
+      const mat = i < lit || i === s.p.idx ? r.encendido[colorSegmento(i, A, R)] : r.apagado;
       if (m.material !== mat) m.material = mat;
     }
   });
@@ -274,4 +294,64 @@ export function PlacaFrenteSonido({ y, z, ancho }: { y: number; z: number; ancho
   }, [ancho]);
   useEffect(() => () => { r.tex.dispose(); r.mat.dispose(); r.geo.dispose(); }, [r]);
   return <mesh position={[0, y, z]} geometry={r.geo} material={r.mat} />;
+}
+
+// ── Z96b: placa sobre la barra trasera del marco (la ve la cámara del modo atril) ──
+// Crema con franja de arcoíris, estilo CR-80. Con ROTULOS_FILA y ROTULOS_MODO "barra" suma una segunda línea con la
+// leyenda numerada de las filas. Se dibuja una vez por combinación (rotulos/modo); libera textura y geometría.
+export function PlacaBarraSonido({ conLeyenda }: { conLeyenda: boolean }) {
+  const r = useMemo(() => {
+    const W = PLACA_BARRA.ancho, D = PLACA_BARRA.prof, cw = 4096, ch = Math.round((cw * D) / W);
+    const cv = document.createElement("canvas");
+    cv.width = cw; cv.height = ch;
+    const c = cv.getContext("2d")!;
+    const ppm = cw / W, vc = (BARRA.v0 + BARRA.v1) / 2;
+    const Y = (v: number) => (vc + D / 2 - v) * ppm;
+    c.fillStyle = "#E8DCC4"; c.fillRect(0, 0, cw, ch);
+    const texto = TEXTO_PLACA(NOMBRE_EMPRESA_MAYUS);
+    const l = lineasBarra(texto.length, conLeyenda);
+    c.fillStyle = "#3A3B3C"; c.textAlign = "center"; c.textBaseline = "middle";
+    c.font = `bold ${Math.round(l.placa.alto * ppm)}px monospace`; c.fillText(texto, cw / 2, Y(l.placa.v));
+    if (l.leyenda) { c.font = `bold ${Math.round(l.leyenda.alto * ppm)}px monospace`; c.fillStyle = "#5a4a3a"; c.fillText(LEYENDA_FILAS, cw / 2, Y(l.leyenda.v)); }
+    // franjas del lado del jugador
+    const fr = (conLeyenda ? BARRA_2L.franjas : PLACA_BARRA.franjas) * ppm, h1 = fr / 5;
+    for (let i = 0; i < 5; i++) { c.fillStyle = FRANJAS[i]; c.fillRect(0, ch - fr + i * h1, cw, h1 * 0.8); }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+    const geo = new THREE.PlaneGeometry(W, D);
+    return { tex, mat, geo, vc };
+  }, [conLeyenda]);
+  useEffect(() => () => { r.tex.dispose(); r.mat.dispose(); r.geo.dispose(); }, [r]);
+  return <mesh position={[0, BARRA.y + 0.0008, -r.vc]} rotation={[-Math.PI / 2, 0, 0]} geometry={r.geo} material={r.mat} />;
+}
+
+// ── Z96b: margen izquierdo de la placa: rótulos de fila verticales ("margen") o números de fila 1·2·3 ("barra") ──
+export function MargenRotulos({ modo }: { modo: string }) {
+  const r = useMemo(() => {
+    const W = MARGEN_ROTULOS.u1 - MARGEN_ROTULOS.u0, v0 = FILAS.transporte.v0, v1 = FILAS.display.v1, D = v1 - v0;
+    const ch = 2048, cw = Math.max(32, Math.round((ch * W) / D));
+    const cv = document.createElement("canvas");
+    cv.width = cw; cv.height = ch;
+    const c = cv.getContext("2d")!;
+    const ppm = ch / D, Y = (v: number) => (v1 - v) * ppm;
+    c.clearRect(0, 0, cw, ch);
+    c.fillStyle = `${CREMA}0.92)`; c.textAlign = "center"; c.textBaseline = "middle";
+    if (modo === "margen") {
+      for (const t of rotulosFila()) {
+        c.save(); c.translate(cw / 2, Y(t.v)); c.rotate(-Math.PI / 2);   // se lee de abajo hacia arriba
+        c.font = `bold ${Math.round(t.alto * ppm)}px monospace`; c.fillText(t.texto, 0, 0); c.restore();
+      }
+    } else {
+      for (const n of numerosFilaMargen()) { c.font = `bold ${Math.round(n.alto * ppm)}px monospace`; c.fillText(n.texto, cw / 2, Y(n.v)); }
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const geo = new THREE.PlaneGeometry(W, D);
+    return { tex, mat, geo, uc: (MARGEN_ROTULOS.u0 + MARGEN_ROTULOS.u1) / 2, vc: (v0 + v1) / 2 };
+  }, [modo]);
+  useEffect(() => () => { r.tex.dispose(); r.mat.dispose(); r.geo.dispose(); }, [r]);
+  return <mesh position={[r.uc, 0.0006, -r.vc]} rotation={[-Math.PI / 2, 0, 0]} geometry={r.geo} material={r.mat} />;
 }

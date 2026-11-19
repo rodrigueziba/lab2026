@@ -120,7 +120,7 @@ function construir(): PosCtrl[] {
   L.push(ctl("s_sam_lp", "loop", uCol(lo, 2, 4), vR, "normal", "LOOP", "LOOP A-B"));
   L.push(ctl("s_sam_cl", "loop", uCol(lo, 3, 4), vR, "normal", "BORRAR", "LOOP BORRAR"));
   // SALIDA: fader vertical + VU al lado
-  L.push(ctl("s_vol", "salida", sa.rect.u0 + 0.045, FADER_V, "normal", "VOLUMEN", "VOLUMEN"));
+  L.push(ctl("s_vol", "salida", sa.rect.u0 + FADER_DU, FADER_V, "normal", "VOLUMEN", "VOLUMEN"));   // Z96b: lugar para la escala 0…10
   return L;
 }
 
@@ -133,6 +133,8 @@ export const HUELLA_FADER_ABAJO = 0.020;                   // medio grosor del p
 export const RADIO_FALDA = 0.044;                          // = KNOB_SKIRT_R de LecternSystem
 export const RADIO_MARCAS_IN = 0.046, RADIO_MARCAS_OUT = 0.051;   // escala serigrafiada de las perillas (× GRANDE_ESCALA)
 export const FADER_RAIL = 0.40, FADER_V = -0.035;           // fader VOLUMEN (de −0,235 a +0,165)
+export const FADER_DU = 0.071;                              // Z96b: fader a 7,1 cm del borde izquierdo de SALIDA (antes 4,5): lugar para 0…10
+export const ESCALA_FADER = { alto: 0.012, marcaLarga: 0.012, marcaCorta: 0.007 };   // Z96b: números 0, 5, 10 a la izquierda
 export const VU = { segmentos: 14, u: 0, v0: -0.215, v1: 0.165, ancho: 0.026 };
 VU.u = SALIDA_U1 - 0.035;
 
@@ -146,7 +148,7 @@ export const ALTO_TEXTO: Record<Exclude<Fila, "salida">, { titulo: number; etiqu
   tono:       { titulo: 0.023, etiqueta: 0.017 },
   transporte: { titulo: 0.019, etiqueta: 0.015 },
 };
-export const ALTO_SALIDA = { titulo: 0.018, etiqueta: 0.015 };
+export const ALTO_SALIDA = { titulo: 0.0318, etiqueta: 0.015 };   // Z96b: título como los de su fila (efectos)
 export const DISPLAY_PAD = 0.006, DISPLAY_INTERLINEA = 0.005, DISPLAY_CHARS_1 = 50, DISPLAY_CHARS_2 = 44;
 /** Alto de las dos líneas del display con la escala, acotado para que siempre entren (alto y ancho) en el display. */
 export function altosDisplay(escala: number): [number, number] {
@@ -190,7 +192,7 @@ export function textos(escala: number): Texto[] {
     const anchoLibre = 2 * Math.min(p.u - m.rect.u0, m.rect.u1 - p.u) - 0.006;
     const altoLibre = p.id === "s_vol" ? 0.02 : p.v - r - 0.008 - (m.rect.v0 + 0.003);
     const alto = Math.min(a.etiqueta * e, anchoLibre / (p.etiqueta.length * ANCHO_CHAR), altoLibre);
-    const v = p.id === "s_vol" ? FADER_V - FADER_RAIL / 2 - HUELLA_FADER_ABAJO - 0.006 - alto / 2 : p.v - r - 0.008 - alto / 2;
+    const v = p.id === "s_vol" ? FADER_V - FADER_RAIL / 2 - HUELLA_FADER_ABAJO - 0.003 - alto / 2 : p.v - r - 0.008 - alto / 2;   // Z96b: pegada al fader
     add(`e_${p.id}`, p.etiqueta, p.u, v, alto, "centro", m.fila);
   }
   return T;
@@ -385,4 +387,125 @@ export function huella(p: PosCtrl, playEscala = 1): Rect {
     return { u0: p.u - r * 0.988, u1: p.u + r * 0.988, v0: p.v - Math.max(falda, r * 0.7072), v1: p.v + r };
   }
   return { u0: p.u - hu, u1: p.u + hu, v0: p.v - hv, v1: p.v + hv };
+}
+
+// ════════════════════════════ Z96b ════════════════════════════
+// ── escala de la perilla: números de mínimo y máximo en los extremos (±135°), dentro de la huella de Z96 ──
+export const NUM_PERILLA_ALTO = 0.0085, NUM_PERILLA_R = RADIO_MARCAS_OUT + 0.004;
+const PERILLAS_HZ = new Set(["s_lp_fr", "s_hp_fr"]);
+/** Los dos números de la escala de una perilla ("0"/"10", o "MIN"/"MAX" en las de Hz). Centro (u, v) y alto. */
+export function numerosPerilla(p: PosCtrl): Texto[] {
+  const k = p.forma === "grande" ? GRANDE_ESCALA : 1, r = NUM_PERILLA_R * k, h = NUM_PERILLA_ALTO * k;
+  const [a, b] = PERILLAS_HZ.has(p.id) ? ["MIN", "MAX"] : ["0", "10"];
+  const s = Math.SQRT1_2;
+  const mk = (id: string, texto: string, u: number, v: number): Texto => ({ id, texto, u, v, alto: h, ancho: texto.length * ANCHO_CHAR * h, alinear: "centro", fila: modulo(p.modulo).fila });
+  return [mk(`n0_${p.id}`, a, p.u - s * r, p.v - s * r), mk(`n1_${p.id}`, b, p.u + s * r, p.v - s * r)];
+}
+export function esPerilla(p: PosCtrl): boolean {
+  return (p.forma === "normal" || p.forma === "grande") && radioCtrl(p) > 0.031 && p.id !== "s_vol";
+}
+/** Escala del fader: números 0, 5 y 10 a la izquierda del recorrido (dentro de SALIDA, sin tocar el pomo). */
+export function numerosFader(): Texto[] {
+  const p = POSICIONES.find(x => x.id === "s_vol")!;
+  const h = ESCALA_FADER.alto;
+  const u = p.u - HUELLA.FADER_U - 0.004 - ESCALA_FADER.marcaLarga - 0.003;   // borde derecho del número
+  return [0, 5, 10].map(n => {
+    const t = String(n), ancho = t.length * ANCHO_CHAR * h;
+    return { id: `nf_${n}`, texto: t, u: u - ancho / 2, v: FADER_V - FADER_RAIL / 2 + (n / 10) * FADER_RAIL, alto: h, ancho, alinear: "centro" as const, fila: "salida" as Fila };
+  });
+}
+
+// ── VU retro: verdes, ámbar desde VU_SEG_AMBAR_DESDE, rojos desde VU_SEG_ROJO_DESDE; pico con retención ──
+export type ColorVu = 0 | 1 | 2;   // verde, ámbar, rojo
+export function colorSegmento(i: number, ambarDesde: number, rojoDesde: number): ColorVu {
+  return i >= rojoDesde ? 2 : i >= ambarDesde ? 1 : 0;
+}
+export interface PicoVu { idx: number; t: number }
+/**
+ * Pico: sube al segmento más alto encendido; se queda RETENCION_MS y después baja de a un segmento por tick (nunca por
+ * debajo del último encendido). idx −1 = sin pico. Sin allocations.
+ */
+export function tickPico(p: PicoVu, encendidos: number, ahoraMs: number, retencionMs: number): void {
+  const top = encendidos - 1;
+  if (top >= p.idx) { p.idx = top; p.t = ahoraMs; return; }
+  if (ahoraMs - p.t >= Math.max(0, retencionMs)) p.idx = Math.max(top, p.idx - 1);
+}
+
+// ── escala de etiquetas por proporción de pantalla ──
+export const AUTO_ASPECTO = { DESDE: 1.6, HASTA: 1.5, MAX: 1.15 };
+/** ETIQUETA_ESCALA efectiva: con auto, sube linealmente de 1 (proporción ≥ 1,6) a MAX (≤ 1,5). */
+export function escalaEfectiva(base: number, auto: boolean, aspect: number): number {
+  const b = Number.isFinite(base) ? base : 1;
+  if (!auto || !Number.isFinite(aspect) || aspect >= AUTO_ASPECTO.DESDE) return b;
+  const t = Math.min(1, (AUTO_ASPECTO.DESDE - aspect) / (AUTO_ASPECTO.DESDE - AUTO_ASPECTO.HASTA));
+  return b * (1 + t * (AUTO_ASPECTO.MAX - 1));
+}
+
+// ── proyección con altura sobre el panel (placa de la barra) y de texto vertical (rótulos de fila) ──
+/** Como fraccionAltura pero con el texto a una altura y sobre la superficie del panel. */
+export function fraccionAlturaY(g: GeoAtril, cam: CamaraPura, t: { u: number; v: number; alto: number }, y: number): number {
+  const a = ndc(cam, aLocal(g, t.u, y, t.v + t.alto / 2)), b = ndc(cam, aLocal(g, t.u, y, t.v - t.alto / 2));
+  if (a.z <= 0.01 || b.z <= 0.01) return 0;
+  return Math.abs(a.y - b.y) / 2;
+}
+/** Texto rotado 90° (se lee de abajo hacia arriba): el alto de la letra va en u. Fracción de la ALTURA de la pantalla. */
+export function fraccionAlturaVertical(g: GeoAtril, cam: CamaraPura, t: { u: number; v: number; alto: number }, y = 0.001): number {
+  const a = ndc(cam, aLocal(g, t.u - t.alto / 2, y, t.v)), b = ndc(cam, aLocal(g, t.u + t.alto / 2, y, t.v));
+  if (a.z <= 0.01 || b.z <= 0.01) return 0;
+  return (Math.abs(a.x - b.x) * cam.aspect) / 2;   // ancho en pantalla expresado en alturas de pantalla
+}
+
+// ── placa del equipo sobre la barra trasera del marco (cara de arriba, vista por la cámara del atril) ──
+export const TEXTO_PLACA = (marca: string) => `SONIDO SN-40 · ${marca} · PROCESADOR DE SONIDO · 10 MÓDULOS`;
+/** Barra trasera: cara de arriba a y = 0,037 m sobre el panel, v 0,345…0,425 (REAR_BAR_D 0,08), 1,60 de ancho. */
+export const BARRA = { y: 0.037, v0: 0.345, v1: 0.425, ancho: 1.60 };
+export const PLACA_BARRA = { ancho: 1.54, prof: 0.074, franjas: 0.016, margen: 0.004 };
+/** Alto del texto de la placa: el máximo que entra a lo ancho y en la profundidad libre (sobre las franjas). */
+export function altoTextoPlaca(nChars: number): number {
+  const porAncho = (PLACA_BARRA.ancho - 0.04) / (nChars * ANCHO_CHAR);
+  const porProf = PLACA_BARRA.prof - PLACA_BARRA.franjas - 3 * PLACA_BARRA.margen;
+  return Math.min(porAncho, porProf);
+}
+/** Texto de la placa (centro en la barra; las franjas van del lado del jugador). */
+export function textoPlaca(nChars: number): { u: number; v: number; alto: number } {
+  const h = altoTextoPlaca(nChars), vc = (BARRA.v0 + BARRA.v1) / 2;
+  const vTop = vc + PLACA_BARRA.prof / 2 - PLACA_BARRA.margen;
+  return { u: 0, v: vTop - h / 2, alto: h };
+}
+
+// ── rótulos de fila en el margen izquierdo (franja negra entre el panel de controles y el borde de la placa) ──
+export const MARGEN_ROTULOS = { u0: -0.748, u1: -0.703 };   // 4,5 cm (PANEL_W/2 = 0,75 · panel de controles 0,70)
+export const ROTULOS = [
+  { id: "r_efectos", texto: "EFECTOS", fila: "efectos" as const },
+  { id: "r_tono", texto: "TONO", fila: "tono" as const },
+  { id: "r_transporte", texto: "TRANSPORTE", fila: "transporte" as const },
+];
+export interface Rotulo { id: string; texto: string; u: number; v: number; alto: number; largo: number; v0: number; v1: number }
+/** Rótulos verticales: centrados en su fila; alto de letra = lo que entra a lo ancho del margen y a lo largo de la fila. */
+export function rotulosFila(): Rotulo[] {
+  const w = MARGEN_ROTULOS.u1 - MARGEN_ROTULOS.u0, u = (MARGEN_ROTULOS.u0 + MARGEN_ROTULOS.u1) / 2;
+  return ROTULOS.map(r => {
+    const f = FILAS[r.fila], largoMax = f.v1 - f.v0 - 0.012;
+    const alto = Math.min(w - 0.008, largoMax / (r.texto.length * ANCHO_CHAR));
+    const largo = r.texto.length * ANCHO_CHAR * alto, v = (f.v0 + f.v1) / 2;
+    return { id: r.id, texto: r.texto, u, v, alto, largo, v0: v - largo / 2, v1: v + largo / 2 };
+  });
+}
+export const ROTULO_MIN = 0.020;
+
+// ── alternativa de rótulos (ROTULOS_MODO "barra"): leyenda numerada en la barra + números grandes en el margen ──
+export const LEYENDA_FILAS = "1 EFECTOS · 2 TONO · 3 TRANSPORTE";
+/** La placa de la barra en dos líneas: placa (lejos) y leyenda (cerca); franjas finas del lado del jugador. */
+export const BARRA_2L = { placa: 0.0325, leyenda: 0.0215, franjas: 0.008, gap: 0.003, margen: 0.003 };
+export function lineasBarra(nCharsPlaca: number, conLeyenda: boolean): { placa: { u: number; v: number; alto: number }; leyenda: { u: number; v: number; alto: number } | null } {
+  if (!conLeyenda) return { placa: textoPlaca(nCharsPlaca), leyenda: null };
+  const vc = (BARRA.v0 + BARRA.v1) / 2, top = vc + PLACA_BARRA.prof / 2 - BARRA_2L.margen;
+  const hp = Math.min(BARRA_2L.placa, (PLACA_BARRA.ancho - 0.04) / (nCharsPlaca * ANCHO_CHAR));
+  const hl = Math.min(BARRA_2L.leyenda, (PLACA_BARRA.ancho - 0.04) / (LEYENDA_FILAS.length * ANCHO_CHAR));
+  return { placa: { u: 0, v: top - hp / 2, alto: hp }, leyenda: { u: 0, v: top - hp - BARRA_2L.gap - hl / 2, alto: hl } };
+}
+/** Números de fila grandes en el margen (uno por fila, derechos). */
+export function numerosFilaMargen(): { id: string; texto: string; u: number; v: number; alto: number }[] {
+  const w = MARGEN_ROTULOS.u1 - MARGEN_ROTULOS.u0, u = (MARGEN_ROTULOS.u0 + MARGEN_ROTULOS.u1) / 2, h = w - 0.008;
+  return ROTULOS.map((r, i) => ({ id: `nfila_${i + 1}`, texto: String(i + 1), u, v: (FILAS[r.fila].v0 + FILAS[r.fila].v1) / 2, alto: h }));
 }

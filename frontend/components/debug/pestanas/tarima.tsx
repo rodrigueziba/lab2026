@@ -612,6 +612,26 @@ export function SecAtrilSonidoZ96() {
                 onPointerUp={() => { if (rehacer) avisar(false); }} onKeyUp={() => { if (rehacer) avisar(false); }} />
             </div>
           ))}
+          {/* Z96b */}
+          {([["ROTULOS_FILA", "rótulos de fila (EFECTOS · TONO · TRANSPORTE)"], ["ETIQUETA_AUTO_ASPECTO", "proporción < 1,6: etiquetas hasta × 1,15"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); A[k] = !A[k]; avisar(false); toca(); }}>{A[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          <div style={ROW}>
+            <span>ROTULOS_MODO <span style={NOTE}>barra = leyenda numerada en la placa + 1·2·3 en el margen · margen = verticales</span></span>
+            {(["barra", "margen"] as const).map(m => (
+              <button key={m} style={{ ...INPUT, opacity: A.ROTULOS_MODO === m ? 1 : 0.5 }} onClick={ev => { ev.currentTarget.blur(); A.ROTULOS_MODO = m; avisar(false); toca(); }}>{m}</button>
+            ))}
+          </div>
+          {([["VU_SEG_AMBAR_DESDE", 1, 14, 1, "segmento desde el que el VU es ámbar"], ["VU_SEG_ROJO_DESDE", 1, 14, 1, "segmento desde el que el VU es rojo"],
+            ["VU_PICO_RETENCION_MS", 0, 3000, 50, "ms que el pico queda arriba"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{A[k]} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={A[k]} onChange={ev => { A[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
           <div style={{ ...ROW, ...NOTE }}><span>doble clic sobre una perilla o el fader: vuelve a su valor por defecto · el display muestra el control tocado</span></div>
     </>
   );
