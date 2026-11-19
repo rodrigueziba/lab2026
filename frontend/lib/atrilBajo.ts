@@ -66,7 +66,9 @@ export const textoMedidor = (i: number): string => `${NOMBRES_MEDIDOR[i]}→${DE
 export const SEQ = { etiquetaW: 0.085, numeros: 0.156, nota: 0.122, acento: 0.078, desliz: 0.040, paso: -0.003 };
 export const FADER_B = { rail: 0.12, v: -0.20 };
 export const VU_B = { segmentos: 14, u: 0, v0: -0.29, v1: -0.115, ancho: 0.024 };   // u se fija en construir()
-export const PATRONES_B = ["CHICAGO", "RAGA", "DEEP", "TECHNO", "MINIMAL"] as const;
+export const PATRONES_B = ["CHICAGO", "RAGA", "DEEP", "TECHNO", "MINIMAL", "FUNK", "DISCO"] as const;   // Z102: + FUNK, DISCO
+/** Z102: módulo PATRÓN en 3 × 3 (7 patrones + LIMPIO, también como pad): escala de los pads y separación entre filas. */
+export const PATRON_GRILLA = { escala: 0.65, fila0: 0.030, paso: 0.068 };
 export const ONDAS_B = [["b_onda_sierra", "sierra", "SIERRA"], ["b_onda_cuadrada", "cuadrada", "CUADRADA"]] as const;
 export const PERILLAS_B = [
   ["afinacion", "AFINACIÓN"], ["corte", "CORTE"], ["resonancia", "RESONANCIA"], ["modEnv", "MOD. ENV."],
@@ -91,13 +93,13 @@ function construir(escalaPasos: number): PosCtrlB[] {
     L.push({ id: `b_desliz${k}`, u, v: SEQ.desliz, forma: "pad", tipo: "toggle", etiqueta: "", nombreLargo: `PASO ${n} · DESLIZ`, modulo: "secuencia", escala: ESC.desliz, paso: k });
     L.push({ id: `b_paso${k}`, u, v: SEQ.paso, forma: "pad", tipo: "toggle", etiqueta: "", nombreLargo: `PASO ${n}`, modulo: "secuencia", escala: ESC.paso * ep, paso: k });
   }
-  // PATRÓN: 3 × 2 (los 5 de fábrica + PATRÓN LIMPIO)
+  // PATRÓN: Z102: 3 × 3 (los 7 de fábrica + PATRÓN LIMPIO, también pad, en la última fila)
   const cc = LAYOUT_B.conCara;
   const pa = moduloB("patron").rect, wp = (pa.u1 - pa.u0 - 0.024) / 3, up = (i: number) => pa.u0 + 0.012 + wp * (i + 0.5);
-  const vf1 = pa.v1 - BANDA_TITULO - 0.040, vf2 = vf1 - 0.096;
-  const escPat = cc ? ESC_CARA.patron : 1;
-  PATRONES_B.forEach((nm, i) => L.push({ id: `b_pat_${nm}`, u: up(i % 3), v: i < 3 ? vf1 : vf2, forma: "pad", tipo: "toggle", etiqueta: nm, nombreLargo: `PATRÓN ${nm}`, modulo: "patron", escala: escPat, paso: -1 }));
-  L.push({ id: "b_limpio", u: up(2), v: vf2, forma: "normal", tipo: "button", etiqueta: "LIMPIO", nombreLargo: "PATRÓN LIMPIO", modulo: "patron", escala: 1, paso: -1 });
+  const vf1 = pa.v1 - BANDA_TITULO - 0.040, vf2 = vf1 - 0.096;   // filas de los pads ONDA de VOZ (sin cambios)
+  const vp = (fila: number) => pa.v1 - BANDA_TITULO - PATRON_GRILLA.fila0 - PATRON_GRILLA.paso * fila;
+  PATRONES_B.forEach((nm, i) => L.push({ id: `b_pat_${nm}`, u: up(i % 3), v: vp(Math.floor(i / 3)), forma: "pad", tipo: "toggle", etiqueta: nm, nombreLargo: `PATRÓN ${nm}`, modulo: "patron", escala: PATRON_GRILLA.escala, paso: -1 }));
+  L.push({ id: "b_limpio", u: up(PATRONES_B.length % 3), v: vp(Math.floor(PATRONES_B.length / 3)), forma: "pad", tipo: "button", etiqueta: "LIMPIO", nombreLargo: "PATRÓN LIMPIO", modulo: "patron", escala: PATRON_GRILLA.escala, paso: -1 });
   // VOZ: ONDA (2 pads apilados) + 8 perillas en 2 filas de 4
   const vz = moduloB("voz").rect, wo = cc ? ESC_CARA.anchoOnda : 0.125, wk = (vz.u1 - vz.u0 - 0.024 - wo) / 4;
   const escOnda = cc ? ESC_CARA.onda : 1, escPer = cc ? ESC_CARA.perilla : ESC.perilla;

@@ -4,8 +4,13 @@
 // display; (j) limpieza. Uso: node scripts/bajo-acido-test.mjs
 import fs from 'node:fs';
 import { register } from 'node:module';
-register('data:text/javascript,' + encodeURIComponent(
-  `export async function resolve(s, c, n) { if (/^\\.\\.?\\//.test(s) && !/\\.[a-z]+$/.test(s)) { try { return await n(s + '.ts', c); } catch {} } return n(s, c); }`));
+const RAIZ = new URL('../', import.meta.url).href;   // Z102: también "@/" (para probar el motor)
+register('data:text/javascript,' + encodeURIComponent(`const R = ${JSON.stringify(RAIZ)};
+export async function resolve(s, c, n) {
+  if (s.startsWith('@/')) s = R + s.slice(2);
+  if ((/^\\.\\.?\\//.test(s) || s.startsWith('file:')) && !/\\.[a-z]+$/.test(s)) { try { return await n(s + '.ts', c); } catch {} }
+  return n(s, c);
+}`));
 const L = await import('../lib/bajoAcido.ts');
 const R = await import('../lib/audio/reloj.ts');
 const B = await import('../lib/atrilBajo.ts');
@@ -34,7 +39,7 @@ check(cerca(L.midiAFrecuencia(36), 65.40639, 1e-4) && L.nombreNota(36) === 'C2' 
 
 console.log('\n(b) patrones de fábrica');
 { const p = L.crearPatronBajo();
-  check(L.NOMBRES_PATRON.join() === 'CHICAGO,RAGA,DEEP,TECHNO,MINIMAL', 'los 5: CHICAGO, RAGA, DEEP, TECHNO, MINIMAL');
+  check(L.NOMBRES_PATRON.join() === 'CHICAGO,RAGA,DEEP,TECHNO,MINIMAL,FUNK,DISCO', 'los 7 (Z102: + FUNK, DISCO): CHICAGO, RAGA, DEEP, TECHNO, MINIMAL, FUNK, DISCO');
   for (const nm of L.NOMBRES_PATRON) {
     L.cargarFabrica(nm, p);
     const notas = Array.from(p.nota).filter((_, i) => p.activo[i]);
@@ -139,6 +144,57 @@ console.log('\n(g) setParam: fuentes manual y cara');
   check(/export function setParamBajo\(id: string, valor: number, fuente: FuenteParam = "manual"\): boolean/.test(MOTOR) && /setParamBajo\(pid, deNormal\(d, v\), "manual"\)/.test(LS),
     'el motor expone setParamBajo(id, valor, fuente); las perillas del atril usan la fuente "manual"'); }
 
+console.log('\n(Z102) patrones FUNK y DISCO');
+{ const M = await import('../lib/audio/bajoAcido.ts');
+  const { DBG_BAJO: DB, DBG_RITMOS: DR } = await import('../lib/debugConfig.ts');
+  const pat = nm => { const p = L.crearPatronBajo(); L.cargarFabrica(nm, p); return p; };
+  const notas = p => new Set(Array.from(p.nota).filter((_, i) => p.activo[i]));
+  check(L.NOMBRES_PATRON.length === 7 && L.NOMBRES_PATRON.every(nm => nm.length <= 7) && L.NOMBRES_PATRON.every(nm => { const p = pat(nm); return L.FABRICA[nm].length === 16 && L.activos(p) >= 4 && Array.from(p.nota).every(n => n >= 0 && n <= 24); }),
+    '7 patrones de fábrica: 16 pasos, notas 0…24, al menos 4 pasos activos, nombres de hasta 7 letras');
+  let peor = 0, detalle = '';
+  for (const nuevo of ['FUNK', 'DISCO']) for (const otro of L.NOMBRES_PATRON) {
+    if (otro === nuevo) continue;
+    const n = L.pasosIguales(pat(nuevo), pat(otro));
+    if (n > peor) { peor = n; detalle = `${nuevo}↔${otro}`; }
+  }
+  check(peor <= 8, `FUNK y DISCO no comparten más de 8 de 16 pasos idénticos (activo/nota) con ningún otro: el máximo es ${peor} (${detalle})`);
+  const f = pat('FUNK'), d = pat('DISCO'), vf = L.VOZ_PATRON.FUNK, vd = L.VOZ_PATRON.DISCO;
+  check(notas(f).size <= 3 && 16 - L.activos(f) >= 6 && f.acento.reduce((a, b) => a + b, 0) >= 2 && [1, 2].includes(f.desliz.reduce((a, b) => a + b, 0)),
+    `FUNK: ${notas(f).size} notas distintas, ${16 - L.activos(f)} silencios, ${f.acento.reduce((a, b) => a + b, 0)} acentos, ${f.desliz.reduce((a, b) => a + b, 0)} desliz`);
+  check(vf.onda === 'sierra' && vf.params.distorsion >= 0.6 && vf.params.modEnv >= 0.7 && vf.params.resonancia >= 0.6 && vf.params.corte <= 300 && vf.bpm === 110,
+    'FUNK: SIERRA, CORTE bajo, MOD. ENV. alto, RESONANCIA media-alta, DISTORSIÓN ≥ 0,6; BPM sugerido 110');
+  check(notas(d).size >= 5 && notas(d).size <= 7 && d.desliz.reduce((a, b) => a + b, 0) >= 3 && 16 - L.activos(d) <= 3 && notas(d).has(0) && notas(d).has(12),
+    `DISCO: ${notas(d).size} notas distintas, ${d.desliz.reduce((a, b) => a + b, 0)} pasos con desliz, ${16 - L.activos(d)} silencios, salto de octava (0 y 12)`);
+  check(vd.onda === 'cuadrada' && vd.params.distorsion <= 0.25 && vd.params.resonancia <= 0.5 && vd.params.decay >= 0.3 && vd.bpm >= 115 && vd.bpm <= 120,
+    'DISCO: CUADRADA, CORTE medio, RESONANCIA baja-media, DISTORSIÓN baja, DECAY medio; BPM sugerido 115…120');
+  const fuera = [];
+  for (const nm of ['FUNK', 'DISCO']) for (const [id, v] of Object.entries(L.VOZ_PATRON[nm].params)) { const dd = L.PARAMS_BAJO[L.indiceParam(id)]; if (!dd || v < dd.min || v > dd.max) fuera.push(`${nm}.${id}=${v}`); }
+  check(fuera.length === 0 && Object.keys(vf.params).length === 8 && Object.keys(L.VOZ_PATRON).join() === 'FUNK,DISCO',
+    `seteo de voz dentro de rango (AFINACIÓN, CORTE, RESONANCIA, MOD. ENV., DECAY, ACENTO, DESLIZ, DISTORSIÓN + onda); solo FUNK y DISCO lo tienen${fuera.length ? ': ' + fuera.join(', ') : ''}`);
+  const ciclo = []; let nm = 'MINIMAL'; for (let i = 0; i < 8; i++) { nm = L.siguienteNombrePatron(nm); ciclo.push(nm); }
+  check(ciclo.join() === 'FUNK,DISCO,CHICAGO,RAGA,DEEP,TECHNO,MINIMAL,FUNK', `siguiente patrón (guiño): recorre los 7 y vuelve al primero (${ciclo.join(' → ')})`);
+  check(L.textoPatron('FUNK') === 'PATRÓN FUNK · BPM SUGERIDO 110' && L.textoPatron('DISCO') === 'PATRÓN DISCO · BPM SUGERIDO 118' && L.textoPatron('RAGA') === 'PATRÓN RAGA'
+    && /if \(id\.startsWith\("b_pat_"\)\) return textoPatron\(id\.slice\(6\)\);/.test(LS), 'display: "PATRÓN FUNK · BPM SUGERIDO 110" al apretar el pad (solo informativo)');
+  // motor: aplica (o no) la voz con valores MANUALES; la cara manda encima y al apagarla quedan los del patrón
+  M.silenciarYReiniciarBajo();
+  const bpm0 = DR.BPM, man = id => M.PARAMS.manual[L.indiceParam(id)];
+  DB.PATRON_APLICA_VOZ = false; M.cargarPatron('FUNK');
+  check(DB.ONDA === 'sierra' && man('corte') === DB.CORTE && man('distorsion') === DB.DISTORSION && M.BAJO.patron === 'FUNK', 'PATRON_APLICA_VOZ false: el pad carga el patrón y NO toca la voz');
+  DB.PATRON_APLICA_VOZ = true; M.cargarPatron('DISCO');
+  check(DB.ONDA === 'cuadrada' && man('corte') === 650 && man('distorsion') === 0.12 && man('desliz') === 0.12 && DR.BPM === bpm0, 'PATRON_APLICA_VOZ true: DISCO escribe su onda y sus valores manuales; el tempo de la caja no cambia');
+  M.cargarPatron('CHICAGO');
+  check(DB.ONDA === 'cuadrada' && man('corte') === 650, 'los cinco originales no tocan la voz (CHICAGO deja la de DISCO)');
+  L.activarCara(M.PARAMS, true); L.setParam(M.PARAMS, 'corte', 1, 'cara');
+  M.cargarPatron('FUNK');
+  check(man('corte') === 180 && M.PARAMS.cara[L.indiceParam('corte')] === 1 && L.valorParam(M.PARAMS, 'corte') === 6000, 'con la cara activa: el patrón escribe el MANUAL (180 Hz) y la cara sigue mandando (6000 Hz)');
+  L.activarCara(M.PARAMS, false);
+  check(L.valorParam(M.PARAMS, 'corte') === 180, 'al apagar la cara queda el valor del patrón (regla de Z99/Z100)');
+  M.cargarPatron('MINIMAL'); M.siguientePatronBajo();
+  check(M.BAJO.patron === 'FUNK' && DB.ONDA === 'sierra' && man('distorsion') === 0.75, 'el guiño (siguientePatronBajo) pasa a FUNK y también aplica su voz');
+  M.silenciarYReiniciarBajo();
+  check(/aplicarVozPatron\(nombre\);/.test(cuerpo(MOTOR, 'cargarPatron')) && /setParam\(PARAMS, id, vz\.params\[id\], "manual"\)/.test(MOTOR) && !/aplicarVozPatron|VOZ_PATRON/.test(cuerpo(MOTOR, 'alPasoReloj')),
+    'la voz se aplica al cargar el patrón (gesto), nunca en el bucle del reloj'); }
+
 console.log('\n(h) layout del atril BA-40');
 { const M = B.MODULOS_B, P = B.POSICIONES_B, mal = [];
   for (const m of M) if (!S.dentro(m.rect, S.PANEL)) mal.push('módulo fuera ' + m.id);
@@ -147,7 +203,7 @@ console.log('\n(h) layout del atril BA-40');
   for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) if (S.seSuperponen(B.huellaB(P[i]), B.huellaB(P[j]))) mal.push(P[i].id + '↔' + P[j].id);
   const vu = B.rectVuB(); if (!S.dentro(vu, B.moduloB('salida').rect)) mal.push('VU fuera'); for (const p of P) if (S.seSuperponen(vu, B.huellaB(p))) mal.push('VU↔' + p.id);
   // Z100: + 2 de CARA (CARA ON y CALIBRAR); los medidores y la luz se prueban en scripts/cara-test.mjs
-  check(P.length === 16 * 4 + 6 + 2 + 8 + 2 + 2 && mal.length === 0, `${P.length} controles (64 de SECUENCIA, 6 de PATRÓN, 10 de VOZ, 2 de SALIDA, 2 de CARA) y el VU: dentro del panel, sin colisiones${mal.length ? ': ' + mal.slice(0, 6).join(', ') : ''}`);
+  check(P.length === 16 * 4 + 8 + 2 + 8 + 2 + 2 && mal.length === 0, `${P.length} controles (64 de SECUENCIA, 8 de PATRÓN (Z102: 7 + LIMPIO), 10 de VOZ, 2 de SALIDA, 2 de CARA) y el VU: dentro del panel, sin colisiones${mal.length ? ': ' + mal.slice(0, 6).join(', ') : ''}`);
   const cols = [0, 1, 2, 3].map(f => P.filter(p => p.modulo === 'secuencia').slice(f).filter((_, i) => i % 4 === 0).map(p => p.u.toFixed(4)).join());
   check(cols.every(c => c === cols[0]), 'las 4 filas de la SECUENCIA (NOTA, ACENTO, DESLIZ, PASO) alineadas en las mismas 16 columnas');
   for (const esc of [0.7, 1, 1.15]) {

@@ -759,7 +759,7 @@ export function SecBajoZ99() {
               {ops.map(v => <button key={v} style={{ ...INPUT, opacity: B[k] === v ? 1 : 0.5 }} onClick={() => { B[k] = v; aplicarParamsBajo(); toca(); }}>{v}</button>)}
             </div>
           ))}
-          {([["ACTIVO", "off = sin bajo (vale al remontar)"], ["ON", "ON del módulo SALIDA (silencia sin parar el reloj)"], ["TEMPO_HEREDADO", "reloj y tempo de la caja · off = reloj propio con BPM"]] as const).map(([k, nota]) => (
+          {([["ACTIVO", "off = sin bajo (vale al remontar)"], ["ON", "ON del módulo SALIDA (silencia sin parar el reloj)"], ["TEMPO_HEREDADO", "reloj y tempo de la caja · off = reloj propio con BPM"], ["PATRON_APLICA_VOZ", "Z102: FUNK y DISCO aplican su seteo de voz al cargarse"]] as const).map(([k, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{nota}</span></span>
               <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); B[k] = !B[k]; aplicarParamsBajo(); if (k === "ACTIVO") avisar(true); toca(); }}>{B[k] ? "ON" : "off"}</button>
@@ -959,7 +959,8 @@ export function SecSinteZ101() {
             ["CORTE_MIN", 20, 300, 5, "Hz"], ["CORTE_MAX", 2000, 18000, 100, "Hz"], ["RES_MAX", 2, 30, 0.5, "Q máximo"], ["ENV_OCTAVAS", 0, 8, 0.1, "octavas de MOD. ENV."],
             ["RUIDO_MAX", 0, 1, 0.05, "nivel del ruido con RUIDO 10"], ["LFO_AFIN_CENTS", 0, 200, 5, "vibrato (centésimas)"], ["LFO_CORTE_CENTS", 0, 4800, 100, "barrido del corte (centésimas)"],
             ["LFO_VOL_MAX", 0, 1, 0.05, "trémolo"], ["ECO_REALIM_MAX", 0, 0.85, 0.01, "tope de la realimentación"], ["ECO_FILTRO_HZ", 500, 8000, 100, "filtro del lazo del eco"],
-            ["ECO_MAX_S", 0.5, 3, 0.1, "tiempo máximo del eco (s)"], ["NIVEL_VOZ", 0.05, 0.5, 0.01, "pico de cada voz"], ["ARP_GATE", 0.1, 0.98, 0.02, "fracción del paso que suena"]] as const).map(([k, mn, mx, st, nota]) => (
+            ["ECO_MAX_S", 0.5, 3, 0.1, "tiempo máximo del eco (s)"], ["NIVEL_VOZ", 0.05, 0.5, 0.01, "pico de cada voz"], ["ARP_GATE", 0.1, 0.98, 0.02, "fracción del paso que suena"],
+            ["ESPACIO_DUR_S", 0.5, 6, 0.1, "Z102: largo de la reverberación (vale al «Silenciar y reiniciar»)"], ["ESPACIO_SECO", 0, 0.8, 0.05, "Z102: cuánto baja el seco con ESPACIO al máximo"]] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
               <span>{k} <span style={NOTE}>{S[k].toFixed(st < 1 ? 3 : 0)} {nota}</span></span>
               <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={S[k]} onChange={ev => { S[k] = parseFloat(ev.target.value); aplicarOpcionesSinte(); toca(); }} />

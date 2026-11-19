@@ -76,6 +76,7 @@ export const PARAMS_SINTE: readonly DefParamSinte[] = [
   { id: "ecoTiempo",   nombre: "ECO TIEMPO",     min: 0,     max: 2,     curva: "paso", defecto: 1,    modulable: false, unidad: "",   clave: "ECO_TIEMPO" },
   { id: "ecoRealim",   nombre: "ECO REALIM.",    min: 0,     max: 0.85,  curva: "lin",  defecto: 0.35, modulable: false, unidad: "",   clave: "ECO_REALIM" },
   { id: "ecoMezcla",   nombre: "ECO MEZCLA",     min: 0,     max: 1,     curva: "lin",  defecto: 0,    modulable: true,  unidad: "",   clave: "ECO_MEZCLA" },
+  { id: "espacio",     nombre: "ESPACIO",        min: 0,     max: 1,     curva: "lin",  defecto: 0,    modulable: true,  unidad: "",   clave: "ESPACIO" },   // Z102: reverberación
   { id: "volumen",     nombre: "VOLUMEN",        min: 0,     max: 1,     curva: "lin",  defecto: 0.7,  modulable: true,  unidad: "",   clave: "VOLUMEN" },
 ];
 export const N_PARAMS = PARAMS_SINTE.length;
@@ -89,6 +90,7 @@ export const P = {
   fAtaque: indiceParam("fAtaque"), fDecay: indiceParam("fDecay"), fSostenido: indiceParam("fSostenido"), fRelease: indiceParam("fRelease"),
   lfoVel: indiceParam("lfoVel"), lfoProf: indiceParam("lfoProf"), lfoDestino: indiceParam("lfoDestino"),
   ecoTiempo: indiceParam("ecoTiempo"), ecoRealim: indiceParam("ecoRealim"), ecoMezcla: indiceParam("ecoMezcla"), volumen: indiceParam("volumen"),
+  espacio: indiceParam("espacio"),   // Z102
 } as const;
 /** Acota un valor real a su rango (los selectores, a un entero). */
 export function acotar(d: DefParamSinte, v: number): number {
@@ -143,31 +145,39 @@ export function liberarParamCara(st: EstadoParams, id: string): boolean {
 }
 
 // ── sonidos de fábrica (valores originales de este proyecto) ──
-/** Cada sonido fija todos los parámetros salvo VOLUMEN (la salida no es parte del sonido). */
+// Z102: carácter oscuro, atmosférico y electrónico (dark wave, industrial, rock electrónico alternativo de los 80 y 90).
+// Inspirados solo en el carácter general de un estilo; ningún valor sale de un instrumento o un sonido existente.
+/** Cada sonido fija todos los parámetros salvo VOLUMEN (la salida no es parte del sonido). Nombres de hasta 8 letras. */
 export const SONIDOS = {
-  PAD:     { onda1: 2, onda2: 2, desafine: 14, mezcla: 0.5, sub: 0.15, subOnda: 1, ruido: 0.03, corte: 1400, resonancia: 0.15, modEnv: 0.25, seguimiento: 0.3,
-             ataque: 0.9, decay: 1.2, sostenido: 0.85, release: 2.4, fAtaque: 1.4, fDecay: 1.8, fSostenido: 0.5, fRelease: 2.4,
-             lfoVel: 0.35, lfoProf: 0.25, lfoDestino: 1, ecoTiempo: 2, ecoRealim: 0.4, ecoMezcla: 0.28 },
-  LEAD:    { onda1: 2, onda2: 3, desafine: 6, mezcla: 0.35, sub: 0.25, subOnda: 0, ruido: 0, corte: 2600, resonancia: 0.35, modEnv: 0.3, seguimiento: 0.6,
-             ataque: 0.008, decay: 0.25, sostenido: 0.8, release: 0.18, fAtaque: 0.005, fDecay: 0.3, fSostenido: 0.45, fRelease: 0.2,
-             lfoVel: 5.5, lfoProf: 0.18, lfoDestino: 0, ecoTiempo: 0, ecoRealim: 0.25, ecoMezcla: 0.18 },
-  PLUCK:   { onda1: 1, onda2: 2, desafine: 4, mezcla: 0.4, sub: 0.2, subOnda: 1, ruido: 0.06, corte: 700, resonancia: 0.3, modEnv: 0.7, seguimiento: 0.7,
-             ataque: 0.002, decay: 0.22, sostenido: 0, release: 0.15, fAtaque: 0.002, fDecay: 0.16, fSostenido: 0, fRelease: 0.12,
-             lfoVel: 1, lfoProf: 0, lfoDestino: 1, ecoTiempo: 0, ecoRealim: 0.3, ecoMezcla: 0.22 },
-  BRASS:   { onda1: 2, onda2: 2, desafine: 9, mezcla: 0.5, sub: 0.3, subOnda: 0, ruido: 0.02, corte: 650, resonancia: 0.2, modEnv: 0.6, seguimiento: 0.5,
-             ataque: 0.09, decay: 0.5, sostenido: 0.75, release: 0.3, fAtaque: 0.16, fDecay: 0.6, fSostenido: 0.35, fRelease: 0.3,
-             lfoVel: 4.8, lfoProf: 0.06, lfoDestino: 0, ecoTiempo: 1, ecoRealim: 0.2, ecoMezcla: 0.1 },
-  ORGANO:  { onda1: 0, onda2: 0, desafine: 3, mezcla: 0.5, sub: 0.55, subOnda: 1, ruido: 0, corte: 9000, resonancia: 0, modEnv: 0, seguimiento: 0,
-             ataque: 0.006, decay: 0.1, sostenido: 1, release: 0.06, fAtaque: 0.002, fDecay: 0.1, fSostenido: 1, fRelease: 0.06,
-             lfoVel: 6.2, lfoProf: 0.12, lfoDestino: 2, ecoTiempo: 1, ecoRealim: 0.15, ecoMezcla: 0.08 },
-  CAMPANA: { onda1: 1, onda2: 1, desafine: 38, mezcla: 0.5, sub: 0, subOnda: 1, ruido: 0, corte: 5200, resonancia: 0.1, modEnv: 0.2, seguimiento: 0.8,
-             ataque: 0.002, decay: 1.6, sostenido: 0, release: 1.8, fAtaque: 0.002, fDecay: 0.9, fSostenido: 0.1, fRelease: 1.4,
-             lfoVel: 0.6, lfoProf: 0.05, lfoDestino: 0, ecoTiempo: 2, ecoRealim: 0.55, ecoMezcla: 0.42 },
+  // sostenido, etéreo y oscuro: dos sierras + sub seno, corte bajo que respira con un LFO muy lento, eco y espacio largos
+  DRON:    { onda1: 2, onda2: 2, desafine: 12, mezcla: 0.5, sub: 0.45, subOnda: 1, ruido: 0.02, corte: 950, resonancia: 0.12, modEnv: 0.15, seguimiento: 0.3,
+             ataque: 1.1, decay: 2.0, sostenido: 1, release: 4.5, fAtaque: 1.6, fDecay: 2.5, fSostenido: 0.7, fRelease: 4.0,
+             lfoVel: 0.12, lfoProf: 0.45, lfoDestino: 1, ecoTiempo: 2, ecoRealim: 0.62, ecoMezcla: 0.35, espacio: 0.55 },
+  // ensamble de cuerdas sintético oscuro: sierras muy desafinadas, ataque y release lentos, vibrato apenas
+  CUERDAS: { onda1: 2, onda2: 2, desafine: 26, mezcla: 0.5, sub: 0.2, subOnda: 1, ruido: 0.01, corte: 1700, resonancia: 0.1, modEnv: 0.22, seguimiento: 0.5,
+             ataque: 0.55, decay: 1.2, sostenido: 0.85, release: 2.0, fAtaque: 0.7, fDecay: 1.4, fSostenido: 0.5, fRelease: 1.8,
+             lfoVel: 5.2, lfoProf: 0.08, lfoDestino: 0, ecoTiempo: 1, ecoRealim: 0.35, ecoMezcla: 0.2, espacio: 0.5 },
+  // bloque de metales ochentoso: barrido de filtro corto y fuerte, sostenido medio, release corto (acordes cortos)
+  METALES: { onda1: 2, onda2: 2, desafine: 10, mezcla: 0.5, sub: 0.3, subOnda: 0, ruido: 0.02, corte: 520, resonancia: 0.25, modEnv: 0.75, seguimiento: 0.5,
+             ataque: 0.06, decay: 0.45, sostenido: 0.6, release: 0.22, fAtaque: 0.04, fDecay: 0.35, fSostenido: 0.3, fRelease: 0.2,
+             lfoVel: 5, lfoProf: 0.04, lfoDestino: 0, ecoTiempo: 1, ecoRealim: 0.2, ecoMezcla: 0.12, espacio: 0.25 },
+  // secuencia oscura de synth pop: cuadrada + sierra, golpe corto, filtro que cae rápido, eco 1/8 (para el arpegiador)
+  PULSO:   { onda1: 3, onda2: 2, desafine: 5, mezcla: 0.45, sub: 0.25, subOnda: 0, ruido: 0, corte: 600, resonancia: 0.4, modEnv: 0.65, seguimiento: 0.6,
+             ataque: 0.002, decay: 0.18, sostenido: 0.12, release: 0.12, fAtaque: 0.002, fDecay: 0.12, fSostenido: 0.05, fRelease: 0.1,
+             lfoVel: 1, lfoProf: 0, lfoDestino: 1, ecoTiempo: 0, ecoRealim: 0.45, ecoMezcla: 0.25, espacio: 0.05 },
+  // textura industrial metálica: cuadrada y sierra muy desafinadas, mucho ruido, resonancia alta, golpe seco
+  ACERO:   { onda1: 3, onda2: 2, desafine: 45, mezcla: 0.5, sub: 0, subOnda: 0, ruido: 0.4, corte: 2200, resonancia: 0.7, modEnv: 0.5, seguimiento: 0.7,
+             ataque: 0.002, decay: 0.2, sostenido: 0.1, release: 0.15, fAtaque: 0.002, fDecay: 0.14, fSostenido: 0.1, fRelease: 0.12,
+             lfoVel: 7, lfoProf: 0.1, lfoDestino: 1, ecoTiempo: 0, ecoRealim: 0.6, ecoMezcla: 0.3, espacio: 0 },
+  // lead de rock electrónico alternativo: sierra + cuadrada, ataque rápido, sostenido alto, vibrato con LFO PROF.
+  LEAD:    { onda1: 2, onda2: 3, desafine: 7, mezcla: 0.4, sub: 0.25, subOnda: 0, ruido: 0, corte: 2300, resonancia: 0.45, modEnv: 0.35, seguimiento: 0.6,
+             ataque: 0.01, decay: 0.3, sostenido: 0.85, release: 0.25, fAtaque: 0.01, fDecay: 0.35, fSostenido: 0.5, fRelease: 0.25,
+             lfoVel: 5.6, lfoProf: 0.2, lfoDestino: 0, ecoTiempo: 0, ecoRealim: 0.25, ecoMezcla: 0.15, espacio: 0.15 },
 } as const;
 export type NombreSonido = keyof typeof SONIDOS;
 export const NOMBRES_SONIDO = Object.keys(SONIDOS) as NombreSonido[];
-/** Nombre para mostrar ("ÓRGANO" con tilde; la clave va sin ella). */
-export const nombreSonido = (s: string): string => (s === "ORGANO" ? "ÓRGANO" : s || "LIBRE");
+/** Nombre para mostrar (Z102: los nombres ya van tal cual; vacío = LIBRE). */
+export const nombreSonido = (s: string): string => s || "LIBRE";
 /** Carga un sonido en los valores manuales (VOLUMEN queda como está). */
 export function cargarSonido(st: EstadoParams, nombre: NombreSonido): void {
   const s = SONIDOS[nombre] as Record<string, number>;
@@ -339,6 +349,22 @@ export function tiempoEcoS(bpm: number, idx: number, maxS = 2): number {
 export function realimAcotada(v: number, tope = 0.85): number {
   const t = Math.max(0, Math.min(0.85, Number.isFinite(tope) ? tope : 0.85));
   return Math.max(0, Math.min(t, Number.isFinite(v) ? v : 0));
+}
+
+// ── Z102: ESPACIO (reverberación) ──
+/**
+ * Respuesta al impulso sintética: ruido estéreo (dos canales distintos) que decae de forma exponencial hasta ~−60 dB en
+ * durS, con un ataque de 4 ms para que no haga clic. Determinista (semilla). Se genera UNA vez (motor) y se escribe en
+ * izq/der (largo = sampleRate × durS).
+ */
+export function llenarRespuestaImpulso(izq: Float32Array, der: Float32Array, sampleRate: number, durS: number, semilla = 0x5102): void {
+  const n = Math.min(izq.length, der.length), sr = Math.max(1, sampleRate), d = Math.max(0.05, Number.isFinite(durS) ? durS : 2.8);
+  let x = (semilla >>> 0) || 1;
+  const rnd = (): number => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 2147483648 - 1; };
+  for (let i = 0; i < n; i++) {
+    const t = i / sr, env = Math.exp(-6.9 * t / d) * Math.min(1, t / 0.004);
+    izq[i] = rnd() * env; der[i] = rnd() * env;
+  }
 }
 
 // ── filtro y envolventes (valores que usa el motor y el display) ──

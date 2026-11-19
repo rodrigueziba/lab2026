@@ -50,9 +50,34 @@ export const FABRICA = {
   DEEP:    ["0a", "-", "-", "0", "-", "7s", "5", "-", "0", "-", "3", "-", "0a", "-", "10s", "7"],
   TECHNO:  ["0", "12", "0", "12a", "0", "12", "3", "15a", "0", "12", "0", "12a", "5", "17", "3s", "15"],
   MINIMAL: ["0a", "-", "-", "-", "0", "-", "-", "12s", "12", "-", "-", "-", "7", "-", "5", "-"],
+  // Z102: dos patrones nuevos, ORIGINALES (inspirados solo en el carácter general de un estilo; ninguna línea copiada).
+  // FUNK: riff corto de 3 notas, muy sincopado, con silencios marcados, acentos en los golpes fuertes y un desliz.
+  FUNK:    ["0a", "-", "0", "-", "-", "0a", "-", "10s", "12", "-", "0", "-", "0a", "12", "-", "10"],
+  // DISCO: línea melódica y fluida, 6 notas, saltos de octava, varias ligadas con DESLIZ y pocos silencios.
+  DISCO:   ["0", "12s", "10", "7a", "-", "5s", "7", "0", "12a", "-", "3s", "5", "7s", "10", "12a", "5"],
 } as const;
 export type NombrePatron = keyof typeof FABRICA;
 export const NOMBRES_PATRON = Object.keys(FABRICA) as NombrePatron[];
+/**
+ * Z102: seteo de voz que trae un patrón (solo FUNK y DISCO; los cinco originales no tocan la voz). Valores REALES de los
+ * parámetros de PARAMS_BAJO, la onda y el BPM sugerido (solo informativo: el tempo de la caja no cambia).
+ */
+export interface VozPatron { onda: "sierra" | "cuadrada"; params: Readonly<Record<string, number>>; bpm: number }
+export const VOZ_PATRON: Readonly<Partial<Record<string, VozPatron>>> = {
+  FUNK:  { onda: "sierra",   bpm: 110, params: { afinacion: 0, corte: 180, resonancia: 0.72, modEnv: 0.85, decay: 0.25, acento: 0.8, desliz: 0.08, distorsion: 0.75 } },
+  DISCO: { onda: "cuadrada", bpm: 118, params: { afinacion: 0, corte: 650, resonancia: 0.35, modEnv: 0.45, decay: 0.45, acento: 0.45, desliz: 0.12, distorsion: 0.12 } },
+};
+/** "PATRÓN FUNK · BPM SUGERIDO 110" (sin seteo de voz: "PATRÓN CHICAGO"). */
+export function textoPatron(nombre: string): string {
+  const v = VOZ_PATRON[nombre];
+  return v ? `PATRÓN ${nombre} · BPM SUGERIDO ${v.bpm}` : `PATRÓN ${nombre}`;
+}
+/** Z102: pasos idénticos entre dos patrones (misma posición: los dos en silencio, o los dos activos con la misma nota). */
+export function pasosIguales(x: PatronBajo, y: PatronBajo): number {
+  let n = 0;
+  for (let i = 0; i < N_PASOS; i++) if (x.activo[i] === y.activo[i] && (!x.activo[i] || x.nota[i] === y.nota[i])) n++;
+  return n;
+}
 /** Carga un patrón de fábrica en p (la memoria editable). */
 export function cargarFabrica(nombre: NombrePatron, p: PatronBajo): void {
   limpiarPatron(p);

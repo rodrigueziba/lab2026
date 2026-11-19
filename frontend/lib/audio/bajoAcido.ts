@@ -28,6 +28,7 @@ import {
   midiAFrecuencia, nivelNota, aperturaNota, corteConEnvolvente, qDeResonancia, crearParams, setParam, valorParam, restaurarParams,
   PARAMS_BAJO, EV_SILENCIO, EV_LIGADA, NOMBRES_PATRON, type NombrePatron, type EventoPaso, type FuenteParam,
   activarCara, liberarParamCara, siguienteNombrePatron, crearAcentoForzado, aplicarAcentoForzado,   // Z100
+  VOZ_PATRON,   // Z102
 } from "@/lib/bajoAcido";
 
 /** Estado leído por el atril, el display y el menú. version sube con cada cambio del patrón o de un parámetro. */
@@ -51,8 +52,6 @@ function defectosDesdeDbg(): void {
   restaurarParams(PARAMS);
   for (const d of PARAMS_BAJO) { const v = DBG_BAJO[CLAVE_DBG[d.id]]; if (typeof v === "number") setParam(PARAMS, d.id, v, "manual"); }
 }
-defectosDesdeDbg();
-cargarPatron((NOMBRES_PATRON as string[]).includes(DBG_BAJO.PATRON_INICIAL) ? DBG_BAJO.PATRON_INICIAL as NombrePatron : "CHICAGO");
 
 interface Voz {
   ctx: BaseAudioContext; osc: OscillatorNode; f1: BiquadFilterNode; f2: BiquadFilterNode; vca: GainNode;
@@ -60,6 +59,9 @@ interface Voz {
   sostenida: boolean; ultimaFrecuencia: number;
 }
 let _voz: Voz | null = null;
+// Z102: valores iniciales después de _voz (un PATRON_INICIAL con seteo de voz la consulta)
+defectosDesdeDbg();
+cargarPatron((NOMBRES_PATRON as string[]).includes(DBG_BAJO.PATRON_INICIAL) ? DBG_BAJO.PATRON_INICIAL as NombrePatron : "CHICAGO");
 let _desuscribir: (() => void) | null = null;
 let _relojPropio: Reloj | null = null;
 let _motorPropio: ReturnType<typeof setInterval> | null = null;
@@ -230,6 +232,20 @@ export function tickBajo(): void {
 export function cargarPatron(nombre: NombrePatron): void {
   cargarFabrica(nombre, PATRON_BAJO); cargarFabrica(nombre, _fabrica);
   BAJO.patron = nombre; BAJO.editado = false; BAJO.version++;
+  aplicarVozPatron(nombre);   // Z102
+}
+/**
+ * Z102: si el patrón trae seteo de voz (FUNK, DISCO) y PATRON_APLICA_VOZ es true, escribe los valores MANUALES (como si
+ * se movieran las perillas): la cara sigue mandando encima según la regla de Z99/Z100 y, al apagarla, quedan estos.
+ */
+export function aplicarVozPatron(nombre: string): boolean {
+  const vz = VOZ_PATRON[nombre];
+  if (!vz || !DBG_BAJO.PATRON_APLICA_VOZ) return false;
+  DBG_BAJO.ONDA = vz.onda;
+  for (const id in vz.params) setParam(PARAMS, id, vz.params[id], "manual");
+  BAJO.version++;
+  const ctx = contextoNucleo(); if (_voz && ctx) aplicarParams(_voz, ctx.currentTime);
+  return true;
 }
 export function patronLimpio(): void {
   limpiarPatron(PATRON_BAJO); limpiarPatron(_fabrica);

@@ -176,8 +176,9 @@ console.log('\n(g) acento forzado y siguiente patrón');
   check(L.patronesIguales(antes, desp) && !M.BAJO.editado, 'el patrón guardado no cambia (ni pasa a EDITADO)');
   check(/eventoPaso\(PATRON_BAJO, k, _ev\);[\s\S]{0,140}aplicarAcentoForzado\(_ev, ACENTO_FORZADO\)/.test(MOTOR), 'el oyente del reloj lo aplica a la copia de trabajo del evento');
   M.patronLimpio(); M.editarPaso('activo', 3, 1);
-  const vistos = []; for (let i = 0; i < 6; i++) vistos.push(M.siguientePatronBajo());
-  check(vistos.join(',') === 'CHICAGO,RAGA,DEEP,TECHNO,MINIMAL,CHICAGO' && !M.BAJO.editado, `siguientePatronBajo: ${vistos.join(' → ')} (no editado)`);
+  const vistos = []; for (let i = 0; i < 8; i++) vistos.push(M.siguientePatronBajo());   // Z102: 7 patrones (+ FUNK, DISCO)
+  check(vistos.join(',') === 'CHICAGO,RAGA,DEEP,TECHNO,MINIMAL,FUNK,DISCO,CHICAGO' && !M.BAJO.editado, `siguientePatronBajo: ${vistos.join(' → ')} (no editado)`);
+  M.silenciarYReiniciarBajo();   // Z102: FUNK y DISCO aplicaron su seteo de voz: vuelve a los valores por defecto
   check(/cargarPatron\(nm\);/.test(cuerpo(MOTOR, 'siguientePatronBajo')) && /BAJO\.version !== ver\.current\) \{ ver\.current = BAJO\.version; sincronizarBajo\(\); \}/.test(LS), 'sincroniza los pads del atril (version → sincronizarBajo)');
   M.cargarPatron('CHICAGO'); }
 
@@ -262,7 +263,7 @@ console.log('\n(j) layout del módulo CARA y legibilidad');
   check(K.textoLineaCara('calibrando', 1, 2) === 'CARA: CALIBRANDO 2/5 · ABRÍ LA BOCA… 2' && K.textoLineaCara('esperando', 0, 0) === 'CARA: ESPERANDO ROSTRO' && K.textoLineaCara('sin_camara', 0, 0) === 'CARA: SIN CÁMARA', 'textos: "CARA: ESPERANDO ROSTRO", "CARA: CALIBRANDO 2/5 · ABRÍ LA BOCA… 2", "CARA: SIN CÁMARA"');
   B.configurarLayoutB(false);
   const viejo = B.MODULOS_B.map(m => `${m.id}:${(m.rect.u1 - m.rect.u0).toFixed(3)}`).join(' ');
-  check(!B.MODULOS_B.some(m => m.id === 'cara') && B.POSICIONES_B.length === 82 && /patron:0\.400 voz:0\.650 salida:0\.290/.test(viejo), 'MODULO_CARA false: vuelve el layout de Z99 (82 controles, PATRÓN 0,40 · VOZ 0,65 · SALIDA 0,29)');
+  check(!B.MODULOS_B.some(m => m.id === 'cara') && B.POSICIONES_B.length === 84 && /patron:0\.400 voz:0\.650 salida:0\.290/.test(viejo), 'MODULO_CARA false: vuelve el layout de Z99 (84 controles con Z102: 7 patrones + LIMPIO; PATRÓN 0,40 · VOZ 0,65 · SALIDA 0,29)');
   B.configurarLayoutB(true); }
 
 console.log(`\n${ok} OK · ${fallas} fallas`);

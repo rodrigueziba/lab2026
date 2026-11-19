@@ -27,7 +27,7 @@ import {
   midiAFrecuencia, notaBase, crearParams, setParam, valorIdx, activarCara, liberarParamCara, cargarSonido, sonidoEditado,
   crearVoces, asignarVoz, liberarNota, vocesActivas, reiniciarVoces, crearMantenidas, pulsar, soltarMantenida,
   crearArp, reiniciarArp, secuenciaArp, siguienteNotaArp, pasosArpEnVentana, tiempoEcoS, realimAcotada,
-  qDeResonancia, corteConTecla, corteEnvolvente, type FuenteParam, type NombreSonido, type Voces,
+  qDeResonancia, corteConTecla, corteEnvolvente, llenarRespuestaImpulso, type FuenteParam, type NombreSonido, type Voces,
 } from "@/lib/sinte";
 
 /** Estado que leen el atril, el display y el menú. version sube con cada cambio de sonido, parámetro u opción. */
@@ -47,7 +47,7 @@ function defectosDesdeDbg(): void {
   for (let i = 0; i < N_PARAMS; i++) { const v = CLAVES[PARAMS_SINTE[i].clave]; if (typeof v === "number") setParam(PARAMS_SY, PARAMS_SINTE[i].id, v, "manual"); }
 }
 function sonidoInicial(): NombreSonido {
-  return (NOMBRES_SONIDO as string[]).includes(DBG_SINTE.SONIDO_INICIAL) ? DBG_SINTE.SONIDO_INICIAL as NombreSonido : "PAD";
+  return (NOMBRES_SONIDO as string[]).includes(DBG_SINTE.SONIDO_INICIAL) ? DBG_SINTE.SONIDO_INICIAL as NombreSonido : "DRON";
 }
 interface VozNodos {
   o1: OscillatorNode; o2: OscillatorNode; sub: OscillatorNode; g1: GainNode; g2: GainNode; gS: GainNode; gR: GainNode;
@@ -57,7 +57,11 @@ interface Grafo {
   ctx: AudioContext; ruido: FuenteRuido; lfo: OscillatorNode; lfoAfin: GainNode; lfoCorte: GainNode; lfoVol: GainNode;
   mezcla: GainNode; trem: GainNode; seco: GainNode; envio: GainNode; retardo: DelayNode; lazo: BiquadFilterNode; realim: GainNode;
   mojado: GainNode; vol: GainNode; on: GainNode; analizador: AnalyserNode; voces: VozNodos[];
+  // Z102: ESPACIO (reverberación): envío → convolución (respuesta al impulso sintética, generada una vez) → mojado
+  envEsp: GainNode; convolver: ConvolverNode; mojEsp: GainNode; espConectado: boolean;
 }
+/** Z102: cuántas respuestas al impulso se generaron (una por grafo; las pruebas lo cuentan). */
+export const ESPACIO = { generadas: 0, conectado: false };
 let _g: Grafo | null = null;
 let _desuscribir: (() => void) | null = null;
 let _bpmAplicado = -1;
@@ -82,6 +86,14 @@ function crearGrafo(ctx: AudioContext): Grafo {
   mezcla.connect(trem); trem.connect(seco); trem.connect(envio); envio.connect(retardo);
   retardo.connect(lazo); lazo.connect(realim); realim.connect(retardo); lazo.connect(mojado);
   seco.connect(vol); mojado.connect(vol); vol.connect(on); on.connect(entradaBus()); on.connect(analizador);
+  // Z102: ESPACIO. La respuesta al impulso se genera UNA vez, acá; el envío se conecta al convolver solo con mezcla > 0
+  const envEsp = ctx.createGain(), convolver = ctx.createConvolver(), mojEsp = ctx.createGain();
+  const largo = Math.max(1, Math.floor(ctx.sampleRate * Math.max(0.5, Math.min(6, DBG_SINTE.ESPACIO_DUR_S))));
+  const ir = ctx.createBuffer(2, largo, ctx.sampleRate);
+  llenarRespuestaImpulso(ir.getChannelData(0), ir.getChannelData(1), ctx.sampleRate, DBG_SINTE.ESPACIO_DUR_S);
+  convolver.normalize = true; convolver.buffer = ir; ESPACIO.generadas++;
+  envEsp.gain.value = 0; mojEsp.gain.value = 0;
+  trem.connect(envEsp); convolver.connect(mojEsp); mojEsp.connect(vol);
   const voces: VozNodos[] = [];
   for (let i = 0; i < VOCES.n; i++) {
     const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), sub = ctx.createOscillator();
@@ -95,7 +107,7 @@ function crearGrafo(ctx: AudioContext): Grafo {
     voces.push({ o1, o2, sub, g1, g2, gS, gR, filtro, vca, base: 1000, nota: -1 });
   }
   lfo.start();
-  const g: Grafo = { ctx, ruido, lfo, lfoAfin, lfoCorte, lfoVol, mezcla, trem, seco, envio, retardo, lazo, realim, mojado, vol, on, analizador, voces };
+  const g: Grafo = { ctx, ruido, lfo, lfoAfin, lfoCorte, lfoVol, mezcla, trem, seco, envio, retardo, lazo, realim, mojado, vol, on, analizador, voces, envEsp, convolver, mojEsp, espConectado: false };
   _bpmAplicado = -1;
   aplicarParams(g, ctx.currentTime);
   return g;
@@ -161,7 +173,19 @@ function aplicarEco(g: Grafo, ahora: number): void {
   g.lazo.frequency.setTargetAtTime(Math.max(200, DBG_SINTE.ECO_FILTRO_HZ), ahora, 0.02);
   g.envio.gain.setTargetAtTime(mz > 0 ? 1 : 0, ahora, 0.02);
   g.mojado.gain.setTargetAtTime(mz, ahora, 0.02);
-  g.seco.gain.setTargetAtTime(1 - 0.4 * mz, ahora, 0.02);
+  // Z102: el seco baja un poco con el ESPACIO (la mezcla total no crece de golpe)
+  const esp = v(P.espacio);
+  g.seco.gain.setTargetAtTime((1 - 0.4 * mz) * (1 - Math.max(0, Math.min(1, DBG_SINTE.ESPACIO_SECO)) * esp), ahora, 0.02);
+  aplicarEspacio(g, ahora, esp);
+}
+/** Z102: ESPACIO. Con mezcla 0 el envío se DESCONECTA del convolver: sin entrada, la convolución no procesa nada. */
+function aplicarEspacio(g: Grafo, ahora: number, esp: number): void {
+  const on = esp > 0.001;
+  if (on && !g.espConectado) { g.envEsp.connect(g.convolver); g.espConectado = true; }
+  else if (!on && g.espConectado) { try { g.envEsp.disconnect(g.convolver); } catch { /* ya desconectado */ } g.espConectado = false; }
+  ESPACIO.conectado = g.espConectado;
+  g.envEsp.gain.setTargetAtTime(on ? 1 : 0, ahora, 0.02);
+  g.mojEsp.gain.setTargetAtTime(on ? esp * 0.8 : 0, ahora, 0.05);
 }
 
 // ── notas (tiempos de audio exactos; sin allocations) ──
@@ -279,7 +303,9 @@ function liberarGrafo(): void {
   }
   try { g.lfo.stop(); } catch { /* ya parado */ }
   g.ruido.liberar();
-  for (const x of [g.lfo, g.lfoAfin, g.lfoCorte, g.lfoVol, g.mezcla, g.trem, g.seco, g.envio, g.retardo, g.lazo, g.realim, g.mojado, g.vol, g.on, g.analizador]) {
+  g.convolver.buffer = null;   // Z102: suelta la respuesta al impulso
+  g.espConectado = false; ESPACIO.conectado = false;
+  for (const x of [g.lfo, g.lfoAfin, g.lfoCorte, g.lfoVol, g.mezcla, g.trem, g.seco, g.envio, g.retardo, g.lazo, g.realim, g.mojado, g.vol, g.on, g.analizador, g.envEsp, g.convolver, g.mojEsp]) {
     try { x.disconnect(); } catch { /* ok */ }
   }
   _g = null; SINTE.listo = false;

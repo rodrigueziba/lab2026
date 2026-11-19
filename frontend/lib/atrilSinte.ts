@@ -55,7 +55,7 @@ export const PAD_Y = { w: 0.100, d: 0.056 };                // el pad de IM-40 y
 export const ESC_Y = { sonido: 0.8, forma: 0.55, perilla: 0.70, perillaMov: 0.66, sel: 0.5, arpB: 0.45, tecla: 0.36 };
 /** Filas de perillas de la fila lejana (alineadas en TIMBRE y FILTRO) y de la cercana. */
 export const VK1 = FILAS_Y.medio.v1 - BANDA_TITULO - RADIO_MARCAS_OUT * ESC_Y.perilla - 0.0045, VK2 = VK1 - 0.099;
-export const MOV = { cabecera: FILAS_Y.abajo.v1 - BANDA_TITULO - 0.0095, va: -0.160, vb: -0.240, lfo: 0.19, eco: 0.19, arp: 0.33, sep: 0.012 };
+export const MOV = { cabecera: FILAS_Y.abajo.v1 - BANDA_TITULO - 0.0095, va: -0.160, vb: -0.240, lfo: 0.185, eco: 0.225, arp: 0.30, sep: 0.012 };   // Z102: ECO + ESPACIO (3 perillas)
 export const TEC = { blancas: -0.200, negras: -0.150, ayuda: -0.252, x0: 0.012, x1: 0.425, oct: 0.462, octMas: -0.140, octMenos: -0.228 };
 export const FADER_Y = { rail: 0.12, v: -0.20, u: 0.575 };
 export const VU_Y = { segmentos: 14, u: 0.650, v0: -0.29, v1: -0.115, ancho: 0.024 };
@@ -95,8 +95,9 @@ function construir(): PosCtrlY[] {
   add("y_p_lfoVel", dosK(gLfo, MOV.lfo, 0), MOV.va, "normal", "knob", "VELOC.", "LFO VELOCIDAD", "movimiento", ESC_Y.perillaMov, "", MOV.lfo / 2);
   add("y_p_lfoProf", dosK(gLfo, MOV.lfo, 1), MOV.va, "normal", "knob", "PROF.", "LFO PROFUNDIDAD", "movimiento", ESC_Y.perillaMov, "", MOV.lfo / 2);
   DESTINOS_LFO_CORTOS.forEach((d, i) => add(`y_lfo_${i}`, tres(gLfo, MOV.lfo, i), MOV.vb, "pad", "toggle", d, `LFO DESTINO ${["AFINACIÓN", "CORTE", "VOLUMEN"][i]}`, "movimiento", ESC_Y.sel, "lfo", MOV.lfo / 3));
-  add("y_p_ecoRealim", dosK(gEco, MOV.eco, 0), MOV.va, "normal", "knob", "REALIM.", "ECO REALIMENTACIÓN", "movimiento", ESC_Y.perillaMov, "", MOV.eco / 2);
-  add("y_p_ecoMezcla", dosK(gEco, MOV.eco, 1), MOV.va, "normal", "knob", "MEZCLA", "ECO MEZCLA", "movimiento", ESC_Y.perillaMov, "", MOV.eco / 2);
+  add("y_p_ecoRealim", tres(gEco, MOV.eco, 0), MOV.va, "normal", "knob", "REALIM.", "ECO REALIMENTACIÓN", "movimiento", ESC_Y.perillaMov, "", MOV.eco / 3);
+  add("y_p_ecoMezcla", tres(gEco, MOV.eco, 1), MOV.va, "normal", "knob", "MEZCLA", "ECO MEZCLA", "movimiento", ESC_Y.perillaMov, "", MOV.eco / 3);
+  add("y_p_espacio", tres(gEco, MOV.eco, 2), MOV.va, "normal", "knob", "ESPACIO", "ESPACIO (REVERBERACIÓN)", "movimiento", ESC_Y.perillaMov, "", MOV.eco / 3);   // Z102
   TIEMPOS_ECO.forEach((d, i) => add(`y_eco_${i}`, tres(gEco, MOV.eco, i), MOV.vb, "pad", "toggle", d, `ECO TIEMPO ${["1/8", "1/4", "1/4 CON PUNTILLO"][i]}`, "movimiento", ESC_Y.sel, "eco", MOV.eco / 3));
   const wa = MOV.arp / 5, wb = MOV.arp / 6;
   add("y_arp_on", gArp + wa * 0.5, MOV.va, "pad", "toggle", "ON", "ARPEGIADOR", "movimiento", ESC_Y.sel, "arpA", wa);
@@ -179,7 +180,7 @@ export function textosY(escala: number, numerados = true): Texto[] {
   for (const [id, et, vv] of [["r_osc1", "OSC 1", VK1], ["r_osc2", "OSC 2", VK2]] as const)
     add(id, et, ti.u0 + 0.012, vv, Math.min(ALTO_Y.fila * e, (COL_ROTULO_TIMBRE - 0.006) / (et.length * ANCHO_CHAR)), "izq", "medio");
   const mo = moduloY("movimiento").rect, gLfo = mo.u0 + 0.012, gEco = gLfo + MOV.lfo + MOV.sep, gArp = gEco + MOV.eco + MOV.sep;
-  for (const [id, et, g, w] of [["c_lfo", "LFO", gLfo, MOV.lfo], ["c_eco", "ECO", gEco, MOV.eco], ["c_arp", "ARPEGIADOR", gArp, MOV.arp]] as const)
+  for (const [id, et, g, w] of [["c_lfo", "LFO", gLfo, MOV.lfo], ["c_eco", "ECO Y ESPACIO", gEco, MOV.eco], ["c_arp", "ARPEGIADOR", gArp, MOV.arp]] as const)
     add(id, et, g, MOV.cabecera, Math.min(ALTO_Y.fila * e, w / (et.length * ANCHO_CHAR)), "izq", "abajo");
   const fi = moduloY("filtro").rect, us = fi.u1 - 0.012 - COL_SELECTOR / 2, etSel = "ENV. DE";
   add("c_envsel", etSel, us, VK2 + 0.036, Math.min(ALTO_Y.fila * e, (COL_SELECTOR - 0.012) / (etSel.length * ANCHO_CHAR)), "centro", "medio");

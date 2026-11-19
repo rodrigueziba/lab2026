@@ -41,7 +41,7 @@ import { CARA, encenderCara, apagarCara, calibrarCara, tickCara, liberarCara } f
 import {
   BAJO, PATRON_BAJO, PARAMS as PARAMS_B, instalarBajo, tickBajo, editarPaso, cargarPatron, patronLimpio, setParamBajo, aplicarParamsBajo,
 } from "@/lib/audio/bajoAcido";
-import { PARAMS_BAJO, aNormal, deNormal, valorParam, indiceParam, nombreNota, type NombrePatron } from "@/lib/bajoAcido";
+import { PARAMS_BAJO, aNormal, deNormal, valorParam, indiceParam, nombreNota, textoPatron, type NombrePatron } from "@/lib/bajoAcido";
 import { DisplayBajo, VuBajo, CaraBajo, buildSilkscreenBajo, mostrarEnDisplayBajo, escalaActualBajo } from "./AtrilBajoNuevo";
 import { poseAtrilBajo, GEO_INSTRUMENTOS } from "@/lib/instrumentosPose";                      // Z99b: posición única de los instrumentos
 // Z101: SINTETIZADOR SY-40 (cuarto atril, índice −1 del arco de instrumentos: el lado opuesto al BA-40)
@@ -1316,7 +1316,7 @@ function defBajo(p: PosCtrlB): CtrlDef {
 configurarLayoutB(DBG_ATRIL_BAJO.MODULO_CARA);   // Z100: con o sin el módulo CARA (antes de armar los controles)
 export const CONTROLES_BAJO: CtrlDef[] = POSICIONES_B.map(defBajo);
 const _posBajo = new Map<string, PosCtrlB>(POSICIONES_B.map(p => [p.id, p]));
-const _radioPat = [0, 0, 0, 0, 0], _radioOnda = [0, 0];
+const _radioPat = [0, 0, 0, 0, 0, 0, 0], _radioOnda = [0, 0];   // Z102: 7 patrones
 /** Estado de los controles del BA-40 desde el motor (patrón, parámetros, onda, ON): al cargar, al editar y desde el menú. */
 function sincronizarBajo(): void {
   for (let k = 0; k < 16; k++) {
@@ -1337,6 +1337,7 @@ function textoBajo(id: string, def: CtrlDef): string {
   if (!p) return def.label;
   const v = ctrlState[id] ?? def.initial;
   if (id.startsWith("b_nota")) return `${p.nombreLargo} ${nombreNota(DBG_BAJO.RAIZ_MIDI + Math.round(v))}`;
+  if (id.startsWith("b_pat_")) return textoPatron(id.slice(6));   // Z102: FUNK y DISCO: "PATRÓN FUNK · BPM SUGERIDO 110"
   if (id.startsWith("b_acento") || id.startsWith("b_desliz") || id.startsWith("b_paso") || id === "b_on") return `${p.nombreLargo} ${v > 0.5 ? "ON" : "OFF"}`;
   if (id.startsWith("b_p_")) {
     const pid = id.slice(4), r = valorParam(PARAMS_B, pid);
@@ -1395,7 +1396,7 @@ function defSinte(p: PosCtrlY): CtrlDef {
 export const CONTROLES_SINTE: CtrlDef[] = POSICIONES_Y.map(defSinte);
 const _posSinte = new Map<string, PosCtrlY>(POSICIONES_Y.map(p => [p.id, p]));
 const _radioSon = [0, 0, 0, 0, 0, 0], _radio4 = [0, 0, 0, 0], _radio3 = [0, 0, 0];
-const PERILLAS_Y_IDS: string[] = [...[...PERILLAS_TIMBRE, ...PERILLAS_FILTRO].map(([pid]) => pid as string), "lfoVel", "lfoProf", "ecoRealim", "ecoMezcla"];
+const PERILLAS_Y_IDS: string[] = [...[...PERILLAS_TIMBRE, ...PERILLAS_FILTRO].map(([pid]) => pid as string), "lfoVel", "lfoProf", "ecoRealim", "ecoMezcla", "espacio"];   // Z102: + ESPACIO
 /** Estado de los controles del SY-40 desde el motor (sonido, parámetros, opciones): al cargar, al tocar y desde el menú. */
 function sincronizarSinte(): void {
   const man = (pid: string) => PARAMS_SY.manual[indiceParamY(pid)];

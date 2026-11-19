@@ -1738,6 +1738,7 @@ export const DBG_BAJO = {
   ONDA:                   "sierra" as string,   // "sierra" | "cuadrada" (defecto) — live
   ON:                     true,     // ON del módulo SALIDA (silencia sin parar el reloj) — live
   PATRON_INICIAL:         "CHICAGO" as string,  // vale al cargar
+  PATRON_APLICA_VOZ:      true,     // Z102: FUNK y DISCO traen su seteo de voz (onda, CORTE, RESONANCIA…) y lo aplican al cargarse — live
   // valores por defecto de cada parámetro (los rangos están en PARAMS_BAJO de lib/bajoAcido.ts)
   AFINACION:              0,        // semitonos
   CORTE:                  420,      // Hz
@@ -1823,7 +1824,7 @@ export const DBG_SINTE = {
   SINTE_MIDI:             false,    // Web MIDI (navigator.requestMIDIAccess): pide permiso al montar el atril — vale al montar
   LOOKAHEAD_S:            0.01,     // margen de programación de las notas en vivo (s): suenan en ahora + esto (el arpegiador usa la anticipación del reloj del núcleo) — live
   ON:                     true,     // ON del módulo TECLADO Y SALIDA (silencia sin soltar las voces) — live
-  SONIDO_INICIAL:         "PAD" as string,   // vale al cargar
+  SONIDO_INICIAL:         "DRON" as string,  // Z102: el dron sostenido y etéreo (antes PAD) — vale al cargar
   OCTAVA:                 4,        // octava de la tecla DO del teclado (DO4 = MIDI 60) — live
   OCTAVA_MIN:             1,
   OCTAVA_MAX:             7,
@@ -1872,7 +1873,10 @@ export const DBG_SINTE = {
   ECO_TIEMPO:             1,        // 0 = 1/8, 1 = 1/4, 2 = 1/4 con puntillo (sincronizado con el BPM de la caja)
   ECO_REALIM:             0.35,
   ECO_MEZCLA:             0,
+  ESPACIO:                0,        // Z102: mezcla de la reverberación (0 = no procesa)
   VOLUMEN:                0.7,
+  ESPACIO_DUR_S:          2.8,      // Z102: largo de la respuesta al impulso (se genera una vez al nacer el grafo)
+  ESPACIO_SECO:           0.3,      // Z102: cuánto baja el seco con ESPACIO al máximo
 };
 export const DBG_ATRIL_SINTE = {
   ETIQUETA_ESCALA:        1.0,      // multiplica títulos y etiquetas — live (rehace la serigrafía)

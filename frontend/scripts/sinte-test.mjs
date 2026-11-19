@@ -29,7 +29,8 @@ class Ctx {
   createDelay() { CUENTA.delay++; const d = new Nodo('delay'); d.delayTime = new Param(0); return d; }
   createAnalyser() { CUENTA.analyser++; const a = new Nodo('analyser'); a.fftSize = 2048; return a; }
   createWaveShaper() { CUENTA.shaper++; const w = new Nodo('shaper'); w.curve = null; w.oversample = 'none'; return w; }
-  createBuffer(_c, len) { const d = new Float32Array(len); return { getChannelData: () => d }; }
+  createBuffer(nc, len) { const ch = Array.from({ length: Math.max(1, nc) }, () => new Float32Array(len)); return { numberOfChannels: nc, length: len, getChannelData: i => ch[i] }; }
+  createConvolver() { CUENTA.convolver = (CUENTA.convolver ?? 0) + 1; const c = new Nodo('convolver'); c.buffer = null; c.normalize = true; return c; }   // Z102
   createBufferSource() { CUENTA.source++; const s = new Fuente('source'); s.buffer = null; s.loop = false; return s; }
 }
 globalThis.AudioContext = Ctx;
@@ -105,6 +106,29 @@ console.log('\n(b) asignación de voces');
     '40 notas más (con robos): ningún nodo nuevo (voces preasignadas)');
   check(M.SINTE.robos > 0 && M.MANTENIDAS.n === 0, `hubo robos de voz (${M.SINTE.robos}) y al soltar todo no queda ninguna tecla mantenida`);
   limpiar(); }
+
+console.log('\n(b2) Z102: ESPACIO (reverberación)');
+{ M.silenciarYReiniciarSinte();
+  check(M.SINTE.sonido === 'DRON', 'el motor arranca (y reinicia) con DRON');
+  const limpiar = M.instalarSinte(), g0 = M.ESPACIO.generadas, c0 = CUENTA.convolver ?? 0;
+  M.notaAbajo(60);
+  check(M.ESPACIO.generadas === g0 + 1 && CUENTA.convolver === c0 + 1 && M.ESPACIO.conectado, 'al nacer el grafo: un convolver y UNA respuesta al impulso; DRON (ESPACIO 0,55) lo conecta');
+  for (let i = 0; i < 30; i++) { M.notaAbajo(40 + i); M.notaArriba(40 + i); }
+  check(M.ESPACIO.generadas === g0 + 1 && CUENTA.convolver === c0 + 1, '30 notas más: la respuesta al impulso no se vuelve a generar');
+  M.setParamSinte('espacio', 0, 'manual');
+  check(!M.ESPACIO.conectado, 'ESPACIO 0: el envío se desconecta del convolver (sin entrada no procesa)');
+  M.setParamSinte('espacio', 0.3, 'manual');
+  check(M.ESPACIO.conectado, 'ESPACIO > 0: se vuelve a conectar');
+  const iz = new Float32Array(48000 * 3), de = new Float32Array(48000 * 3);
+  L.llenarRespuestaImpulso(iz, de, 48000, 2.8);
+  const pico = a => a.reduce((m, x) => Math.max(m, Math.abs(x)), 0), tramo = (a, t0, t1) => pico(a.subarray(Math.floor(t0 * 48000), Math.floor(t1 * 48000)));
+  check(tramo(iz, 0, 0.1) > 0.5 && tramo(iz, 2.7, 2.8) < 0.003 && iz[100] !== de[100] && Number.isFinite(iz.reduce((a, b) => a + b, 0)),
+    `respuesta al impulso: ruido estéreo (canales distintos) que cae de ${f(tramo(iz, 0, 0.1))} al inicio a ${f(tramo(iz, 2.7, 2.8), 4)} a los 2,8 s (−60 dB)`);
+  M.soltarTodasSinte(); limpiar();
+  check(!M.SINTE.listo && !M.ESPACIO.conectado && /g\.convolver\.buffer = null;/.test(cuerpo(MOTOR, 'liberarGrafo')) && /g\.envEsp, g\.convolver, g\.mojEsp\]/.test(cuerpo(MOTOR, 'liberarGrafo')),
+    'al desmontar: se suelta la respuesta al impulso y se desconectan envío, convolver y mojado');
+  check(/createConvolver\(\)/.test(cuerpo(MOTOR, 'crearGrafo')) && !/createConvolver|createBuffer|llenarRespuestaImpulso/.test(cuerpo(MOTOR, 'aplicarParams') + cuerpo(MOTOR, 'aplicarEspacio') + cuerpo(MOTOR, 'notaOn')),
+    'el convolver y su respuesta al impulso se crean solo en crearGrafo (ni por nota ni al mover perillas)'); }
 
 console.log('\n(c) arpegiador');
 { const m = L.crearMantenidas(); for (const n of [67, 60, 64]) L.pulsar(m, n);
@@ -184,7 +208,8 @@ check(L.PARAMS_SINTE[L.P.ecoRealim].max === 0.85 && /realimAcotada\(v\(P\.ecoRea
   'el motor aplica la realimentación acotada y el filtro suave del lazo; la perilla REALIM. llega a 0,85');
 
 console.log('\n(e) sonidos de fábrica');
-check(L.NOMBRES_SONIDO.join() === 'PAD,LEAD,PLUCK,BRASS,ORGANO,CAMPANA', 'los 6: PAD, LEAD, PLUCK, BRASS, ÓRGANO, CAMPANA');
+check(L.NOMBRES_SONIDO.join() === 'DRON,CUERDAS,METALES,PULSO,ACERO,LEAD' && !L.NOMBRES_SONIDO.includes('CAMPANA') && L.NOMBRES_SONIDO.every(n => n.length <= 8),
+  'Z102: los 6 nuevos (DRON, CUERDAS, METALES, PULSO, ACERO, LEAD), ninguno se llama CAMPANA, nombres de hasta 8 letras');
 for (const nm of L.NOMBRES_SONIDO) {
   const s = L.SONIDOS[nm], malos = [];
   for (const d of L.PARAMS_SINTE) {
@@ -193,20 +218,27 @@ for (const nm of L.NOMBRES_SONIDO) {
     if (typeof v !== 'number' || v < d.min || v > d.max || (d.curva === 'paso' && v !== Math.round(v))) malos.push(`${d.id}=${v}`);
   }
   for (const k of Object.keys(s)) if (L.indiceParam(k) < 0) malos.push('desconocido ' + k);
-  check(malos.length === 0, `${L.nombreSonido(nm)}: los ${Object.keys(s).length} parámetros dentro de su rango${malos.length ? ': ' + malos.join(', ') : ''}`);
+  if (s.ecoRealim > CS.ECO_REALIM_MAX) malos.push('ecoRealim > ECO_REALIM_MAX');
+  check(malos.length === 0, `${L.nombreSonido(nm)}: los ${Object.keys(s).length} parámetros dentro de su rango; realimentación ${s.ecoRealim} ≤ ${CS.ECO_REALIM_MAX}${malos.length ? ': ' + malos.join(', ') : ''}`);
 }
-{ const S2 = L.SONIDOS;
-  check(S2.PAD.ataque >= 0.5 && S2.PAD.release >= 1.5 && S2.PLUCK.ataque <= 0.005 && S2.PLUCK.decay <= 0.3 && S2.PLUCK.sostenido === 0 && S2.LEAD.onda1 === 2 && S2.LEAD.lfoDestino === 0 && S2.LEAD.lfoProf > 0
-    && S2.BRASS.ataque >= 0.05 && S2.BRASS.ataque <= 0.2 && S2.BRASS.modEnv >= 0.5 && S2.ORGANO.onda1 === 0 && S2.ORGANO.onda2 === 0 && S2.ORGANO.sub > 0.3 && S2.ORGANO.sostenido === 1
-    && S2.CAMPANA.onda1 === 1 && S2.CAMPANA.onda2 === 1 && S2.CAMPANA.desafine >= 20 && S2.CAMPANA.ecoMezcla > 0.3,
-    'carácter pedido: PAD lento y largo, LEAD sierra con vibrato, PLUCK instantáneo y corto, BRASS ataque medio y barrido, ÓRGANO dos senos con sub y sostenido lleno, CAMPANA triángulos desafinados con eco'); }
-{ const st = L.crearParams(); L.cargarSonido(st, 'BRASS');
-  check(!L.sonidoEditado(st, 'BRASS'), 'recién cargado: no está EDITADO');
+{ const S2 = L.SONIDOS, D = S2.DRON;
+  check(CS.SONIDO_INICIAL === 'DRON' && D.ataque >= 0.8 && D.ataque <= 1.5 && D.sostenido >= 0.9 && D.release >= 3 && D.corte >= 600 && D.corte <= 1300 && D.lfoDestino === 1 && D.lfoProf > 0
+    && D.onda1 === 2 && D.onda2 === 2 && D.subOnda === 1 && D.sub > 0 && D.ecoTiempo === 2 && D.ecoRealim >= 0.5 && D.espacio >= 0.4,
+    `DRON (sonido inicial): ataque ${D.ataque} s, sostenido ${D.sostenido}, release ${D.release} s, corte ${D.corte} Hz, LFO al CORTE ${D.lfoProf} a ${D.lfoVel} Hz, eco 1/4. ${D.ecoRealim}, ESPACIO ${D.espacio}`);
+  check(S2.CUERDAS.ataque >= 0.3 && S2.CUERDAS.ataque <= 0.8 && S2.CUERDAS.release >= 1.5 && S2.CUERDAS.release <= 2.5 && S2.CUERDAS.desafine >= 20 && S2.CUERDAS.lfoDestino === 0 && S2.CUERDAS.lfoProf > 0 && S2.CUERDAS.lfoProf <= 0.15,
+    'CUERDAS: ataque 0,3…0,8 s, release 1,5…2,5 s, sierras bien desafinadas, vibrato muy leve');
+  check(S2.METALES.modEnv >= 0.6 && S2.METALES.fAtaque <= 0.08 && S2.METALES.release <= 0.4 && S2.METALES.sostenido >= 0.4 && S2.METALES.sostenido <= 0.8, 'METALES: barrido de filtro (MOD. ENV. alto, ataque de filtro corto), sostenido medio, release corto');
+  check(S2.PULSO.decay <= 0.25 && S2.PULSO.sostenido <= 0.2 && S2.PULSO.ataque <= 0.005 && S2.PULSO.onda1 === 3 && S2.PULSO.ecoTiempo === 0, 'PULSO: cuadrada + sierra, ataque casi instantáneo, decay corto, sostenido bajo, eco 1/8');
+  check(S2.ACERO.ruido >= 0.25 && S2.ACERO.resonancia >= 0.6 && S2.ACERO.desafine >= 30 && S2.ACERO.ataque <= 0.005 && S2.ACERO.espacio <= 0.1, 'ACERO: RUIDO alto, resonancia alta, osciladores muy desafinados, golpe seco, sin espacio');
+  check(S2.LEAD.onda1 === 2 && S2.LEAD.onda2 === 3 && S2.LEAD.sostenido >= 0.8 && S2.LEAD.ataque <= 0.02 && S2.LEAD.lfoDestino === 0 && S2.LEAD.ecoTiempo === 0, 'LEAD: sierra + cuadrada, ataque rápido, sostenido alto, vibrato con LFO PROF., eco 1/8');
+  check(S2.DRON.espacio >= 0.4 && S2.CUERDAS.espacio >= 0.4 && S2.PULSO.espacio <= 0.1 && S2.ACERO.espacio <= 0.1, 'ESPACIO: alto en DRON y CUERDAS, bajo o cero en PULSO y ACERO'); }
+{ const st = L.crearParams(); L.cargarSonido(st, 'METALES');
+  check(!L.sonidoEditado(st, 'METALES'), 'recién cargado: no está EDITADO');
   L.setParam(st, 'corte', 900, 'manual');
-  check(L.sonidoEditado(st, 'BRASS'), 'al tocar una perilla: EDITADO');
-  L.setParam(st, 'corte', L.SONIDOS.BRASS.corte, 'manual'); L.setParam(st, 'volumen', 0.2, 'manual');
-  check(!L.sonidoEditado(st, 'BRASS'), 'volver al valor del sonido (doble clic) le saca el EDITADO; VOLUMEN no cuenta como edición');
-  check(/EDITADO/.test(L.lineaSinte1('PAD', true, true, 0, 124)) && L.lineaSinte1('ORGANO', false, false, 0, 100) === 'ÓRGANO · ARP OFF · 100 BPM' && L.lineaSinte1('CAMPANA', true, true, 2, 180).length <= Y.DISPLAY_CHARS_Y[0],
+  check(L.sonidoEditado(st, 'METALES'), 'al tocar una perilla: EDITADO');
+  L.setParam(st, 'corte', L.SONIDOS.METALES.corte, 'manual'); L.setParam(st, 'volumen', 0.2, 'manual');
+  check(!L.sonidoEditado(st, 'METALES'), 'volver al valor del sonido (doble clic) le saca el EDITADO; VOLUMEN no cuenta como edición');
+  check(/EDITADO/.test(L.lineaSinte1('PAD', true, true, 0, 124)) && L.lineaSinte1('DRON', false, false, 0, 100) === 'DRON · ARP OFF · 100 BPM' && L.lineaSinte1('CUERDAS', true, true, 2, 180).length <= Y.DISPLAY_CHARS_Y[0],
     `línea 1 del display: "${L.lineaSinte1('PAD', true, true, 0, 124)}" (la más larga entra en ${Y.DISPLAY_CHARS_Y[0]} caracteres)`);
   check(L.lineaSinte2Reposo(4, false).length <= Y.DISPLAY_CHARS_Y[1] && /PLAY/.test(L.lineaSinte2Reposo(4, true)), `línea 2 en reposo: "${L.lineaSinte2Reposo(4, false)}" (octava y teclas); con el arpegiador esperando, pide el play`); }
 
@@ -268,8 +300,8 @@ console.log('\n(h) layout del atril SY-40');
   for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) if (S.seSuperponen(Y.huellaY(P[i]), Y.huellaY(P[j]))) mal.push(P[i].id + '↔' + P[j].id);
   const vu = Y.rectVuY(); if (!S.dentro(vu, Y.moduloY('teclado').rect)) mal.push('VU fuera'); for (const p of P) if (S.seSuperponen(vu, Y.huellaY(p))) mal.push('VU↔' + p.id);
   const cuenta = m => P.filter(p => p.modulo === m).length;
-  check(P.length === 66 && cuenta('sonidos') === 6 && cuenta('teclado') === 17 && P.filter(p => p.id.startsWith('y_tecla_')).length === 13 && mal.length === 0,
-    `${P.length} controles (6 SONIDOS, ${cuenta('timbre')} TIMBRE, ${cuenta('filtro')} FILTRO Y ENVOLVENTE, ${cuenta('movimiento')} MOVIMIENTO, 17 TECLADO Y SALIDA: 13 teclas, OCT ±, VOLUMEN, ON) y el VU: dentro del panel, sin colisiones${mal.length ? ': ' + mal.slice(0, 6).join(', ') : ''}`);
+  check(P.length === 67 && cuenta('sonidos') === 6 && cuenta('teclado') === 17 && P.filter(p => p.id.startsWith('y_tecla_')).length === 13 && mal.length === 0,
+    `${P.length} controles (6 SONIDOS, ${cuenta('timbre')} TIMBRE, ${cuenta('filtro')} FILTRO Y ENVOLVENTE, ${cuenta('movimiento')} MOVIMIENTO (Z102: + ESPACIO), 17 TECLADO Y SALIDA: 13 teclas, OCT ±, VOLUMEN, ON) y el VU: dentro del panel, sin colisiones${mal.length ? ': ' + mal.slice(0, 6).join(', ') : ''}`);
   check(MO.map(m => m.titulo).filter(Boolean).join(' | ') === '1 SONIDOS | 2 TIMBRE | 3 FILTRO Y ENVOLVENTE | 4 MOVIMIENTO | 5 TECLADO Y SALIDA'
     && MO.filter(m => m.fila === 'medio').every(m => m.rect.v0 > Y.FILAS_Y.abajo.v1) && Y.moduloY('sonidos').rect.u0 < Y.moduloY('timbre').rect.u0 && Y.moduloY('timbre').rect.u0 < Y.moduloY('filtro').rect.u0,
     '5 módulos del más simple al más fino: 1 · 2 · 3 en la fila lejana (izquierda → derecha), 4 · 5 en la cercana');
