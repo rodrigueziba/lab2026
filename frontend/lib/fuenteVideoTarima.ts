@@ -17,6 +17,7 @@ import {
   elegirFuente, reintentoAutomatico, ondaAPuntos, espectroABarras, enSilencio, PALETAS,
   type EstadoCamara, type Eleccion, type MotivoCamara,
 } from "@/lib/ondasTarima";
+import { dibujarVisualizador, liberarVisualizador, soltarXYVisualizador } from "@/lib/visualizadorTarimaDibujo";   // Z98
 
 export const ANCHO = 640, ALTO = 360;
 const MAX_PUNTOS = 1024, MAX_BARRAS = 128;
@@ -59,7 +60,7 @@ export function texturaTarima(): THREE.Texture | null {
 /** Un cuadro (FaceDome visible). Dibuja las ondas a FPS si son la fuente elegida. */
 export function tickFuenteTarima(): void {
   const F = FUENTE_TARIMA;
-  if (F.eleccion.tipo !== "ondas" || DBG_RENDIMIENTO.SIS.ondasTarima === false) return;
+  if (F.eleccion.tipo !== "ondas" || DBG_RENDIMIENTO.SIS.ondasTarima === false) { soltarXYVisualizador(); return; }   // Z98: sin dibujo, sin analizadores extra
   const dt = RELOJ_EXP.dtExp;
   if (dt <= 0 && F.cuadros > 0) return;   // pausa central: quieto
   F.t += dt; F.acc += dt;
@@ -67,7 +68,12 @@ export function tickFuenteTarima(): void {
   F.acc = 0;
   const o = asegurarCanvas();
   if (!o) return;
-  dibujar(o.c, F.t);
+  // Z98: visualizador retro (cascada / XY) con DBG_ONDAS_TARIMA.VISUALIZADOR_NUEVO; los estilos de Z87 siguen igual
+  const D = DBG_ONDAS_TARIMA;
+  if (D.VISUALIZADOR_NUEVO && (D.ESTILO === "cascada" || D.ESTILO === "xy")) {
+    if (DBG_RENDIMIENTO.SIS.visualizadorTarima === false) return;   // benchmark: queda el último cuadro
+    dibujarVisualizador(o.c, ANCHO, ALTO, F.t);
+  } else { soltarXYVisualizador(); dibujar(o.c, F.t); }
   o.tex.needsUpdate = true;
   F.cuadros++;
 }
@@ -158,6 +164,7 @@ export function instalarFuenteTarima(): () => void {
 
 /** Al desmontar la tarima: libera el canvas de ondas. */
 export function liberarFuenteTarima(): void {
+  liberarVisualizador();   // Z98: analizadores del XY, capas, patrón e historial
   FUENTE_TARIMA.ondas?.tex.dispose();
   FUENTE_TARIMA.ondas = null;
 }

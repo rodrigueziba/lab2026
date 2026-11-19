@@ -23,12 +23,14 @@ export const FILAS_I: Record<FilaI, { v0: number; v1: number }> = {
   efectos: { v0: 0.030, v1: 0.211 },
   media:   { v0: V_MIN, v1: 0.015 },
 };
-const ANCHO_IMAGEN = 0.655;
+// Z98: la fila media pasa a IMAGEN | VISUALIZADOR | ESCENA (antes IMAGEN 0,655 | ESCENA 0,70); el panel no cambia de tamaño
+const ANCHO_IMAGEN = 0.60, ANCHO_VISUAL = 0.37;
 export const MODULOS_I: ModuloI[] = [
   { id: "display", titulo: "", etiqueta: "", fila: "display", rect: { u0: IZQ, u1: DER, v0: FILAS_I.display.v0, v1: FILAS_I.display.v1 }, on: null, punteado: false },
   { id: "efectos", titulo: "EFECTOS DEL DOMO", etiqueta: "SE TRANSMITE", fila: "efectos", rect: { u0: IZQ, u1: DER, v0: FILAS_I.efectos.v0, v1: FILAS_I.efectos.v1 }, on: "dom_fx_on", punteado: false },
   { id: "imagen", titulo: "IMAGEN", etiqueta: "SE TRANSMITE", fila: "media", rect: { u0: IZQ, u1: IZQ + ANCHO_IMAGEN, v0: FILAS_I.media.v0, v1: FILAS_I.media.v1 }, on: "wcam_on", punteado: false },
-  { id: "escena", titulo: "ESCENA", etiqueta: "SOLO PARA VOS", fila: "media", rect: { u0: IZQ + ANCHO_IMAGEN + GAP, u1: DER, v0: FILAS_I.media.v0, v1: FILAS_I.media.v1 }, on: null, punteado: true },
+  { id: "visual", titulo: "VISUALIZADOR", etiqueta: "SIN CÁMARA · SE TRANSMITE", fila: "media", rect: { u0: IZQ + ANCHO_IMAGEN + GAP, u1: IZQ + ANCHO_IMAGEN + GAP + ANCHO_VISUAL, v0: FILAS_I.media.v0, v1: FILAS_I.media.v1 }, on: null, punteado: false },
+  { id: "escena", titulo: "ESCENA", etiqueta: "SOLO PARA VOS", fila: "media", rect: { u0: IZQ + ANCHO_IMAGEN + GAP + ANCHO_VISUAL + GAP, u1: DER, v0: FILAS_I.media.v0, v1: FILAS_I.media.v1 }, on: null, punteado: true },
 ];
 export function moduloI(id: string): ModuloI { const m = MODULOS_I.find(x => x.id === id); if (!m) throw new Error(`módulo ${id}`); return m; }
 export function posOnI(m: ModuloI): { u: number; v: number } { return { u: m.rect.u1 - ON_DX, v: m.rect.v1 - BANDA_TITULO / 2 }; }
@@ -37,15 +39,18 @@ export function posOnI(m: ModuloI): { u: number; v: number } { return { u: m.rec
 export const PAD = { w: 0.100, d: 0.056, alto: 0.016 };
 export const ANCHO_PADS = 1.04;                       // los 7 pads; a la derecha AUTO, VELOC. y PSICO
 export const FADER_RAIL_I = 0.20, FADER_V_I = -0.155;
-export const FILA_ESCENA = { botones: -0.080, perillas: -0.215 };
+export const FILA_ESCENA = { botones: -0.066, perillas: -0.178 };   // Z98: 3 columnas × 2 filas (antes −0,080 / −0,215 en 4 columnas)
+export const FILA_VISUAL = { estilo: -0.084, paleta: -0.195 };      // Z98: ESTILO (+ VELOC. COLOR) y PALETA
 export const IND = { w: 0.070, d: 0.030 };             // lectura numérica de la luz (indicador CRT existente)
 
 export const EFECTOS_CORTOS = ["RGB", "PIXEL", "ONDA", "LÍNEAS", "ESPEJO", "ESTIRAR", "POSTER"];
 export const EFECTOS_LARGOS = ["SEPARACIÓN RGB", "PIXELADO", "ONDA", "LÍNEAS DE BARRIDO", "ESPEJO", "ESTIRAR", "POSTERIZAR"];
 
+/** Z98: ancho de columna de ESCENA y VISUALIZADOR (3 columnas cada uno). */
+function colModulo(id: "escena" | "visual"): number { const m = moduloI(id); return (m.rect.u1 - m.rect.u0 - 0.024) / 3; }
 function construir(): PosCtrlI[] {
   const L: PosCtrlI[] = [];
-  const ef = moduloI("efectos"), im = moduloI("imagen"), es = moduloI("escena");
+  const ef = moduloI("efectos"), im = moduloI("imagen"), es = moduloI("escena"), vi = moduloI("visual");
   const vE = (ef.rect.v0 + (ef.rect.v1 - BANDA_TITULO)) / 2 + 0.012;
   const slot = ANCHO_PADS / 7;
   for (let i = 0; i < 7; i++) {
@@ -61,15 +66,23 @@ function construir(): PosCtrlI[] {
   const wi = (im.rect.u1 - im.rect.u0) / 4;
   fad.forEach(([id, et, nl], i) => L.push({ id, u: im.rect.u0 + wi * (i + 0.5) + 0.018, v: FADER_V_I, forma: "normal", tipo: "slider", etiqueta: et, nombreLargo: `IMAGEN ${nl}`, modulo: "imagen" }));
   L.push({ id: "wcam_on", u: posOnI(im).u, v: posOnI(im).v, forma: "pastilla", tipo: "toggle", etiqueta: "ON", nombreLargo: "AJUSTES DE IMAGEN", modulo: "imagen" });
-  // ESCENA: LUZ −, lectura, LUZ +, LUZ EXTRA; INTENS. y FOV
-  const we = (es.rect.u1 - es.rect.u0) / 4;
-  L.push({ id: "dom_minus", u: es.rect.u0 + we * 0.5, v: FILA_ESCENA.botones, forma: "normal", tipo: "button", etiqueta: "LUZ -", nombreLargo: "LUZ DE ESCENA −", modulo: "escena" });
-  L.push({ id: "lights_ind", u: es.rect.u0 + we * 1.5, v: FILA_ESCENA.botones, forma: "indicador", tipo: "indicator", etiqueta: "NIVEL", nombreLargo: "NIVEL DE LUZ", modulo: "escena" });
-  L.push({ id: "dom_plus", u: es.rect.u0 + we * 2.5, v: FILA_ESCENA.botones, forma: "normal", tipo: "button", etiqueta: "LUZ +", nombreLargo: "LUZ DE ESCENA +", modulo: "escena" });
+  // ESCENA (Z98: 3 columnas × 2 filas): LUZ −, lectura, LUZ + / LUZ EXTRA, INTENS. y FOV
+  const we = colModulo("escena"), ue = (i: number) => es.rect.u0 + 0.012 + we * (i + 0.5);
+  L.push({ id: "dom_minus", u: ue(0), v: FILA_ESCENA.botones, forma: "normal", tipo: "button", etiqueta: "LUZ -", nombreLargo: "LUZ DE ESCENA −", modulo: "escena" });
+  L.push({ id: "lights_ind", u: ue(1), v: FILA_ESCENA.botones, forma: "indicador", tipo: "indicator", etiqueta: "NIVEL", nombreLargo: "NIVEL DE LUZ", modulo: "escena" });
+  L.push({ id: "dom_plus", u: ue(2), v: FILA_ESCENA.botones, forma: "normal", tipo: "button", etiqueta: "LUZ +", nombreLargo: "LUZ DE ESCENA +", modulo: "escena" });
   // Z97b: EXTRA pasa a ser una tecla con luz (on/off de UNA luz fija); antes sumaba una luz de 200 cd por pulsación
-  L.push({ id: "dom_star", u: es.rect.u0 + we * 3.5, v: FILA_ESCENA.botones, forma: "pad", tipo: "toggle", etiqueta: "EXTRA", nombreLargo: "LUZ EXTRA", modulo: "escena" });
-  L.push({ id: "dom_int", u: es.rect.u0 + we * 1.0, v: FILA_ESCENA.perillas, forma: "normal", tipo: "knob", etiqueta: "INTENS.", nombreLargo: "INTENSIDAD DE LUCES", modulo: "escena" });
-  L.push({ id: "cam_fov", u: es.rect.u0 + we * 3.0, v: FILA_ESCENA.perillas, forma: "normal", tipo: "knob", etiqueta: "FOV", nombreLargo: "CAMPO DE VISIÓN", modulo: "escena" });
+  L.push({ id: "dom_star", u: ue(0), v: FILA_ESCENA.perillas, forma: "pad", tipo: "toggle", etiqueta: "EXTRA", nombreLargo: "LUZ EXTRA", modulo: "escena" });
+  L.push({ id: "dom_int", u: ue(1), v: FILA_ESCENA.perillas, forma: "normal", tipo: "knob", etiqueta: "INTENS.", nombreLargo: "INTENSIDAD DE LUCES", modulo: "escena" });
+  L.push({ id: "cam_fov", u: ue(2), v: FILA_ESCENA.perillas, forma: "normal", tipo: "knob", etiqueta: "FOV", nombreLargo: "CAMPO DE VISIÓN", modulo: "escena" });
+  // Z98: VISUALIZADOR (sin cámara · se transmite): radios ESTILO y PALETA + VELOC. COLOR (IDENTIDAD)
+  const wv = colModulo("visual"), uv = (i: number) => vi.rect.u0 + 0.012 + wv * (i + 0.5);
+  L.push({ id: "vis_cascada", u: uv(0), v: FILA_VISUAL.estilo, forma: "pad", tipo: "toggle", etiqueta: "CASCADA", nombreLargo: "VISUALIZADOR CASCADA", modulo: "visual" });
+  L.push({ id: "vis_xy", u: uv(1), v: FILA_VISUAL.estilo, forma: "pad", tipo: "toggle", etiqueta: "XY", nombreLargo: "VISUALIZADOR XY", modulo: "visual" });
+  L.push({ id: "vis_color_v", u: uv(2), v: FILA_VISUAL.estilo, forma: "normal", tipo: "knob", etiqueta: "VEL. COLOR", nombreLargo: "VELOCIDAD DEL COLOR", modulo: "visual" });
+  L.push({ id: "vis_ambar", u: uv(0), v: FILA_VISUAL.paleta, forma: "pad", tipo: "toggle", etiqueta: "ÁMBAR", nombreLargo: "PALETA ÁMBAR", modulo: "visual" });
+  L.push({ id: "vis_fosforo", u: uv(1), v: FILA_VISUAL.paleta, forma: "pad", tipo: "toggle", etiqueta: "FÓSFORO", nombreLargo: "PALETA FÓSFORO", modulo: "visual" });
+  L.push({ id: "vis_identidad", u: uv(2), v: FILA_VISUAL.paleta, forma: "pad", tipo: "toggle", etiqueta: "IDENTIDAD", nombreLargo: "PALETA IDENTIDAD", modulo: "visual" });
   return L;
 }
 export const POSICIONES_I: PosCtrlI[] = construir();
@@ -82,7 +95,11 @@ export const RETIRADOS_I: Record<string, string> = {
   dom_nxt: "SIG.EFE.: lo reemplazan los 7 pads (además, la rotación de 5 s lo pisaba enseguida)",
   dom_speed: "VELOC. (0,2…4): STORE.dome.globalSpeed no tiene consumidor; la VELOC. nueva (dom_rot_s) es el intervalo de la rotación",
 };
-export const NUEVOS_I = ["dom_fx0", "dom_fx1", "dom_fx2", "dom_fx3", "dom_fx4", "dom_fx5", "dom_fx6", "dom_auto", "dom_rot_s", "dom_fx_on", "wcam_on"];
+export const NUEVOS_I = ["dom_fx0", "dom_fx1", "dom_fx2", "dom_fx3", "dom_fx4", "dom_fx5", "dom_fx6", "dom_auto", "dom_rot_s", "dom_fx_on", "wcam_on",
+  "vis_cascada", "vis_xy", "vis_color_v", "vis_ambar", "vis_fosforo", "vis_identidad"];   // Z98: VISUALIZADOR
+/** Z98: radios del VISUALIZADOR (id del pad → valor de DBG_ONDAS_TARIMA). */
+export const RADIO_ESTILO_I = [["vis_cascada", "cascada"], ["vis_xy", "xy"]] as const;
+export const RADIO_PALETA_I = [["vis_ambar", "ambar"], ["vis_fosforo", "fosforo"], ["vis_identidad", "identidad"]] as const;
 
 // ── textos ──
 export const ALTO_I: Record<FilaI, { titulo: number; etiqueta: number }> = {
@@ -132,7 +149,8 @@ export function textosI(escala: number): Texto[] {
     if (p.forma === "pastilla") continue;
     const m = moduloI(p.modulo), a = ALTO_I[m.fila];
     const r = radioCtrlI(p);
-    const colW = p.forma === "pad" ? ANCHO_PADS / 7 : p.tipo === "slider" ? (m.rect.u1 - m.rect.u0) / 4 : 0.16;
+    const colW = p.modulo === "escena" || p.modulo === "visual" ? colModulo(p.modulo)   // Z98: 3 columnas
+      : p.forma === "pad" ? ANCHO_PADS / 7 : p.tipo === "slider" ? (m.rect.u1 - m.rect.u0) / 4 : 0.16;
     const anchoLibre = Math.min(2 * Math.min(p.u - m.rect.u0, m.rect.u1 - p.u) - 0.006, colW - 0.012);
     const altoLibre = p.tipo === "slider" ? 0.02 : p.v - r - 0.008 - (m.rect.v0 + 0.003);
     const alto = Math.min(a.etiqueta * e, anchoLibre / (p.etiqueta.length * ANCHO_CHAR), altoLibre);

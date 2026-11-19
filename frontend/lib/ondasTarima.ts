@@ -83,4 +83,7 @@ export const PALETAS: Record<string, { trazo: string; brillo: string; fondo: str
   ambar: { trazo: "#FF9A1F", brillo: "#FFD08A", fondo: "#2A1400" },
   verde: { trazo: "#34F28A", brillo: "#C8FFD9", fondo: "#04170C" },
   cian:  { trazo: "#7FEFE6", brillo: "#E0FFFB", fondo: "#04161A" },
+  // Z98: nombres del visualizador nuevo, por si se usan con el dibujo de Z87 (IDENTIDAD cae en ámbar)
+  fosforo:   { trazo: "#33FF66", brillo: "#C8FFD2", fondo: "#04170C" },
+  identidad: { trazo: "#FF9A1F", brillo: "#FFD08A", fondo: "#2A1400" },
 };

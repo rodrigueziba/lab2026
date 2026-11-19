@@ -18,7 +18,7 @@ import {
   nextTrack, prevTrack, initAudio, loadPlaylist, playTrack,   // Z79: togglePlayPause ahora va por lib/playTarimaAcciones
   playUIClick,
 } from "@/lib/audioEngine";
-import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO } from "@/lib/debugConfig";
+import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_ONDAS_TARIMA } from "@/lib/debugConfig";
 // Z96: atril de sonido rediseñado ("SONIDO SN-40"): layout como datos (lib/atrilSonido.ts) y piezas (AtrilSonidoNuevo.tsx)
 import {
   POSICIONES as POS_SONIDO_NUEVO, FADER_RAIL, GRANDE_ESCALA, PLAY_W, PLAY_D, textoValor, camaraAtril, legibilidadMinima,
@@ -27,9 +27,11 @@ import {
 } from "@/lib/atrilSonido";
 import { DisplaySonido, VuSonido, PlacaFrenteSonido, buildSilkscreenSonido, mostrarEnDisplay, PlacaBarraSonido, MargenRotulos, escalaActual } from "./AtrilSonidoNuevo";
 // Z97: atril de imagen rediseñado ("IMAGEN IM-40")
-import { POSICIONES_I, legibilidadMinimaI, NOMBRE_EQUIPO_I, DESCRIPCION_EQUIPO_I, TEXTO_PLACA_I, LEYENDA_FILAS_I, type PosCtrlI } from "@/lib/atrilImagen";
+import { RADIO_ESTILO_I, RADIO_PALETA_I, POSICIONES_I, legibilidadMinimaI, NOMBRE_EQUIPO_I, DESCRIPCION_EQUIPO_I, TEXTO_PLACA_I, LEYENDA_FILAS_I, type PosCtrlI } from "@/lib/atrilImagen";
 import { DOMO_EFECTOS, fijarPad } from "@/lib/domoEfectos";
 import { LUZ_ESCENA, acotarNivel, pasoNivel, textoNivel } from "@/lib/lucesEscena";   // Z97b
+import { radio } from "@/lib/visualizadorTarima";                                      // Z98
+import { FUENTE_TARIMA } from "@/lib/fuenteVideoTarima";                               // Z98
 import { DisplayImagen, buildSilkscreenImagen, mostrarEnDisplayImagen, escalaActualImagen, ROTULOS_VERTICALES_I, ROTULOS_NUMEROS_I } from "./AtrilImagenNuevo";
 import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
 import { PLAY_TARIMA } from "@/lib/playTarima";                                              // Z79
@@ -880,6 +882,9 @@ function setCtrl(id: string, v: number, def: CtrlDef) {
     const p = _posImagen.get(id)!;
     if (def.type !== "button" || ctrlState[id] > 0.5) {
       mostrarEnDisplayImagen(id === "dom_rot_s" ? `${p.nombreLargo} ${ctrlState[id].toFixed(1)} s`
+        // Z98: pads del VISUALIZADOR: "VISUALIZADOR CASCADA" / "PALETA IDENTIDAD"; con cámara, aclara que se ve sin ella
+        : id.startsWith("vis_") && def.type === "toggle" ? (FUENTE_TARIMA.eleccion.tipo === "webcam" ? `${p.nombreLargo} · SE VE SIN CÁMARA` : p.nombreLargo)
+        : id === "vis_color_v" ? `${p.nombreLargo} ${ctrlState[id].toFixed(2)} CICLOS/S`
         : textoValor(p.nombreLargo, def.type as "button" | "toggle" | "slider" | "knob", ctrlState[id], def.min, def.max));
     }
   }
@@ -1147,8 +1152,29 @@ export const IMAGE_CONTROLS_EXTRA: CtrlDef[] = [
     onActivate: (v) => { DOMO_EFECTOS.rotS = v; marcar(); } },
   { id: "dom_fx_on", type: "toggle", label: "ON", px: 0, py: 0, min: 0, max: 1, initial: 1, onActivate: (v) => { DOMO_EFECTOS.on = v > 0.5; marcar(); } },
   { id: "wcam_on",   type: "toggle", label: "ON", px: 0, py: 0, min: 0, max: 1, initial: 1, onActivate: (v) => { DOMO_EFECTOS.imagenOn = v > 0.5; } },
+  // Z98: VISUALIZADOR (sin cámara · se transmite): radios de ESTILO y PALETA (uno encendido por grupo) y VEL. COLOR
+  { id: "vis_cascada",   type: "toggle", label: "CASCADA",   px: 0, py: 0, min: 0, max: 1, initial: 0, onActivate: () => elegirVis("estilo", "cascada") },
+  { id: "vis_xy",        type: "toggle", label: "XY",        px: 0, py: 0, min: 0, max: 1, initial: 0, onActivate: () => elegirVis("estilo", "xy") },
+  { id: "vis_ambar",     type: "toggle", label: "ÁMBAR",     px: 0, py: 0, min: 0, max: 1, initial: 0, onActivate: () => elegirVis("paleta", "ambar") },
+  { id: "vis_fosforo",   type: "toggle", label: "FÓSFORO",   px: 0, py: 0, min: 0, max: 1, initial: 0, onActivate: () => elegirVis("paleta", "fosforo") },
+  { id: "vis_identidad", type: "toggle", label: "IDENTIDAD", px: 0, py: 0, min: 0, max: 1, initial: 0, onActivate: () => elegirVis("paleta", "identidad") },
+  { id: "vis_color_v",   type: "knob",   label: "VEL. COLOR", px: 0, py: 0, min: 0, max: 0.6, initial: DBG_ONDAS_TARIMA.COLOR_VELOC,
+    onActivate: (v) => { DBG_ONDAS_TARIMA.COLOR_VELOC = v; } },
 ];
+/** Z98: elige estilo o paleta del visualizador y deja encendido un solo pad por grupo (también si se aprieta el ya elegido). */
+function elegirVis(grupo: "estilo" | "paleta", valor: string): void {
+  if (grupo === "estilo") DBG_ONDAS_TARIMA.ESTILO = valor; else DBG_ONDAS_TARIMA.PALETA = valor;
+  sincronizarVis();
+}
+const _radioE = [0, 0], _radioP = [0, 0, 0];
+/** Pads del VISUALIZADOR según DBG_ONDAS_TARIMA (al cargar, al tocar un pad y cuando cambia desde el menú de debug). */
+function sincronizarVis(): void {
+  radio(RADIO_ESTILO_I.map(r => r[1]), DBG_ONDAS_TARIMA.ESTILO, _radioE).forEach((v, i) => { ctrlState[RADIO_ESTILO_I[i][0]] = v; });
+  radio(RADIO_PALETA_I.map(r => r[1]), DBG_ONDAS_TARIMA.PALETA, _radioP).forEach((v, i) => { ctrlState[RADIO_PALETA_I[i][0]] = v; });
+  ctrlState.vis_color_v = DBG_ONDAS_TARIMA.COLOR_VELOC;
+}
 IMAGE_CONTROLS_EXTRA.forEach(c => { ctrlState[c.id] = c.initial; });
+sincronizarVis();   // Z98
 DOMO_EFECTOS.mascara = DBG_ATRIL_VIDEO.PADS_INICIO & 0x7f;
 DOMO_EFECTOS.rotS = DBG_ATRIL_VIDEO.VELOC_DEFECTO_S;
 /** Layout nuevo del atril de imagen: los controles que siguen (mismo id, acción y rango) + los nuevos, en otra posición. */
@@ -2683,6 +2709,7 @@ export default function LecternSystem() {
     // Z97b: "Restaurar luces del domo" y checkpoints: la perilla INTENS. y la tecla EXTRA vuelven con los valores
     const onLuces = () => { ctrlState.dom_int = STORE.lights.globalIntensity; ctrlState.dom_star = 0; };
     window.addEventListener("alight:luces-restauradas", onLuces);
+    window.addEventListener("alight:visualizador-cambio", sincronizarVis);   // Z98: estilo y paleta cambiados desde el menú
     // Z96b: con ETIQUETA_AUTO_ASPECTO, si al cambiar el tamaño de la ventana cambia la escala efectiva, se rehace la serigrafía
     let escPrev = escalaActual(), escPrevI = escalaActualImagen();
     const onResize = () => {
@@ -2690,7 +2717,7 @@ export default function LecternSystem() {
       if (Math.abs(e - escPrev) > 0.005 || Math.abs(ei - escPrevI) > 0.005) { escPrev = e; escPrevI = ei; setSilkV(v => v + 1); }
     };
     window.addEventListener("resize", onResize);
-    return () => { window.removeEventListener("alight:atril-sonido-cambio", on); window.removeEventListener("alight:atril-imagen-cambio", on); window.removeEventListener("alight:luces-restauradas", onLuces); window.removeEventListener("resize", onResize); };
+    return () => { window.removeEventListener("alight:atril-sonido-cambio", on); window.removeEventListener("alight:atril-imagen-cambio", on); window.removeEventListener("alight:luces-restauradas", onLuces); window.removeEventListener("alight:visualizador-cambio", sincronizarVis); window.removeEventListener("resize", onResize); };
   }, []);
 
   // I1: flip lectern orientation (debug)

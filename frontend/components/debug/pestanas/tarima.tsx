@@ -10,6 +10,7 @@ import { reintentarCamara, textoEstadoFuente } from "@/lib/fuenteVideoTarima";  
 import { setLecternRetro, syncRetroUniforms } from "@/lib/retro/lecternMaterials";
 import { STORE, storeNotify } from "@/lib/alightStore";
 import { LUZ_ESCENA } from "@/lib/lucesEscena";                       // Z97b
+import { textoCronoVis } from "@/lib/visualizadorTarimaDibujo";        // Z98
 import { restaurarLucesEscena } from "@/lib/lucesEscenaAcciones";    // Z97b
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
 import { useDbg } from "../contexto";
@@ -462,12 +463,13 @@ export function SecCajaRitmosZ80() {
 export function SecOndasTarimaZ87() {
   // Z87: fuente de video de la tarima (webcam u ondas del analizador maestro) para las proyecciones del domo de caras.
   const O = DBG_ONDAS_TARIMA;
+  const avisarVis = () => window.dispatchEvent(new CustomEvent("alight:visualizador-cambio"));   // Z98: los pads del atril siguen al menú
   const [, setTick] = useState(0);
   useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
   const toca = () => setTick(t => (t + 1) % 1e6);
   return (
     <>
-          <span style={LABEL}>Ondas de la tarima Z87 <span style={NOTE}>(live · reemplazo de la webcam en el domo)</span></span>
+          <span style={LABEL}>Ondas de la tarima Z87 <span style={NOTE}>(live · reemplazo de la webcam en el domo · Z98: visualizador cascada / XY, paletas ámbar / fósforo / identidad)</span></span>
           <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoFuente()}</span></div>
           <div style={ROW}>
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); O.MODO = "ondas"; toca(); }}>Forzar ondas</button>
@@ -475,10 +477,28 @@ export function SecOndasTarimaZ87() {
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); O.MODO = "auto"; toca(); }}>Auto</button>
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); reintentarCamara(); toca(); }}>Reintentar permiso</button>
           </div>
-          {([["MODO", ["auto", "webcam", "ondas"]], ["ESTILO", ["onda", "espectro", "ambos"]], ["PALETA", ["ambar", "verde", "cian"]]] as const).map(([k, ops]) => (
+          {/* Z98: cascada / xy y ámbar / fósforo / identidad (visualizador nuevo); los de Z87 siguen */}
+          {([["MODO", ["auto", "webcam", "ondas"]], ["ESTILO", ["cascada", "xy", "onda", "espectro", "ambos"]], ["PALETA", ["ambar", "fosforo", "identidad", "verde", "cian"]],
+            ["XY_MODO", ["auto", "estereo", "retardo"]]] as const).map(([k, ops]) => (
             <div key={k} style={ROW}>
               <span>{k}</span>
-              {ops.map(v => <button key={v} style={{ ...INPUT, opacity: O[k] === v ? 1 : 0.5 }} onClick={() => { O[k] = v; toca(); }}>{v}</button>)}
+              {ops.map(v => <button key={v} style={{ ...INPUT, opacity: O[k] === v ? 1 : 0.5 }} onClick={() => { O[k] = v; avisarVis(); toca(); }}>{v}</button>)}
+            </div>
+          ))}
+          <div style={{ ...ROW, ...NOTE }}><span>Z98 cronómetro del dibujo: {textoCronoVis()}</span></div>
+          {([["VISUALIZADOR_NUEVO", "off = dibujo de Z87 tal cual"], ["ROTULO", "rótulo de esquina CASCADA · ÁMBAR"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); O[k] = !O[k]; toca(); }}>{O[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([["LINEAS", 4, 64, 1, "líneas de la cascada"], ["COLUMNAS", 16, 256, 8, "frecuencias por línea"], ["SUBIDA", 0.05, 1, 0.05, "suavizado: subida"],
+            ["BAJADA", 0.01, 1, 0.01, "suavizado: bajada"], ["FREC_MIN", 0.001, 0.05, 0.001, "inicio del eje"], ["FREC_SUAVE", 0, 1, 0.05, "0 lineal · 1 log"],
+            ["XY_RETARDO", 1, 32, 1, "muestras (mono)"], ["XY_PUNTOS", 64, 2048, 32, "puntos"], ["XY_PERSISTENCIA", 0, 0.97, 0.01, "estela XY"],
+            ["COLOR_VELOC", 0, 0.6, 0.01, "ciclos/s (IDENTIDAD)"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{O[k].toFixed(st < 0.01 ? 3 : st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={O[k]} onChange={ev => { O[k] = parseFloat(ev.target.value); avisarVis(); toca(); }} />
             </div>
           ))}
           {([["FPS", 5, 60, 1, "cuadros/s"], ["GROSOR", 1, 10, 0.5, "px"], ["PERSISTENCIA", 0, 0.97, 0.01, "estela"], ["SENSIBILIDAD", 0.2, 10, 0.1, "×"], ["PUNTOS", 32, 1024, 16, ""], ["BARRAS", 8, 128, 4, ""]] as const).map(([k, mn, mx, st, nota]) => (

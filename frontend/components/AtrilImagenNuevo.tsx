@@ -18,6 +18,7 @@ import {
   rotulosFilaI, numerosFilaMargenI,
 } from "@/lib/atrilImagen";
 import { BANDA_TITULO, DISPLAY_PAD, DISPLAY_INTERLINEA, RADIO_MARCAS_IN, RADIO_MARCAS_OUT, HUELLA, ESCALA_FADER, escalaEfectiva, tocaActualizar } from "@/lib/atrilSonido";
+import { FRANJAS_PLACA } from "@/lib/marca";   // Z98
 
 export const DISPLAY_IMAGEN = { texto: "", hasta: 0, version: 0 };
 export function mostrarEnDisplayImagen(texto: string): void {
@@ -34,7 +35,7 @@ export const ROTULOS_VERTICALES_I = rotulosFilaI();
 export const ROTULOS_NUMEROS_I = numerosFilaMargenI();
 
 const CREMA = "rgba(241,239,230,";
-const FRANJAS = ["#E5322B", "#F0742A", "#F4B62E", "#2E9E5B", "#1F7FB8"];
+const FRANJAS = FRANJAS_PLACA;   // Z98: fuente única en lib/marca.ts
 
 // ── visibilidad (objetos de módulo) ──
 const _fr = new THREE.Frustum(), _m4 = new THREE.Matrix4(), _esf = new THREE.Sphere(new THREE.Vector3(), 0.9);

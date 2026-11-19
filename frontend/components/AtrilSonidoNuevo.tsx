@@ -18,7 +18,7 @@ import { STORE } from "@/lib/alightStore";
 import { PLAY_TARIMA } from "@/lib/playTarima";
 import { getAudioElement } from "@/lib/audioEngine";
 import { analizadorMaestro } from "@/lib/audio/nucleo";
-import { NOMBRE_EMPRESA_MAYUS } from "@/lib/marca";
+import { NOMBRE_EMPRESA_MAYUS, FRANJAS_PLACA } from "@/lib/marca";
 import {
   MODULOS, POSICIONES, VU, FADER_RAIL, FADER_V, GRANDE_ESCALA, BANDA_TITULO, BANDA_TITULO_TRANSPORTE,
   DISPLAY_PAD, DISPLAY_INTERLINEA, RADIO_MARCAS_IN, RADIO_MARCAS_OUT, altosDisplay, textos,
@@ -54,7 +54,7 @@ function enPantalla(obj: THREE.Object3D, cam: THREE.Camera): boolean {
 }
 
 const CREMA = "rgba(241,239,230,";
-const FRANJAS = ["#E5322B", "#F0742A", "#F4B62E", "#2E9E5B", "#1F7FB8"];
+const FRANJAS = FRANJAS_PLACA;   // Z98: fuente única en lib/marca.ts
 
 // ── serigrafía ──
 export async function buildSilkscreenSonido(dims: { CW: number; CD: number; KNOB_SKIRT_R: number; THUMB_W: number }): Promise<THREE.CanvasTexture> {

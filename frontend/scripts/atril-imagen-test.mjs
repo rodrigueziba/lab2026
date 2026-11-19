@@ -40,7 +40,7 @@ for (const o of ORIG) {
 }
 check(I.POSICIONES_I.every(p => ORIG.some(o => o.id === p.id) || I.NUEVOS_I.includes(p.id)), 'cada control nuevo es un id original o figura en NUEVOS_I');
 check(I.NUEVOS_I.every(id => !!I.posI(id)) && I.NUEVOS_I.every(id => new RegExp(`id: [\`"]${id.replace(/\d$/, '\\$\\{i\\}')}|id: "${id}"`).test(LS)),
-  'los 11 controles nuevos tienen posición y definición en IMAGE_CONTROLS_EXTRA');
+  `los ${I.NUEVOS_I.length} controles nuevos (Z97 + Z98 VISUALIZADOR) tienen posición y definición en IMAGE_CONTROLS_EXTRA`);
 check(/IMAGE_CONTROLS\.find\(c => c\.id === p\.id\) \?\? IMAGE_CONTROLS_EXTRA\.find/.test(LS) && /return \{ \.\.\.d, px: p\.u, py: p\.v, label: p\.etiqueta/.test(LS),
   'IMAGE_CONTROLS_NUEVO copia cada definición original (mismo onActivate y rango): cambian posición, etiqueta y forma');
 check(I.posI('cam_fov').tipo === 'knob', 'FOV pasa de fader a perilla (mismo id cam_fov, mismo rango)');

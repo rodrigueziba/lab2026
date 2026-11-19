@@ -1093,6 +1093,7 @@ export const DBG_RENDIMIENTO = {
     ritmos: true, videoDomo: true,   // Z80 caja de ritmos · Z83 video en el domo
     tiempoDetenido: true,            // Z86: historial, estela y efecto del tiempo detenido
     ondasTarima: true,               // Z87: dibujo del canvas de ondas de la tarima
+    visualizadorTarima: true,        // Z98: visualizador retro (cascada / XY) del canvas de la tarima (false = queda el último cuadro)
     transmisionTarima: true,         // Z92: subida a LiveKit (false = pauseUpstream: sin codificar ni enviar)
     videoTransmitidoTarima: true,    // Z94: pase plano del domo + copia al canvas transmisible (false = queda el último cuadro)
     recepcionTarima:   true,         // Z93: recepción en SILLAS (false = des-suscribe audio y video sin desconectar)
@@ -1725,11 +1726,27 @@ export const DBG_LIVEKIT = {
 export const DBG_ONDAS_TARIMA = {
   MODO:          "auto" as string,     // "auto" (sin webcam → ondas) | "webcam" | "ondas" (forzar) — live
   FPS:           30,                   // cuadros por segundo del canvas de ondas — live
-  ESTILO:        "ambos" as string,    // "onda" | "espectro" | "ambos" — live
-  PALETA:        "ambar" as string,    // "ambar" | "verde" | "cian" — live
+  // Z98: visualizador nuevo: "cascada" | "xy" (los de Z87 "onda" | "espectro" | "ambos" siguen funcionando) — live
+  ESTILO:        "cascada" as string,
+  // Z98: "ambar" | "fosforo" | "identidad" (franjas de las placas, lib/marca.ts); Z87: "verde" | "cian" — live
+  PALETA:        "ambar" as string,
   GROSOR:        3,                    // px del trazo (canvas de 640×360) — live
   PERSISTENCIA:  0.82,                 // estela: cuánto queda del cuadro anterior (0 = sin estela) — live
   SENSIBILIDAD:  2.5,                  // ganancia sobre el analizador maestro — live
   PUNTOS:        256,                  // puntos de la forma de onda — live
   BARRAS:        48,                   // barras del espectro — live
+  // ── Z98: visualizador retro (lib/visualizadorTarima.ts y visualizadorTarimaDibujo.ts) ──
+  VISUALIZADOR_NUEVO: true,            // false = el dibujo de Z87 tal cual (onda / espectro) — live
+  LINEAS:        24,                   // CASCADA: líneas del historial (vale al cambiar: rehace el buffer) — live
+  COLUMNAS:      96,                   // CASCADA: puntos por línea (frecuencias) — live
+  SUBIDA:        0.6,                  // suavizado: cuánto sube por cuadro hacia un valor mayor (0…1) — live
+  BAJADA:        0.12,                 // suavizado: cuánto baja por cuadro (lento) — live
+  FREC_MIN:      0.006,                // fracción del espectro donde empieza el eje (≈ 140 Hz con fft 2048 a 48 kHz) — live
+  FREC_SUAVE:    0.75,                 // 0 = eje lineal · 1 = logarítmico — live
+  XY_MODO:       "auto" as string,     // "auto" (estéreo si los canales difieren; si no, retardo) | "estereo" | "retardo" — live
+  XY_RETARDO:    10,                   // muestras de retardo para Y en mono (8…12) — live
+  XY_PUNTOS:     512,                  // puntos de la figura — live
+  XY_PERSISTENCIA: 0.86,               // estela de fósforo del XY (0 = sin estela) — live
+  COLOR_VELOC:   0.15,                 // IDENTIDAD: ciclos por segundo de los colores sobre las ondas — live
+  ROTULO:        true,                 // rótulo de esquina "CASCADA · ÁMBAR" — live
 };

@@ -147,6 +147,7 @@ export const SISTEMAS = [
   { id: "ritmos",     etiqueta: "caja de ritmos",   como: "CajaRitmos (Z80) dentro de un grupo invisible (con su SpotLight: recompila)" },
   { id: "videoDomo",  etiqueta: "video en el domo", como: "Z83: uRemoteMix forzado a 0 (la rama de la proyección y la estática no se ejecuta; no se sube la textura)" },
   { id: "ondasTarima", etiqueta: "ondas de la tarima", como: "Z87: el canvas de ondas no se redibuja (queda el último cuadro; sin subida de textura)" },
+  { id: "visualizadorTarima", etiqueta: "visualizador de la tarima", como: "Z98: cascada / XY sin cámara: no se redibuja (queda el último cuadro; sin subida de textura). El cronómetro por estilo está en Ondas de la tarima" },
   { id: "transmisionTarima", etiqueta: "transmisión de la tarima", como: "Z92: pauseUpstream de las pistas de LiveKit (sin codificar ni enviar; sigue conectada). Sin transmisión activa no cambia nada" },
   { id: "videoTransmitidoTarima", etiqueta: "video transmitido (procesado)", como: "Z94: no dibuja el pase plano del domo ni lo copia al canvas transmisible (se publica el último cuadro). Sin transmisión activa no cambia nada" },
   { id: "recepcionTarima", etiqueta: "recepción de la tarima", como: "Z93: des-suscribe el audio y el video de LiveKit sin desconectar (sin decodificar ni subir la textura; el domo muestra estática). Sin sesión recibida no cambia nada" },
