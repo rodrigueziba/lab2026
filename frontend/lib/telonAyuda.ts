@@ -131,3 +131,77 @@ export function textoEstadoAyuda(e: EstadoAyuda, c: CfgAyuda): string {
   if (e.fase === "cancelada") return "cancelada por movimiento";
   return "terminada";
 }
+
+// ── Z104b: ubicación y tamaño (puro). La TINTA de la ayuda queda BAJAR × alto del bloque debajo de la TINTA del crédito,
+// sea cual sea TAMANO (el plano se corre según dónde empieza la tinta dentro de la celda). Después se limita el tamaño:
+// (1) la tinta no baja de max(piso + MARGEN_ABAJO_M, borde inferior de la zona iluminada); (2) la fila (4 celdas en
+// "acumulado", 1 en "uno") no supera ANCHO_MAX_FILA × el ancho iluminado a la altura de la tinta (el más angosto entre
+// arriba y abajo). Lo que se reduce se informa en factorAlto, factorAncho y factor (1 = sin reducir).
+export interface ReflectorAyuda { atrasM: number; altoM: number; objetivoY: number; angulo: number; penumbra: number }
+export interface CfgLayoutAyuda { TAMANO: number; BAJAR: number; MODO: string; ANCHO_MAX_FILA: number; MARGEN_ABAJO_M: number }
+export interface EntradaLayoutAyuda {
+  centroY: number;          // y del centro del bloque del título (m)
+  offsetX: number;          // corrimiento horizontal del bloque respecto del eje del reflector (m)
+  altoBloque: number;       // alto del bloque del título (m)
+  creditoAbajoRel: number;  // borde inferior de la tinta del crédito, bajo el centro del bloque / alto del bloque (0,5 sin crédito)
+  tintaArriba: number;      // dónde empieza la tinta en la celda, desde arriba (fracción del alto de la celda)
+  tintaAbajo: number;       // dónde termina la tinta, desde arriba
+  aspectoCelda: number;     // ancho / alto de una celda
+  pisoM: number;            // y del borde inferior del telón (m)
+  reflector: ReflectorAyuda;
+}
+export interface LayoutAyuda {
+  y: number; hCelda: number; wCelda: number;                 // centro del plano y tamaño de una celda (m)
+  creditoAbajoY: number; tintaArribaY: number; tintaAbajoY: number; limiteAbajoY: number;
+  anchoFila: number; anchoUtil: number;                       // ancho de la fila completa del modo y ancho permitido (m)
+  factorAlto: number; factorAncho: number; factor: number;
+}
+export function crearLayoutAyuda(): LayoutAyuda {
+  return { y: 0, hCelda: 0, wCelda: 0, creditoAbajoY: 0, tintaArribaY: 0, tintaAbajoY: 0, limiteAbajoY: 0, anchoFila: 0, anchoUtil: 0, factorAlto: 1, factorAncho: 1, factor: 1 };
+}
+/** Semiángulo del haz a media intensidad (el mismo criterio que anchoZonaIluminada del texto del telón). */
+function semiangulo(r: ReflectorAyuda): number {
+  const cosExt = Math.cos(r.angulo), cosInt = Math.cos(r.angulo * (1 - sat(r.penumbra)));
+  return Math.acos(Math.min(1, (cosExt + cosInt) / 2));
+}
+/** Ancho (m) de la zona iluminada sobre el telón a la altura y (0 si el haz no llega). En y = objetivoY coincide con
+ *  anchoZonaIluminada. El haz es un cono desde (0, altoM, atrasM) hacia (0, objetivoY, 0); el telón es el plano z = 0. */
+export function anchoIluminadoEn(y: number, r: ReflectorAyuda): number {
+  const ay = r.objetivoY - r.altoM, az = -r.atrasM, n = Math.hypot(ay, az) || 1;
+  const vy = y - r.altoM, vz = -r.atrasM, dot = (vy * ay + vz * az) / n;
+  if (!(dot > 0)) return 0;
+  const c = Math.cos(semiangulo(r));
+  const x2 = (dot * dot) / (c * c) - vy * vy - vz * vz;
+  return x2 > 0 ? 2 * Math.sqrt(x2) : 0;
+}
+/** y (m) del borde inferior de la zona iluminada (−Infinity si el haz no tiene borde inferior sobre el telón). */
+export function bordeInferiorIluminado(r: ReflectorAyuda): number {
+  const a = Math.atan2(r.altoM - r.objetivoY, r.atrasM) + semiangulo(r);
+  return a >= Math.PI / 2 - 1e-6 ? -Infinity : r.altoM - r.atrasM * Math.tan(a);
+}
+export function layoutAyuda(c: CfgLayoutAyuda, en: EntradaLayoutAyuda, out: LayoutAyuda): LayoutAyuda {
+  const hB = Math.max(1e-4, fin(en.altoBloque, 1)), asp = Math.max(0.1, fin(en.aspectoCelda, 2));
+  const arriba = sat(fin(en.tintaArriba, 0.19)), abajo = Math.max(arriba + 0.01, Math.min(1, fin(en.tintaAbajo, 0.81))), rango = abajo - arriba;
+  out.creditoAbajoY = en.centroY - hB * Math.max(0, fin(en.creditoAbajoRel, 0.5));
+  out.tintaArribaY = out.creditoAbajoY - hB * Math.max(0, fin(c.BAJAR, 0.41));
+  out.limiteAbajoY = Math.max(fin(en.pisoM, 0) + Math.max(0, fin(c.MARGEN_ABAJO_M, 0.3)), bordeInferiorIluminado(en.reflector));
+  const h0 = Math.max(0.05, fin(c.TAMANO, 0.72)) * hB;
+  let h = h0;
+  const hMax = (out.tintaArribaY - out.limiteAbajoY) / rango;
+  out.factorAlto = h > hMax ? Math.max(0, hMax) / h : 1;
+  h *= out.factorAlto;
+  const celdas = c.MODO === "acumulado" ? 4 : 1, tope = Math.max(0.1, Math.min(1, fin(c.ANCHO_MAX_FILA, 0.9)));
+  out.factorAncho = 1;
+  for (let i = 0; i < 2; i++) {   // el ancho útil depende de la altura de la tinta, que depende del tamaño: dos vueltas alcanzan
+    const yAbajo = out.tintaArribaY - rango * h;
+    const util = tope * Math.min(anchoIluminadoEn(out.tintaArribaY, en.reflector), anchoIluminadoEn(yAbajo, en.reflector)) - 2 * Math.abs(fin(en.offsetX, 0));
+    out.anchoUtil = Math.max(0, util);
+    const w = celdas * asp * h;
+    if (w > out.anchoUtil) { const f = w > 0 ? out.anchoUtil / w : 1; h *= f; out.factorAncho *= f; }
+  }
+  out.hCelda = h; out.wCelda = h * asp; out.anchoFila = celdas * out.wCelda;
+  out.tintaAbajoY = out.tintaArribaY - rango * h;
+  out.factor = h0 > 0 ? h / h0 : 1;
+  out.y = out.tintaArribaY + arriba * h - h / 2;   // centro del plano: su borde superior queda arriba × h sobre la tinta
+  return out;
+}

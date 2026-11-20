@@ -1257,9 +1257,13 @@ export const DBG_TELON_AYUDA = {
   MODO:          "uno" as string,   // "uno" (reemplaza en el mismo lugar) | "acumulado" (se suman en una fila) — live
   CUENTA_MIRAR:  false,    // true = girar la cámara también cuenta como moverse — live
   REARMAR:       false,    // true = tras moverse, vuelve a empezar después de otros ESPERA_S quieto — live
-  TAMANO:        0.32,     // alto de una indicación / alto del bloque del título — live
+  TAMANO:        0.72,     // alto de una indicación / alto del bloque del título (Z104b: 0,32 → 0,72, ×2,25) — live
   OPACIDAD:      0.85,     // como el texto del telón — live
-  BAJAR:         0.35,     // separación entre el bloque (y su crédito) y la ayuda / alto del bloque — live
+  BAJAR:         0.41,     // Z104b: separación entre la TINTA del crédito y la TINTA de la ayuda / alto del bloque (antes 0,35 medido
+                           // desde el borde de la celda: 0,35 + 0,19 × 0,32 ≈ 0,41 deja la misma separación visible y ya no crece con TAMANO) — live
+  ANCHO_MAX_FILA: 0.9,     // Z104b: la fila (4 celdas en "acumulado", 1 en "uno") no supera esta fracción del ancho iluminado a su altura — live
+  MARGEN_ABAJO_M: 0.3,     // Z104b: la tinta no baja de max(piso + esto, borde inferior de la zona iluminada) (m) — live
+  RES_CELDA_H:   384,      // Z104b: alto de cada celda de la textura en px (ancho = 2×; 4 celdas en fila). Antes 256. Tope 512 — recrea la textura
   UMBRAL_MOV_M:  0.02,     // cuánto tiene que cambiar la posición en un cuadro para contar como movimiento (m) — live
   UMBRAL_MIRAR:  0.002,    // cuánto tiene que girar la cámara en un cuadro para contar como mirar (cuaternión) — live
   ENTRADA_S:     0.6,      // fundido de entrada (después del parpadeo) — live

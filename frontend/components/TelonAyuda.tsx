@@ -16,9 +16,10 @@ import { INTERACT_STATE } from "@/lib/alightStore";
 import { LUZ_STATE } from "@/lib/caminoLuz";
 import { CK_STATE } from "@/lib/checkpoints";
 import { DIALOGO_STATE } from "@/lib/dialogo/dialogoEstado";
-import { crearEstadoAyuda, avanzarAyuda, reiniciarAyuda, dispararAyuda, TEXTO_ACCESIBLE_AYUDA, type EntradaAyuda } from "@/lib/telonAyuda";
+import { crearEstadoAyuda, avanzarAyuda, reiniciarAyuda, dispararAyuda, TEXTO_ACCESIBLE_AYUDA, type EntradaAyuda,
+  crearLayoutAyuda, layoutAyuda, type EntradaLayoutAyuda } from "@/lib/telonAyuda";
 import { anchoZonaIluminada } from "@/lib/telonTexto/lineaTiempo";
-import { crearTexturaAyuda, CELDA_W, CELDA_H, N_CELDAS } from "@/lib/telonTexto/texturaAyuda";
+import { crearTexturaAyuda, resolucionCelda, ASPECTO_CELDA, N_CELDAS, TINTA_AYUDA_DEF, type TexturaAyuda } from "@/lib/telonTexto/texturaAyuda";
 import { TAM_REF } from "@/lib/telonTexto/layoutTexto";
 import { anton } from "@/app/alight/fuentes";
 import { REFLECTOR, VERT_TELON, TELON_TEXTO_DIAG } from "./TelonTexto";
@@ -27,6 +28,10 @@ import { REFLECTOR, VERT_TELON, TELON_TEXTO_DIAG } from "./TelonTexto";
 export const AYUDA = crearEstadoAyuda();
 const _entrada: EntradaAyuda = { presente: false, pausado: false, movio: false, miro: false };
 const INICIO_DEMORA_S = 0.3;
+/** Z104b: ubicación y tamaño del último cuadro (lo lee el menú: factor de reducción, ancho de la fila, etc.). */
+export const AYUDA_LAYOUT = crearLayoutAyuda();
+const _lay: EntradaLayoutAyuda = { centroY: 0, offsetX: 0, altoBloque: 1, creditoAbajoRel: 0.5, tintaArriba: TINTA_AYUDA_DEF.arriba,
+  tintaAbajo: TINTA_AYUDA_DEF.abajo, aspectoCelda: ASPECTO_CELDA, pisoM: 0, reflector: REFLECTOR };
 
 const FRAG = /* glsl */`
   uniform sampler2D uMapa;
@@ -61,7 +66,7 @@ const UNIFORMS = {
 export default function TelonAyuda() {
   const { gl, camera } = useThree();
   const meshRef = useRef<THREE.Mesh>(null);
-  const texRef = useRef<THREE.CanvasTexture | null>(null);
+  const texRef = useRef<TexturaAyuda | null>(null);
   const familia = useRef("");
   const tecla = useRef(false);
   const prev = useRef({ x: NaN, z: NaN, qx: 0, qy: 0, qz: 0, qw: 1, tinte: "" });
@@ -92,7 +97,7 @@ export default function TelonAyuda() {
       window.removeEventListener("alight:telon-ayuda-probar", onProbar);
       window.removeEventListener("alight:telon-ayuda-reiniciar", onReiniciar);
       div.remove(); vivo.current = null;
-      texRef.current?.dispose(); texRef.current = null; UNIFORMS.uMapa.value = null;
+      texRef.current?.tex.dispose(); texRef.current = null; UNIFORMS.uMapa.value = null;
       if (AYUDA.fase !== "cancelada") AYUDA.fase = "terminada";   // cruzó el telón: no se muestra más en esta visita
       AYUDA.indicacion = -1; AYUDA.alfa = 0; AYUDA.alfaResto = 0;
     };
@@ -102,10 +107,12 @@ export default function TelonAyuda() {
     const mesh = meshRef.current;
     if (!mesh) return;
     const D = DBG_TELON_AYUDA, T = DBG_TELON_TEXTO;
-    // textura: una vez, con la fuente lista (mismo borde suave relativo que el título)
-    if (!texRef.current && familia.current) {
-      texRef.current = crearTexturaAyuda(familia.current, T.BLUR_PX / Math.max(1e-3, TAM_REF), gl.capabilities.getMaxAnisotropy());
-      UNIFORMS.uMapa.value = texRef.current;
+    // textura: una vez, con la fuente lista (mismo borde suave relativo que el título); Z104b: se recrea solo si cambia
+    // RES_CELDA_H (el borde suave y los trazos son proporcionales al alto de la celda)
+    if (familia.current && (!texRef.current || texRef.current.resH !== resolucionCelda(D.RES_CELDA_H))) {
+      texRef.current?.tex.dispose();
+      texRef.current = crearTexturaAyuda(familia.current, T.BLUR_PX / Math.max(1e-3, TAM_REF), gl.capabilities.getMaxAnisotropy(), D.RES_CELDA_H);
+      UNIFORMS.uMapa.value = texRef.current.tex;
     }
     // ¿se movió? teclas W A S D o cambio de posición; ¿miró? giro de la cámara (solo con CUENTA_MIRAR)
     const p = prev.current, q = camera.quaternion;
@@ -126,16 +133,19 @@ export default function TelonAyuda() {
     mesh.visible = visible;
     if (!visible) return;
 
-    // ubicación: debajo del bloque del título y de su crédito, centrada (mismas cuentas que TelonTexto)
+    // ubicación: debajo del bloque del título y de su crédito, centrada (mismas cuentas que TelonTexto). Z104b: se mide
+    // de tinta a tinta (la del crédito real si ya está medida) y el tamaño se limita a la zona iluminada (lib/telonAyuda.ts)
     const A = anclarTelon(), rx = -A.fz, rz = A.fx;
     const zona = anchoZonaIluminada(Math.hypot(REFLECTOR.atrasM, REFLECTOR.altoM - REFLECTOR.objetivoY), REFLECTOR.angulo, REFLECTOR.penumbra);
     const anchoBloque = Math.max(0.1, T.TAMANO) * zona, altoBloque = anchoBloque / aspecto;
-    const hCelda = Math.max(0.05, D.TAMANO) * altoBloque, wCelda = hCelda * (CELDA_W / CELDA_H);
-    const credito = T.CREDITO_ACTIVO ? T.CREDITO_MARGEN + T.CREDITO_TAMANO : 0;
-    const y = REFLECTOR.objetivoY + T.OFFSET_Y_M - altoBloque * (0.5 + credito + Math.max(0, D.BAJAR)) - hCelda / 2;
+    const credMedido = TELON_TEXTO_DIAG.creditoListo && TELON_TEXTO_DIAG.creditoAltoTintaM > 0 ? TELON_TEXTO_DIAG.creditoAltoTintaM / altoBloque : T.CREDITO_TAMANO;
+    _lay.centroY = REFLECTOR.objetivoY + T.OFFSET_Y_M; _lay.offsetX = T.OFFSET_X_M; _lay.altoBloque = altoBloque;
+    _lay.creditoAbajoRel = 0.5 + (T.CREDITO_ACTIVO ? Math.max(0, T.CREDITO_MARGEN) + credMedido : 0);
+    _lay.tintaArriba = tx.tintaArriba; _lay.tintaAbajo = tx.tintaAbajo;
+    const L = layoutAyuda(D, _lay, AYUDA_LAYOUT);
     const acumulado = D.MODO === "acumulado";
-    mesh.scale.set(wCelda * AYUDA.celdas, hCelda, 1);
-    mesh.position.set(A.cx + rx * T.OFFSET_X_M, y, A.cz + rz * T.OFFSET_X_M);
+    mesh.scale.set(L.wCelda * AYUDA.celdas, L.hCelda, 1);
+    mesh.position.set(A.cx + rx * T.OFFSET_X_M, L.y, A.cz + rz * T.OFFSET_X_M);
     mesh.rotation.set(0, Math.atan2(-A.fx, -A.fz), 0);
     const U = UNIFORMS;
     U.uInicio.value = acumulado ? 0 : AYUDA.indicacion;

@@ -1,6 +1,6 @@
 // Z104: ayuda de movimiento del telón. (a) línea de tiempo sin movimiento; (b) moverse la corta; (c) CUENTA_MIRAR;
 // (d) REARMAR; (e) MODO "acumulado"; (f) telón cruzado o pausa; (g) lectura de código (sin allocations, limpieza);
-// (h) texto accesible una sola vez. Uso: node scripts/telon-ayuda-test.mjs
+// (h) texto accesible una sola vez; Z104b (i) tamaño 0,72 y ubicación (fila dentro del ancho útil, sin pisar el crédito). Uso: node scripts/telon-ayuda-test.mjs
 import fs from 'node:fs';
 import { register } from 'node:module';
 register('data:text/javascript,' + encodeURIComponent(
@@ -88,12 +88,12 @@ console.log('\n(f) telón cruzado o pausa');
 
 console.log('\n(g) lectura de código');
 { const i = COMP.indexOf('useFrame((_, dt) => {'), cuadro = COMP.slice(i, COMP.indexOf('\n  });', i));
-  const sc = sinCom(cuadro).replace('crearTexturaAyuda(', 'X(');   // la textura se crea UNA vez (guardada por !texRef.current)
-  check(cuadro.length > 1500 && !/new |`|\[\s*\]|\.map\(|\.filter\(|\.slice\(|\{\s*\.\.\./.test(sc) && /if \(!texRef\.current && familia\.current\)/.test(cuadro), 'el cuadro no crea objetos (la textura una sola vez, con la fuente lista)');
+  const sc = sinCom(cuadro).replace('crearTexturaAyuda(', 'X(');   // la textura se crea UNA vez (guardada por !texRef.current; Z104b: o si cambia RES_CELDA_H)
+  check(cuadro.length > 1500 && !/new |`|\[\s*\]|\.map\(|\.filter\(|\.slice\(|\{\s*\.\.\./.test(sc) && /if \(familia\.current && \(!texRef\.current \|\| texRef\.current\.resH !== resolucionCelda\(D\.RES_CELDA_H\)\)\)/.test(cuadro), 'el cuadro no crea objetos (la textura una sola vez, con la fuente lista)');
   const pu = ['avanzarAyuda', 'alfaEntradaAyuda'].map(n => { const k = PURO.indexOf(`export function ${n}(`); return PURO.slice(k, PURO.indexOf('\n}', k)); }).join('\n');
   check(!/new |`|\[\s*\]|\.map\(|\.filter\(|\{\s*\.\.\./.test(sinCom(pu)), 'la línea de tiempo pura no crea objetos (escribe en el estado)');
   check(!/setTimeout|setInterval/.test(sinCom(COMP)) && /avanzarAyuda\(AYUDA, dt, D, _entrada\)/.test(COMP), 'sin timers: avanza con el dt del cuadro');
-  check(/window\.removeEventListener\("keydown", onTecla\)/.test(COMP) && /div\.remove\(\)/.test(COMP) && /texRef\.current\?\.dispose\(\)/.test(COMP) && /removeEventListener\("alight:telon-ayuda-probar"/.test(COMP),
+  check(/window\.removeEventListener\("keydown", onTecla\)/.test(COMP) && /div\.remove\(\)/.test(COMP) && /texRef\.current\?\.tex\.dispose\(\); texRef\.current = null/.test(COMP) && /removeEventListener\("alight:telon-ayuda-probar"/.test(COMP),
     'al desmontar (cruzar el telón): se quitan los oyentes, el aviso accesible y la textura');
   check(/VERT_TELON/.test(COMP) && /blendSrc=\{THREE\.DstColorFactor\}/.test(COMP) && /anton/.test(COMP) && /flecha\(/.test(TEX) && !/[↑↓←→]/.test(sinCom(TEX)),
     'mismo mecanismo que el texto del telón (pliegues, gobo multiplicativo, fuente Anton); las flechas son formas, no una fuente de reemplazo'); }
@@ -104,6 +104,62 @@ console.log('\n(h) texto accesible');
   check(n === 1, `se anuncia una sola vez aunque la ayuda vuelva a empezar (${n})`);
   check(L.TEXTO_ACCESIBLE_AYUDA === 'Usá la tecla W para avanzar, S para retroceder, A para ir a la izquierda y D a la derecha' && /aria-live", "polite"/.test(COMP) && /clip:rect\(0 0 0 0\)/.test(COMP),
     'texto oculto con aria-live "polite" en español, sin ruido visual'); }
+
+console.log('\n(i) Z104b: tamaño y ubicación');
+{ check(/TAMANO:\s+0\.72,/.test(CFG.slice(CFG.indexOf('export const DBG_TELON_AYUDA'))), 'TAMANO por defecto 0,72 (antes 0,32: ×2,25), editable en vivo');
+  const num = k => parseFloat(CFG.slice(CFG.indexOf('export const DBG_TELON_AYUDA')).match(new RegExp(`\\n  ${k}:\\s+([0-9.]+)`))[1]);
+  const R = { atrasM: 5, altoM: 9, objetivoY: 4, angulo: 0.6, penumbra: 0.7 };   // REFLECTOR de TelonTexto
+  const REFL = leer('../components/TelonTexto.tsx');
+  check(/REFLECTOR = \{ atrasM: 5, altoM: 9, objetivoY: 4, angulo: 0\.6, penumbra: 0\.7 \}/.test(REFL), 'el reflector de la prueba es el de TelonTexto');
+  const zona = (() => { const cE = Math.cos(R.angulo), cI = Math.cos(R.angulo * (1 - R.penumbra)); return 2 * Math.hypot(5, 5) * Math.tan(Math.acos((cE + cI) / 2)); })();
+  check(Math.abs(L.anchoIluminadoEn(R.objetivoY, R) - zona) < 1e-6, `el ancho iluminado a la altura del reflector coincide con anchoZonaIluminada (${zona.toFixed(2)} m)`);
+  const base = { BAJAR: num('BAJAR'), ANCHO_MAX_FILA: num('ANCHO_MAX_FILA'), MARGEN_ABAJO_M: num('MARGEN_ABAJO_M') };
+  const entrada = (tamTitulo = 0.6, o = {}) => { const hB = tamTitulo * zona / 4.79;
+    return { centroY: 4, offsetX: 0, altoBloque: hB, creditoAbajoRel: 0.5 + 0.12 + 0.2, tintaArriba: 0.19, tintaAbajo: 0.81, aspectoCelda: 2, pisoM: 0, reflector: R, ...o }; };
+  const lay = (c, en) => L.layoutAyuda({ TAMANO: 0.72, MODO: 'uno', ...base, ...c }, en, L.crearLayoutAyuda());
+  const d = lay({}, entrada()), da = lay({ MODO: 'acumulado' }, entrada());
+  console.log(`    por defecto: bloque ${entrada().altoBloque.toFixed(3)} m · celda ${d.hCelda.toFixed(3)} m · fila acumulada ${da.anchoFila.toFixed(2)} / ${da.anchoUtil.toFixed(2)} m útiles · tinta ${d.tintaArribaY.toFixed(2)}…${d.tintaAbajoY.toFixed(2)} m · factor uno ${d.factor.toFixed(3)} · acumulado ${da.factor.toFixed(3)}`);
+  check(d.factor === 1 && da.factor === 1, 'con los valores por defecto entra entera: no se reduce en ningún modo (factor 1)');
+  check(Math.abs(d.hCelda / (0.32 * entrada().altoBloque) - 2.25) < 1e-9, 'la celda mide 2,25 veces lo de antes');
+  // separación de tinta a tinta: constante, no depende del tamaño, y nunca se monta sobre el crédito
+  let sep = true, monta = false;
+  for (const tam of [0.1, 0.32, 0.5, 0.72, 1, 1.5]) for (const bajar of [0, 0.2, 0.41, 1]) for (const tt of [0.3, 0.6, 1.2]) for (const modo of ['uno', 'acumulado']) {
+    const en = entrada(tt), r = lay({ TAMANO: tam, BAJAR: bajar, MODO: modo }, en);
+    if (Math.abs((r.creditoAbajoY - r.tintaArribaY) - bajar * en.altoBloque) > 1e-9) sep = false;
+    const bordeSupPlano = r.y + r.hCelda / 2;
+    if (r.tintaArribaY > r.creditoAbajoY + 1e-9 || bordeSupPlano - 0.19 * r.hCelda > r.creditoAbajoY + 1e-9) monta = true;
+  }
+  check(sep, 'la separación entre la tinta del crédito y la de la ayuda es BAJAR × alto del bloque para cualquier TAMANO (no crece al agrandar)');
+  check(!monta, 'la ayuda nunca se monta sobre el crédito (TAMANO 0,1…1,5, BAJAR 0…1, título 0,3…1,2, ambos modos)');
+  const viejo = 0.35 + 0.19 * 0.32;
+  check(Math.abs(base.BAJAR - viejo) < 0.005, `BAJAR ${base.BAJAR} deja la misma separación visible que Z104 (0,35 desde la celda + 0,19 × 0,32 = ${viejo.toFixed(3)})`);
+  // acumulado: la fila nunca supera el ancho útil
+  let entra = true, peor = 1;
+  for (const tam of [0.32, 0.72, 1, 1.5]) for (const tt of [0.2, 0.6, 0.9, 1.2]) for (const ox of [0, 0.5, 1.5]) {
+    const r = lay({ TAMANO: tam, MODO: 'acumulado' }, entrada(tt, { offsetX: ox }));
+    const util = base.ANCHO_MAX_FILA * Math.min(L.anchoIluminadoEn(r.tintaArribaY, R), L.anchoIluminadoEn(r.tintaAbajoY, R)) - 2 * ox;
+    if (r.anchoFila > Math.max(0, util) + 1e-6) entra = false;
+    peor = Math.min(peor, r.factor);
+  }
+  check(entra, `en "acumulado" la fila de 4 celdas nunca supera el ancho útil (aunque se agrande el título o la ayuda; menor factor aplicado ${peor.toFixed(2)})`);
+  const g = lay({ TAMANO: 1.5, MODO: 'acumulado' }, entrada(1.2));
+  check(g.factorAncho < 1 && g.factor < 1, `si no entra, se reduce solo lo necesario (título 1,2 y ayuda 1,5: ×${g.factor.toFixed(2)})`);
+  // uno: la indicación completa dentro de la zona iluminada
+  let dentro = true;
+  for (const tam of [0.32, 0.72, 1.5]) for (const tt of [0.3, 0.6, 1.2]) {
+    const r = lay({ TAMANO: tam }, entrada(tt));
+    const ok1 = r.tintaAbajoY >= Math.max(base.MARGEN_ABAJO_M, L.bordeInferiorIluminado(R)) - 1e-9 && r.wCelda <= base.ANCHO_MAX_FILA * Math.min(L.anchoIluminadoEn(r.tintaArribaY, R), L.anchoIluminadoEn(r.tintaAbajoY, R)) + 1e-6;
+    if (!ok1) dentro = false;
+  }
+  check(dentro && d.tintaAbajoY > 1, `en "uno" la indicación queda entera dentro de la zona iluminada, sin cortarse abajo ni a los lados (tinta hasta ${d.tintaAbajoY.toFixed(2)} m del piso)`);
+  const baja = lay({ TAMANO: 0.72 }, entrada(0.6, { centroY: 1.6 }));   // título corrido muy abajo (OFFSET_Y_M −2,4)
+  check(baja.factorAlto < 1 && baja.tintaAbajoY >= base.MARGEN_ABAJO_M - 1e-9, `si llegara al piso, se limita el alto (×${baja.factorAlto.toFixed(2)})`);
+  // textura: resolución y trazos proporcionales
+  check(/RES_CELDA_H:\s+384,/.test(CFG) && /RES_CELDA_MAX = 512/.test(TEX) && /const F = Math\.round\(H \* 0\.72\)/.test(TEX) && /flecha\(g, x0 \+ W \* 0\.70, H \* 0\.5, H \* 0\.62/.test(TEX) && /const b = Math\.max\(0, blurRel\) \* F/.test(TEX) && /ancho = t \* 0\.16/.test(TEX),
+    'textura: celda de 768 × 384 (antes 512 × 256; tope 512 de alto); letra, trazo de la flecha y borde suave proporcionales al alto de la celda');
+  check(/layoutAyuda\(D, _lay, AYUDA_LAYOUT\)/.test(COMP) && /creditoAltoTintaM/.test(COMP) && !/CELDA_W \/ CELDA_H/.test(COMP), 'el componente ubica la ayuda con la función pura (crédito medido, sin allocations)');
+  const fn = PURO.slice(PURO.indexOf('export function layoutAyuda('), PURO.indexOf('\n}', PURO.indexOf('export function layoutAyuda(')));
+  check(!/new |`|\[\s*\]|\{\s*\.\.\./.test(sinCom(fn)), 'layoutAyuda no crea objetos (escribe en out)'); }
 
 console.log(`\n${ok} OK · ${fallas} fallas`);
 process.exit(fallas ? 1 : 0);

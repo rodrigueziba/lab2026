@@ -3,7 +3,7 @@
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
 import { DBG_SILLAS, DBG_INICIO, DBG_TELON_TEXTO, DBG_FLASH, DBG_ENTRADA, DBG_TELON_AYUDA } from "@/lib/debugConfig";
-import { AYUDA } from "@/components/TelonAyuda";                    // Z104
+import { AYUDA, AYUDA_LAYOUT } from "@/components/TelonAyuda";      // Z104 (Z104b: ubicación)
 import { textoEstadoAyuda } from "@/lib/telonAyuda";                // Z104
 import { pedirMedicionFlash } from "@/lib/curtainFlash";
 import { ENTRADA_POSE, calcularPoseEntrada } from "@/components/EntradaTelon";
@@ -315,6 +315,9 @@ export function SecAyudaMovimientoZ104() {
     <>
           <span style={LABEL}>Ayuda de movimiento Z104 <span style={NOTE}>(se proyecta bajo el título del telón si te quedás quieto ESPERA_S; moverte la corta para toda la visita)</span></span>
           <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoAyuda(AYUDA, A)}{AYUDA.movido ? " · el usuario se movió" : ""}{AYUDA.anunciado ? " · aviso accesible dado" : ""}</span></div>
+          {AYUDA_LAYOUT.hCelda > 0 && (
+            <div style={{ ...ROW, ...NOTE }}><span>Z104b: celda {AYUDA_LAYOUT.hCelda.toFixed(2)} m de alto · fila {AYUDA_LAYOUT.anchoFila.toFixed(2)} de {AYUDA_LAYOUT.anchoUtil.toFixed(2)} m útiles · tinta de {AYUDA_LAYOUT.tintaArribaY.toFixed(2)} a {AYUDA_LAYOUT.tintaAbajoY.toFixed(2)} m (crédito termina en {AYUDA_LAYOUT.creditoAbajoY.toFixed(2)}) · factor {AYUDA_LAYOUT.factor.toFixed(2)}{AYUDA_LAYOUT.factor < 0.999 ? ` (reducida: alto ×${AYUDA_LAYOUT.factorAlto.toFixed(2)}, ancho ×${AYUDA_LAYOUT.factorAncho.toFixed(2)})` : ""}</span></div>
+          )}
           <div style={ROW}>
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:telon-ayuda-probar")); toca(); }}>Probar ayuda ahora</button>
             <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:telon-ayuda-reiniciar")); toca(); }}>Reiniciar ayuda</button>
@@ -330,7 +333,9 @@ export function SecAyudaMovimientoZ104() {
             </div>
           ))}
           {([["ESPERA_S", 0, 30, 0.5, "s quieto antes de empezar"], ["INTERVALO_S", 0.5, 6, 0.1, "s de cada indicación"], ["PASADAS", 1, 5, 1, "vueltas de las cuatro"],
-            ["TAMANO", 0.1, 1, 0.01, "alto / alto del título"], ["OPACIDAD", 0, 1, 0.05, ""], ["BAJAR", 0, 1.5, 0.05, "separación bajo el título y su crédito"],
+            ["TAMANO", 0.1, 1.5, 0.01, "alto / alto del título"], ["OPACIDAD", 0, 1, 0.05, ""], ["BAJAR", 0, 1.5, 0.01, "separación de tinta a tinta bajo el crédito / alto del título"],
+            ["ANCHO_MAX_FILA", 0.3, 1, 0.01, "la fila no supera esta fracción del ancho iluminado"], ["MARGEN_ABAJO_M", 0, 2, 0.05, "m sobre el piso o el borde del haz"],
+            ["RES_CELDA_H", 128, 512, 32, "px de alto de cada celda (recrea la textura)"],
             ["UMBRAL_MOV_M", 0.002, 0.2, 0.002, "m por cuadro que cuentan como moverse"], ["UMBRAL_MIRAR", 0.0001, 0.02, 0.0001, "giro por cuadro que cuenta como mirar"],
             ["ENTRADA_S", 0, 2, 0.05, "fundido de entrada"], ["SALIDA_S", 0, 2, 0.05, "fundido de salida"], ["FLICKER_S", 0, 1, 0.05, "parpadeo de reflector"], ["FLICKER_N", 0, 8, 1, "destellos"]] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>
