@@ -4,7 +4,8 @@
 // /login source: /music.mp3 via /api/music-list — we use the same track.
 
 import { crearRuido, type FuenteRuido, type TipoRuido } from "@/lib/audio/ruido";   // Z82
-import { DBG_SILLAS } from "./debugConfig";
+import { DBG_SILLAS, DBG_PLAYLIST_SILLAS } from "./debugConfig";
+import { armarListaSillas } from "./playlistSillas";   // Z104: orden de las canciones
 
 // ── N4 constants ──────────────────────────────────────────────────────────────
 const MUSIC_FIRST             = '/music.mp3'; // always the first track each session
@@ -194,6 +195,13 @@ export const VIZ_EFFECTS_DEBUG = {
 let _playlist:   string[] = [];
 let _currentUrl: string   = "";
 let _recentUrls: string[] = [];
+// Z104: cola del orden inicial (music.mp3, anycolour.mp3, breathe.mp3 y después una permutación al azar del resto). Se arma
+// una vez por sesión del visualizador; cuando se vacía, sigue pickNextTrack como siempre (al azar, sin repetir los dos
+// últimos) y los tres primeros ya no se fijan.
+let _cola: string[] = [];
+let _colaArmada = false;
+/** Z104: el orden que quedó armado (lo muestra el menú de debug). */
+export const PLAYLIST_SILLAS = { orden: [] as string[], faltantes: [] as string[], fijoActivo: false, encontrados: [] as string[], pendientes: 0 };
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -205,6 +213,9 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 function pickNextTrack(): string {
+  const deCola = _cola.shift();   // Z104: primero el orden inicial
+  PLAYLIST_SILLAS.pendientes = _cola.length;
+  if (deCola) return deCola;
   if (_playlist.length === 0) return DBG_SILLAS.vizTrackUrl;
   const candidates = _playlist.filter(u => !_recentUrls.includes(u));
   const pool = candidates.length > 0 ? candidates : _playlist;
@@ -218,8 +229,21 @@ async function fetchVizPlaylist(): Promise<void> {
     const data = await res.json() as { files?: string[] };
     if (Array.isArray(data.files) && data.files.length > 0) {
       _playlist = shuffleArray(data.files);
+      if (!_colaArmada) armarCola(data.files);   // Z104
     }
   } catch { /* playlist stays empty, loop plays same track */ }
+}
+
+/** Z104: arma la cola del orden inicial (una vez por sesión). El primer tema (MUSIC_FIRST) ya está sonando: si la lista
+ *  empieza con él, la cola sigue desde el segundo. Con ORDEN_FIJO_ACTIVO false queda vacía (comportamiento anterior). */
+function armarCola(archivos: string[]): void {
+  const r = armarListaSillas(archivos, DBG_PLAYLIST_SILLAS.ORDEN_INICIAL, Math.floor(Math.random() * 4294967296), DBG_PLAYLIST_SILLAS.ORDEN_FIJO_ACTIVO);
+  const actual = _currentUrl.replace(/^\//, "").toLowerCase();
+  _cola = !DBG_PLAYLIST_SILLAS.ORDEN_FIJO_ACTIVO ? [] : r.lista.length && r.lista[0].toLowerCase() === actual ? r.lista.slice(1) : r.lista.slice();
+  _colaArmada = true;
+  PLAYLIST_SILLAS.orden = r.lista; PLAYLIST_SILLAS.faltantes = r.faltantes; PLAYLIST_SILLAS.fijoActivo = DBG_PLAYLIST_SILLAS.ORDEN_FIJO_ACTIVO;
+  PLAYLIST_SILLAS.encontrados = archivos.slice(); PLAYLIST_SILLAS.pendientes = _cola.length;
+  if (r.faltantes.length) console.info("[VizAudio] Z104: no están en /public:", r.faltantes.join(", "));
 }
 
 // Z48: duración e identificador del tema que suena (el ciclo de día dura lo que dura el tema). El id cambia
@@ -427,6 +451,7 @@ export function stopVizAudio(): void {
   _vizCtx = null; _vizAnalyser = null; _vizFreq = null; _vizAudioEl = null;
   _beatPrev = 0; _beatLast = 0;
   _playlist = []; _currentUrl = ""; _recentUrls = [];
+  _cola = []; _colaArmada = false; PLAYLIST_SILLAS.pendientes = 0;   // Z104
   // N4: band chain cleanup
   _bandFilters = []; _bandAnalysers = []; _bandTimeDom = []; _bandGates = []; _sumGain = null;
   // N5: noise cleanup

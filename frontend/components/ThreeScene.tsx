@@ -14,6 +14,7 @@ import FaceDome from "./FaceDome";
 import WatcherEye from "./WatcherEye";
 import Curtain from "./Curtain";
 import TelonTexto from "./TelonTexto"; // Z46: texto proyectado sobre el telón
+import TelonAyuda from "./TelonAyuda"; // Z104: ayuda de movimiento (W S A D) con el mismo gobo
 import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from "./LecternSystem";
 import GuiaArcoInstrumentos from "./GuiaArcoInstrumentos";                                    // Z99b: guía de debug del arco
 import { ATRIL_RITMOS } from "@/lib/ritmos";   // Z80: aviso "Tocar E" del atril de la caja de ritmos
@@ -42,7 +43,7 @@ import { STORE, INTERACT_STATE, storeSubscribe, activateVisualizerOnce, isVizAct
 import { LUZ_ESCENA, multSpot, factorTope } from "@/lib/lucesEscena";          // Z97b
 import { aporteViejasActual } from "@/lib/lucesEscenaAcciones";               // Z97b
 import LuzExtraEscena from "@/components/LuzExtraEscena";                     // Z97b
-import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV, DBG_SECUENCIA, DBG_LAYOUT, DBG_TELON_TEXTO, DBG_RENDIMIENTO, DBG_ATRIL_VIDEO } from "@/lib/debugConfig";
+import { DBG_SPOTLIGHT, DBG_SILLAS, DBG_LECTERNS, DBG_RETRO_FX, POINTERLOCK_RETRY_MS, DEBUG_ENABLED, DBG_LUZ, DBG_MOV, DBG_SECUENCIA, DBG_LAYOUT, DBG_TELON_TEXTO, DBG_RENDIMIENTO, DBG_ATRIL_VIDEO, DBG_TELON_AYUDA } from "@/lib/debugConfig";
 import { crearEspera, type Espera } from "@/lib/relojExperiencia"; // Z39
 import { cancelarSecuencia } from "@/lib/secuenciaSillas"; // Z39
 import { ZONA_TARIMA, ZONA_SILLAS_BASE, zonaSillasEn } from "@/lib/layoutSala"; // Z41
@@ -531,6 +532,7 @@ function Scene() {
       <EntradaTelon />
       {/* Z46: "A LIGHT FOR ATTRACTING ATTENTION" sobre el telón (recorte del reflector); se va con el telón */}
       {curtainVisible && DBG_TELON_TEXTO.ACTIVO && <SistemaPerf id="telonTexto"><TelonTexto /></SistemaPerf>}
+      {curtainVisible && DBG_TELON_AYUDA.ACTIVO && <TelonAyuda />}
       {/* Z23: iconos de los dos caminos grabados en el piso, entre el inicio y el telón */}
       <PisoIconos />
       {/* Z28: luz lejana detrás del inicio (camino LUZ), estrellas y salida de la sala */}

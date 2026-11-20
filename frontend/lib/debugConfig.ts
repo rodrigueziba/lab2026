@@ -1248,6 +1248,27 @@ export const DBG_FRACTAL = {
 };
 
 // ── Z46: texto proyectado sobre el telón ("A LIGHT FOR ATTRACTING ATTENTION", recorte del reflector) ──
+// ── Z104: ayuda de movimiento sobre el telón (lib/telonAyuda.ts, components/TelonAyuda.tsx). Mismo gobo que el texto. ──
+export const DBG_TELON_AYUDA = {
+  ACTIVO:        true,     // false = no se crea nada
+  ESPERA_S:      5,        // s quieto frente al telón antes de empezar — live
+  INTERVALO_S:   2,        // s de cada indicación (W ↑, S ↓, A ←, D →) — live
+  PASADAS:       2,        // vueltas completas de las cuatro; después no vuelve — live
+  MODO:          "uno" as string,   // "uno" (reemplaza en el mismo lugar) | "acumulado" (se suman en una fila) — live
+  CUENTA_MIRAR:  false,    // true = girar la cámara también cuenta como moverse — live
+  REARMAR:       false,    // true = tras moverse, vuelve a empezar después de otros ESPERA_S quieto — live
+  TAMANO:        0.32,     // alto de una indicación / alto del bloque del título — live
+  OPACIDAD:      0.85,     // como el texto del telón — live
+  BAJAR:         0.35,     // separación entre el bloque (y su crédito) y la ayuda / alto del bloque — live
+  UMBRAL_MOV_M:  0.02,     // cuánto tiene que cambiar la posición en un cuadro para contar como movimiento (m) — live
+  UMBRAL_MIRAR:  0.002,    // cuánto tiene que girar la cámara en un cuadro para contar como mirar (cuaternión) — live
+  ENTRADA_S:     0.6,      // fundido de entrada (después del parpadeo) — live
+  SALIDA_S:      0.4,      // fundido de salida — live
+  FLICKER_S:     0.35,     // parpadeo de reflector al aparecer cada indicación — live
+  FLICKER_N:     3,
+  FLICKER_PICO:  0.7,
+};
+
 export const DBG_TELON_TEXTO = {
   ACTIVO:          true,    // false = no se crea nada (ni textura ni plano)
   INVERTIDO:       false,   // false = gobo (letras en sombra); true = letras iluminadas y el telón oscurecido alrededor
@@ -1888,6 +1909,12 @@ export const DBG_ATRIL_SINTE = {
 };
 
 // ── Z103: SAMPLER SM-40 (motor lib/audio/sampler.ts, lógica pura lib/sampler.ts, atril lib/atrilSampler.ts) ──
+// ── Z104: orden de las canciones del visualizador de las SILLAS (lib/playlistSillas.ts, lib/vizAudio.ts) ──
+export const DBG_PLAYLIST_SILLAS = {
+  ORDEN_FIJO_ACTIVO: true,   // false = como antes: music.mp3 primero y después al azar — vale al próximo armado de la lista
+  ORDEN_INICIAL:     ["music.mp3", "anycolour.mp3", "breathe.mp3"] as string[],   // van primero, en este orden (sin distinguir mayúsculas)
+};
+
 export const DBG_SAMPLER = {
   ACTIVO:                  true,     // false = sin sampler (no crea el grafo ni se suscribe al reloj) — vale al montar
   SAMPLER_VOCES:           8,        // ranuras base preasignadas (una por pad); el grupo es max(VOCES, MAX_SIMULTANEAS) — vale al reiniciar

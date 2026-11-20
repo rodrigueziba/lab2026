@@ -1,7 +1,10 @@
 "use client";
 // Z70: pestaña "Telón y entrada" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
-import { DBG_SILLAS, DBG_INICIO, DBG_TELON_TEXTO, DBG_FLASH, DBG_ENTRADA } from "@/lib/debugConfig";
+import { useEffect, useState } from "react";
+import { DBG_SILLAS, DBG_INICIO, DBG_TELON_TEXTO, DBG_FLASH, DBG_ENTRADA, DBG_TELON_AYUDA } from "@/lib/debugConfig";
+import { AYUDA } from "@/components/TelonAyuda";                    // Z104
+import { textoEstadoAyuda } from "@/lib/telonAyuda";                // Z104
 import { pedirMedicionFlash } from "@/lib/curtainFlash";
 import { ENTRADA_POSE, calcularPoseEntrada } from "@/components/EntradaTelon";
 import { ENTRADA } from "@/lib/entradaTelon";
@@ -297,6 +300,44 @@ export function SecEntradaTrasElTelonZ59() {
             <div style={ROW}><span style={NOTE}>pose final ({P.modo}): x {P.x.toFixed(2)} · z {P.z.toFixed(2)} · yaw {P.yawDeg.toFixed(1)}° · pitch {P.pitchDeg.toFixed(1)}°{P.modo !== "manual" ? ` · ${P.desplazM.toFixed(2)} m a la izq.` : ""}{P.modo === "linea_sillas" ? ` · borde de la fila ${P.lateralBordeM.toFixed(2)} m (lateral)` : ""}{P.ajustada ? " · AJUSTADA (caía en un obstáculo, una zona o fuera de la sala)" : ""}</span></div>
           ); })()}
           <div style={ROW}><span style={NOTE}>entrada: {ENTRADA.fase} · saltos {ENTRADA.teletransportes}</span></div>
+    </>
+  );
+}
+
+// sección: ayuda-movimiento-z104
+export function SecAyudaMovimientoZ104() {
+  // Z104: ayuda de movimiento sobre el telón (W ↑, S ↓, A ←, D →). Estado 4 veces por segundo.
+  const A = DBG_TELON_AYUDA;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  return (
+    <>
+          <span style={LABEL}>Ayuda de movimiento Z104 <span style={NOTE}>(se proyecta bajo el título del telón si te quedás quieto ESPERA_S; moverte la corta para toda la visita)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{textoEstadoAyuda(AYUDA, A)}{AYUDA.movido ? " · el usuario se movió" : ""}{AYUDA.anunciado ? " · aviso accesible dado" : ""}</span></div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:telon-ayuda-probar")); toca(); }}>Probar ayuda ahora</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:telon-ayuda-reiniciar")); toca(); }}>Reiniciar ayuda</button>
+          </div>
+          <div style={ROW}>
+            <span>MODO</span>
+            {(["uno", "acumulado"] as const).map(m => <button key={m} style={{ ...INPUT, opacity: A.MODO === m ? 1 : 0.5 }} onClick={ev => { ev.currentTarget.blur(); A.MODO = m; toca(); }}>{m}</button>)}
+          </div>
+          {([["ACTIVO", "off = no se crea (vale al volver al telón)"], ["CUENTA_MIRAR", "girar la cámara también cuenta como moverse"], ["REARMAR", "tras moverse, vuelve tras otros ESPERA_S quieto"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); A[k] = !A[k]; toca(); }}>{A[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([["ESPERA_S", 0, 30, 0.5, "s quieto antes de empezar"], ["INTERVALO_S", 0.5, 6, 0.1, "s de cada indicación"], ["PASADAS", 1, 5, 1, "vueltas de las cuatro"],
+            ["TAMANO", 0.1, 1, 0.01, "alto / alto del título"], ["OPACIDAD", 0, 1, 0.05, ""], ["BAJAR", 0, 1.5, 0.05, "separación bajo el título y su crédito"],
+            ["UMBRAL_MOV_M", 0.002, 0.2, 0.002, "m por cuadro que cuentan como moverse"], ["UMBRAL_MIRAR", 0.0001, 0.02, 0.0001, "giro por cuadro que cuenta como mirar"],
+            ["ENTRADA_S", 0, 2, 0.05, "fundido de entrada"], ["SALIDA_S", 0, 2, 0.05, "fundido de salida"], ["FLICKER_S", 0, 1, 0.05, "parpadeo de reflector"], ["FLICKER_N", 0, 8, 1, "destellos"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{A[k].toFixed(st < 1 ? (st < 0.01 ? 4 : 2) : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={A[k]} onChange={ev => { A[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
     </>
   );
 }

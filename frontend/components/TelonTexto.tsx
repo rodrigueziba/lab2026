@@ -36,7 +36,7 @@ export const ENFOQUE_CREDITO = crearEstadoEnfoque(DBG_TELON_TEXTO.SEMILLA);
 
 // Reflector del telón (valores de Curtain.tsx: 5 m delante del telón, 9 m de alto, apunta a y = 4 m,
 // ángulo 0,6 rad, penumbra 0,7). Se repiten acá para no tocar Curtain.tsx.
-const REFLECTOR = { atrasM: 5, altoM: 9, objetivoY: 4, angulo: 0.6, penumbra: 0.7 };
+export const REFLECTOR = { atrasM: 5, altoM: 9, objetivoY: 4, angulo: 0.6, penumbra: 0.7 };
 const PLIEGUES = 8, PLIEGUE_M = 0.15;   // patrón de pliegues de buildSim (Curtain.tsx)
 const INICIO_DEMORA_S = 0.3;            // deja arrancar un checkpoint pedido por URL antes de empezar
 
@@ -46,7 +46,7 @@ export const TELON_TEXTO = crearEstadoTexto();
 export const TELON_TEXTO_DIAG = { listo: false, aspecto: 0, bordeG: 0, bordeN: 0, interletra: 0, anchoZonaM: 0, anchoBloqueM: 0, familia: "",
   creditoListo: false, creditoAltoTintaM: 0, creditoCx: 0, creditoCy: 0, altoBloqueM: 0 };   // Z71
 
-const VERT = /* glsl */`
+export const VERT_TELON = /* glsl */`
   uniform vec2  uFwd;          // hacia el telón (xz)
   uniform vec2  uRight;        // a la derecha vista desde el público (xz)
   uniform vec2  uCentroTelon;  // centro del telón (xz)
@@ -317,7 +317,7 @@ export default function TelonTexto() {
     <mesh ref={meshRef} visible={false} renderOrder={1} frustumCulled={false}>
       <planeGeometry args={[1, 1, 96, 1]} />
       <shaderMaterial
-        vertexShader={VERT}
+        vertexShader={VERT_TELON}
         fragmentShader={FRAG}
         uniforms={UNIFORMS}
         transparent
@@ -335,7 +335,7 @@ export default function TelonTexto() {
     <mesh ref={creditoRef} visible={false} renderOrder={1} frustumCulled={false}>
       <planeGeometry args={[1, 1, 24, 1]} />
       <shaderMaterial
-        vertexShader={VERT}
+        vertexShader={VERT_TELON}
         fragmentShader={FRAG_CREDITO}
         uniforms={UNIFORMS_CREDITO}
         transparent

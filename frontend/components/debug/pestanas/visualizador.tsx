@@ -6,7 +6,8 @@ import { DBG_SILLAS, DBG_DOMO_VIVO, DBG_RENDIMIENTO, DBG_TIEMPO } from "@/lib/de
 import { dispararTiempoAhora, pararTiempoAhora, textoEstadoTiempo } from "@/lib/tiempoDetenidoAcciones";   // Z84 · Z86
 import { textoEstadoDomoVivo } from "@/lib/domoVivoAcciones";   // Z83
 import { simularSesionEnVivo, quitarSesion } from "@/lib/monolitosVivoAcciones";   // Z82
-import { BAND_STATE, reshuffleAssignment } from "@/lib/vizAudio";
+import { BAND_STATE, reshuffleAssignment, PLAYLIST_SILLAS } from "@/lib/vizAudio";
+import { DBG_PLAYLIST_SILLAS } from "@/lib/debugConfig";                   // Z104
 import { LABEL, ROW, INPUT, NOTE, NumField, BandEnergyOverlay, AudioU2Meters } from "../comun";
 import { useDbg } from "../contexto";
 
@@ -344,6 +345,25 @@ export function SecTiempoDetenidoZ84() {
             <span style={NOTE}>HIST_N {String(T.HIST_N)}</span>
             <button style={INPUT} onClick={() => { T.HIST_N = "auto"; toca(); }}>auto</button>
           </div>
+    </>
+  );
+}
+
+// sección: lista-sillas-z104
+export function SecListaSillasZ104() {
+  // Z104: orden de las canciones del visualizador de las SILLAS (lib/playlistSillas.ts). Se lee 2 veces por segundo.
+  const P = DBG_PLAYLIST_SILLAS;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 500); return () => clearInterval(id); }, []);
+  return (
+    <>
+          <span style={LABEL}>Lista de las sillas Z104 <span style={NOTE}>(primero {P.ORDEN_INICIAL.join(", ")}; después al azar el resto · se arma al empezar la música del visualizador)</span></span>
+          <div style={ROW}>
+            <span>ORDEN_FIJO_ACTIVO <span style={NOTE}>off = como antes (music.mp3 primero y después al azar) · vale al próximo armado</span></span>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); P.ORDEN_FIJO_ACTIVO = !P.ORDEN_FIJO_ACTIVO; setTick(t => t + 1); }}>{P.ORDEN_FIJO_ACTIVO ? "ON" : "off"}</button>
+          </div>
+          <div style={{ ...ROW, ...NOTE }}><span>{PLAYLIST_SILLAS.orden.length ? `orden (${PLAYLIST_SILLAS.orden.length}): ${PLAYLIST_SILLAS.orden.join(" → ")}` : "todavía sin armar (empieza con la música del visualizador)"}</span></div>
+          <div style={{ ...ROW, ...NOTE }}><span>quedan en la cola: {PLAYLIST_SILLAS.pendientes} · faltan en /public: {PLAYLIST_SILLAS.faltantes.length ? PLAYLIST_SILLAS.faltantes.join(", ") : "ninguno"} · encontrados: {PLAYLIST_SILLAS.encontrados.length}</span></div>
     </>
   );
 }
