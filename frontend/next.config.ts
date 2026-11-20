@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Z107: ninguna función del servidor necesita leer en tiempo de ejecución los mp3 ni los archivos de mediapipe de
+  // /public (/api/music y /api/music-list ahora se arman en el build). Sin esto, el trazado de archivos los metía en
+  // el paquete de la función y Vercel la rechazaba por superar 250 MB.
+  outputFileTracingExcludes: {
+    "*": ["public/**/*.mp3", "public/alight/mediapipe/**"],
+  },
   webpack: (config) => {
     // Enable async WASM for @mediapipe/tasks-vision
     config.experiments = {

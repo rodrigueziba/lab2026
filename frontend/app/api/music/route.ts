@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { readdir } from "fs/promises";
 import path from "path";
 
+// Z107: estática, como /api/music-list (se arma en el build; sin función de 265 MB en Vercel). Misma respuesta.
+export const dynamic = "force-static";
+export const revalidate = false;
+
 // T4: returns the sorted list of .mp3 files served from /public
 // stress.mp3 is placed first if it exists; otherwise alphabetical order.
 export async function GET() {
