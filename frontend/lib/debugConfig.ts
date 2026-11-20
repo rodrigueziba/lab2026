@@ -1960,6 +1960,15 @@ export const DBG_SAMPLER = {
   ROBO_S:                  0.008,    // caída de una fuente robada o soltada (s)
   LOOKAHEAD_S:             0.005,    // margen de los disparos inmediatos (s)
   FUENTE_GRAB:             0,        // 0 MIC, 1 MEZCLA — live
+  // Z106: grabación (lib/muestreoGrabacion.ts). Procesamiento del micrófono: apagado para samplear (el sonido tal cual) — live
+  GRAB_ECO:                false,    // echoCancellation
+  GRAB_RUIDO:              false,    // noiseSuppression
+  GRAB_AGC:                false,    // autoGainControl
+  GRAB_NORMALIZAR:         true,     // lo grabado se lleva a GRAB_PICO (sin AGC el micrófono de una notebook graba muy bajo) — live
+  GRAB_PICO:               0.9,      // el mismo pico que los sonidos de fábrica
+  GRAB_GANANCIA_MAX:       20,       // tope de la normalización (+26 dB): un silencio no se convierte en ruido fuerte
+  GRAB_LIBERAR_PUNTERO:    true,     // con el puntero bloqueado, se libera antes de pedir el permiso y se recupera después
+  GRAB_LISTO_S:            6,        // cuánto queda «MIC: LISTO, PAD n» en el display
   // valores por defecto (PARAMS_SAMPLER: id → clave); los por pad valen para los 8 (el DRON de fábrica arranca con LOOP)
   CORTE:                   7000,     // Hz
   RESONANCIA:              0.15,

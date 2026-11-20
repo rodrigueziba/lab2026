@@ -25,6 +25,7 @@ export const INDICE_CONTROLES: Record<string, readonly string[]> = {
   "controles-sin-efecto": ["prismRangeScale"],
   "debug-overlays": ["debugOverlays"],
   "destello-de-cortina-f1": ["FLASH_SUBIDA_MS","FLASH_SOSTENIDO_MS","FLASH_BAJADA_MS","FLASH_PICO","FLASH_BLOOM_MULT","FLASH_EXPOSICION_MULT","FLASH_LUZ_FADE_MS","FLASH_TOPE_MS","FLASH_RM_PICO_MULT","FLASH_RM_SUBIDA_MS","FLASH_CRT_MAX","FLASH_GLOW","FLASH_BAJADA_EXP_K","FLASH_GLARE_INICIO","FLASH_GLARE_MS","FLASH_GLARE_EXP_K","FLASH_GLARE_BLOOM","FLASH_GLARE_ABERRACION","FLASH_RM_BAJADA_MS","FLASH_RM_GLARE_MULT","FLASH_SCAN_MAX","FLASH_VIG_ATEN","FLASH_TOPE_LUM","FLASH_BORDE","FLASH_COLOR","FLASH_GLARE_COLOR","FLASH_HDR","FLASH_HDR_CLAMP","FLASH_BLOWOUT","FLASH_BLOWOUT_TEXTURA","FLASH_BLOOM_TOPE","FLASH_EXPOSICION_TOPE","FLASH_MEDIR_HOLD_MS","FLASH_ACTIVO","estado","FLASH_OVERLAY_DOM","FLASH_INTENSIDAD","FLASH_AVISO_FOTOSENSIBILIDAD","centro","intensidad","esquina","Medir pico del destello","Disparar destello de cortina"],
+  "diag-mic-z106": ["Probar micrófono ahora","Actualizar permisos y entradas","GRAB_ECO","GRAB_RUIDO","GRAB_AGC","GRAB_NORMALIZAR","GRAB_LIBERAR_PUNTERO","GRAB_PICO","GRAB_GANANCIA_MAX","GRAB_LISTO_S"],
   "diagonalspot": ["color","intensity","distance","angle","penumbra","attenuation","anglePower"],
   "dialogo-z27": ["VEL_CPS","PAUSA_MS","ANCHO_VW","ALTO_VH","MARGEN_PX","FUENTE_PX","HISTORIAL","CURSOR_PARPADEO_S","abajo","izquierda","derecha","MARCAR_PENDIENTES","POSICION","RESALTADO_INVERTIDO","Probar diálogo","Cerrar"],
   "dome": ["delayMs","glitchIntervalMs"],

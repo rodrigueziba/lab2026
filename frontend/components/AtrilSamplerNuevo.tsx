@@ -12,7 +12,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DBG_ATRIL_SAMPLER, DBG_SAMPLER } from "@/lib/debugConfig";
 import { INTERACT_STATE } from "@/lib/alightStore";
-import { SAMPLER, EST, analizadorSampler, datosPad, lineaEstadoSampler, padAbajo, padArriba } from "@/lib/audio/sampler";
+import { SAMPLER, EST, analizadorSampler, datosPad, lineaEstadoSampler, padAbajo, padArriba, textoGrabacion } from "@/lib/audio/sampler";   // Z106: textoGrabacion
 import { N_PADS, PS, valorIdx, picosOnda, generarFabrica, crearTeclasPads, teclaPadAbajo, teclaPadArriba, TEXTO_REPOSO_SAMPLER } from "@/lib/sampler";
 import {
   MODULOS_M, POSICIONES_M, FADER_M, VU_M, ONDA_M, DISPLAY_TEXTO_U1, moduloM, textosM, numerosPerillaM, numerosFaderM,
@@ -161,7 +161,7 @@ export function DisplaySampler() {
     const marcoMat = new THREE.MeshStandardMaterial({ color: "#E8DCC4", roughness: 0.85, metalness: 0 });
     return { d, w, h, cw, ch, cv, tex, mat, geo, marcoGeo, marcoMat };
   }, []);
-  const ult = useRef({ ms: -1e9, ver: -1, va: -1, sel: -1, val: -2, esc: -1, est: "", ds: -1, son: -1, msj: -1, l1: "", ini: -1, fin: -1 });
+  const ult = useRef({ ms: -1e9, ver: -1, va: -1, sel: -1, val: -2, esc: -1, est: "", ds: -1, son: -1, msj: -1, l1: "", l2: "", ini: -1, fin: -1 });
   useEffect(() => () => { r.tex.dispose(); r.mat.dispose(); r.geo.dispose(); r.marcoGeo.dispose(); r.marcoMat.dispose(); }, [r]);
 
   useFrame(({ camera }) => {
@@ -178,8 +178,9 @@ export function DisplaySampler() {
     if (u.va !== SAMPLER.versionAudio || u.sel !== sel) calcularOnda(sel);
     const cambio = u.ver !== SAMPLER.version || u.sel !== sel || u.est !== SAMPLER.estadoGrab || u.ds !== ds || u.son !== son || u.va !== SAMPLER.versionAudio;
     u.ver = SAMPLER.version; u.va = SAMPLER.versionAudio; u.sel = sel; u.val = val; u.esc = esc; u.est = SAMPLER.estadoGrab; u.ds = ds; u.son = son; u.ini = ini; u.fin = fin;
-    if (cambio || !u.l1) u.l1 = lineaEstadoSampler();
-    dibujarDisplaySampler(r, u.l1, val >= 0 ? DISPLAY_SAMPLER.texto : TEXTO_REPOSO_SAMPLER, esc, ini, fin);
+    if (cambio || !u.l1) { u.l1 = lineaEstadoSampler(); u.l2 = textoGrabacion(); }
+    // Z106: sin un mensaje pasajero, la línea 2 muestra el estado de la grabación (pedido, grabando, listo o el motivo del error)
+    dibujarDisplaySampler(r, u.l1, val >= 0 ? DISPLAY_SAMPLER.texto : (u.l2 || TEXTO_REPOSO_SAMPLER), esc, ini, fin);
   });
 
   const cu = (r.d.u0 + r.d.u1) / 2, cvv = (r.d.v0 + r.d.v1) / 2;

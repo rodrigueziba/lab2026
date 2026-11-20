@@ -870,7 +870,9 @@ export default function ThreeScene() {
     <>
       <Canvas
         style={{ width: "100vw", height: "100vh" }}
-        shadows
+        // Z106: "percentage" = PCFShadowMap. Con `shadows` a secas R3F pide PCFSoftShadowMap, que three 0.183 ya reemplaza por
+        // PCFShadowMap con un aviso en consola: el resultado visual es el mismo y el aviso desaparece
+        shadows="percentage"
         // Z25: rotation explícita → R3F no hace camera.lookAt(0,0,0); el spawn lo fija aplicarSpawn
         camera={{ position: posicionInicial(), rotation: [0, 0, 0], fov: 90 }}
         onCreated={({ camera: cam }) => aplicarSpawn(cam)}

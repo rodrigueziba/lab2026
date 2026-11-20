@@ -21,6 +21,8 @@ import { CARA, EST as EST_CARA, encenderCara, apagarCara, calibrarCara, olvidarC
 import { NOMBRES_GESTO } from "@/lib/cara";                                                  // Z100
 import { SINTE, PARAMS_SY, VOCES, MANTENIDAS, ARP, cargarSonidoSinte, setParamSinte, aplicarOpcionesSinte, silenciarYReiniciarSinte, notaAbajo, notaArriba, bpmSinte } from "@/lib/audio/sinte";   // Z101
 import { SAMPLER, EST as EST_SAMPLER, RANURAS, silenciarYReiniciarSampler, padAbajo, padArriba, seleccionarPad, setParamSampler, aplicarOpcionesSampler, grabar, pararGrabacion, borrarPad } from "@/lib/audio/sampler";   // Z103
+import { MUESTREO, DIAG_MIC, probarMicrofono, actualizarDiagMic, estadoAudioYGrabador, textoGrabacion } from "@/lib/audio/sampler";   // Z106
+import { MENSAJES_MUESTREO } from "@/lib/muestreoGrabacion";   // Z106
 import { PARAMS_SAMPLER, QUANTS, FUENTES_GRAB, N_PADS, manualIdx as manualIdxSampler } from "@/lib/sampler";   // Z103
 import { PARAMS_SINTE, NOMBRES_SONIDO, PATRONES_ARP, VELOCIDADES_ARP, nombreSonido, nombreNota as nombreNotaSinte, indiceParam as indiceParamSinte } from "@/lib/sinte";   // Z101
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
@@ -991,6 +993,46 @@ export function SecSinteZ101() {
             </div>
           ))}
           <div style={{ ...ROW, ...NOTE }}><span>ROTULOS_MODO {A.ROTULOS_MODO} (leyenda en la placa de la barra) · doble clic en perillas y fader: el valor del sonido cargado · en el modo del SY-40 no hay atajos Z–M (el teclado es el piano)</span></div>
+    </>
+  );
+}
+
+// sección: diag-mic-z106
+export function SecDiagMicZ106() {
+  // Z106: diagnóstico de la grabación del SM-40 (permiso, entradas, formato, AudioContext, MediaRecorder, último error).
+  const S = DBG_SAMPLER;
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    void actualizarDiagMic().then(() => setTick(t => (t + 1) % 1e6));   // solo consulta: no pide el permiso
+    const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250);
+    return () => clearInterval(id);
+  }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const M = MUESTREO;
+  return (
+    <>
+          <span style={LABEL}>Diagnóstico de micrófono Z106 <span style={NOTE}>(grabación del SM-40; el permiso se pide solo al apretar GRABAR con MIC o «Probar micrófono ahora»; la prueba no graba en ningún pad ni se transmite)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>permiso de micrófono: {DIAG_MIC.permiso} · entradas: {DIAG_MIC.entradas.length}{DIAG_MIC.entradas.length ? ` (${DIAG_MIC.entradas.join(" · ")})` : ""}</span></div>
+          <div style={{ ...ROW, ...NOTE }}><span>{estadoAudioYGrabador()} · formato elegido: {M.mime || (M.fase === "inactivo" ? "—" : "el del navegador")}{M.mimeReal ? ` (grabado: ${M.mimeReal})` : ""}</span></div>
+          <div style={{ ...ROW, ...NOTE }}><span>estado: {M.fase}{textoGrabacion() ? ` · ${textoGrabacion()}` : ""} · pico de la última grabación {M.pico.toFixed(3)}</span></div>
+          <div style={{ ...ROW, ...NOTE }}><span>último error: {M.nombreError ? `${M.nombreError} · ${MENSAJES_MUESTREO[M.codigo]}${M.detalle ? ` · ${M.detalle}` : ""}` : "ninguno"}</span></div>
+          <div style={ROW}>
+            <button style={INPUT} disabled={DIAG_MIC.probando} onClick={ev => { ev.currentTarget.blur(); void probarMicrofono().then(() => actualizarDiagMic()).then(toca); toca(); }}>Probar micrófono ahora</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); void actualizarDiagMic().then(toca); }}>Actualizar permisos y entradas</button>
+          </div>
+          {DIAG_MIC.prueba && <div style={{ ...ROW, ...NOTE }}><span>prueba: {DIAG_MIC.prueba}</span></div>}
+          {([["GRAB_ECO", "cancelación de eco"], ["GRAB_RUIDO", "supresión de ruido"], ["GRAB_AGC", "control automático de ganancia"], ["GRAB_NORMALIZAR", "lleva lo grabado a GRAB_PICO"], ["GRAB_LIBERAR_PUNTERO", "libera el pointer lock para el aviso de permiso"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); S[k] = !S[k]; toca(); }}>{S[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([["GRAB_PICO", 0.1, 1, 0.01, "pico tras normalizar"], ["GRAB_GANANCIA_MAX", 1, 100, 1, "tope de la normalización (×)"], ["GRAB_LISTO_S", 1, 20, 0.5, "s de «LISTO, PAD n»"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{S[k].toFixed(st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={S[k]} onChange={ev => { S[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
     </>
   );
 }

@@ -23,6 +23,8 @@ import { DBG_SAMPLER, DBG_RITMOS } from "@/lib/debugConfig";
 import { contextoNucleo, obtenerContexto, reanudarContexto, entradaBus, analizadorMaestro, suscribirPasos, RELOJ } from "@/lib/audio/nucleo";
 import { duracionPasoS } from "@/lib/audio/reloj";
 import { RITMOS } from "@/lib/ritmosMotor";
+import { INTERACT_STATE } from "@/lib/alightStore";   // Z106: el pointer lock se recupera solo fuera del modo atril
+import { crearEstadoMuestreo, crearGrabacion, textoMuestreo, codigoDeError, elegirMime, gananciaNormalizar, MENSAJES_MUESTREO, type GrabadorLike } from "@/lib/muestreoGrabacion";   // Z106
 import {
   N_PADS, N_PARAMS, PARAMS_SAMPLER, PS, FABRICA_SAMPLER, SEMICORCHEAS_QUANT, MODO_MIENTRAS,
   velocidadDeAfinacion, rangoReproduccion, invertir, generarFabrica, crearEstado, setParam, valorIdx, activarCara,
@@ -251,93 +253,193 @@ export function borrarPad(pad = EST.sel): void {
   SAMPLER.versionAudio++; SAMPLER.version++; calcularMemoria();
   mensaje(`PAD ${p + 1}: VUELVE ${FABRICA_SAMPLER[p].nombre} DE FÁBRICA`);
 }
-/** Cierra el micrófono y la derivación de la mezcla (al terminar, al cancelar o al desmontar). */
+/** Cierra el micrófono y la derivación de la mezcla (al terminar, al cancelar o al desmontar). Z106: red de seguridad; el
+ *  orquestador (lib/muestreoGrabacion.ts) ya detiene las pistas y desconecta la derivación en cada final. */
 function cerrarEntradas(): void {
   if (GRAB.timer) { clearTimeout(GRAB.timer); GRAB.timer = null; }
   if (GRAB.stream) { GRAB.stream.getTracks().forEach(t => t.stop()); GRAB.stream = null; }
   if (GRAB.tap) { const an = analizadorMaestro(); try { an?.disconnect(GRAB.tap); } catch { /* ya desconectado */ } GRAB.tap = null; }
 }
+
+// ── Z106: grabación con estado visible (lib/muestreoGrabacion.ts) ──
+/** Estado de la grabación (fase, código y mensaje del último error, formato, pico): lo muestran el atril y el menú. */
+export const MUESTREO = crearEstadoMuestreo();
+/** Diagnóstico de micrófono (menú «Diagnóstico de micrófono Z106»). */
+export const DIAG_MIC = { permiso: "?", entradas: [] as string[], prueba: "", probando: false };
+/** Decodifica con la versión de promesa y, si el navegador es viejo, con la de callbacks. */
+function decodificarAudio(ctx: BaseAudioContext, ab: ArrayBuffer): Promise<AudioBuffer> {
+  return new Promise<AudioBuffer>((ok, mal) => {
+    try {
+      const pr = ctx.decodeAudioData(ab, ok, e => mal(e ?? new DOMException("no se pudo decodificar", "EncodingError")));
+      if (pr && typeof pr.then === "function") pr.then(ok, mal);
+    } catch (e) { mal(e); }
+  });
+}
+function restriccionesMic(): MediaStreamConstraints {
+  return { audio: { echoCancellation: DBG_SAMPLER.GRAB_ECO, noiseSuppression: DBG_SAMPLER.GRAB_RUIDO, autoGainControl: DBG_SAMPLER.GRAB_AGC }, video: false };
+}
+const PUNTERO = {
+  bloqueado: () => DBG_SAMPLER.GRAB_LIBERAR_PUNTERO && typeof document !== "undefined" && !!document.pointerLockElement,
+  liberar: () => { try { document.exitPointerLock(); } catch { /* sin pointer lock */ } },
+  // se recupera solo fuera del modo atril (en el atril el cursor tiene que quedar libre para los controles)
+  recuperar: () => {
+    if (INTERACT_STATE.mode !== "none") return;
+    try { const c = document.querySelector("canvas") as (HTMLCanvasElement & { requestPointerLock(): unknown }) | null; const r = c?.requestPointerLock() as Promise<void> | undefined; r?.catch?.(() => {}); } catch { /* sin gesto: el usuario vuelve a hacer clic */ }
+  },
+};
+const GRABACION = crearGrabacion<AudioBuffer>(MUESTREO, {
+  pedirMic: () => navigator.mediaDevices.getUserMedia(restriccionesMic()),
+  crearGrabador: (st, mime) => new MediaRecorder(st as MediaStream, mime ? { mimeType: mime } : undefined) as unknown as GrabadorLike,
+  get soporta() { return typeof MediaRecorder !== "undefined" && typeof MediaRecorder.isTypeSupported === "function" ? (m: string) => MediaRecorder.isTypeSupported(m) : null; },
+  aArrayBuffer: (partes, mime) => new Blob(partes as BlobPart[], { type: mime }).arrayBuffer(),
+  decodificar: ab => (_g ? decodificarAudio(_g.ctx, ab) : Promise.reject(new DOMException("el sampler no tiene grafo", "InvalidStateError"))),
+  ahora: () => performance.now() / 1000,
+  puntero: PUNTERO,
+  alListo: (buf, pad, fuente) => colocarGrabacion(pad, buf, fuente),
+  alCambio: e => {
+    GRAB.rec = GRABACION ? (GRABACION.grabador() as unknown as MediaRecorder | null) : null;
+    GRAB.stream = GRABACION ? (GRABACION.stream() as MediaStream | null) : null;
+    SAMPLER.estadoGrab = e.fase === "pidiendo" || e.fase === "grabando" || e.fase === "procesando" ? e.fase : "libre";
+    if (e.fase === "grabando") {
+      GRAB.t0 = performance.now();
+      // corte de seguridad aunque no haya cuadros (pestaña en segundo plano); tickSampler corta también por cuadro
+      if (GRAB.timer) clearTimeout(GRAB.timer);
+      GRAB.timer = setTimeout(() => { GRAB.timer = null; if (MUESTREO.fase === "grabando") { mensaje(`CORTE: MÁXIMO ${DBG_SAMPLER.SAMPLER_MAX_S} S`); GRABACION.parar(); } }, Math.max(0.5, e.maxS) * 1000);
+      if (e.fuente === "MIC" && !SAMPLER.avisoMic) { SAMPLER.avisoMic = true; mensaje("MIC: SI COMPARTÍS, SE TRANSMITE"); }
+    } else if (e.fase !== "pidiendo") {
+      cerrarEntradas();
+      if (e.fase === "error") mensaje(textoMuestreo(e));
+      if (e.fase === "inactivo") { SAMPLER.grabPad = -1; SAMPLER.grabS = 0; }
+    }
+    SAMPLER.version++;
+  },
+  avisar: (nombre, msj) => { console.warn(`[SM-40] ${nombre}: ${msj}`); },
+});
 /** GRABAR en el pad seleccionado desde MIC o MEZCLA (DBG_SAMPLER.FUENTE_GRAB). Un solo grabador: false si ya hay uno. */
 export function grabar(): boolean {
-  if (SAMPLER.estadoGrab !== "libre") return false;
-  const g = grafo();
-  if (!g || typeof MediaRecorder === "undefined") { mensaje("GRABAR: ESTE NAVEGADOR NO PUEDE"); return false; }
-  const pad = EST.sel, mic = Math.round(DBG_SAMPLER.FUENTE_GRAB) === 0;
-  GRAB.cancelado = false; SAMPLER.grabPad = pad; SAMPLER.grabS = 0;
-  if (mic) {
-    if (!navigator.mediaDevices?.getUserMedia) { mensaje("MIC: NO DISPONIBLE"); return false; }
-    SAMPLER.estadoGrab = "pidiendo"; SAMPLER.version++;
-    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false })
-      .then(stream => {
-        if (GRAB.cancelado || SAMPLER.estadoGrab !== "pidiendo") { stream.getTracks().forEach(t => t.stop()); return; }
-        GRAB.stream = stream;
-        if (!SAMPLER.avisoMic) { SAMPLER.avisoMic = true; mensaje("MIC: SI COMPARTÍS, SE TRANSMITE"); }
-        empezarRecorder(stream, pad, "MIC");
-      })
-      .catch(() => { SAMPLER.estadoGrab = "libre"; SAMPLER.version++; mensaje("MIC: SIN PERMISO · PROBÁ MEZCLA"); });
-    return true;
+  if (SAMPLER.estadoGrab !== "libre") {
+    if (SAMPLER.estadoGrab === "pidiendo") mensaje("MIC: ACEPTÁ EL PERMISO EN EL NAVEGADOR (ARRIBA A LA IZQUIERDA)");
+    return false;
   }
-  const an = analizadorMaestro();
-  if (!an) { mensaje("MEZCLA: NO HAY NADA SONANDO"); return false; }
-  GRAB.tap = g.ctx.createMediaStreamDestination();
-  an.connect(GRAB.tap);   // derivación: lo que suena no cambia
-  empezarRecorder(GRAB.tap.stream, pad, "MEZCLA");
-  return true;
+  const g = grafo();
+  const pad = EST.sel, mic = Math.round(DBG_SAMPLER.FUENTE_GRAB) === 0, fuente = mic ? "MIC" : "MEZCLA";
+  if (!g || typeof MediaRecorder === "undefined" || (mic && !navigator.mediaDevices?.getUserMedia)) {
+    MUESTREO.fuente = fuente; MUESTREO.codigo = "navegador"; MUESTREO.nombreError = "NotSupportedError";
+    MUESTREO.detalle = !g ? "sin sampler" : typeof MediaRecorder === "undefined" ? "sin MediaRecorder" : "sin getUserMedia (¿página sin HTTPS?)";
+    MUESTREO.fase = "error"; MUESTREO.version++;
+    console.warn(`[SM-40] ${MUESTREO.nombreError}: ${MUESTREO.detalle}`);
+    mensaje(textoMuestreo(MUESTREO)); SAMPLER.version++;
+    return false;
+  }
+  SAMPLER.grabPad = pad; SAMPLER.grabS = 0; GRAB.cancelado = false;
+  let mezcla: { stream: MediaStream; cerrar(): void } | null = null;
+  if (!mic) {
+    const an = analizadorMaestro();
+    if (an) {
+      // derivación del analizador maestro (todo lo que suena en la tarima pasa por él): lo que suena no cambia
+      const tap = g.ctx.createMediaStreamDestination();
+      an.connect(tap);
+      GRAB.tap = tap;
+      mezcla = { stream: tap.stream, cerrar: () => { try { an.disconnect(tap); } catch { /* ya desconectado */ } if (GRAB.tap === tap) GRAB.tap = null; } };
+    }
+  }
+  return GRABACION.iniciar(fuente, pad, DBG_SAMPLER.SAMPLER_MAX_S, mezcla);
 }
-function empezarRecorder(stream: MediaStream, pad: number, nombre: string): void {
-  const partes: Blob[] = [];
-  const rec = new MediaRecorder(stream);
-  GRAB.rec = rec;
-  rec.ondataavailable = e => { if (e.data && e.data.size) partes.push(e.data); };
-  rec.onstop = () => {
-    cerrarEntradas();
-    GRAB.rec = null;
-    if (GRAB.cancelado || !partes.length) { SAMPLER.estadoGrab = "libre"; SAMPLER.version++; return; }
-    SAMPLER.estadoGrab = "procesando"; SAMPLER.version++;
-    new Blob(partes, { type: rec.mimeType || "audio/webm" }).arrayBuffer()
-      .then(ab => (_g ? _g.ctx.decodeAudioData(ab) : Promise.reject(new Error("sin grafo"))))
-      .then(buf => colocarGrabacion(pad, buf, nombre))
-      .catch(() => mensaje("GRABAR: NO SE PUDO LEER EL AUDIO"))
-      .finally(() => { SAMPLER.estadoGrab = "libre"; SAMPLER.version++; });
-  };
-  rec.start();
-  GRAB.t0 = performance.now();
-  SAMPLER.estadoGrab = "grabando"; SAMPLER.version++;
-  GRAB.timer = setTimeout(() => { mensaje(`CORTE: MÁXIMO ${DBG_SAMPLER.SAMPLER_MAX_S} S`); pararGrabacion(); }, Math.max(0.5, DBG_SAMPLER.SAMPLER_MAX_S) * 1000);
-}
-/** Pone lo grabado en el pad (recortado a SAMPLER_MAX_S) con sus parámetros por defecto. */
-function colocarGrabacion(pad: number, buf: AudioBuffer, nombre: string): void {
+/** Pone lo grabado en el pad (recortado a SAMPLER_MAX_S, normalizado con GRAB_NORMALIZAR) con sus parámetros por defecto.
+ *  Devuelve el pico original (0…1). */
+function colocarGrabacion(pad: number, buf: AudioBuffer, nombre: string): number {
   const g = _g;
-  if (!g) return;
+  if (!g) return 0;
   const max = Math.floor(Math.max(0.5, DBG_SAMPLER.SAMPLER_MAX_S) * buf.sampleRate);
   let b = buf;
   if (buf.length > max) {
     b = g.ctx.createBuffer(buf.numberOfChannels, max, buf.sampleRate);
     for (let c = 0; c < buf.numberOfChannels; c++) b.getChannelData(c).set(buf.getChannelData(c).subarray(0, max));
   }
+  let pico = 0;
+  for (let c = 0; c < b.numberOfChannels; c++) { const x = b.getChannelData(c); for (let i = 0; i < x.length; i++) { const v = Math.abs(x[i]); if (v > pico) pico = v; } }
+  // Z106: sin control automático de ganancia, el micrófono de una notebook graba muy bajo frente a los sonidos de fábrica
+  if (DBG_SAMPLER.GRAB_NORMALIZAR) {
+    const k = gananciaNormalizar(pico, DBG_SAMPLER.GRAB_PICO, DBG_SAMPLER.GRAB_GANANCIA_MAX);
+    if (k !== 1) for (let c = 0; c < b.numberOfChannels; c++) { const x = b.getChannelData(c); for (let i = 0; i < x.length; i++) x[i] *= k; }
+  }
   cortar(g, pad, g.ctx.currentTime);
   g.buffers[pad] = b; g.invertidos[pad] = null;
-  restaurarPad(EST, pad, false);
+  restaurarPad(EST, pad, false);   // INICIO y FIN vuelven a 0 y 1
   SAMPLER.nombres[pad] = nombre; SAMPLER.grabado[pad] = 1;
   SAMPLER.versionAudio++; SAMPLER.version++; calcularMemoria();
   mensaje(`PAD ${pad + 1}: ${nombre} ${b.duration.toFixed(1)} S GRABADO`);
+  return pico;
 }
-/** PARAR: termina la grabación (se decodifica y va al pad). */
+/** PARAR: termina la grabación (se decodifica y va al pad). Z106: durante el pedido de permiso no cancela (antes un
+ *  segundo clic descartaba en silencio el micrófono que el navegador concedía después). */
 export function pararGrabacion(): void {
-  if (SAMPLER.estadoGrab === "pidiendo") { GRAB.cancelado = true; SAMPLER.estadoGrab = "libre"; SAMPLER.version++; return; }
-  const rec = GRAB.rec;
-  if (SAMPLER.estadoGrab !== "grabando" || !rec) return;
+  if (SAMPLER.estadoGrab === "pidiendo") { mensaje("MIC: ACEPTÁ EL PERMISO EN EL NAVEGADOR (ARRIBA A LA IZQUIERDA)"); return; }
   if (GRAB.timer) { clearTimeout(GRAB.timer); GRAB.timer = null; }
-  try { rec.stop(); } catch { cerrarEntradas(); SAMPLER.estadoGrab = "libre"; }
+  GRABACION.parar();
 }
 /** Cancela sin guardar (desmontar, reiniciar): corta el grabador y cierra micrófono y derivación. */
 export function cancelarGrabacion(): void {
   GRAB.cancelado = true;
-  const rec = GRAB.rec;
-  if (rec) { rec.ondataavailable = null; try { if (rec.state !== "inactive") rec.stop(); } catch { /* ya parado */ } }
+  GRABACION.cancelar();
   GRAB.rec = null;
   cerrarEntradas();
   SAMPLER.estadoGrab = "libre"; SAMPLER.grabPad = -1; SAMPLER.grabS = 0;
+}
+/** Línea de estado de la grabación para el atril ("" = nada que mostrar). */
+export function textoGrabacion(): string { return textoMuestreo(MUESTREO, performance.now() / 1000, DBG_SAMPLER.GRAB_LISTO_S); }
+
+/** Menú «Probar micrófono ahora»: pide el permiso, mide el pico durante 1 s y libera todo. No graba en ningún pad ni
+ *  pasa por el bus (no se transmite). */
+export async function probarMicrofono(): Promise<string> {
+  if (DIAG_MIC.probando) return DIAG_MIC.prueba;
+  DIAG_MIC.probando = true; DIAG_MIC.prueba = "pidiendo permiso…";
+  let st: MediaStream | null = null, src: MediaStreamAudioSourceNode | null = null, an: AnalyserNode | null = null;
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) throw new DOMException("sin getUserMedia", "NotSupportedError");
+    const soltado = PUNTERO.bloqueado(); if (soltado) PUNTERO.liberar();
+    try { st = await navigator.mediaDevices.getUserMedia(restriccionesMic()); } finally { if (soltado) PUNTERO.recuperar(); }
+    const ctx = obtenerContexto(); if (ctx.state !== "running") await reanudarContexto();
+    src = ctx.createMediaStreamSource(st); an = ctx.createAnalyser(); an.fftSize = 2048; src.connect(an);   // sin salida: no suena ni se transmite
+    const datos = new Float32Array(an.fftSize);
+    let pico = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 1000) {
+      an.getFloatTimeDomainData(datos);
+      for (let i = 0; i < datos.length; i++) { const v = Math.abs(datos[i]); if (v > pico) pico = v; }
+      await new Promise(r => setTimeout(r, 40));
+    }
+    const pista = st.getAudioTracks()[0];
+    const db = pico > 0 ? 20 * Math.log10(pico) : -Infinity;
+    DIAG_MIC.prueba = `OK · pico ${pico.toFixed(3)} (${Number.isFinite(db) ? db.toFixed(1) : "−∞"} dBFS) · ${pista?.label || "micrófono"} · ${elegirMime(typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported ? (m: string) => MediaRecorder.isTypeSupported(m) : null).mime || "formato del navegador"}`;
+  } catch (e) {
+    const x = e as { name?: string; message?: string };
+    const c = codigoDeError(x?.name || "");
+    DIAG_MIC.prueba = `FALLÓ · ${x?.name || "Error"}: ${MENSAJES_MUESTREO[c]}${x?.message ? " · " + x.message : ""}`;
+    console.warn(`[SM-40] prueba de micrófono · ${x?.name || "Error"}: ${x?.message || ""}`);
+  } finally {
+    try { src?.disconnect(); } catch { /* ok */ }
+    try { an?.disconnect(); } catch { /* ok */ }
+    st?.getTracks().forEach(t => t.stop());
+    DIAG_MIC.probando = false;
+  }
+  return DIAG_MIC.prueba;
+}
+/** Menú: permisos y dispositivos de entrada (solo etiquetas y cantidad). */
+export async function actualizarDiagMic(): Promise<void> {
+  try {
+    const q = await (navigator.permissions?.query?.({ name: "microphone" as PermissionName }));
+    DIAG_MIC.permiso = q ? q.state : "sin navigator.permissions";
+  } catch (e) { DIAG_MIC.permiso = `no se puede consultar (${(e as Error)?.name || "Error"})`; }
+  try {
+    const ds = await navigator.mediaDevices?.enumerateDevices?.();
+    DIAG_MIC.entradas = (ds ?? []).filter(d => d.kind === "audioinput").map((d, i) => d.label || `entrada ${i + 1} (sin etiqueta hasta dar permiso)`);
+  } catch { DIAG_MIC.entradas = []; }
+}
+/** Menú: estado del AudioContext y del MediaRecorder. */
+export function estadoAudioYGrabador(): string {
+  const ctx = contextoNucleo();
+  return `AudioContext ${ctx ? ctx.state : "sin crear"} · MediaRecorder ${typeof MediaRecorder === "undefined" ? "no existe" : GRAB.rec ? GRAB.rec.state : "sin grabador"}`;
 }
 
 // ── ciclo de vida ──
@@ -359,6 +461,8 @@ function liberarGrafo(): void {
   RANURAS = crearRanuras(Math.max(DBG_SAMPLER.SAMPLER_VOCES, DBG_SAMPLER.SAMPLER_MAX_SIMULTANEAS));
   SAMPLER.sonando.fill(0); SAMPLER.vivas = 0; SAMPLER.memoriaBytes = 0;
 }
+let _listoVisto = false;   // Z106
+function avisarCorte(): void { mensaje(`CORTE: MÁXIMO ${DBG_SAMPLER.SAMPLER_MAX_S} S`); }   // Z106: fuera del cuadro (solo al cortar)
 /** Al desmontar: suscripción, grabación (y micrófono), fuentes y nodos. Las grabaciones se pierden (solo en memoria). */
 export function liberarSampler(): void {
   _desuscribir?.(); _desuscribir = null;
@@ -373,7 +477,13 @@ export function liberarSampler(): void {
 export function tickSampler(): void {
   const g = _g;
   if (g && !RITMOS.sonando) for (let p = 0; p < N_PADS; p++) if (_pend[p] >= 0) { _pend[p] = -1; iniciarFuente(g, p, g.ctx.currentTime + 0.005); }
-  if (SAMPLER.estadoGrab === "grabando") SAMPLER.grabS = tiempoGrab(GRAB.t0 / 1000, performance.now() / 1000, DBG_SAMPLER.SAMPLER_MAX_S);
+  if (SAMPLER.estadoGrab === "grabando") {
+    SAMPLER.grabS = tiempoGrab(GRAB.t0 / 1000, performance.now() / 1000, DBG_SAMPLER.SAMPLER_MAX_S);
+    if (GRABACION.tick()) avisarCorte();   // Z106: corte por cuadro (el temporizador queda de respaldo)
+  }
+  // Z106: el «LISTO, PAD n» se apaga solo después de GRAB_LISTO_S
+  if (MUESTREO.fase === "listo" && performance.now() / 1000 - MUESTREO.tFin > DBG_SAMPLER.GRAB_LISTO_S && !_listoVisto) { _listoVisto = true; SAMPLER.version++; }
+  else if (MUESTREO.fase !== "listo") _listoVisto = false;
   const t = g ? g.ctx.currentTime : 0;
   for (let p = 0; p < N_PADS; p++) SAMPLER.sonando[p] = g && padSonando(RANURAS, p, t) ? 1 : 0;
   SAMPLER.vivas = g ? vivas(RANURAS, t) : 0;

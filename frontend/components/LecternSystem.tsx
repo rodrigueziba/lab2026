@@ -842,7 +842,9 @@ function fitLecternCamera(
     }
 
     if (bestPose) return bestPose;
-    if (fovDeg >= 90 && (!conPasadas || pasada === 3)) console.warn(`[K1 fit] No pose found for side=${side} at fov=90°`);
+    // Z106: el aviso decía «at fov=90°», pero la causa es la proporción de la ventana (con 16:9 y 16:10 todos los atriles
+    // encuentran pose en la pasada 1; con ≤ 1,45, por ejemplo con DevTools al costado, el panel no entra con d ≤ 1,20 m)
+    if (fovDeg >= 90 && (!conPasadas || pasada === 3)) console.warn(`[K1 fit] side=${side}: sin pose de 60° a 90° con proporción ${aspect.toFixed(2)} (fuera de 16:9 y 16:10, p. ej. con DevTools al costado); se usa la pose fija`);
   }
   if (conPasadas && pasada < 3) return fitLecternCamera(side, aspect, pasada + 1);   // Z96 (Z97: también imagen "panel")
 
