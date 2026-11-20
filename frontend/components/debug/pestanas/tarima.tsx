@@ -2,7 +2,7 @@
 // Z70: pestaña "Camino TARIMA (atriles)" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
 import { useEffect, useState } from "react";
-import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_BAJO, DBG_ATRIL_BAJO, DBG_INSTRUMENTOS, DBG_CARA, DBG_SINTE, DBG_ATRIL_SINTE, DBG_SAMPLER, DBG_ATRIL_SAMPLER } from "@/lib/debugConfig";
+import { DBG_DOME, DBG_LECTERNS, DBG_CAM_IMAGE, DBG_CAM_SOUND, DBG_RETRO, DBG_FACE, DBG_AUDIO_NUCLEO, DBG_PLAY, DBG_RITMOS, DBG_ONDAS_TARIMA, DBG_CONSENT, DBG_LIVEKIT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_BAJO, DBG_ATRIL_BAJO, DBG_INSTRUMENTOS, DBG_CARA, DBG_SINTE, DBG_ATRIL_SINTE, DBG_SAMPLER, DBG_ATRIL_SAMPLER, DBG_MANOS } from "@/lib/debugConfig";
 import { mostrarTexto1Ahora, mostrarEleccionAhora, cortarTransmision, reiniciarConsentimiento, textoEstadoConsent, modoActual } from "@/lib/consentTarimaAcciones";   // Z91
 import { publicarLiveKit, detenerLiveKit, textoEstadoLiveKit, alternarPanelCuadro, panelCuadroVisible } from "@/lib/vivo/publicarLiveKit";   // Z92 · Z94b
 import { sesionIdNavegador } from "@/lib/vivo/vivoAcciones";   // Z92
@@ -23,6 +23,8 @@ import { SINTE, PARAMS_SY, VOCES, MANTENIDAS, ARP, cargarSonidoSinte, setParamSi
 import { SAMPLER, EST as EST_SAMPLER, RANURAS, silenciarYReiniciarSampler, padAbajo, padArriba, seleccionarPad, setParamSampler, aplicarOpcionesSampler, grabar, pararGrabacion, borrarPad } from "@/lib/audio/sampler";   // Z103
 import { MUESTREO, DIAG_MIC, probarMicrofono, actualizarDiagMic, estadoAudioYGrabador, textoGrabacion } from "@/lib/audio/sampler";   // Z106
 import { MENSAJES_MUESTREO } from "@/lib/muestreoGrabacion";   // Z106
+import { MANOS, EST_MANOS, AGARRE, CAL_MANO, encenderManos, apagarManos, calibrarManos, calibrandoManos, reiniciarManosTodo } from "@/lib/manosAtril";   // Z108
+import { INTERACT_STATE } from "@/lib/alightStore";   // Z108
 import { PARAMS_SAMPLER, QUANTS, FUENTES_GRAB, N_PADS, manualIdx as manualIdxSampler } from "@/lib/sampler";   // Z103
 import { PARAMS_SINTE, NOMBRES_SONIDO, PATRONES_ARP, VELOCIDADES_ARP, nombreSonido, nombreNota as nombreNotaSinte, indiceParam as indiceParamSinte } from "@/lib/sinte";   // Z101
 import { LABEL, ROW, INPUT, NOTE, NumField, EFFECT_NAMES } from "../comun";
@@ -1105,6 +1107,68 @@ export function SecSamplerZ103() {
             </div>
           ))}
           <div style={{ ...ROW, ...NOTE }}><span>ROTULOS_MODO {A.ROTULOS_MODO} · en el modo del SM-40 no hay atajos Z–M (V B N M son pads; X sigue cortando la transmisión)</span></div>
+    </>
+  );
+}
+
+// sección: manos-z108
+export function SecManosZ108() {
+  // Z108: MANOS (lib/manosAtril.ts). Estado 4 veces por segundo. Todo local: no se sube ni se transmite nada.
+  const C = DBG_MANOS;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const E = EST_MANOS, R = E.rasgos;
+  return (
+    <>
+          <span style={LABEL}>Manos Z108 <span style={NOTE}>(MediaPipe Hand Landmarker en un worker; el video y los puntos no salen de la máquina. Solo corre con MANOS activo, un atril enfocado y la pestaña visible)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{MANOS.on ? "ON" : "off"} · {MANOS.estado}{MANOS.error ? ` (${MANOS.error}: ${MANOS.errorNombre})` : ""}{MANOS.linea ? ` · «${MANOS.linea}»` : ""} · fuente {MANOS.fuente || "-"} · modelo {MANOS.modeloCargado ? `cargado (${MANOS.rutas})` : MANOS.rutas || "-"} · atril {INTERACT_STATE.mode}</span></div>
+          <div style={{ ...ROW, ...NOTE }}><span>manosTarima: hilo principal {MANOS.msHilo.toFixed(3)} ms/cuadro · latencia del worker (ida y vuelta) {MANOS.msIdaVuelta.toFixed(1)} ms · {MANOS.hzReal.toFixed(1)} Hz reales · enviados {MANOS.enviados} · recibidos {MANOS.recibidos} · descartados {MANOS.descartados}</span></div>
+          <div style={{ ...ROW, ...NOTE }}><span>mano {E.vista ? `vista (${E.lado})` : "no vista"} · postura {E.postura ? "sí" : "no"} (abierta {E.abierta ? "sí" : "no"}, ángulo {R.angulo.toFixed(0)}°) · apertura {R.apertura.toFixed(2)} · tamaño {E.tamano.toFixed(3)} · altura filtrada {E.alturaSalida.toFixed(3)} · pellizco {E.pellizco ? "sí" : "no"} ({R.pellizco.toFixed(2)}) · embrague {MANOS.embrague ? "sí" : "no"}{MANOS.tecla ? " (tecla)" : ""}</span></div>
+          <div style={{ ...ROW, ...NOTE }}><span>agarrado {AGARRE.agarrado ? `${MANOS.agarradoNombre} (${MANOS.agarradoId})` : "-"} · valor {(MANOS.valor * 100).toFixed(0)} % · calibración {CAL_MANO.calibrada ? `${CAL_MANO.min.toFixed(2)}…${CAL_MANO.max.toFixed(2)}` : "por defecto 0,20…0,80"}{calibrandoManos() ? " · calibrando" : ""}</span></div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); if (MANOS.on) apagarManos(); else encenderManos(INTERACT_STATE.mode); toca(); }}>{MANOS.on ? "Desactivar MANOS" : "Activar MANOS"}</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); C.SIMULAR = !C.SIMULAR; if (MANOS.on) apagarManos(); if (C.SIMULAR) encenderManos(INTERACT_STATE.mode); toca(); }}>{C.SIMULAR ? "Simular manos: ON" : "Simular manos"}</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); calibrarManos(); toca(); }}>Calibrar</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); reiniciarManosTodo(); toca(); }}>Reiniciar</button>
+          </div>
+          <div style={{ ...ROW, ...NOTE }}><span>Sin un atril enfocado MANOS se apaga solo (salvo con Simular). Calibrar sirve para MODO_MANO absoluto: abajo y arriba, CAL_PASO_S cada una, en memoria.</span></div>
+          {([["MANO", ["derecha", "izquierda", "cualquiera"]], ["POSTURA", ["plana", "abierta"]], ["MODO_MANO", ["relativo", "absoluto"]], ["EMBRAGUE_TECLA", ["Space", "KeyK", "KeyL"]]] as const).map(([k, ops]) => (
+            <div key={k} style={ROW}>
+              <span>{k}</span>
+              <select style={INPUT} value={C[k]} onChange={ev => { (C as Record<string, unknown>)[k] = ev.target.value; toca(); }}>{ops.map(o => <option key={o} value={o}>{o}</option>)}</select>
+            </div>
+          ))}
+          {([["ACTIVO", "false = MANOS no enciende"], ["ESPEJO", "invertir la etiqueta de MediaPipe (cámara cruda)"], ["EMBRAGUE_PELLIZCO", "pellizco sostenido = embrague"], ["MOSTRAR_ESQUELETO", "21 puntos abajo a la izquierda"],
+            ["RESALTE", "anillo sobre el control"], ["MODELO_LOCAL", "/alight/mediapipe/ primero (vale al activar)"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); C[k] = !C[k]; toca(); }}>{C[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([["MANOS_HZ", 5, 60, 1, "cuadros/s máx. al worker"], ["POSTURA_TOL_GRADOS", 10, 60, 1, "° de tolerancia de la postura plana"], ["POSTURA_HIST_GRADOS", 0, 20, 1, "° de histéresis"],
+            ["ABIERTA_ENTRAR", 0.2, 1, 0.05, "apertura para abierta"], ["ABIERTA_SALIR", 0.1, 1, 0.05, "apertura para dejar de serlo"], ["RECORRIDO_MANOS", 1, 8, 0.1, "R: tamaños de mano para 0…1"],
+            ["SUAVIZADO_ABS_S", 0.02, 1, 0.01, "s (modo absoluto)"], ["DEADBAND", 0, 0.02, 0.001, "altos de imagen"], ["MINCUTOFF", 0.1, 5, 0.1, "1 euro: Hz"], ["BETA", 0, 10, 0.1, "1 euro: × velocidad"],
+            ["UMBRAL_PELLIZCO", 0.1, 0.8, 0.01, "pulgar–índice ÷ tamaño"], ["UMBRAL_PELLIZCO_SALIDA", 0.2, 1, 0.01, "para soltar"], ["TOLERANCIA_PERDIDA_MS", 0, 1000, 10, "ms"],
+            ["CAL_PASO_S", 1, 6, 0.5, "s por paso de calibración"], ["ANCHO_CUADRO", 160, 640, 16, "px al worker"], ["ALTO_CUADRO", 120, 480, 12, "px"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{C[k].toFixed(st < 0.01 ? 3 : st < 1 ? 2 : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={C[k]} onChange={ev => { C[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
+          <span style={LABEL}>Simular manos <span style={NOTE}>(sin cámara ni worker: una mano plana del lado de MANO a esta altura; con el cursor sobre una perilla, prendé el embrague y mové la altura)</span></span>
+          {([["SIM_CON_MOUSE", "la altura sigue a la y del mouse"], ["SIM_EMBRAGUE", "forzador del embrague"], ["SIM_MANO_VISTA", "off = la mano se pierde"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); C[k] = !C[k]; toca(); }}>{C[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([["SIM_ALTURA", 0, 1, 0.01, "altura (0 abajo, 1 arriba)"], ["SIM_TAMANO", 0.05, 0.5, 0.01, "tamaño de la mano"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{C[k].toFixed(2)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={C[k]} onChange={ev => { C[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
     </>
   );
 }

@@ -174,6 +174,14 @@ async function arrancar(gen: number): Promise<void> {
   }
 }
 
+/** Z108: el <video> que está usando la cara (de la tarima o propio), para que MANOS lo comparta sin abrir otra cámara.
+ * Solo lectura: MANOS nunca lo cierra; si la cara se apaga, MANOS lo nota (deja de estar activo) y busca otra fuente. */
+export function videoCaraCompartible(): HTMLVideoElement | null {
+  const v = CARA.on && CARA.fuente !== "simulada" ? _video : null;
+  const s = v ? (v.srcObject as MediaStream | null) : null;
+  return v && v.readyState >= 2 && !!s && s.active ? v : null;
+}
+
 function videoTarima(): HTMLVideoElement | null {
   const tex = LIVE_TEX_REF.value as { image?: unknown } | null;
   const v = tex?.image;

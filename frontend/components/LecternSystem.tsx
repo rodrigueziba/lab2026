@@ -18,7 +18,7 @@ import {
   nextTrack, prevTrack, initAudio, loadPlaylist, playTrack,   // Z79: togglePlayPause ahora va por lib/playTarimaAcciones
   playUIClick,
 } from "@/lib/audioEngine";
-import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_ONDAS_TARIMA, DBG_BAJO, DBG_ATRIL_BAJO, DBG_SINTE, DBG_ATRIL_SINTE, DBG_SAMPLER, DBG_ATRIL_SAMPLER } from "@/lib/debugConfig";
+import { DBG_LECTERNS, DBG_RETRO, DBG_CAM_IMAGE, DBG_CAM_SOUND, LECTERNS_AFTER_PEOPLE_MS, LECTERN_OUTWARD_OFFSET_M, DBG_PLAY, DBG_RITMOS, DBG_CONSENT, DBG_ATRIL_SONIDO, DBG_ATRIL_VIDEO, DBG_ONDAS_TARIMA, DBG_BAJO, DBG_ATRIL_BAJO, DBG_SINTE, DBG_ATRIL_SINTE, DBG_SAMPLER, DBG_ATRIL_SAMPLER, DBG_MANOS } from "@/lib/debugConfig";
 // Z96: atril de sonido rediseñado ("SONIDO SN-40"): layout como datos (lib/atrilSonido.ts) y piezas (AtrilSonidoNuevo.tsx)
 import {
   POSICIONES as POS_SONIDO_NUEVO, FADER_RAIL, GRANDE_ESCALA, PLAY_W, PLAY_D, textoValor, camaraAtril, legibilidadMinima,
@@ -38,6 +38,9 @@ import {
   configurarLayoutB, LAYOUT_B,   // Z100: módulo CARA
 } from "@/lib/atrilBajo";
 import { CARA, encenderCara, apagarCara, calibrarCara, tickCara, liberarCara } from "@/lib/caraBajo";   // Z100: tocar el BA-40 con la cara
+import { PUENTE_MANOS, alternarManos, manoAgarra, paramIdxAgarrado, type CtrlManos } from "@/lib/manosAtril";   // Z108: MANOS
+import { posManos, ID_MANOS, IDS_MANOS, type LadoManos } from "@/lib/atrilManos";                // Z108
+import ManosTarima from "./ManosTarima";                                                         // Z108
 import {
   BAJO, PATRON_BAJO, PARAMS as PARAMS_B, instalarBajo, tickBajo, editarPaso, cargarPatron, patronLimpio, setParamBajo, aplicarParamsBajo,
 } from "@/lib/audio/bajoAcido";
@@ -873,7 +876,7 @@ function buildKeyMap(side: Lado) {
   _keyMapSide = side;
   if (side === "sinte" || side === "sampler") { _keyMap.clear(); return; }   // Z103: tampoco en el SM-40 (sus pads usan V B N M)   // Z101: sin atajos Z–M en el SY-40 (el teclado es el piano): sin letras en sus controles
   const controls = side === "left" ? controlesImagen() : side === "bajo" ? CONTROLES_BAJO : SOUND_CONTROLS;   // Z97 · Z99 (Z101: el SY-40 no tiene atajos)
-  const btns = controls.filter(c => c.type === "button" || c.type === "toggle");
+  const btns = controls.filter(c => (c.type === "button" || c.type === "toggle") && !IDS_MANOS.includes(c.id));   // Z108: MANOS sin letra (no cambia los atajos)
   const rng  = seededRand(_keySeed + (side === "left" ? 0 : side === "bajo" ? 2000 : 1000));
   const idxs = btns.map((_, i) => i).sort(() => rng() - 0.5).slice(0, KEY_LETTERS.length);
   _keyMap.clear();
@@ -977,6 +980,8 @@ function MotorBajo() {
     // Z100: la cara (manda cuadros al worker o corre la simulación); prioridad manual: qué perilla se arrastra
     const d = _drag.def;
     CARA.arrastreIdx = d && _drag.type === "knob" && d.paramIdx !== undefined ? d.paramIdx : -1;
+    const iMano = paramIdxAgarrado();   // Z108: con el embrague apretado sobre una perilla tomada, manda la mano
+    if (iMano >= 0) CARA.arrastreIdx = iMano;
     tickCara(INTERACT_STATE.mode === "bass");
     const caraOn = CARA.on ? 1 : 0;
     if (ctrlState.b_cara_on !== undefined && ctrlState.b_cara_on !== caraOn) ctrlState.b_cara_on = caraOn;   // sin cámara: se apaga sola
@@ -1505,6 +1510,31 @@ function defSampler(p: PosCtrlM): CtrlDef {
   return { ...base, type: "toggle", min: 0, max: 1, initial: 1, onActivate: (v) => { DBG_SAMPLER.ON = v > 0.5; aplicarOpcionesSampler(); } };   // m_on
 }
 export const CONTROLES_SAMPLER: CtrlDef[] = POSICIONES_M.map(defSampler);
+
+// ── Z108: MANOS — pastilla en cada atril (posición en lib/atrilManos.ts) y puente con lib/manosAtril.ts ──
+function defManos(lado: LadoManos): CtrlDef {
+  const p = posManos(lado);
+  return { id: ID_MANOS[lado], type: "toggle", forma: "pastilla", label: "MANOS", nombreLargo: "CONTROL CON MANOS", px: p.u, py: p.v,
+    min: 0, max: 1, initial: 0, onActivate: (v) => { alternarManos(v > 0.5, INTERACT_STATE.mode); } };
+}
+if (DBG_MANOS.BOTON_EN_ATRILES) {
+  SOUND_CONTROLS_NUEVO.push(defManos("sonido")); IMAGE_CONTROLS_NUEVO.push(defManos("imagen"));
+  CONTROLES_BAJO.push(defManos("bajo")); CONTROLES_SINTE.push(defManos("sinte")); CONTROLES_SAMPLER.push(defManos("sampler"));
+}
+/** Valor que se VE en el control (el de la cara si la cara toma esa perilla del BA-40): MANOS agarra desde ahí, sin salto. */
+function valorVisible(d: CtrlManos): number {
+  const i = d.paramIdx;
+  if (i !== undefined && caraTomaParam(i)) return PARAMS_B.cara[i];
+  return ctrlVal(d.id, (d as CtrlDef).initial ?? d.min);
+}
+PUENTE_MANOS.leer = valorVisible;
+PUENTE_MANOS.aplicar = (d, v) => { setCtrl(d.id, v, d as CtrlDef); };   // la misma vía que el mouse
+PUENTE_MANOS.mostrar = (modo, texto) => {
+  if (modo === "image") mostrarEnDisplayImagen(texto); else if (modo === "sound") mostrarEnDisplay(texto);
+  else if (modo === "bass") mostrarEnDisplayBajo(texto); else if (modo === "synth") mostrarEnDisplaySinte(texto);
+  else if (modo === "sampler") mostrarEnDisplaySampler(texto);
+};
+PUENTE_MANOS.boton = (v) => { for (const id of IDS_MANOS) sincronizarCtrlExterno(id, v); storeNotify(); };
 const _posSampler = new Map<string, PosCtrlM>(POSICIONES_M.map(p => [p.id, p]));
 const IDS_PAD_M = Array.from({ length: N_PADS }, (_, i) => `m_pad_${i}`);   // sin template strings por cuadro
 /** Estado de los controles del SM-40 desde el motor (pad seleccionado, globales, opciones). */
@@ -2041,24 +2071,26 @@ function CtrlMesh({
 
   // ── Z96: ON en pastilla con luz (arriba a la derecha de la banda de título del módulo) ──
   if (def.type === "toggle" && def.forma === "pastilla") {
+    const esManos = IDS_MANOS.includes(def.id);   // Z108: pastilla MANOS (más ancha, dice MANOS)
+    const pw = esManos ? 0.080 : 0.058;
     return (
       <group position={[def.px, surfY, -def.py]}>
         <mesh position={[0, 0.004, 0]}>
-          <boxGeometry args={[0.058, 0.008, 0.026]} />
+          <boxGeometry args={[pw, 0.008, 0.026]} />
           <primitive object={ROCKER_BASE_DARK_MAT} attach="material" />
         </mesh>
         {/* lente ámbar: se enciende con el módulo */}
         <mesh position={[0, 0.0095, 0]}>
-          <boxGeometry args={[0.046, 0.004, 0.018]} />
+          <boxGeometry args={[pw - 0.012, 0.004, 0.018]} />
           <meshStandardMaterial ref={ledMatRef} color="#3A1A00" emissive={lecternPalette().ledToggle} emissiveIntensity={0.04} roughness={0.5} />
         </mesh>
         <mesh position={[0, 0.0118, 0]} rotation={LBL_ROT}>
-          <planeGeometry args={[0.040, 0.0125]} />
-          <meshBasicMaterial map={labelTex("ON")} transparent alphaTest={0.05} depthWrite={false} toneMapped={false}
+          <planeGeometry args={[0.040, 0.0125]} />   {/* Z108: mismo plano y misma letra que el ON (la textura es 128×40) */}
+          <meshBasicMaterial map={labelTex(esManos ? "MANOS" : "ON")} transparent alphaTest={0.05} depthWrite={false} toneMapped={false}
             polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
         </mesh>
         <mesh ref={m => { hitRef.current = m!; register(m); }} position={[0, 0.006, 0]} visible={false}>
-          <boxGeometry args={[0.058 * HIT_PAD, 0.016, 0.026 * HIT_PAD]} />
+          <boxGeometry args={[pw * HIT_PAD, 0.016, 0.026 * HIT_PAD]} />
           <meshBasicMaterial transparent opacity={0} />
         </mesh>
       </group>
@@ -2845,10 +2877,12 @@ function InteractionHandler() {
     function doHover(clientX: number, clientY: number) {
       if (INTERACT_STATE.mode === "none") {
         if (_hoveredId !== null) { _hoveredId = null; canvas.style.cursor = ""; }
+        PUENTE_MANOS.hover = null; PUENTE_MANOS.hoverObj = null;   // Z108
         return;
       }
       const ndc = setNDC(clientX, clientY);
       const hit = rayHit(ndc);
+      PUENTE_MANOS.hover = hit?.def ?? null; PUENTE_MANOS.hoverObj = hit?.mesh ?? null;   // Z108: el mismo hover, para MANOS
       const newId = hit?.def.id ?? null;
       if (newId !== _hoveredId) {
         _hoveredId = newId;
@@ -2869,6 +2903,7 @@ function InteractionHandler() {
       lastPt.current = { x: e.clientX, y: e.clientY };
 
       if (_drag.type !== "none" && _drag.def && e.pointerId === _drag.pointerId) {
+        if (manoAgarra(_drag.def.id)) return;   // Z108: con el embrague apretado sobre este control, manda la mano
         const ndc = setNDC(e.clientX, e.clientY);
         if (_drag.type === "slider_h" || _drag.type === "slider_v") {
           localRc.current.setFromCamera(ndc, camera);
@@ -3008,7 +3043,7 @@ function InteractionHandler() {
     };
 
     const onPointerLeave = () => {
-      if (_drag.type === "none") { _hoveredId = null; LECTERN_DBG.hoveredId = null; canvas.style.cursor = ""; }
+      if (_drag.type === "none") { _hoveredId = null; LECTERN_DBG.hoveredId = null; canvas.style.cursor = ""; PUENTE_MANOS.hover = null; PUENTE_MANOS.hoverObj = null; }
     };
 
     const onPointerCancel = (e: PointerEvent) => {
@@ -3357,6 +3392,8 @@ export default function LecternSystem() {
       {/* Z103: SAMPLER SM-40, índice +2 del arco; sale con los demás */}
       {DBG_SAMPLER.ACTIVO && <Lectern key={`sampler-${disenoV}`} side="sampler" controls={CONTROLES_SAMPLER} appearProgress={appearProgress} keyVersion={keyVersion} flipVersion={flipVersion} silkV={silkV} />}
       <InteractionHandler />
+      {/* Z108: MANOS (tecla de embrague, tick del seguimiento, resalte del control y esqueleto de debug) */}
+      <ManosTarima />
       {/* Z79: slots de los atriles de instrumentos (detrás del atril de sonido; marcadores con DBG_PLAY.MOSTRAR_SLOTS) */}
       <SlotsAtriles atrilX={LECTERN_PLACE_X} tarimaMedia={TARIMA_W / 2} tarimaH={TARIMA_H_REF} anchoM={OUTER_W} profM={OUTER_D} />
       {/* Z80: caja de ritmos en su slot (sale del piso al apretar play del atril de sonido) · Z88: por defecto sale con

@@ -111,6 +111,12 @@ Z45: cálculo en una textura compartida por las 3 caras; port a TypeScript del r
 - Filtro "1 euro": algoritmo de **Géry Casiez, Nicolas Roussel y Daniel Vogel** ("1€ Filter: A Simple Speed-based Low-pass Filter for Noisy Input in Interactive Systems", CHI 2012). Reimplementado (sin copiar código).
 - El mapa de gestos, la calibración, los detectores de cabeceo y guiño y el módulo del atril son propios de este proyecto.
 
+## Controles con las manos en los atriles (Z108)
+
+- **MediaPipe Hand Landmarker** de **Google** (@mediapipe/tasks-vision 1.0.1, licencia **Apache-2.0**), en un Web Worker propio. Modelo `hand_landmarker.task` (float16, versión 1) de Google (Apache-2.0), servido desde `public/alight/mediapipe/` o, si no está, desde `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`. Se usan los mismos wasm que la cara del BA-40.
+- Filtro "1 euro" (Casiez, Roussel y Vogel, CHI 2012) sobre la altura de la mano: el mismo de la cara (reimplementado, sin copiar código).
+- Los rasgos de la mano, la postura, el embrague relativo, la calibración y el módulo de los atriles son propios de este proyecto.
+
 ## Sonidos del SY-40 y patrones del BA-40 (Z101, Z102)
 - Los 6 sonidos de fábrica del SINTETIZADOR SY-40 (DRON, CUERDAS, METALES, PULSO, ACERO, LEAD) y los 7 patrones de fábrica del BAJO ÁCIDO BA-40 (incluidos FUNK y DISCO, con su seteo de voz) son **originales** de este proyecto.
 - Están inspirados solo en el carácter general de un estilo (dark wave, industrial y rock electrónico alternativo de los 80 y 90 para el SY-40; French house de bajo ácido de los 90 y synth disco psicodélico de los 2010 para FUNK y DISCO). No transcriben ni copian melodías, riffs, líneas de bajo, secuencias ni sonidos de ninguna obra existente.

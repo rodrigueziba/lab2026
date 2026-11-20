@@ -140,3 +140,32 @@ fuente
 | `lightMax` | 3.0 | Máximo de `globalIntensity` |
 | `lightHoldMs` | 120 | Intervalo de hold-repeat de LUZ+/LUZ- |
 | `maxExtraLights` | 12 | Tope de luces aleatorias de LUZ* |
+
+## MANOS: control con las manos (Z108, todos los atriles)
+
+Es una alternativa extra: el mouse y el teclado siguen igual. Todo pasa en la máquina: el video no se sube ni se guarda y los landmarks no se transmiten.
+
+- **Activar.** Cada atril tiene una pastilla **MANOS** en la banda de título de un módulo sin ON:
+  - SN-40 (sonido): LFO;
+  - IM-40 (imagen): ESCENA;
+  - BA-40: 1 SECUENCIA;
+  - SY-40: TIMBRE;
+  - SM-40: 3 EDITAR PAD.
+
+  La caja de ritmos no tiene pastilla. Para ella se activa desde otro atril o desde el menú de debug ("Manos Z108"). El permiso de cámara se pide solo al activar MANOS.
+- **Usar.**
+  1. Poné el cursor sobre una perilla o un deslizador.
+  2. Mantené **ESPACIO** (`DBG_MANOS.EMBRAGUE_TECLA`) o pellizcá (pulgar e índice) para agarrar.
+  3. Con la mano derecha plana en horizontal, apuntando a tu izquierda como si marcaras una altura, subí o bajá la mano.
+
+  Subir la mano sube el valor. El recorrido completo equivale a 3,5 tamaños de mano, sin importar la distancia a la cámara. Al soltar, el control queda donde está.
+- **Qué no se toca.** Los pads, los botones y las palancas no se agarran nunca.
+- **Prioridad.** Con el embrague apretado, la mano manda sobre el mouse y sobre la cara del BA-40 en ese control. Al soltar, la cara retoma sus perillas.
+- **Estado.** Se ve en la línea del display:
+  - MANOS: PIDIENDO CÁMARA
+  - MANOS: NO SE VE LA MANO
+  - MANOS: LISTA
+  - MANOS: AGARRANDO CORTE 42 %
+  - MANOS: USA LA CÁMARA, NO SE TRANSMITE (si la tarima está compartiendo)
+  - Errores: CÁMARA DENEGADA, SIN CÁMARA, CÁMARA EN USO.
+- **Al salir del atril** MANOS se apaga y se liberan el worker y la cámara propia.

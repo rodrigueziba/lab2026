@@ -1099,6 +1099,7 @@ export const DBG_RENDIMIENTO = {
     recepcionTarima:   true,         // Z93: recepción en SILLAS (false = des-suscribe audio y video sin desconectar)
     caraBajo:          true,         // Z100: lector de cara del BA-40 (false = no manda cuadros al worker)
     esperaCamara:      true,         // Z105: modo de espera (false = no corre su lógica ni dibuja la esfera)
+    manosTarima:       true,         // Z108: MANOS (false = no manda cuadros al worker de manos)
   } as Record<string, boolean>,
 };
 
@@ -1866,6 +1867,48 @@ export const DBG_CARA = {
   // Simulación sin cámara (menú): alimenta el mismo camino desde los blendshapes, sin worker. Apagada por defecto.
   SIMULAR:                    false,
   SIM_BOCA: 0, SIM_O: 0, SIM_SONRISA: 0, SIM_CEJAS: 0, SIM_CABECEO: 0, SIM_GUINO: 0,   // 0…1 (CABECEO = pitch 0…0,6 rad)
+};
+
+// ── Z108: MANOS — controles con las manos en todos los atriles (lib/manos.ts y lib/manoControl.ts puros, lib/manosAtril.ts,
+// lib/manosWorker.ts, MediaPipe Hand Landmarker). Todo local: el video no se sube ni se guarda, los landmarks no se
+// transmiten; el permiso de cámara se pide solo al activar MANOS. Solo corre con MANOS activado, un atril enfocado y la
+// pestaña visible. Perillas y deslizadores por la ALTURA de la mano con embrague (tecla o pellizco); pads y botones no.
+export const DBG_MANOS = {
+  ACTIVO:                 true,          // false = el botón MANOS no enciende nada — live
+  BOTON_EN_ATRILES:       true,          // pastilla MANOS en los cinco atriles (lib/atrilManos.ts); false = solo desde el menú — vale al cargar
+  MANOS_HZ:               30,            // cuadros por segundo al worker como máximo (uno en vuelo; si está ocupado, se descarta) — live
+  ANCHO_CUADRO:           320,           // px del cuadro reducido que va al worker — live
+  ALTO_CUADRO:            240,
+  MANO:                   "derecha" as "derecha" | "izquierda" | "cualquiera",   // mano que controla — live
+  ESPEJO:                 true,          // la etiqueta de MediaPipe es de la imagen (supuesta espejada): true = invertirla (cámara cruda) — live
+  POSTURA:                "plana" as "plana" | "abierta",   // plana = abierta y horizontal apuntando hacia el otro lado (como marcando una altura) — live
+  POSTURA_TOL_GRADOS:     35,            // tolerancia del ángulo muñeca→dedo medio respecto de la horizontal — live
+  POSTURA_HIST_GRADOS:    10,            // histéresis del ángulo (para perderla hay que pasar TOL + esto) — live
+  ABIERTA_ENTRAR:         0.6,           // apertura de los 4 dedos para "abierta"… — live
+  ABIERTA_SALIR:          0.45,          // …y para dejar de serlo (histéresis) — live
+  MODO_MANO:              "relativo" as "relativo" | "absoluto",   // relativo = embrague (sin saltos); absoluto = altura calibrada → valor — live
+  RECORRIDO_MANOS:        3.5,           // R: tamaños de mano (muñeca → base del dedo medio) para el recorrido 0…1 — live
+  SUAVIZADO_ABS_S:        0.25,          // modo absoluto: constante de tiempo del suavizado (s) — live
+  DEADBAND:               0.003,         // altura filtrada: cambios menores que esto (altos de imagen) no mueven — live
+  MINCUTOFF:              1.5,           // filtro 1 euro de la altura: corte en reposo (Hz) — live
+  BETA:                   4,             // filtro 1 euro: corte × velocidad — live
+  DCUTOFF:                1.0,           // filtro 1 euro: corte de la velocidad (Hz) — live
+  EMBRAGUE_TECLA:         "Space",       // KeyboardEvent.code de la tecla de embrague (mantenida) — live
+  EMBRAGUE_PELLIZCO:      true,          // pellizco sostenido (pulgar + índice) = embrague — live
+  UMBRAL_PELLIZCO:        0.35,          // pulgar–índice ÷ tamaño: por debajo = pellizco… — live
+  UMBRAL_PELLIZCO_SALIDA: 0.5,           // …por encima = se suelta (histéresis) — live
+  TOLERANCIA_PERDIDA_MS:  300,           // la mano o la postura pueden faltar esto antes de soltar el pellizco / la postura — live
+  CAL_PASO_S:             3,             // calibración (modo absoluto): segundos abajo y arriba — live
+  MOSTRAR_ESQUELETO:      false,         // overlay con los 21 puntos (oculto por defecto) — live
+  RESALTE:                true,          // anillo sobre el control bajo el cursor (MANOS activo) y agarrado — live
+  MODELO_LOCAL:           true,          // /alight/mediapipe/hand_landmarker.task primero; si no está, el CDN — vale al activar
+  // Simular manos sin cámara (menú): la altura viene de SIM_ALTURA (o del mouse) y el embrague de SIM_EMBRAGUE
+  SIMULAR:                false,
+  SIM_ALTURA:             0.5,           // 0…1 del alto de la imagen (hacia arriba)
+  SIM_TAMANO:             0.2,           // tamaño de la mano simulada (altos de imagen)
+  SIM_CON_MOUSE:          false,         // la altura simulada sigue a la y del mouse
+  SIM_EMBRAGUE:           false,         // forzador del embrague
+  SIM_MANO_VISTA:         true,          // false = simula que la mano se pierde
 };
 
 // ── Z101: SINTETIZADOR SY-40 (motor lib/audio/sinte.ts, lógica pura lib/sinte.ts, atril lib/atrilSinte.ts) ──
