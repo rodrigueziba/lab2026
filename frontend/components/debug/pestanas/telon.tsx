@@ -71,7 +71,7 @@ export function SecTextoDelTelonZ46() {
           {([
             ["TAMANO", 0.2, 1.2, 0.01, "× zona iluminada"], ["OFFSET_X_M", -4, 4, 0.05, "m"], ["OFFSET_Y_M", -3, 3, 0.05, "m"],
             ["OPACIDAD", 0, 1, 0.01, ""], ["BLUR_PX", 0, 30, 0.5, "recrea la textura"], ["PLIEGUE", 0, 1, 0.01, "0 = plano"],
-            ["FADE_IN_S", 0, 8, 0.1, "s"], ["DURACION_S", 2, 120, 1, "s"], ["DIST_OCULTAR_M", 2, 40, 0.5, "m"],
+            ["FADE_IN_S", 0, 8, 0.1, "s"], ["DURACION_S", 2, 300, 1, "s (Z105: 120)"], ["DIST_OCULTAR_M", 2, 40, 0.5, "m"],
             ["OSCURO_INV", 0, 1, 0.01, "invertido"], ["BRILLO_INV", 0, 3, 0.05, "invertido"],
           ] as const).map(([k, mn, mx, st, nota]) => (
             <div key={k} style={ROW}>

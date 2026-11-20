@@ -11,7 +11,7 @@ import { SecDebugOverlays } from "./pestanas/otros";
 import { SecPanelesSillas, SecAcercamientoZ8, SecPrioridadZ10ProyectoAbiertoSobreLas, SecVideoEtapa1, SecFocoZ19SubpanelAgrandado, SecSubpanelesZ4HistoriaGaleriaFicha } from "./pestanas/paneles";
 import { SecMonolitosN5V1V2V3, SecPastoZ64, SecPastoExtensionZ74, SecMonolitosVivoZ82, SecAvisoVivoZ85, SecSesionVivoZ89, SecRecepcionLiveKitZ93 } from "./pestanas/pasto";
 import { SecRendimientoZ66, SecPostProcesoR4 } from "./pestanas/rendimiento";
-import { SecSecuenciaSillas, SecIconosDelPisoZ23, SecLayoutZ41, SecRelojDeLaExperienciaZ39, SecMovimientoZ34 } from "./pestanas/sala";
+import { SecSecuenciaSillas, SecIconosDelPisoZ23, SecLayoutZ41, SecRelojDeLaExperienciaZ39, SecMovimientoZ34, SecModoEsperaZ105 } from "./pestanas/sala";
 import { SecSolN3, SecOndasPorKickZ52, SecSolNuevoZ51 } from "./pestanas/sol";
 import { SecStars, SecDome, SecSectorEffects, SecLecterns, SecRetroAtriles, SecFaceCapture, SecAudio, SecExtraLights, SecAudioNucleoZ78, SecPlayTarimaZ79, SecCajaRitmosZ80, SecOndasTarimaZ87, SecConsentTarimaZ91, SecLiveKitZ92, SecAtrilSonidoZ96, SecAtrilImagenZ97, SecBajoZ99, SecInstrumentosArcoZ99b, SecCaraBajoZ100, SecSinteZ101, SecSamplerZ103 } from "./pestanas/tarima";
 import { SecTelonN6, SecInicioZ24, SecTextoDelTelonZ46, SecDestelloDeCortinaF1, SecEntradaTrasElTelonZ59, SecAyudaMovimientoZ104 } from "./pestanas/telon";
@@ -91,6 +91,7 @@ export const COMPONENTES_SECCION: Record<string, ComponentType> = {
   "telon-n6": SecTelonN6,
   "inicio-z24": SecInicioZ24,
   "texto-del-telon-z46": SecTextoDelTelonZ46,
+  "modo-espera-z105": SecModoEsperaZ105,
   "ayuda-movimiento-z104": SecAyudaMovimientoZ104,
   "lista-sillas-z104": SecListaSillasZ104,
   "destello-de-cortina-f1": SecDestelloDeCortinaF1,

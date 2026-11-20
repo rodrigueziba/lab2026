@@ -15,6 +15,7 @@ import WatcherEye from "./WatcherEye";
 import Curtain from "./Curtain";
 import TelonTexto from "./TelonTexto"; // Z46: texto proyectado sobre el telón
 import TelonAyuda from "./TelonAyuda"; // Z104: ayuda de movimiento (W S A D) con el mismo gobo
+import EsperaCamara, { ESPERA } from "./EsperaCamara";   // Z105: modo de espera (cámara cenital con esfera)
 import LecternSystem, { LECTERN_PLACE_X, LECTERN_PROMPT_M, LECTERN_DBG } from "./LecternSystem";
 import GuiaArcoInstrumentos from "./GuiaArcoInstrumentos";                                    // Z99b: guía de debug del arco
 import { ATRIL_RITMOS } from "@/lib/ritmos";   // Z80: aviso "Tocar E" del atril de la caja de ritmos
@@ -374,6 +375,8 @@ function Player() {
       perspCam.fov = STORE.cam.fov;
       perspCam.updateProjectionMatrix();
     }
+    // Z105: en modo de espera la cámara la maneja EsperaCamara (la esfera es el usuario); se retoma al aterrizar
+    if (ESPERA.modo) return;
 
     // Camera fly-in/out for lectern interaction (Prompt C)
     if (INTERACT_STATE.camAnimActive && INTERACT_STATE.camSaved && INTERACT_STATE.camTarget) {
@@ -554,6 +557,7 @@ function Scene() {
       {path !== "sillas" && <VideoTransmitidoTarima />}{/* Z94: imagen procesada del domo para la transmisión */}
       {path !== "sillas" && <DynamicLights />}
       <Player />
+      <EsperaCamara />{/* Z105: modo de espera (DBG_ESPERA); toma la cámara solo con camaraLibre() */}
       <BigMeshScanner />
       <PointerLockControls />
     </>

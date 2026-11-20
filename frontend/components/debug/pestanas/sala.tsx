@@ -1,7 +1,10 @@
 "use client";
 // Z70: pestaña "Sala y movimiento" del menú de debug. Cada sección es el código movido tal cual desde DebugMenu.tsx;
 // toma del contexto (useDbg) solo el estado que usa. Registro y orden: lib/debugSecciones.ts.
-import { DBG_SILLAS, DBG_PISO_ICONOS, DBG_LAYOUT, DBG_SECUENCIA, DBG_MOV } from "@/lib/debugConfig";
+import { DBG_SILLAS, DBG_PISO_ICONOS, DBG_LAYOUT, DBG_SECUENCIA, DBG_MOV, DBG_ESPERA } from "@/lib/debugConfig";
+import { useEffect, useState } from "react";                                   // Z105
+import { ESPERA, ESPERA_DIAG } from "@/components/EsperaCamara";            // Z105
+import { textoFaseEspera } from "@/lib/esperaCamara";                         // Z105
 import { RELOJ, esperasPendientes } from "@/lib/relojExperiencia";
 import { SECUENCIA } from "@/lib/secuenciaSillas";
 import { LABEL, ROW, INPUT, NOTE, NumField } from "../comun";
@@ -155,6 +158,46 @@ export function SecMovimientoZ34() {
             onChange={v => { DBG_MOV.PASO_POR_FRAME_M = v; setMov(o => ({ ...o, PASO_POR_FRAME_M: v })); }} />
           <NumField label="DT_MAX_S" value={mov.DT_MAX_S} step={0.01} min={0.01} max={1} note="s"
             onChange={v => { DBG_MOV.DT_MAX_S = v; setMov(o => ({ ...o, DT_MAX_S: v })); }} />
+    </>
+  );
+}
+
+// sección: modo-espera-z105
+export function SecModoEsperaZ105() {
+  // Z105: modo de espera (cámara cenital con esfera). Estado 4 veces por segundo.
+  const E = DBG_ESPERA;
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick(t => (t + 1) % 1e6), 250); return () => clearInterval(id); }, []);
+  const toca = () => setTick(t => (t + 1) % 1e6);
+  const d = ESPERA_DIAG;
+  return (
+    <>
+          <span style={LABEL}>Modo de espera Z105 <span style={NOTE}>(tras IDLE_S sin entrada la cámara sube a plano cenital y aparece la esfera; cualquier entrada la baja; W A S D mueven la esfera)</span></span>
+          <div style={{ ...ROW, ...NOTE }}><span>{textoFaseEspera(ESPERA, E)}{d.motivo ? ` · bloqueado: ${d.motivo}` : " · cámara libre"}{d.reducir ? " · reducir movimiento" : ""}{d.oculto ? " · pestaña oculta o sin foco" : ""}</span></div>
+          <div style={{ ...ROW, ...NOTE }}><span>altura {d.altura.toFixed(2)} m · inclinación {d.pitchDeg.toFixed(1)}° · encuadre {d.alturaEncuadre.toFixed(1)} m (círculo r {d.radio.toFixed(1)} m en {d.cx.toFixed(1)}, {d.cz.toFixed(1)}) · esfera {d.esferaX.toFixed(2)}, {d.esferaZ.toFixed(2)} ({d.recorrido.toFixed(1)} m, escala {d.escala.toFixed(2)}) · {d.msCuadro.toFixed(3)} ms/cuadro</span></div>
+          <div style={ROW}>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:espera-forzar")); toca(); }}>Forzar modo de espera ahora</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:espera-salir")); toca(); }}>Salir del modo de espera</button>
+            <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); window.dispatchEvent(new CustomEvent("alight:espera-entrada")); toca(); }}>Simular entrada</button>
+          </div>
+          <div style={{ ...ROW, ...NOTE }}><span>Tras «Forzar», el mouse no cuenta durante 1,5 s (para volver del menú sin cortarlo).</span></div>
+          {([["ACTIVO", "off = no se activa nunca"], ["CENTRAR", "en el tramo cenital se desliza al centro del escenario"], ["EN_TELON", "también frente al telón del inicio"],
+            ["ESCUCHA_EN_ESFERA", "el oyente de audio queda en la esfera"], ["RESPETAR_REDUCIR_MOVIMIENTO", "con reducir movimiento no se activa"],
+            ["NIEBLA_COMPENSAR", "menos niebla con la cámara arriba (solo al dibujar)"], ["GUIA", "círculo de encuadre en el piso (debug)"]] as const).map(([k, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{nota}</span></span>
+              <button style={INPUT} onClick={ev => { ev.currentTarget.blur(); E[k] = !E[k]; toca(); }}>{E[k] ? "ON" : "off"}</button>
+            </div>
+          ))}
+          {([["IDLE_S", 5, 300, 1, "s sin entrada"], ["SUBIDA_S", 2, 60, 0.5, "s de subida"], ["BAJADA_S", 2, 60, 0.5, "s de bajada"], ["SUAVIZADO_S", 0.05, 2, 0.05, "s (velocidad suavizada)"],
+            ["ALTURA_CENITAL_M", 3, 30, 0.5, "m: llega a −90°"], ["MARGEN", 1, 2, 0.01, "del encuadre"], ["ALTURA_MAX_M", 10, 200, 1, "m (tope)"], ["RADIO_EXTRA_M", 0, 10, 0.1, "m sumados al círculo"],
+            ["UMBRAL_MOUSE_PX", 0, 40, 1, "px por cuadro"], ["RADIO_M", 0.1, 1.5, 0.01, "m"], ["ESCALA_ALTURA", 0, 0.3, 0.005, "× altura"], ["ESCALA_MAX", 1, 10, 0.1, "tope"],
+            ["APARECE_S", 0.05, 3, 0.05, "s"], ["FRACTAL", 0, 1, 0.01, "intensidad"], ["NIEBLA_REF_M", 5, 120, 1, "m"]] as const).map(([k, mn, mx, st, nota]) => (
+            <div key={k} style={ROW}>
+              <span>{k} <span style={NOTE}>{E[k].toFixed(st < 1 ? (st < 0.01 ? 3 : 2) : 0)} {nota}</span></span>
+              <input type="range" min={mn} max={mx} step={st} style={{ flex: 1 }} value={E[k]} onChange={ev => { E[k] = parseFloat(ev.target.value); toca(); }} />
+            </div>
+          ))}
     </>
   );
 }

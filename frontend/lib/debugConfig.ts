@@ -1098,6 +1098,7 @@ export const DBG_RENDIMIENTO = {
     videoTransmitidoTarima: true,    // Z94: pase plano del domo + copia al canvas transmisible (false = queda el último cuadro)
     recepcionTarima:   true,         // Z93: recepción en SILLAS (false = des-suscribe audio y video sin desconectar)
     caraBajo:          true,         // Z100: lector de cara del BA-40 (false = no manda cuadros al worker)
+    esperaCamara:      true,         // Z105: modo de espera (false = no corre su lógica ni dibuja la esfera)
   } as Record<string, boolean>,
 };
 
@@ -1249,6 +1250,33 @@ export const DBG_FRACTAL = {
 
 // ── Z46: texto proyectado sobre el telón ("A LIGHT FOR ATTRACTING ATTENTION", recorte del reflector) ──
 // ── Z104: ayuda de movimiento sobre el telón (lib/telonAyuda.ts, components/TelonAyuda.tsx). Mismo gobo que el texto. ──
+// ── Z105: modo de espera: tras IDLE_S sin entrada la cámara sube a plano cenital y en el lugar del usuario aparece la
+// esfera del footer (lib/esperaCamara.ts, lib/esperaCamaraLibre.ts, components/EsperaCamara.tsx) ──
+export const DBG_ESPERA = {
+  ACTIVO:            true,   // false = no se activa nunca — live
+  IDLE_S:            60,     // s sin entrada (mouse, clic, rueda, tecla o toque) antes de empezar — live
+  SUBIDA_S:          16,     // duración de la subida completa (p de 0 a 1) — live
+  BAJADA_S:          20,     // duración de la bajada (más lenta) — live
+  SUAVIZADO_S:       0.4,    // constante de tiempo de la velocidad de p (al invertir no hay tirón) — live
+  ALTURA_CENITAL_M:  9,      // a esta altura la cámara termina de apuntar recto hacia abajo (−90°) — live
+  MARGEN:            1.15,   // el círculo del escenario entra con este margen — live
+  ALTURA_MAX_M:      120,    // tope de seguridad de la altura de encuadre — live
+  CENTRAR:           true,   // en el tramo cenital se desliza al centro del escenario; false = se queda sobre la esfera — live
+  RADIO_EXTRA_M:     1.5,    // se suma al círculo que abarca inicio, telón, tarima, sillas, monolitos e instrumentos — live
+  UMBRAL_MOUSE_PX:   4,      // px de mouse acumulados en un cuadro para contar como entrada (ignora ruido) — live
+  EN_TELON:          false,  // true = también puede activarse frente al telón del inicio — live
+  RADIO_M:           0.35,   // radio de la esfera (m) — live
+  ESCALA_ALTURA:     0.1,    // escala = max(1, altura de la cámara × esto): se la distingue desde arriba — live
+  ESCALA_MAX:        3,      // tope de esa escala — live
+  APARECE_S:         0.6,    // aparición y retiro (fundido y escala) — live
+  FRACTAL:           0.56,   // intensidad del fractal de la esfera (la del footer bajo el reflector: SPH_FRACTAL_INTENSITY) — live
+  ESCUCHA_EN_ESFERA: true,   // el oyente de audio (si hay uno colgado de la cámara) queda en la esfera, no sube — live
+  RESPETAR_REDUCIR_MOVIMIENTO: true,   // con prefers-reduced-motion en el sistema, el modo no se activa — live
+  NIEBLA_COMPENSAR:  true,   // con la cámara arriba, la densidad de la niebla baja (× NIEBLA_REF_M / altura) solo al dibujar — live
+  NIEBLA_REF_M:      20,     // hasta esta altura la niebla no cambia — live
+  GUIA:              false,  // debug: dibuja en el piso el círculo de encuadre del escenario — live
+};
+
 export const DBG_TELON_AYUDA = {
   ACTIVO:        true,     // false = no se crea nada
   ESPERA_S:      5,        // s quieto frente al telón antes de empezar — live
@@ -1294,7 +1322,7 @@ export const DBG_TELON_TEXTO = {
   FLICKER_S:       0.6,     // parpadeo de reflector al encenderse
   FLICKER_N:       4,       // destellos
   FLICKER_PICO:    0.7,     // opacidad de cada destello
-  DURACION_S:      25,      // s de experiencia desde que aparece
+  DURACION_S:      120,     // s de experiencia desde que aparece (Z105: 25 → 120; el crédito usa la misma opacidad, así que dura lo mismo)
   DIST_OCULTAR_M:  12,      // se desvanece si el usuario se aleja más que esto del telón (el spawn está a 8 m)
   // Z71: crédito "An IN-GO'S WAN INC. Simulation" debajo del bloque, alineado a su borde derecho, con efecto de foco
   CREDITO_ACTIVO:   true,    // false = como estaba (sin crédito)
